@@ -65,9 +65,12 @@ export function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
           <DialogTrigger asChild>
             <Button>+ Add Lead</Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[700px] h-[80vh] flex flex-col p-0">
+          <DialogContent className="sm:max-w-[700px] h-[80vh] flex flex-col p-0" aria-describedby="new-lead-description">
             <DialogHeader className="px-6 py-4 border-b shrink-0">
               <DialogTitle>New Lead</DialogTitle>
+              <p id="new-lead-description" className="text-sm text-muted-foreground hidden">
+                Enter the details of the new lead here.
+              </p>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
               <ScrollArea className="flex-1 p-6">
@@ -83,8 +86,8 @@ export function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="title">Job Title</Label>
-                    <Input id="title" name="title" />
+                    <Label htmlFor="jobTitle">Job Title</Label>
+                    <Input id="jobTitle" name="jobTitle" />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
@@ -141,7 +144,7 @@ export function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
                   <div className="space-y-2">
                     <Label htmlFor="status">Lead Status</Label>
                     <Select name="status" defaultValue="new">
-                      <SelectTrigger>
+                      <SelectTrigger aria-label="Lead Status">
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -156,7 +159,7 @@ export function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
                   <div className="space-y-2">
                     <Label htmlFor="rating">Rating</Label>
                     <Select name="rating" defaultValue="warm">
-                      <SelectTrigger>
+                      <SelectTrigger aria-label="Lead Rating">
                         <SelectValue placeholder="Select rating" />
                       </SelectTrigger>
                       <SelectContent>
@@ -219,7 +222,7 @@ export function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
                   </TableCell>
                   <TableCell>
                     {lead.companyName || "-"}
-                    {lead.title && <span className="block text-xs text-muted-foreground">{lead.title}</span>}
+                    {lead.jobTitle && <span className="block text-xs text-muted-foreground">{lead.jobTitle}</span>}
                   </TableCell>
                   <TableCell>{lead.email || "-"}</TableCell>
                   <TableCell>
