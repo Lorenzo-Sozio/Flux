@@ -7,50 +7,64 @@ import { eq, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
+const emptyStringToNull = z.union([z.string(), z.null()]).transform(v => v === "" ? null : v);
+
 const leadSchema = z.object({
-  firstName: z.string().min(1, "Il nome è obbligatorio"),
-  lastName: z.string().min(1, "Il cognome è obbligatorio"),
-  email: z.string().email("Email non valida").optional().or(z.literal("")),
-  phone: z.string().optional().or(z.literal("")),
-  companyName: z.string().optional().or(z.literal("")),
-  status: z.enum(["new", "contacted", "qualified", "lost"]).default("new"),
-  source: z.string().optional().or(z.literal("")),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  title: emptyStringToNull,
+  email: z.union([z.string().email("Invalid email address"), z.literal(""), z.null()]).transform(v => v === "" ? null : v),
+  phone: emptyStringToNull,
+  mobile: emptyStringToNull,
+  companyName: emptyStringToNull,
+  industry: emptyStringToNull,
+  website: emptyStringToNull,
+  street: emptyStringToNull,
+  city: emptyStringToNull,
+  state: emptyStringToNull,
+  zipCode: emptyStringToNull,
+  country: emptyStringToNull,
+  status: z.enum(["new", "contacting", "engaged", "qualified", "unqualified"]).default("new"),
+  source: emptyStringToNull,
+  rating: emptyStringToNull,
+  notes: emptyStringToNull,
 });
 
 export async function getLeads() {
   const session = await auth();
-  if (!session?.user) throw new Error("Non autorizzato");
+  if (!session?.user) throw new Error("Unauthorized");
 
   return await db.select().from(leads).orderBy(desc(leads.createdAt));
 }
 
 export async function createLead(formData: FormData) {
-  const session = await auth();
-  if (!session?.user) throw new Error("Non autorizzato");
+  try {
+    const session = await auth();
+    if (!session?.user) throw new Error("Unauthorized");
 
-  const rawData = {
-    firstName: formData.get("firstName") as string,
-    lastName: formData.get("lastName") as string,
-    email: formData.get("email") as string,
-    phone: formData.get("phone") as string,
-    companyName: formData.get("companyName") as string,
-    status: (formData.get("status") as string) || "new",
-    source: formData.get("source") as string,
-  };
+    const rawData = Object.fromEntries(formData.entries());
+    const validatedData = leadSchema.parse(rawData);
 
-  const validatedData = leadSchema.parse(rawData);
+    await db.insert(leads).values({
+      ...validatedData,
+      ownerId: session.user.id,
+    });
 
-  await db.insert(leads).values({
-    ...validatedData,
-    ownerId: session.user.id,
-  });
-
-  revalidatePath("/dashboard/leads");
+    revalidatePath("/dashboard/leads");
+    return { success: true };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      console.error("Validation error:", error.errors);
+      return { success: false, error: error.errors[0].message };
+    }
+    console.error("Error creating lead:", error);
+    return { success: false, error: "Failed to create lead" };
+  }
 }
 
 export async function deleteLead(id: string) {
   const session = await auth();
-  if (!session?.user) throw new Error("Non autorizzato");
+  if (!session?.user) throw new Error("Unauthorized");
 
   await db.delete(leads).where(eq(leads.id, id));
   revalidatePath("/dashboard/leads");
