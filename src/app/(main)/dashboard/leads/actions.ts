@@ -7,13 +7,13 @@ import { eq, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
-const emptyStringToNull = z.union([z.string(), z.null()]).transform(v => v === "" ? null : v);
+const emptyStringToNull = z.union([z.string(), z.null(), z.undefined()]).transform(v => !v ? null : v);
 
 const leadSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   title: emptyStringToNull,
-  email: z.union([z.string().email("Invalid email address"), z.literal(""), z.null()]).transform(v => v === "" ? null : v),
+  email: z.union([z.string().email("Invalid email address"), z.literal(""), z.null(), z.undefined()]).transform(v => !v ? null : v),
   phone: emptyStringToNull,
   mobile: emptyStringToNull,
   companyName: emptyStringToNull,
