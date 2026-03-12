@@ -58,7 +58,7 @@ export async function createLead(formData: FormData) {
       return { success: false, error: error.errors[0].message };
     }
     console.error("Error creating lead:", error);
-    return { success: false, error: "Failed to create lead" };
+    return { success: false, error: error instanceof Error ? error.message : "Failed to create lead" };
   }
 }
 
