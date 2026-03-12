@@ -23,7 +23,7 @@ import { NavMain } from "./nav-main";
 import { NavUser } from "./nav-user";
 import { SidebarSupportCard } from "./sidebar-support-card";
 
-const _data = {
+export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sidebar> & { user: any }) {
   navSecondary: [
     {
       title: "Settings",
@@ -60,7 +60,7 @@ const _data = {
   ],
 };
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({ user, ...props }: React.ComponentProps<typeof Sidebar> & { user: any }) {
   const { sidebarVariant, sidebarCollapsible, isSynced } = usePreferencesStore(
     useShallow((s) => ({
       sidebarVariant: s.sidebarVariant,
@@ -93,7 +93,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <SidebarSupportCard />
-        <NavUser user={rootUser} />
+        <NavUser user={user} />
       </SidebarFooter>
     </Sidebar>
   );

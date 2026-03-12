@@ -19,7 +19,11 @@ import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
 
+import { auth } from "@/auth";
+
 export default async function Layout({ children }: Readonly<{ children: ReactNode }>) {
+  const session = await auth();
+  const user = session?.user || { name: "Ospite", email: "" };
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
   const [variant, collapsible] = await Promise.all([
@@ -29,7 +33,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
 
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
-      <AppSidebar variant={variant} collapsible={collapsible} />
+      <AppSidebar user={user} variant={variant} collapsible={collapsible} />
       <SidebarInset
         className={cn(
           "[html[data-content-layout=centered]_&]:mx-auto! [html[data-content-layout=centered]_&]:max-w-screen-2xl!",
