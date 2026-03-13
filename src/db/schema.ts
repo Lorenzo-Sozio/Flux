@@ -166,21 +166,6 @@ export const opportunities = pgTable("opportunity", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 })
 
-export const activities = pgTable("activity", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  title: text("title").notNull(),
-  type: text("type").notNull(), // call, email, meeting, task
-  description: text("description"),
-  dueDate: timestamp("due_date", { mode: "date" }),
-  status: text("status").default("pending").notNull(), // pending, completed
-  leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
-  contactId: text("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
-  companyId: text("company_id").references(() => companies.id, { onDelete: "cascade" }),
-  opportunityId: text("opportunity_id").references(() => opportunities.id, { onDelete: "cascade" }),
-  assignedTo: text("assigned_to").references(() => users.id, { onDelete: "set null" }),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-})
 
 export const products = pgTable("product", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
@@ -263,4 +248,53 @@ export const dealsRelations = relations(deals, ({ one }) => ({
     fields: [deals.ownerId],
     references: [users.id],
   }),
+}));
+
+export const activities = pgTable("activity", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  type: text("type").notNull(), // note, call, meeting, email
+  content: text("content"),
+  date: timestamp("date", { mode: "date" }),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+  contactId: text("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
+  companyId: text("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  dealId: text("deal_id").references(() => deals.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const tasks = pgTable("task", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  title: text("title").notNull(),
+  description: text("description"),
+  dueDate: timestamp("due_date", { mode: "date" }),
+  status: text("status").default("todo").notNull(), // todo, done
+  priority: text("priority").default("normal").notNull(), // low, normal, high
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+  contactId: text("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
+  companyId: text("company_id").references(() => companies.id, { onDelete: "cascade" }),
+  dealId: text("deal_id").references(() => deals.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const activitiesRelations = relations(activities, ({ one }) => ({
+  owner: one(users, { fields: [activities.ownerId], references: [users.id] }),
+  lead: one(leads, { fields: [activities.leadId], references: [leads.id] }),
+  contact: one(contacts, { fields: [activities.contactId], references: [contacts.id] }),
+  company: one(companies, { fields: [activities.companyId], references: [companies.id] }),
+  deal: one(deals, { fields: [activities.dealId], references: [deals.id] }),
+}));
+
+export const tasksRelations = relations(tasks, ({ one }) => ({
+  owner: one(users, { fields: [tasks.ownerId], references: [users.id] }),
+  lead: one(leads, { fields: [tasks.leadId], references: [leads.id] }),
+  contact: one(contacts, { fields: [tasks.contactId], references: [contacts.id] }),
+  company: one(companies, { fields: [tasks.companyId], references: [companies.id] }),
+  deal: one(deals, { fields: [tasks.dealId], references: [deals.id] }),
+}));
+
+export const leadsRelations = relations(leads, ({ many }) => ({
+  activities: many(activities),
+  tasks: many(tasks)
 }));
