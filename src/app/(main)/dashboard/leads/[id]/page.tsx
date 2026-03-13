@@ -15,6 +15,7 @@ import { ConvertLeadButton } from "./_components/convert-lead-button";
 import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, CheckCircle2Icon } from "lucide-react";
 import { ActivityModal } from "@/components/crm/activity-modal";
 import { TaskModal } from "@/components/crm/task-modal";
+import { FormattedDate } from "@/components/crm/formatted-date";
 
 export default async function LeadDetailPage({
   params,
@@ -176,7 +177,7 @@ export default async function LeadDetailPage({
                       </p>
                       <div className="flex items-center gap-2">
                         <p className="text-[10px] text-muted-foreground">
-                          {new Date(activity.date || activity.createdAt).toLocaleString()}
+                          <FormattedDate date={activity.date || activity.createdAt} />
                         </p>
                         <ActivityModal activity={activity} revalidatePathStr={`/dashboard/leads/${leadId}`} />
                       </div>
@@ -253,18 +254,18 @@ export default async function LeadDetailPage({
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <ClockIcon className="w-3 h-3 text-blue-500" />
-                          Created: {new Date(task.createdAt).toLocaleString()}
+                          Created: <FormattedDate date={task.createdAt} />
                         </span>
                         {task.status === "done" && task.completedAt && (
                           <span className="flex items-center gap-1 font-medium text-green-600">
                             <CheckCircle2Icon className="w-3 h-3" />
-                            Completed: {new Date(task.completedAt).toLocaleString()}
+                            Completed: <FormattedDate date={task.completedAt} />
                           </span>
                         )}
                         {task.dueDate && (
                           <span className={`flex items-center gap-1 font-semibold ${task.status !== "done" && new Date(task.dueDate) < new Date() ? "text-destructive" : "text-foreground/70"}`}>
                             <CalendarIcon className="w-3 h-3" />
-                            Due: {new Date(task.dueDate).toLocaleString()}
+                            Due: <FormattedDate date={task.dueDate} />
                           </span>
                         )}
                       </div>

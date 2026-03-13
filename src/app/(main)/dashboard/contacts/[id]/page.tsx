@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, BuildingIcon } from "lucide-react";
 import Link from "next/link";
 import { ActivityModal } from "@/components/crm/activity-modal";
+import { FormattedDate } from "@/components/crm/formatted-date";
 import { TaskModal } from "@/components/crm/task-modal";
 
 export default async function ContactDetailPage({
@@ -173,7 +174,7 @@ export default async function ContactDetailPage({
                         {activity.ownerName || "System"}
                       </p>
                       <div className="flex items-center gap-2">
-                        <p className="text-[10px] text-muted-foreground">{new Date(activity.date || activity.createdAt).toLocaleString()}</p>
+                        <p className="text-[10px] text-muted-foreground"><FormattedDate date={activity.date || activity.createdAt} /></p>
                         <ActivityModal activity={activity} revalidatePathStr={`/dashboard/contacts/${contactId}`} />
                       </div>
                     </div>
