@@ -2,7 +2,8 @@
 
 import { db } from "@/db";
 import { tasks, users, leads } from "@/db/schema";
-import { eq, desc, alias, isNotNull } from "drizzle-orm";
+import { eq, desc, isNotNull } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { revalidatePath } from "next/cache";
 
 export async function createTask(data: {
