@@ -1,12 +1,21 @@
-import { getEmailTemplates } from "@/actions/marketing";
+import { getEmailTemplates, deleteEmailTemplate } from "@/actions/marketing";
 import { auth } from "@/auth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusIcon, PencilIcon, TrashIcon, MailIcon } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TemplateModal } from "@/components/crm/template-modal";
+import { revalidatePath } from "next/cache";
 
 export default async function TemplatesPage() {
   const templates = await getEmailTemplates();
+  const session = await auth();
+
+  async function handleDelete(templateId: string) {
+    "use server";
+    await deleteEmailTemplate(templateId);
+    revalidatePath("/dashboard/marketing/templates");
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -18,9 +27,7 @@ export default async function TemplatesPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Manage your reusable email messages with dynamic placeholders.</p>
         </div>
-        <Button className="gap-2">
-          <PlusIcon className="w-4 h-4" /> New Template
-        </Button>
+        <TemplateModal onSuccess={() => revalidatePath("/dashboard/marketing/templates")} />
       </div>
 
       <div className="grid grid-cols-1 gap-6">
@@ -39,18 +46,31 @@ export default async function TemplatesPage() {
                 {templates.map((t) => (
                   <TableRow key={t.id}>
                     <TableCell className="font-semibold">{t.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{t.subject}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">{t.subject}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {new Date(t.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <PencilIcon className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
-                          <TrashIcon className="h-4 w-4" />
-                        </Button>
+                        <TemplateModal
+                          template={{
+                            id: t.id,
+                            name: t.name,
+                            subject: t.subject,
+                            body: t.body,
+                          }}
+                          onSuccess={() => revalidatePath("/dashboard/marketing/templates")}
+                        />
+                        <form action={async () => { await handleDelete(t.id); }}>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                            type="submit"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </Button>
+                        </form>
                       </div>
                     </TableCell>
                   </TableRow>
