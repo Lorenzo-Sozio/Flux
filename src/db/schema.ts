@@ -291,6 +291,36 @@ export const tasks = pgTable("task", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+export const emailTemplates = pgTable("email_template", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  body: text("body").notNull(),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const marketingCampaigns = pgTable("marketing_campaign", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  description: text("description"),
+  status: text("status").default("draft").notNull(), // draft, active, completed
+  templateId: text("template_id").references(() => emailTemplates.id, { onDelete: "set null" }),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const campaignLogs = pgTable("campaign_log", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  campaignId: text("campaign_id").references(() => marketingCampaigns.id, { onDelete: "cascade" }),
+  leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+  contactId: text("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
+  sentAt: timestamp("sent_at", { mode: "date" }).defaultNow().notNull(),
+  status: text("status").default("sent").notNull(), // sent, opened, clicked, failed
+});
+
 export const activitiesRelations = relations(activities, ({ one }) => ({
   owner: one(users, { fields: [activities.ownerId], references: [users.id] }),
   lead: one(leads, { fields: [activities.leadId], references: [leads.id] }),
@@ -307,7 +337,32 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   deal: one(deals, { fields: [tasks.dealId], references: [deals.id] }),
 }));
 
+export const emailTemplatesRelations = relations(emailTemplates, ({ one, many }) => ({
+  owner: one(users, { fields: [emailTemplates.ownerId], references: [users.id] }),
+  campaigns: many(marketingCampaigns),
+}));
+
+export const marketingCampaignsRelations = relations(marketingCampaigns, ({ one, many }) => ({
+  owner: one(users, { fields: [marketingCampaigns.ownerId], references: [users.id] }),
+  template: one(emailTemplates, { fields: [marketingCampaigns.templateId], references: [emailTemplates.id] }),
+  logs: many(campaignLogs),
+}));
+
+export const campaignLogsRelations = relations(campaignLogs, ({ one }) => ({
+  campaign: one(marketingCampaigns, { fields: [campaignLogs.campaignId], references: [marketingCampaigns.id] }),
+  lead: one(leads, { fields: [campaignLogs.leadId], references: [leads.id] }),
+  contact: one(contacts, { fields: [campaignLogs.contactId], references: [contacts.id] }),
+}));
+
 export const leadsRelations = relations(leads, ({ many }) => ({
   activities: many(activities),
-  tasks: many(tasks)
+  tasks: many(tasks),
+  campaignLogs: many(campaignLogs),
+}));
+
+export const contactsRelations = relations(contacts, ({ many, one }) => ({
+  activities: many(activities),
+  tasks: many(tasks),
+  campaignLogs: many(campaignLogs),
+  company: one(companies, { fields: [contacts.companyId], references: [companies.id] }),
 }));

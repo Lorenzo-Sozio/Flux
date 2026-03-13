@@ -18,6 +18,7 @@ import {
   ShoppingBag,
   SquareArrowUpRight,
   Users,
+  Target,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -95,28 +96,26 @@ export const sidebarItems: NavGroup[] = [
         url: "/dashboard/analytics",
         icon: Gauge,
       },
-      {
-        title: "E-commerce",
-        url: "/dashboard/coming-soon",
-        icon: ShoppingBag,
-        comingSoon: true,
-      },
-      {
-        title: "Academy",
-        url: "/dashboard/coming-soon",
-        icon: GraduationCap,
-        comingSoon: true,
-      },
-      {
-        title: "Logistics",
-        url: "/dashboard/coming-soon",
-        icon: Forklift,
-        comingSoon: true,
-      },
     ],
   },
   {
     id: 2,
+    label: "Marketing",
+    items: [
+      {
+        title: "Templates",
+        url: "/dashboard/marketing/templates",
+        icon: Mail,
+      },
+      {
+        title: "Campaigns",
+        url: "/dashboard/marketing/campaigns",
+        icon: Target,
+      },
+    ],
+  },
+  {
+    id: 3,
     label: "Pages",
     items: [
       {
@@ -169,7 +168,7 @@ export const sidebarItems: NavGroup[] = [
     ],
   },
   {
-    id: 3,
+    id: 4,
     label: "Misc",
     items: [
       {

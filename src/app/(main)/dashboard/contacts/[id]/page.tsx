@@ -16,6 +16,8 @@ import Link from "next/link";
 import { ActivityModal } from "@/components/crm/activity-modal";
 import { FormattedDate } from "@/components/crm/formatted-date";
 import { TaskModal } from "@/components/crm/task-modal";
+import { SendEmailModal } from "@/components/crm/send-email-modal";
+import { getEmailTemplates } from "@/actions/marketing";
 
 export default async function ContactDetailPage({
   params,
@@ -26,14 +28,18 @@ export default async function ContactDetailPage({
   const session = await auth();
   const userId = session?.user?.id;
 
-  const [contact] = await db
-    .select({
-      contact: contacts,
-      companyName: companies.name,
-    })
-    .from(contacts)
-    .leftJoin(companies, eq(contacts.companyId, companies.id))
-    .where(eq(contacts.id, contactId));
+  const [contact, templates] = await Promise.all([
+    db
+      .select({
+        contact: contacts,
+        companyName: companies.name,
+      })
+      .from(contacts)
+      .leftJoin(companies, eq(contacts.companyId, companies.id))
+      .where(eq(contacts.id, contactId))
+      .then(rows => rows[0]),
+    getEmailTemplates()
+  ]);
 
   if (!contact) {
     return notFound();
@@ -94,8 +100,9 @@ export default async function ContactDetailPage({
       {/* Left side: Contact Details */}
       <div className="w-full md:w-1/3 flex flex-col gap-6">
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Contact Details</CardTitle>
+            <SendEmailModal entity={cData} templates={templates} ownerId={userId} />
           </CardHeader>
           <CardContent className="space-y-4">
             <div>

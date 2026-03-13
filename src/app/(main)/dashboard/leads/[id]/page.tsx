@@ -16,6 +16,8 @@ import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, CheckCircle2Icon } fr
 import { ActivityModal } from "@/components/crm/activity-modal";
 import { TaskModal } from "@/components/crm/task-modal";
 import { FormattedDate } from "@/components/crm/formatted-date";
+import { SendEmailModal } from "@/components/crm/send-email-modal";
+import { getEmailTemplates } from "@/actions/marketing";
 
 export default async function LeadDetailPage({
   params,
@@ -26,7 +28,10 @@ export default async function LeadDetailPage({
   const session = await auth();
   const userId = session?.user?.id;
 
-  const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
+  const [lead, templates] = await Promise.all([
+    db.select().from(leads).where(eq(leads.id, leadId)).then(rows => rows[0]),
+    getEmailTemplates()
+  ]);
 
   if (!lead) {
     return notFound();
@@ -88,7 +93,10 @@ export default async function LeadDetailPage({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Lead Details</CardTitle>
-            {!lead.isConverted && <ConvertLeadButton leadId={lead.id} />}
+            <div className="flex gap-2">
+              <SendEmailModal entity={lead} templates={templates} ownerId={userId} />
+              {!lead.isConverted && <ConvertLeadButton leadId={lead.id} />}
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
