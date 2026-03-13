@@ -15,9 +15,9 @@ import { Textarea } from "@/components/ui/textarea";
 export default async function LeadDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const leadId = params.id;
+  const { id: leadId } = await params;
   const lead = await db.query.leads.findFirst({
     where: eq(leads.id, leadId),
   });
