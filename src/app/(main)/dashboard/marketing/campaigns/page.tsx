@@ -1,18 +1,17 @@
-import { getMarketingCampaigns, deleteMarketingCampaign } from "@/actions/marketing";
+import { getMarketingCampaigns } from "@/actions/marketing";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PlusIcon, TargetIcon, SendIcon, MoreVerticalIcon, TrashIcon } from "lucide-react";
+import { TargetIcon, SendIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { CampaignModal } from "@/components/crm/campaign-modal";
-import { revalidatePath } from "next/cache";
+import { CampaignDeleteButton } from "./_components/campaign-delete-button";
 
 export default async function CampaignsPage() {
-  const campaigns = await getMarketingCampaigns();
+  let campaigns: any[] = [];
 
-  async function handleDelete(campaignId: string) {
-    "use server";
-    await deleteMarketingCampaign(campaignId);
-    revalidatePath("/dashboard/marketing/campaigns");
+  try {
+    campaigns = await getMarketingCampaigns();
+  } catch (error) {
+    console.error("Failed to fetch campaigns:", error);
   }
 
   const getStatusBadge = (status: string) => {
@@ -36,63 +35,53 @@ export default async function CampaignsPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Track and manage your outbound marketing efforts.</p>
         </div>
-        <CampaignModal onSuccess={() => revalidatePath("/dashboard/marketing/campaigns")} />
+        <CampaignModal />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {campaigns.map((c) => (
-          <Card key={c.id} className="overflow-hidden hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-start">
-                {getStatusBadge(c.status)}
-                <form action={async () => { await handleDelete(c.id); }}>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 -mr-2 -mt-2 text-muted-foreground hover:text-destructive"
-                    type="submit"
-                  >
-                    <TrashIcon className="h-4 w-4" />
-                  </Button>
-                </form>
-              </div>
-              <CardTitle className="text-lg mt-2">{c.name}</CardTitle>
-              <CardDescription className="line-clamp-2 min-h-[2.5rem]">
-                {c.description || "No description provided."}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-4 border-t bg-muted/10">
-              <div className="flex justify-between items-center text-xs text-muted-foreground mb-4">
-                <span className="flex items-center gap-1">
-                  <SendIcon className="w-3 h-3" />
-                  0 Sent
-                </span>
-                <span>{new Date(c.createdAt).toLocaleDateString()}</span>
-              </div>
-              <div className="flex gap-2">
-                <CampaignModal
-                  campaign={{
-                    id: c.id,
-                    name: c.name,
-                    description: c.description || undefined,
-                    status: c.status,
-                    templateId: c.templateId || undefined,
-                  }}
-                  onSuccess={() => revalidatePath("/dashboard/marketing/campaigns")}
-                />
-                <Button size="sm" className="flex-1 text-xs bg-primary/90">
-                  Launch
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-
-        {campaigns.length === 0 && (
+        {campaigns && campaigns.length > 0 ? (
+          campaigns.map((c: any) => (
+            <Card key={c.id} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardHeader className="pb-2">
+                <div className="flex justify-between items-start">
+                  {getStatusBadge(c.status)}
+                  <CampaignDeleteButton campaignId={c.id} />
+                </div>
+                <CardTitle className="text-lg mt-2">{c.name}</CardTitle>
+                <CardDescription className="line-clamp-2 min-h-[2.5rem]">
+                  {c.description || "No description provided."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-4 border-t bg-muted/10">
+                <div className="flex justify-between items-center text-xs text-muted-foreground mb-4">
+                  <span className="flex items-center gap-1">
+                    <SendIcon className="w-3 h-3" />
+                    0 Sent
+                  </span>
+                  <span>{new Date(c.createdAt).toLocaleDateString()}</span>
+                </div>
+                <div className="flex gap-2">
+                  <CampaignModal
+                    campaign={{
+                      id: c.id,
+                      name: c.name,
+                      description: c.description || undefined,
+                      status: c.status,
+                      templateId: c.templateId || undefined,
+                    }}
+                  />
+                  <button className="flex-1 text-xs px-3 py-2 bg-primary/90 hover:bg-primary text-white rounded-md transition-colors">
+                    Launch
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
           <div className="col-span-full py-20 text-center border-2 border-dashed rounded-xl bg-muted/5">
             <TargetIcon className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
             <p className="text-muted-foreground">No campaigns found. Ready to reach some leads?</p>
-            <CampaignModal onSuccess={() => revalidatePath("/dashboard/marketing/campaigns")} />
+            <CampaignModal />
           </div>
         )}
       </div>

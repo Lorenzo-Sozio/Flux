@@ -1,20 +1,17 @@
-import { getEmailTemplates, deleteEmailTemplate } from "@/actions/marketing";
-import { auth } from "@/auth";
+import { getEmailTemplates } from "@/actions/marketing";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PlusIcon, PencilIcon, TrashIcon, MailIcon } from "lucide-react";
+import { MailIcon } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { TemplateModal } from "@/components/crm/template-modal";
-import { revalidatePath } from "next/cache";
+import { TemplateDeleteButton } from "./_components/template-delete-button";
 
 export default async function TemplatesPage() {
-  const templates = await getEmailTemplates();
-  const session = await auth();
-
-  async function handleDelete(templateId: string) {
-    "use server";
-    await deleteEmailTemplate(templateId);
-    revalidatePath("/dashboard/marketing/templates");
+  let templates: any[] = [];
+  
+  try {
+    templates = await getEmailTemplates();
+  } catch (error) {
+    console.error("Failed to fetch templates:", error);
   }
 
   return (
@@ -27,7 +24,7 @@ export default async function TemplatesPage() {
           </h1>
           <p className="text-sm text-muted-foreground">Manage your reusable email messages with dynamic placeholders.</p>
         </div>
-        <TemplateModal onSuccess={() => revalidatePath("/dashboard/marketing/templates")} />
+        <TemplateModal />
       </div>
 
       <div className="grid grid-cols-1 gap-6">
@@ -43,39 +40,30 @@ export default async function TemplatesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {templates.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="font-semibold">{t.name}</TableCell>
-                    <TableCell className="text-muted-foreground text-sm">{t.subject}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {new Date(t.createdAt).toLocaleDateString()}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <TemplateModal
-                          template={{
-                            id: t.id,
-                            name: t.name,
-                            subject: t.subject,
-                            body: t.body,
-                          }}
-                          onSuccess={() => revalidatePath("/dashboard/marketing/templates")}
-                        />
-                        <form action={async () => { await handleDelete(t.id); }}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                            type="submit"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </Button>
-                        </form>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {templates.length === 0 && (
+                {templates && templates.length > 0 ? (
+                  templates.map((t: any) => (
+                    <TableRow key={t.id}>
+                      <TableCell className="font-semibold">{t.name}</TableCell>
+                      <TableCell className="text-muted-foreground text-sm">{t.subject}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {new Date(t.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <TemplateModal
+                            template={{
+                              id: t.id,
+                              name: t.name,
+                              subject: t.subject,
+                              body: t.body,
+                            }}
+                          />
+                          <TemplateDeleteButton templateId={t.id} />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-10 text-muted-foreground italic">
                       No templates created yet. Start by creating your first reusable email template!
