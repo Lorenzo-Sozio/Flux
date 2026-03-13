@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2Icon, PencilIcon, TrashIcon } from "lucide-react";
@@ -32,6 +33,12 @@ type CompanyFormValues = z.infer<typeof companySchema>;
 export function CompanyModal({ company, children }: { company?: any; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const isEditing = !!company;
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    if (!isEditing && searchParams?.get("new") === "true") {
+      setOpen(true);
+    }
+  }, [isEditing, searchParams]);
 
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
