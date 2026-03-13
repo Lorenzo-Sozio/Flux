@@ -236,14 +236,14 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
           </div>
 
           {/* Editor & Preview - Full Width Tabs */}
-          <div className="flex-1 overflow-scroll border rounded-lg flex flex-col">
+          <div className="flex-1 overflow-auto border rounded-lg flex flex-col">
             <Tabs defaultValue="editor" value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
               <TabsList className="w-full justify-start rounded-none border-b bg-muted/50">
                 <TabsTrigger value="editor" className="text-sm font-semibold">📝 HTML Editor</TabsTrigger>
                 <TabsTrigger value="preview" className="text-sm font-semibold">👁️ Live Preview</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="editor" className="flex-1 overflow-scroll min-h-0">
+              <TabsContent value="editor" className="flex-1 overflow-auto min-h-0">
                 <Textarea
                   placeholder={`${
                     formData.isHtml
@@ -257,7 +257,7 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
                 />
               </TabsContent>
 
-              <TabsContent value="preview" className="flex-1 overflow-scroll p-8 bg-gradient-to-b from-muted/20 to-muted/40">
+              <TabsContent value="preview" className="flex-1 overflow-auto p-8 bg-gradient-to-b from-muted/20 to-muted/40">
                 <div className="max-w-3xl mx-auto">
                   {formData.isHtml ? (
                     <div
