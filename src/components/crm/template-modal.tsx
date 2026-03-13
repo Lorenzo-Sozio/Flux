@@ -122,35 +122,36 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
         )}
       </Button>
 
-      <DialogContent className="max-w-6xl h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-[95vw] w-[95vw] h-[95vh] flex flex-col p-0">
+        <DialogHeader className="px-6 pt-6 pb-4">
           <DialogTitle>{template ? "Edit Email Template" : "Create New Email Template"}</DialogTitle>
           <DialogDescription>
             Design a professional email template with HTML support and dynamic placeholders.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 flex-1 overflow-hidden">
-          {/* Basic Info */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 flex-1 overflow-hidden px-6 pb-6">
+          {/* Basic Info - Compact Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="name">Template Name *</Label>
+              <Label htmlFor="name" className="text-xs">Template Name *</Label>
               <Input
                 id="name"
                 placeholder="e.g., Welcome Email"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="h-8 text-sm"
                 required
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
+              <Label htmlFor="category" className="text-xs">Category</Label>
               <select
                 id="category"
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+                className="w-full h-8 rounded-md border border-input bg-background px-2 text-xs"
               >
                 {CATEGORIES.map((cat) => (
                   <option key={cat.value} value={cat.value}>
@@ -160,95 +161,101 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
               </select>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="subject">Subject Line *</Label>
+            <div className="space-y-2 lg:col-span-2">
+              <Label htmlFor="subject" className="text-xs">Subject Line *</Label>
               <Input
                 id="subject"
                 placeholder="e.g., Welcome to Flux, {firstName}!"
                 value={formData.subject}
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
+                className="h-8 text-sm"
                 required
               />
             </div>
           </div>
 
-          {/* Description & Preview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Description & Preview - Compact */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description" className="text-xs">Description</Label>
               <Textarea
                 id="description"
                 placeholder="Internal notes about this template..."
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="h-20 resize-none"
+                className="h-16 resize-none text-xs"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="previewText">Preview Text (Email Client)</Label>
+              <Label htmlFor="previewText" className="text-xs">Preview Text</Label>
               <Textarea
                 id="previewText"
-                placeholder="Short text shown in email preview (50-100 chars)"
+                placeholder="Short text shown in email preview"
                 value={formData.previewText}
                 onChange={(e) => setFormData({ ...formData, previewText: e.target.value })}
-                className="h-20 resize-none"
+                className="h-16 resize-none text-xs"
               />
             </div>
           </div>
 
-          {/* Tags */}
-          <div className="space-y-2">
-            <Label>Tags</Label>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Add tag and press Enter or Add"
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    addTag();
-                  }
-                }}
-              />
-              <Button type="button" variant="outline" onClick={addTag}>
-                Add
-              </Button>
-            </div>
-            {formData.tags.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {formData.tags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="secondary"
-                    className="cursor-pointer hover:bg-secondary/80"
-                    onClick={() => removeTag(tag)}
-                  >
-                    {tag} ✕
-                  </Badge>
-                ))}
+          {/* Tags & Checkbox - Horizontal */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+            <div className="lg:col-span-2 space-y-2">
+              <Label className="text-xs">Tags</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Add tag and press Enter"
+                  value={tagInput}
+                  onChange={(e) => setTagInput(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addTag();
+                    }
+                  }}
+                  className="h-8 text-sm flex-1"
+                />
+                <Button type="button" variant="outline" onClick={addTag} className="h-8 px-3 text-xs">
+                  Add
+                </Button>
               </div>
-            )}
+              {formData.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {formData.tags.map((tag) => (
+                    <Badge
+                      key={tag}
+                      variant="secondary"
+                      className="text-xs cursor-pointer hover:bg-secondary/80"
+                      onClick={() => removeTag(tag)}
+                    >
+                      {tag} ✕
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-end">
+              <Label htmlFor="isHtml" className="text-xs cursor-pointer flex items-center gap-2 bg-muted p-2 rounded">
+                <input
+                  id="isHtml"
+                  type="checkbox"
+                  checked={formData.isHtml}
+                  onChange={(e) => setFormData({ ...formData, isHtml: e.target.checked })}
+                  className="cursor-pointer"
+                />
+                <span>HTML Format</span>
+              </Label>
+            </div>
           </div>
 
-          {/* Editor & Preview Tabs */}
-          <div className="flex-1 overflow-hidden border rounded-lg">
+          {/* Editor & Preview - Full Width Tabs */}
+          <div className="flex-1 overflow-hidden border rounded-lg flex flex-col">
             <Tabs defaultValue="editor" value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
               <TabsList className="w-full justify-start rounded-none border-b">
-                <TabsTrigger value="editor">HTML Editor</TabsTrigger>
-                <TabsTrigger value="preview">Preview</TabsTrigger>
-                <div className="ml-auto flex items-center gap-2 pr-4">
-                  <Label htmlFor="isHtml" className="text-xs cursor-pointer flex items-center gap-1">
-                    <input
-                      id="isHtml"
-                      type="checkbox"
-                      checked={formData.isHtml}
-                      onChange={(e) => setFormData({ ...formData, isHtml: e.target.checked })}
-                    />
-                    HTML Format
-                  </Label>
-                </div>
+                <TabsTrigger value="editor" className="text-xs">HTML Editor</TabsTrigger>
+                <TabsTrigger value="preview" className="text-xs">Live Preview</TabsTrigger>
               </TabsList>
 
               <TabsContent value="editor" className="flex-1 overflow-hidden">
@@ -260,36 +267,38 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
                   }`}
                   value={formData.body}
                   onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                  className="w-full h-full font-mono text-sm border-0 rounded-none resize-none"
+                  className="w-full h-full font-mono text-xs border-0 rounded-none resize-none"
                   required
                 />
               </TabsContent>
 
-              <TabsContent value="preview" className="flex-1 overflow-auto p-4 bg-muted/20">
-                {formData.isHtml ? (
-                  <div
-                    className="bg-white rounded-lg shadow-sm p-6 font-sans"
-                    dangerouslySetInnerHTML={{ __html: formData.body }}
-                  />
-                ) : (
-                  <div className="bg-white rounded-lg shadow-sm p-6 font-sans whitespace-pre-wrap">
-                    {formData.body}
-                  </div>
-                )}
+              <TabsContent value="preview" className="flex-1 overflow-auto p-6 bg-muted/20">
+                <div className="max-w-2xl">
+                  {formData.isHtml ? (
+                    <div
+                      className="bg-white rounded-lg shadow-sm p-6 font-sans text-sm"
+                      dangerouslySetInnerHTML={{ __html: formData.body }}
+                    />
+                  ) : (
+                    <div className="bg-white rounded-lg shadow-sm p-6 font-sans whitespace-pre-wrap text-sm">
+                      {formData.body}
+                    </div>
+                  )}
+                </div>
               </TabsContent>
             </Tabs>
           </div>
 
-          {/* Info */}
+          {/* Info & Footer */}
           <div className="text-xs text-muted-foreground">
             💡 Available placeholders: firstName, lastName, email, companyName, phone
           </div>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setOpen(false)} className="h-9 text-sm">
               Cancel
             </Button>
-            <Button type="submit" disabled={loading}>
+            <Button type="submit" disabled={loading} className="h-9 text-sm">
               {loading ? "Saving..." : template ? "Update Template" : "Create Template"}
             </Button>
           </DialogFooter>
