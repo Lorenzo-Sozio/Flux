@@ -18,9 +18,12 @@ export default async function LeadDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id: leadId } = await params;
+  console.log("Loading Lead Detail for ID:", leadId);
+  
   const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
 
   if (!lead) {
+    console.log("Lead not found for ID:", leadId);
     return notFound();
   }
 
