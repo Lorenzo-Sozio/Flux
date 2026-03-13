@@ -52,11 +52,6 @@ export const sidebarItems: NavGroup[] = [
     label: "Dashboards",
     items: [
       {
-        title: "Default",
-        url: "/dashboard/default",
-        icon: LayoutDashboard,
-      },
-      {
         title: "CRM",
         url: "/dashboard/crm",
         icon: ChartBar,
@@ -86,20 +81,42 @@ export const sidebarItems: NavGroup[] = [
         url: "/dashboard/companies",
         icon: Building2,
       },
-      {
-        title: "Finance",
-        url: "/dashboard/finance",
-        icon: Banknote,
-      },
-      {
-        title: "Analytics",
-        url: "/dashboard/analytics",
-        icon: Gauge,
-      },
     ],
   },
   {
     id: 2,
+    label: "Templates",
+    items: [
+    {
+        title: "Templates - 1",
+        url: "/dashboard/default",
+        icon: LayoutDashboard,
+      },
+      {
+        title: "Templates - Finance",
+        url: "/dashboard/finance",
+        icon: Banknote,
+      },
+      {
+        title: "Templates -Analytics",
+        url: "/dashboard/analytics",
+        icon: Gauge,
+      },
+      {
+        title: "Authentication",
+        url: "/auth",
+        icon: Fingerprint,
+        subItems: [
+          { title: "Login v1", url: "/auth/v1/login", newTab: true },
+          { title: "Login v2", url: "/auth/v2/login", newTab: true },
+          { title: "Register v1", url: "/auth/v1/register", newTab: true },
+          { title: "Register v2", url: "/auth/v2/register", newTab: true },
+        ],
+      },
+    ],
+  },
+  {
+    id: 3,
     label: "Marketing",
     items: [
       {
@@ -115,8 +132,8 @@ export const sidebarItems: NavGroup[] = [
     ],
   },
   {
-    id: 3,
-    label: "Pages",
+    id: 4,
+    label: "Pages Soon",
     items: [
       {
         title: "Email",
@@ -154,21 +171,10 @@ export const sidebarItems: NavGroup[] = [
         icon: Lock,
         comingSoon: true,
       },
-      {
-        title: "Authentication",
-        url: "/auth",
-        icon: Fingerprint,
-        subItems: [
-          { title: "Login v1", url: "/auth/v1/login", newTab: true },
-          { title: "Login v2", url: "/auth/v2/login", newTab: true },
-          { title: "Register v1", url: "/auth/v1/register", newTab: true },
-          { title: "Register v2", url: "/auth/v2/register", newTab: true },
-        ],
-      },
     ],
   },
   {
-    id: 4,
+    id: 5,
     label: "Misc",
     items: [
       {
