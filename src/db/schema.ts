@@ -283,6 +283,7 @@ export const tasks = pgTable("task", {
   priority: text("priority").default("normal").notNull(), // low, normal, high
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
+  completedAt: timestamp("completed_at", { mode: "date" }),
   leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
   companyId: text("company_id").references(() => companies.id, { onDelete: "cascade" }),

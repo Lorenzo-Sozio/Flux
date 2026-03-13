@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ConvertLeadButton } from "./_components/convert-lead-button";
-import { CalendarIcon, UserIcon, UserCheckIcon } from "lucide-react";
+import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, CheckCircle2Icon } from "lucide-react";
 
 export default async function LeadDetailPage({
   params,
@@ -65,7 +65,7 @@ export default async function LeadDetailPage({
         dueDate: dueDateStr ? new Date(dueDateStr) : undefined,
         leadId,
         ownerId: userId,
-        assigneeId: assigneeId || userId, // Default to self if not specified
+        assigneeId: assigneeId || userId,
       });
       revalidatePath(`/dashboard/leads/${leadId}`);
     }
@@ -212,14 +212,14 @@ export default async function LeadDetailPage({
                 <p className="text-sm text-muted-foreground">No tasks pending.</p>
               ) : (
                 leadTasks.map(task => (
-                  <div key={task.id} className={`flex flex-col gap-2 border p-3 rounded-md transition-all ${task.status === "done" ? "opacity-50 bg-muted/30" : "bg-card"}`}>
+                  <div key={task.id} className={`flex flex-col gap-2 border p-3 rounded-md transition-all ${task.status === "done" ? "opacity-60 bg-muted/30" : "bg-card shadow-sm"}`}>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3">
                         <div className="mt-1 h-4 w-4 rounded-full border border-primary flex items-center justify-center">
                           {task.status === "done" && <div className="w-2 h-2 bg-primary rounded-full" />}
                         </div>
                         <div>
-                          <p className={`font-medium text-sm ${task.status === "done" ? "line-through" : ""}`}>{task.title}</p>
+                          <p className={`font-medium text-sm ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>{task.title}</p>
                           {task.description && <p className="text-xs text-muted-foreground mt-1">{task.description}</p>}
                         </div>
                       </div>
@@ -228,30 +228,42 @@ export default async function LeadDetailPage({
                       </Badge>
                     </div>
                     
-                    <div className="flex items-center justify-between mt-1">
-                      <div className="flex flex-col gap-1 text-[10px] text-muted-foreground">
-                        <div className="flex items-center gap-4">
-                          {task.dueDate && (
-                            <span className="flex items-center gap-1 font-semibold text-foreground/70">
-                              <CalendarIcon className="w-3 h-3" />
-                              Due: {new Date(task.dueDate).toLocaleDateString()}
-                            </span>
-                          )}
+                    <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-dashed">
+                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <ClockIcon className="w-3 h-3 text-blue-500" />
+                          Created: {new Date(task.createdAt).toLocaleDateString()}
+                        </span>
+                        {task.status === "done" && task.completedAt && (
+                          <span className="flex items-center gap-1 font-medium text-green-600">
+                            <CheckCircle2Icon className="w-3 h-3" />
+                            Completed: {new Date(task.completedAt).toLocaleDateString()}
+                          </span>
+                        )}
+                        {task.dueDate && (
+                          <span className={`flex items-center gap-1 font-semibold ${task.status !== "done" && new Date(task.dueDate) < new Date() ? "text-destructive" : "text-foreground/70"}`}>
+                            <CalendarIcon className="w-3 h-3" />
+                            Due: {new Date(task.dueDate).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 text-[10px]">
                           <span className="flex items-center gap-1">
                             <UserIcon className="w-3 h-3" />
                             By: {task.ownerName || "System"}
                           </span>
+                          <span className="flex items-center gap-1 font-medium text-primary/80">
+                            <UserCheckIcon className="w-3 h-3" />
+                            To: {task.assigneeName || "Myself"}
+                          </span>
                         </div>
-                        <span className="flex items-center gap-1 font-medium text-primary/80">
-                          <UserCheckIcon className="w-3 h-3" />
-                          Assigned to: {task.assigneeName || "Myself"}
-                        </span>
+                        <form action={async () => { "use server"; await toggleTask(task.id, task.status); }}>
+                          <Button variant="outline" size="sm" className="h-6 px-2 text-[10px] bg-background">
+                            {task.status === "done" ? "Undo" : "Mark as Done"}
+                          </Button>
+                        </form>
                       </div>
-                      <form action={async () => { "use server"; await toggleTask(task.id, task.status); }}>
-                        <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]">
-                          {task.status === "done" ? "Mark as Todo" : "Mark as Done"}
-                        </Button>
-                      </form>
                     </div>
                   </div>
                 ))
