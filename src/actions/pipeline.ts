@@ -27,7 +27,15 @@ export async function getPipelineData() {
 
 export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
   if (!data.name || !data.stageId) throw new Error("Name and Stage are required.");
-  const [newDeal] = await db.insert(deals).values(data as any).returning();
+  
+  const payload = {
+    ...data,
+    amount: data.amount ? String(data.amount) : "0",
+    currency: data.currency || "EUR",
+    status: data.status || "open",
+  };
+
+  const [newDeal] = await db.insert(deals).values(payload as any).returning();
   revalidatePath("/dashboard/pipeline");
   return newDeal;
 }
@@ -43,9 +51,14 @@ export async function updateDealStage(dealId: string, newStageId: string) {
 }
 
 export async function updateDeal(dealId: string, data: Partial<typeof deals.$inferInsert>) {
+  const payload = {
+    ...data,
+    amount: data.amount ? String(data.amount) : undefined,
+  };
+
   const [updatedDeal] = await db
     .update(deals)
-    .set(data)
+    .set(payload as any)
     .where(eq(deals.id, dealId))
     .returning();
   revalidatePath("/dashboard/pipeline");

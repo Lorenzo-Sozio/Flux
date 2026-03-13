@@ -1,13 +1,22 @@
 import { getPipelineData } from "@/actions/pipeline";
+import { getCompanies, getContacts } from "@/actions/crm";
 import { PipelineBoard } from "./components/pipeline-board";
 
 export default async function PipelinePage() {
-  const data = await getPipelineData();
+  const [data, companies, contacts] = await Promise.all([
+    getPipelineData(),
+    getCompanies(),
+    getContacts(),
+  ]);
 
   return (
-    <div className="flex h-full flex-col p-8 space-y-4">
-      <h1 className="text-2xl font-bold tracking-tight">Sales Pipeline</h1>
-      <PipelineBoard initialStages={data.stages} initialDeals={data.deals} />
+    <div className="p-4 sm:p-6 md:p-8 h-full bg-muted/10">
+      <PipelineBoard 
+        initialStages={data.stages} 
+        initialDeals={data.deals}
+        companies={companies}
+        contacts={contacts}
+      />
     </div>
   );
 }

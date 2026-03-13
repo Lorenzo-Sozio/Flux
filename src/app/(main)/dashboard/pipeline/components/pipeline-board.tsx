@@ -5,6 +5,9 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { updateDealStage } from "@/actions/pipeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { DealModal } from "@/components/crm/deal-modal";
+import { Button } from "@/components/ui/button";
+import { PlusIcon, DollarSignIcon, PencilIcon } from "lucide-react";
 
 type Deal = {
   id: string;
@@ -33,12 +36,15 @@ type Stage = {
 export function PipelineBoard({
   initialStages,
   initialDeals,
+  companies,
+  contacts,
 }: {
   initialStages: Stage[];
   initialDeals: Deal[];
+  companies: any[];
+  contacts: any[];
 }) {
   const [isMounted, setIsMounted] = useState(false);
-  const [stages, setStages] = useState(initialStages);
   const [deals, setDeals] = useState(initialDeals);
 
   useEffect(() => {
@@ -46,9 +52,8 @@ export function PipelineBoard({
   }, []);
 
   useEffect(() => {
-    setStages(initialStages);
     setDeals(initialDeals);
-  }, [initialStages, initialDeals]);
+  }, [initialDeals]);
 
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
@@ -60,9 +65,13 @@ export function PipelineBoard({
     const dealIndex = newDeals.findIndex((d) => d.id === draggableId);
     if (dealIndex < 0) return;
 
-    const deal = newDeals[dealIndex];
+    const deal = { ...newDeals[dealIndex] };
     deal.stageId = destination.droppableId;
-    setDeals(newDeals);
+    
+    newDeals.splice(dealIndex, 1); // remove from old position
+    // We don't have true sorting logic for deals yet, just simple filtering
+    // So we just update the stageId
+    setDeals(deals.map(d => d.id === draggableId ? deal : d));
 
     try {
       await updateDealStage(deal.id, destination.droppableId);
@@ -75,54 +84,103 @@ export function PipelineBoard({
   if (!isMounted) return null;
 
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
-      <div className="flex gap-4 overflow-x-auto pb-4 h-[calc(100vh-10rem)]">
-        {stages.map((stage) => {
-          const stageDeals = deals.filter((d) => d.stageId === stage.id);
-          return (
-            <div key={stage.id} className="min-w-[300px] flex flex-col gap-2 bg-muted/30 p-4 rounded-lg">
-              <div className="font-semibold text-lg pb-2 border-b flex items-center justify-between mb-2">
-                <span style={{ color: stage.color || "inherit" }}>{stage.name}</span>
-                <Badge variant="secondary">{stageDeals.length}</Badge>
-              </div>
-              <Droppable droppableId={stage.id}>
-                {(provided, snapshot) => (
-                  <div
-                    {...provided.droppableProps}
-                    ref={provided.innerRef}
-                    className={`flex-1 flex flex-col gap-3 min-h-[150px] transition-colors ${
-                      snapshot.isDraggingOver ? "bg-muted/50" : "bg-transparent"
-                    }`}
-                  >
-                    {stageDeals.map((deal, index) => (
-                      <Draggable key={deal.id} draggableId={deal.id} index={index}>
-                        {(provided, snapshot) => (
-                          <div
-                            ref={provided.innerRef}
-                            {...provided.draggableProps}
-                            {...provided.dragHandleProps}
-                            style={{ ...provided.draggableProps.style }}
-                          >
-                            <Card className={snapshot.isDragging ? "shadow-lg scale-105" : ""}>
-                              <CardHeader className="p-4 pb-2">
-                                <CardTitle className="text-md font-medium">{deal.name}</CardTitle>
-                              </CardHeader>
-                              <CardContent className="p-4 pt-0 text-sm text-muted-foreground">
-                                {deal.amount ? `${deal.currency} ${deal.amount}` : "No value"}
-                              </CardContent>
-                            </Card>
-                          </div>
-                        )}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </div>
-          );
-        })}
+    <div className="flex flex-col h-[calc(100vh-120px)] w-full overflow-hidden">
+      <div className="flex items-center justify-between mb-6 shrink-0 px-1">
+        <div>
+          <h2 className="text-xl font-bold">Sales Pipeline</h2>
+          <p className="text-sm text-muted-foreground">Drag and drop deals to change their progress</p>
+        </div>
+        <DealModal stages={initialStages} companies={companies} contacts={contacts}>
+          <Button size="sm" className="gap-2">
+            <PlusIcon className="w-4 h-4" /> New Deal
+          </Button>
+        </DealModal>
       </div>
-    </DragDropContext>
+
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="flex-1 flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+          {initialStages.map((stage) => {
+            const stageDeals = deals.filter((d) => d.stageId === stage.id);
+            const totalAmount = stageDeals.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+
+            return (
+              <div key={stage.id} className="min-w-[320px] max-w-[320px] flex flex-col bg-muted/30 rounded-xl border h-full overflow-hidden shadow-sm">
+                <div className="p-4 border-b bg-background/50 backdrop-blur-sm flex flex-col gap-1 shrink-0">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-sm tracking-tight truncate uppercase" style={{ color: stage.color || "inherit" }}>
+                      {stage.name}
+                    </h3>
+                    <Badge variant="secondary" className="rounded-full h-5 text-[10px]">
+                      {stageDeals.length}
+                    </Badge>
+                  </div>
+                  <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                    <DollarSignIcon className="w-3 h-3" />
+                    {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </p>
+                </div>
+
+                <Droppable droppableId={stage.id}>
+                  {(provided, snapshot) => (
+                    <div
+                      {...provided.droppableProps}
+                      ref={provided.innerRef}
+                      className={`flex-1 overflow-y-auto p-3 flex flex-col gap-3 transition-colors ${
+                        snapshot.isDraggingOver ? "bg-primary/5" : "bg-transparent"
+                      }`}
+                    >
+                      {stageDeals.map((deal, index) => (
+                        <Draggable key={deal.id} draggableId={deal.id} index={index}>
+                          {(provided, snapshot) => (
+                            <div
+                              ref={provided.innerRef}
+                              {...provided.draggableProps}
+                              {...provided.dragHandleProps}
+                              style={{ ...provided.draggableProps.style }}
+                              className="group"
+                            >
+                              <Card className={`relative transition-all border-l-4 ${
+                                snapshot.isDragging ? "shadow-xl ring-2 ring-primary/20 rotate-1 scale-[1.02]" : "hover:shadow-md"
+                              }`} style={{ borderLeftColor: stage.color || '#3b82f6' }}>
+                                <CardHeader className="p-3 pb-1">
+                                  <div className="flex justify-between items-start gap-2">
+                                    <CardTitle className="text-sm font-bold leading-tight group-hover:text-primary transition-colors cursor-pointer">
+                                      {deal.name}
+                                    </CardTitle>
+                                    <DealModal deal={deal} stages={initialStages} companies={companies} contacts={contacts}>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <PencilIcon className="h-3 w-3" />
+                                      </Button>
+                                    </DealModal>
+                                  </div>
+                                </CardHeader>
+                                <CardContent className="p-3 pt-0 flex flex-col gap-2">
+                                  <div className="flex items-center justify-between mt-1">
+                                    <p className="text-[11px] font-bold text-foreground/80">
+                                      {deal.currency} {Number(deal.amount || 0).toLocaleString()}
+                                    </p>
+                                    <Badge variant="outline" className="text-[9px] h-4 uppercase">
+                                      {deal.status}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-[9px] text-muted-foreground italic">
+                                    {deal.createdAt && `Created: ${new Date(deal.createdAt).toLocaleDateString()}`}
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </div>
+            );
+          })}
+        </div>
+      </DragDropContext>
+    </div>
   );
 }
