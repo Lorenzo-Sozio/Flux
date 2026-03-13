@@ -127,7 +127,7 @@ export function SendEmailModal({
                 placeholder="Write your message here..." 
                 className="min-h-[200px]"
               />
-              <p className="text-[10px] text-muted-foreground italic">You can use {{firstName}} and {{lastName}} in templates.</p>
+              <p className="text-[10px] text-muted-foreground italic">You can use {'{{firstName}}'} and {'{{lastName}}'} in templates.</p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
