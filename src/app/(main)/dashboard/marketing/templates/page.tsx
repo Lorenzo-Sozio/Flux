@@ -35,6 +35,7 @@ export default async function TemplatesPage() {
                 <TableRow>
                   <TableHead>Template Name</TableHead>
                   <TableHead>Subject Line</TableHead>
+                  <TableHead>Type & Category</TableHead>
                   <TableHead>Created At</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -43,8 +44,25 @@ export default async function TemplatesPage() {
                 {templates && templates.length > 0 ? (
                   templates.map((t: any) => (
                     <TableRow key={t.id}>
-                      <TableCell className="font-semibold">{t.name}</TableCell>
+                      <TableCell className="font-semibold">
+                        <div>
+                          <p>{t.name}</p>
+                          <p className="text-xs text-muted-foreground">{t.description}</p>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-muted-foreground text-sm">{t.subject}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-100 rounded capitalize">
+                            {t.category}
+                          </span>
+                          {t.isHtml && (
+                            <span className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-100 rounded">
+                              HTML
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
                         {new Date(t.createdAt).toLocaleDateString()}
                       </TableCell>
@@ -54,8 +72,13 @@ export default async function TemplatesPage() {
                             template={{
                               id: t.id,
                               name: t.name,
+                              description: t.description,
                               subject: t.subject,
                               body: t.body,
+                              isHtml: t.isHtml,
+                              category: t.category,
+                              previewText: t.previewText,
+                              tags: t.tags,
                             }}
                           />
                           <TemplateDeleteButton templateId={t.id} />
@@ -65,8 +88,8 @@ export default async function TemplatesPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-10 text-muted-foreground italic">
-                      No templates created yet. Start by creating your first reusable email template!
+                    <TableCell colSpan={5} className="text-center py-10 text-muted-foreground italic">
+                      No templates created yet. Start by creating your first professional email template!
                     </TableCell>
                   </TableRow>
                 )}

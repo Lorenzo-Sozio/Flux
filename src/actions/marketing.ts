@@ -12,7 +12,16 @@ export async function getEmailTemplates() {
   return await db.select().from(emailTemplates).orderBy(desc(emailTemplates.createdAt));
 }
 
-export async function createEmailTemplate(data: { name: string; subject: string; body: string }) {
+export async function createEmailTemplate(data: {
+  name: string;
+  description?: string;
+  subject: string;
+  body: string;
+  isHtml?: boolean;
+  category?: string;
+  previewText?: string;
+  tags?: string[];
+}) {
   const session = await auth();
   const ownerId = session?.user?.id;
 
@@ -20,8 +29,13 @@ export async function createEmailTemplate(data: { name: string; subject: string;
     .insert(emailTemplates)
     .values({
       name: data.name,
+      description: data.description,
       subject: data.subject,
       body: data.body,
+      isHtml: data.isHtml !== false,
+      category: data.category || "general",
+      previewText: data.previewText,
+      tags: data.tags || [],
       ownerId,
     })
     .returning();
@@ -29,10 +43,33 @@ export async function createEmailTemplate(data: { name: string; subject: string;
   return newTemplate;
 }
 
-export async function updateEmailTemplate(id: string, data: { name: string; subject: string; body: string }) {
+export async function updateEmailTemplate(
+  id: string,
+  data: {
+    name?: string;
+    description?: string;
+    subject?: string;
+    body?: string;
+    isHtml?: boolean;
+    category?: string;
+    previewText?: string;
+    tags?: string[];
+  }
+) {
+  const updateData: Record<string, any> = {};
+  if (data.name) updateData.name = data.name;
+  if (data.description) updateData.description = data.description;
+  if (data.subject) updateData.subject = data.subject;
+  if (data.body) updateData.body = data.body;
+  if (data.isHtml !== undefined) updateData.isHtml = data.isHtml;
+  if (data.category) updateData.category = data.category;
+  if (data.previewText !== undefined) updateData.previewText = data.previewText;
+  if (data.tags) updateData.tags = data.tags;
+  updateData.updatedAt = new Date();
+
   const [updated] = await db
     .update(emailTemplates)
-    .set(data)
+    .set(updateData)
     .where(eq(emailTemplates.id, id))
     .returning();
   revalidatePath("/dashboard/marketing/templates");

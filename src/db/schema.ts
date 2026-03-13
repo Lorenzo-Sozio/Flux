@@ -294,9 +294,15 @@ export const tasks = pgTable("task", {
 export const emailTemplates = pgTable("email_template", {
   id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
+  description: text("description"),
   subject: text("subject").notNull(),
-  body: text("body").notNull(),
+  body: text("body").notNull(), // HTML content
+  isHtml: boolean("is_html").default(true).notNull(), // true = HTML, false = plain text
+  category: text("category").default("general").notNull(), // general, welcome, followup, promotional, transactional
+  previewText: text("preview_text"), // Short preview of email (for email clients)
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  isPublic: boolean("is_public").default(false), // Share with team
+  tags: text("tags").array().default([]), // e.g., ["sales", "onboarding", "q2-2026"]
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
