@@ -15,6 +15,20 @@
       "when": 1773387389892,
       "tag": "0001_flippant_red_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1773392545348,
+      "tag": "0002_add_is_converted_to_leads",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1773395334297,
+      "tag": "0003_add_completed_at_to_tasks",
+      "breakpoints": true
     }
   ]
 }
