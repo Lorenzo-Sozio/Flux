@@ -5,6 +5,7 @@ import { useState } from "react";
 import { BadgeCheck, Bell, CreditCard, LogOut } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { logoutAction } from "@/actions/auth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -71,9 +72,13 @@ export function AccountSwitcher({
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <LogOut />
-          Log out
+        <DropdownMenuItem asChild>
+          <form action={logoutAction} className="w-full">
+            <button type="submit" className="flex w-full items-center gap-2">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
+            </button>
+          </form>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

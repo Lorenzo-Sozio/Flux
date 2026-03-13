@@ -1,6 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { CardOverview } from "./_components/card-overview";
 import { CashFlowOverview } from "./_components/cash-flow-overview";
 import { IncomeReliability } from "./_components/income-reliability";
 import { MonthlyCashFlow } from "./_components/kpis/monthly-cash-flow";
@@ -44,8 +43,6 @@ export default function Page() {
                   <IncomeReliability />
                 </div>
               </div>
-
-              <CardOverview />
             </div>
           </div>
         </TabsContent>
