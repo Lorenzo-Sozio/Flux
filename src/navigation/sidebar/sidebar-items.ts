@@ -1,7 +1,9 @@
 import {
   Banknote,
+  Building2,
   Calendar,
   ChartBar,
+  Contact,
   Fingerprint,
   Forklift,
   Gauge,
@@ -62,6 +64,16 @@ export const sidebarItems: NavGroup[] = [
         title: "Leads",
         url: "/dashboard/leads",
         icon: Users,
+      },
+      {
+        title: "Contacts",
+        url: "/dashboard/contacts",
+        icon: Contact,
+      },
+      {
+        title: "Companies",
+        url: "/dashboard/companies",
+        icon: Building2,
       },
       {
         title: "Finance",
