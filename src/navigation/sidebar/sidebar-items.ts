@@ -132,11 +132,6 @@ export const sidebarItems: NavGroup[] = [
         comingSoon: true,
       },
       {
-        title: "Calendar",
-        url: "/dashboard/calendar",
-        icon: Calendar,
-      },
-      {
         title: "Kanban",
         url: "/dashboard/coming-soon",
         icon: Kanban,
