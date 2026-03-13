@@ -22,6 +22,9 @@ const companySchema = z.object({
   type: z.string().default("prospect"),
   status: z.string().default("active"),
   employeeCount: z.coerce.number().optional().nullable(),
+  vatNumber: z.string().optional(),
+  sdiCode: z.string().optional(),
+  tags: z.string().optional(),
 });
 
 type CompanyFormValues = z.infer<typeof companySchema>;
@@ -39,6 +42,9 @@ export function CompanyModal({ company, children }: { company?: any; children: R
       type: company?.type || "prospect",
       status: company?.status || "active",
       employeeCount: company?.employeeCount || 0,
+      vatNumber: company?.vatNumber || "",
+      sdiCode: company?.sdiCode || "",
+      tags: company?.tags ? company.tags.join(", ") : "",
     },
   });
 
@@ -160,6 +166,41 @@ export function CompanyModal({ company, children }: { company?: any; children: R
               )}
             />
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Controller
+              control={form.control}
+              name="vatNumber"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel>VAT Number</FieldLabel>
+                  <Input {...field} placeholder="IT01234567890" aria-invalid={fieldState.invalid} />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+            <Controller
+              control={form.control}
+              name="sdiCode"
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel>SDI Code</FieldLabel>
+                  <Input {...field} placeholder="XXXXXXX" aria-invalid={fieldState.invalid} />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+          </div>
+          <Controller
+            control={form.control}
+            name="tags"
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel>Tags (comma-separated)</FieldLabel>
+                <Input {...field} placeholder="tech, startup, b2b" aria-invalid={fieldState.invalid} />
+                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              </Field>
+            )}
+          />
           <DialogFooter className="mt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel

@@ -88,6 +88,9 @@ export const companies = pgTable("company", {
   source: text("source"),
   leadScore: integer("lead_score"),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  vatNumber: text("vat_number"),
+  sdiCode: text("sdi_code"),
+  tags: text("tags").array(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 })
@@ -114,6 +117,9 @@ export const leads = pgTable("lead", {
   leadScore: integer("lead_score"),
   notes: text("notes"),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  marketingConsent: boolean("marketing_consent").default(false),
+  consentDate: timestamp("consent_date", { mode: "date" }),
+  tags: text("tags").array(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 })
@@ -139,6 +145,9 @@ export const contacts = pgTable("contact", {
   notes: text("notes"),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  marketingConsent: boolean("marketing_consent").default(false),
+  consentDate: timestamp("consent_date", { mode: "date" }),
+  tags: text("tags").array(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 })
@@ -206,3 +215,52 @@ export const orderItems = pgTable("order_item", {
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
   totalPrice: numeric("total_price", { precision: 12, scale: 2 }).notNull(),
 })
+
+import { relations } from "drizzle-orm";
+
+export const pipelineStages = pgTable("pipeline_stage", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  order: integer("order").notNull(),
+  color: text("color"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const deals = pgTable("deal", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }),
+  currency: text("currency").default("USD").notNull(),
+  expectedCloseDate: timestamp("expected_close_date", { mode: "date" }),
+  stageId: text("stage_id").references(() => pipelineStages.id, { onDelete: "restrict" }),
+  companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+  contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  status: text("status").default("open").notNull(), // open, won, lost
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const pipelineStagesRelations = relations(pipelineStages, ({ many }) => ({
+  deals: many(deals),
+}));
+
+export const dealsRelations = relations(deals, ({ one }) => ({
+  stage: one(pipelineStages, {
+    fields: [deals.stageId],
+    references: [pipelineStages.id],
+  }),
+  company: one(companies, {
+    fields: [deals.companyId],
+    references: [companies.id],
+  }),
+  contact: one(contacts, {
+    fields: [deals.contactId],
+    references: [contacts.id],
+  }),
+  owner: one(users, {
+    fields: [deals.ownerId],
+    references: [users.id],
+  }),
+}));

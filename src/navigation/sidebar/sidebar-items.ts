@@ -61,6 +61,11 @@ export const sidebarItems: NavGroup[] = [
         icon: ChartBar,
       },
       {
+        title: "Pipeline",
+        url: "/dashboard/pipeline",
+        icon: Kanban,
+      },
+      {
         title: "Leads",
         url: "/dashboard/leads",
         icon: Users,

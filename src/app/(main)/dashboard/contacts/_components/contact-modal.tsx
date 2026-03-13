@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const contactSchema = z.object({
@@ -22,6 +23,8 @@ const contactSchema = z.object({
   jobTitle: z.string().optional(),
   status: z.string().default("active"),
   leadScore: z.coerce.number().optional().nullable(),
+  marketingConsent: z.boolean().default(false),
+  tags: z.string().optional(),
 });
 
 type ContactFormValues = z.infer<typeof contactSchema>;
@@ -39,6 +42,8 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
       jobTitle: contact?.jobTitle || "",
       status: contact?.status || "active",
       leadScore: contact?.leadScore || 0,
+      marketingConsent: contact?.marketingConsent || false,
+      tags: contact?.tags ? contact.tags.join(", ") : "",
     },
   });
 
@@ -150,6 +155,29 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
               )}
             />
           </div>
+          <Controller
+            control={form.control}
+            name="tags"
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel>Tags (comma-separated)</FieldLabel>
+                <Input {...field} placeholder="tech, startup, b2b" aria-invalid={fieldState.invalid} />
+                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              </Field>
+            )}
+          />
+          <Controller
+            control={form.control}
+            name="marketingConsent"
+            render={({ field }) => (
+              <div className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                <div className="space-y-0.5">
+                  <FieldLabel>Marketing Consent</FieldLabel>
+                </div>
+                <Switch checked={field.value} onCheckedChange={field.onChange} />
+              </div>
+            )}
+          />
           <DialogFooter className="mt-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel

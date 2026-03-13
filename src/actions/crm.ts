@@ -13,13 +13,25 @@ export async function getLeads() {
 }
 
 export async function createLead(data: any) {
-  const [newLead] = await db.insert(leads).values(data).returning();
+  const payload = {
+    ...data,
+    marketingConsent: data.marketingConsent ?? false,
+    consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
+    tags: Array.isArray(data.tags) ? data.tags : typeof data.tags === 'string' ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null,
+  };
+  const [newLead] = await db.insert(leads).values(payload).returning();
   revalidatePath("/dashboard/leads");
   return newLead;
 }
 
 export async function updateLead(id: string, data: any) {
-  const [updatedLead] = await db.update(leads).set(data).where(eq(leads.id, id)).returning();
+  const payload = {
+    ...data,
+    marketingConsent: data.marketingConsent ?? false,
+    consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
+    tags: Array.isArray(data.tags) ? data.tags : typeof data.tags === 'string' ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null,
+  };
+  const [updatedLead] = await db.update(leads).set(payload).where(eq(leads.id, id)).returning();
   revalidatePath("/dashboard/leads");
   return updatedLead;
 }
@@ -35,13 +47,25 @@ export async function getContacts() {
 }
 
 export async function createContact(data: any) {
-  const [newContact] = await db.insert(contacts).values(data).returning();
+  const payload = {
+    ...data,
+    marketingConsent: data.marketingConsent ?? false,
+    consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
+    tags: Array.isArray(data.tags) ? data.tags : typeof data.tags === 'string' ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null,
+  };
+  const [newContact] = await db.insert(contacts).values(payload).returning();
   revalidatePath("/dashboard/contacts");
   return newContact;
 }
 
 export async function updateContact(id: string, data: any) {
-  const [updatedContact] = await db.update(contacts).set(data).where(eq(contacts.id, id)).returning();
+  const payload = {
+    ...data,
+    marketingConsent: data.marketingConsent ?? false,
+    consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
+    tags: Array.isArray(data.tags) ? data.tags : typeof data.tags === 'string' ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null,
+  };
+  const [updatedContact] = await db.update(contacts).set(payload).where(eq(contacts.id, id)).returning();
   revalidatePath("/dashboard/contacts");
   return updatedContact;
 }
@@ -57,13 +81,25 @@ export async function getCompanies() {
 }
 
 export async function createCompany(data: any) {
-  const [newCompany] = await db.insert(companies).values(data).returning();
+  const payload = {
+    ...data,
+    vatNumber: data.vatNumber,
+    sdiCode: data.sdiCode,
+    tags: Array.isArray(data.tags) ? data.tags : typeof data.tags === 'string' ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null,
+  };
+  const [newCompany] = await db.insert(companies).values(payload).returning();
   revalidatePath("/dashboard/companies");
   return newCompany;
 }
 
 export async function updateCompany(id: string, data: any) {
-  const [updatedCompany] = await db.update(companies).set(data).where(eq(companies.id, id)).returning();
+  const payload = {
+    ...data,
+    vatNumber: data.vatNumber,
+    sdiCode: data.sdiCode,
+    tags: Array.isArray(data.tags) ? data.tags : typeof data.tags === 'string' ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null,
+  };
+  const [updatedCompany] = await db.update(companies).set(payload).where(eq(companies.id, id)).returning();
   revalidatePath("/dashboard/companies");
   return updatedCompany;
 }
