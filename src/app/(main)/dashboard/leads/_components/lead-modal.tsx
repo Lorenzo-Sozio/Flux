@@ -235,7 +235,19 @@ export function DeleteLeadButton({ id }: { id: string }) {
 
 export function LeadActions({ lead }: { lead: any }) {
   return (
+    import Link from "next/link";
+import { EyeIcon, PencilIcon, TrashIcon } from "lucide-react";
+
+// ... other imports
+
+export function LeadActions({ lead }: { lead: any }) {
+  return (
     <div className="flex items-center gap-2">
+      <Link href={`/dashboard/leads/${lead.id}`}>
+        <Button variant="ghost" size="icon">
+          <EyeIcon className="h-4 w-4" />
+        </Button>
+      </Link>
       <LeadModal lead={lead}>
         <Button variant="ghost" size="icon">
           <PencilIcon className="h-4 w-4" />
@@ -243,5 +255,7 @@ export function LeadActions({ lead }: { lead: any }) {
       </LeadModal>
       <DeleteLeadButton id={lead.id} />
     </div>
+  );
+}
   );
 }
