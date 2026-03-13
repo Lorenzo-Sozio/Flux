@@ -21,10 +21,7 @@ export async function createActivity(data: {
 }
 
 export async function getActivitiesByLead(leadId: string) {
-  return await db.query.activities.findMany({
-    where: eq(activities.leadId, leadId),
-    orderBy: [desc(activities.createdAt)],
-  });
+  return await db.select().from(activities).where(eq(activities.leadId, leadId)).orderBy(desc(activities.createdAt));
 }
 
 export async function deleteActivity(id: string) {

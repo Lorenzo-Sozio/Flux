@@ -18,9 +18,7 @@ export default async function LeadDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id: leadId } = await params;
-  const lead = await db.query.leads.findFirst({
-    where: eq(leads.id, leadId),
-  });
+  const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
 
   if (!lead) {
     return notFound();

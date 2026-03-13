@@ -1,16 +1,9 @@
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
-import * as schema from '../db/schema';
-import * as dotenv from 'dotenv';
-dotenv.config();
+import { db } from "../db";
+import { leads } from "../db/schema";
 
-const sql = neon(process.env.DATABASE_URL!);
-const db = drizzle(sql, { schema });
-
-async function run() {
-  console.log("Checking leads table...");
-  const existing = await db.select().from(schema.leads).limit(1);
-  console.log("Existing:", existing);
+async function main() {
+  const allLeads = await db.select().from(leads);
+  console.log("Leads in DB:", JSON.stringify(allLeads, null, 2));
 }
 
-run().catch(console.error);
+main().catch(console.error);

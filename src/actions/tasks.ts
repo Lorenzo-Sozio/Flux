@@ -23,10 +23,7 @@ export async function createTask(data: {
 }
 
 export async function getTasksByLead(leadId: string) {
-  return await db.query.tasks.findMany({
-    where: eq(tasks.leadId, leadId),
-    orderBy: [desc(tasks.createdAt)],
-  });
+  return await db.select().from(tasks).where(eq(tasks.leadId, leadId)).orderBy(desc(tasks.createdAt));
 }
 
 export async function updateTaskStatus(id: string, status: string) {
