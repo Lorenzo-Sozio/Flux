@@ -98,13 +98,13 @@ export function PipelineBoard({
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex-1 flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
+        <div className="flex-1 flex gap-4 w-full pb-4">
           {initialStages.map((stage) => {
             const stageDeals = deals.filter((d) => d.stageId === stage.id);
             const totalAmount = stageDeals.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
 
             return (
-              <div key={stage.id} className="min-w-[320px] max-w-[320px] flex flex-col bg-muted/30 rounded-xl border h-full overflow-hidden shadow-sm">
+              <div key={stage.id} className="flex-1 min-w-0 flex flex-col bg-muted/30 rounded-xl border h-full overflow-hidden shadow-sm">
                 <div className="p-4 border-b bg-background/50 backdrop-blur-sm flex flex-col gap-1 shrink-0">
                   <div className="flex items-center justify-between">
                     <h3 className="font-bold text-sm tracking-tight truncate uppercase" style={{ color: stage.color || "inherit" }}>

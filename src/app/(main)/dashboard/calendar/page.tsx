@@ -34,6 +34,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FormattedDate } from "@/components/crm/formatted-date";
+import { FormattedTime } from "@/components/crm/formatted-time";
 
 export default async function CalendarPage({
   searchParams,
@@ -166,7 +167,8 @@ export default async function CalendarPage({
                         <div className="flex items-center gap-1 font-bold">
                           {getEventIcon(event.type)}
                           <span className="truncate">
-                            <FormattedDate date={event.date} includeTime={true} /> - {event.displayTitle}
+                            <span className="text-[8px] font-black mr-1"><FormattedTime date={event.date} /></span>
+                            {event.displayTitle}
                           </span>
                         </div>
                         <div className="text-[8px] opacity-80 italic truncate pl-4">
@@ -227,6 +229,7 @@ export default async function CalendarPage({
                         <div className={`text-[10px] p-2 rounded-lg border shadow-sm flex flex-col gap-1 ${getEventStyle(event)}`}>
                           <div className="flex items-center gap-1 font-bold">
                             {getEventIcon(event.type)}
+                            <span className="text-[9px] font-black"><FormattedTime date={event.date} /></span>
                             <span>{event.displayTitle}</span>
                           </div>
                           <Badge variant="outline" className="text-[8px] h-4 bg-background/50 border-none w-fit">
@@ -266,7 +269,10 @@ export default async function CalendarPage({
                       {getEventIcon(event.type)}
                     </div>
                     <div>
-                      <h3 className="font-bold text-sm">{event.displayTitle}</h3>
+                      <h3 className="font-bold text-sm">
+                        <span className="mr-2 text-primary"><FormattedTime date={event.date} /></span>
+                        {event.displayTitle}
+                      </h3>
                       <p className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
                         <span className="font-semibold text-primary capitalize">{event.type}</span>
                         <span>•</span>
