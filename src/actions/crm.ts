@@ -81,7 +81,7 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
 
     const [newDeal] = await db.insert(deals).values({
       name: `Deal for ${lead.firstName} ${lead.lastName}`,
-      amount: 0, // Default to 0, can be updated later
+      amount: "0", // Default to 0, converted to string for numeric type
       currency: "USD",
       stageId: firstStage.id,
       companyId: companyId,
