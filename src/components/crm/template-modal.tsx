@@ -122,7 +122,7 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
         )}
       </Button>
 
-      <DialogContent className="max-w-7xl w-[90vw] max-h-[95vh] flex flex-col p-0">
+      <DialogContent className="!max-w-7xl w-[90vw] max-h-[95vh] flex flex-col p-0">
         <DialogHeader className="px-8 py-6 border-b flex-shrink-0">
           <DialogTitle className="text-2xl">{template ? "Edit Email Template" : "Create New Email Template"}</DialogTitle>
           <DialogDescription>
