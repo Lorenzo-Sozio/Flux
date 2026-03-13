@@ -28,10 +28,18 @@ export default async function LeadDetailPage({
   const session = await auth();
   const userId = session?.user?.id;
 
-  const [lead, templates] = await Promise.all([
-    db.select().from(leads).where(eq(leads.id, leadId)).then(rows => rows[0]),
-    getEmailTemplates()
-  ]);
+  let lead;
+  let templates: any[] = [];
+
+  try {
+    [lead, templates] = await Promise.all([
+      db.select().from(leads).where(eq(leads.id, leadId)).then(rows => rows[0]),
+      getEmailTemplates().catch(() => [])
+    ]);
+  } catch (error) {
+    console.error("Error loading lead:", error);
+    return notFound();
+  }
 
   if (!lead) {
     return notFound();

@@ -36,15 +36,16 @@ type EmailFormValues = z.infer<typeof emailSchema>;
 
 export function SendEmailModal({ 
   entity, 
-  templates,
+  templates = [],
   ownerId 
 }: { 
   entity: any; 
-  templates: any[];
+  templates?: any[];
   ownerId?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const safeTemplates = Array.isArray(templates) ? templates : [];
 
   const form = useForm<EmailFormValues>({
     resolver: zodResolver(emailSchema),
@@ -55,14 +56,17 @@ export function SendEmailModal({
   });
 
   const handleTemplateSelect = (templateId: string) => {
-    const template = templates.find(t => t.id === templateId);
+    const template = safeTemplates.find(t => t.id === templateId);
     if (template) {
       // Replace placeholders
-      let body = template.body;
+      let body = template.body || "";
       body = body.replace(/\{\{firstName\}\}/g, entity.firstName || "");
       body = body.replace(/\{\{lastName\}\}/g, entity.lastName || "");
+      body = body.replace(/\{\{email\}\}/g, entity.email || "");
+      body = body.replace(/\{\{companyName\}\}/g, entity.companyName || "");
+      body = body.replace(/\{\{phone\}\}/g, entity.phone || "");
       
-      form.setValue("subject", template.subject);
+      form.setValue("subject", template.subject || "");
       form.setValue("body", body);
     }
   };
@@ -103,16 +107,20 @@ export function SendEmailModal({
         <div className="space-y-4 pt-4">
           <div className="space-y-2">
             <label className="text-sm font-medium">Use Template</label>
-            <Select onValueChange={handleTemplateSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a template..." />
-              </SelectTrigger>
-              <SelectContent>
-                {templates.map(t => (
-                  <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {safeTemplates.length > 0 ? (
+              <Select onValueChange={handleTemplateSelect}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a template..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {safeTemplates.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">No templates available. Create one in Marketing &gt; Templates.</p>
+            )}
           </div>
           
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

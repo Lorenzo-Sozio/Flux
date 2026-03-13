@@ -28,18 +28,26 @@ export default async function ContactDetailPage({
   const session = await auth();
   const userId = session?.user?.id;
 
-  const [contact, templates] = await Promise.all([
-    db
-      .select({
-        contact: contacts,
-        companyName: companies.name,
-      })
-      .from(contacts)
-      .leftJoin(companies, eq(contacts.companyId, companies.id))
-      .where(eq(contacts.id, contactId))
-      .then(rows => rows[0]),
-    getEmailTemplates()
-  ]);
+  let contact;
+  let templates: any[] = [];
+
+  try {
+    [contact, templates] = await Promise.all([
+      db
+        .select({
+          contact: contacts,
+          companyName: companies.name,
+        })
+        .from(contacts)
+        .leftJoin(companies, eq(contacts.companyId, companies.id))
+        .where(eq(contacts.id, contactId))
+        .then(rows => rows[0]),
+      getEmailTemplates().catch(() => [])
+    ]);
+  } catch (error) {
+    console.error("Error loading contact:", error);
+    return notFound();
+  }
 
   if (!contact) {
     return notFound();
