@@ -122,15 +122,15 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
         )}
       </Button>
 
-      <DialogContent className="fixed inset-0 max-w-none w-full h-full m-0 rounded-none flex flex-col p-0">
-        <DialogHeader className="px-8 py-6 border-b">
+      <DialogContent className="max-w-7xl w-[90vw] max-h-[95vh] flex flex-col p-0">
+        <DialogHeader className="px-8 py-6 border-b flex-shrink-0">
           <DialogTitle className="text-2xl">{template ? "Edit Email Template" : "Create New Email Template"}</DialogTitle>
           <DialogDescription>
             Design a professional email template with HTML support and dynamic placeholders.
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4 flex-1 overflow-hidden px-8 pb-6">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4 flex-1 overflow-y-auto px-8 pb-6">
           {/* Basic Info - Compact Grid */}
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
             <div className="space-y-2">
