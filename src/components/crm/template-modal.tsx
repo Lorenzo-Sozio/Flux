@@ -78,7 +78,7 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
         <DialogHeader>
           <DialogTitle>{template ? "Edit Template" : "Create New Template"}</DialogTitle>
           <DialogDescription>
-            Design your email template with dynamic placeholders like {`{{firstName}}`} and {`{{lastName}}`}.
+            Design your email template with dynamic placeholders like {"{firstName}"} and {"{lastName}"}.
           </DialogDescription>
         </DialogHeader>
 
@@ -98,7 +98,7 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
             <Label htmlFor="subject">Email Subject Line</Label>
             <Input
               id="subject"
-              placeholder="e.g., Welcome to Flux CRM, {{firstName}}!"
+              placeholder="e.g., Welcome to Flux CRM, {firstName}!"
               value={formData.subject}
               onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
               required
@@ -109,14 +109,14 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
             <Label htmlFor="body">Email Body</Label>
             <Textarea
               id="body"
-              placeholder="Write your email content here. Use {{firstName}}, {{lastName}}, {{email}}, {{companyName}} for dynamic placeholders."
+              placeholder="Write your email content here. Use {firstName}, {lastName}, {email}, {companyName} for dynamic placeholders."
               value={formData.body}
               onChange={(e) => setFormData({ ...formData, body: e.target.value })}
               className="min-h-[300px]"
               required
             />
             <p className="text-xs text-muted-foreground">
-              💡 Available placeholders: {'{'}}{'{'}firstName{'}'}{'}'}，{'{'}}{'{'}lastName{'}'}{'}'}，{'{'}}{'{'}email{'}'}{'}'}，{'{'}}{'{'}companyName{'}'}{'}'}{'}'}
+              Available placeholders: firstName, lastName, email, companyName
             </p>
           </div>
 

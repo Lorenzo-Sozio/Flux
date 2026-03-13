@@ -53,10 +53,7 @@ export function CampaignModal({ campaign, onSuccess }: CampaignModalProps) {
         await updateMarketingCampaign(campaign.id, formData);
         toast.success("Campaign updated successfully");
       } else {
-        await createMarketingCampaign({
-          ...formData,
-          ownerId: "", // Will be set by server action
-        });
+        await createMarketingCampaign(formData);
         toast.success("Campaign created successfully");
       }
       setOpen(false);
