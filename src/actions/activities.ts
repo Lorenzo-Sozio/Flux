@@ -17,6 +17,9 @@ export async function createActivity(data: {
 }) {
   const result = await db.insert(activities).values(data).returning();
   if (data.leadId) revalidatePath(`/dashboard/leads/${data.leadId}`);
+  if (data.contactId) revalidatePath(`/dashboard/contacts/${data.contactId}`);
+  if (data.companyId) revalidatePath(`/dashboard/companies/${data.companyId}`);
+  if (data.dealId) revalidatePath(`/dashboard/pipeline`);
   return result[0];
 }
 
@@ -35,7 +38,37 @@ export async function getActivitiesByLead(leadId: string) {
     .orderBy(desc(activities.createdAt));
 }
 
-export async function deleteActivity(id: string, leadId?: string) {
+export async function getActivitiesByContact(contactId: string) {
+  return await db
+    .select({
+      id: activities.id,
+      type: activities.type,
+      content: activities.content,
+      createdAt: activities.createdAt,
+      ownerName: users.name,
+    })
+    .from(activities)
+    .leftJoin(users, eq(activities.ownerId, users.id))
+    .where(eq(activities.contactId, contactId))
+    .orderBy(desc(activities.createdAt));
+}
+
+export async function getActivitiesByCompany(companyId: string) {
+  return await db
+    .select({
+      id: activities.id,
+      type: activities.type,
+      content: activities.content,
+      createdAt: activities.createdAt,
+      ownerName: users.name,
+    })
+    .from(activities)
+    .leftJoin(users, eq(activities.ownerId, users.id))
+    .where(eq(activities.companyId, companyId))
+    .orderBy(desc(activities.createdAt));
+}
+
+export async function deleteActivity(id: string, revalidatePathStr?: string) {
   await db.delete(activities).where(eq(activities.id, id));
-  if (leadId) revalidatePath(`/dashboard/leads/${leadId}`);
+  if (revalidatePathStr) revalidatePath(revalidatePathStr);
 }

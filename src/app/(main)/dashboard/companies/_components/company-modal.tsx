@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2Icon, PencilIcon, TrashIcon } from "lucide-react";
+import { Loader2Icon, PencilIcon, TrashIcon, EyeIcon } from "lucide-react";
+import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -255,6 +256,11 @@ export function DeleteCompanyButton({ id }: { id: string }) {
 export function CompanyActions({ company }: { company: any }) {
   return (
     <div className="flex items-center gap-2 justify-end">
+      <Link href={`/dashboard/companies/${company.id}`}>
+        <Button variant="ghost" size="icon">
+          <EyeIcon className="h-4 w-4" />
+        </Button>
+      </Link>
       <CompanyModal company={company}>
         <Button variant="ghost" size="icon">
           <PencilIcon className="h-4 w-4" />

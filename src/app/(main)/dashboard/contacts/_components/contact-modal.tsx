@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Loader2Icon, PencilIcon, TrashIcon } from "lucide-react";
+import { Loader2Icon, PencilIcon, TrashIcon, EyeIcon } from "lucide-react";
+import Link from "next/link";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -232,6 +233,11 @@ export function DeleteContactButton({ id }: { id: string }) {
 export function ContactActions({ contact }: { contact: any }) {
   return (
     <div className="flex items-center gap-2 justify-end">
+      <Link href={`/dashboard/contacts/${contact.id}`}>
+        <Button variant="ghost" size="icon">
+          <EyeIcon className="h-4 w-4" />
+        </Button>
+      </Link>
       <ContactModal contact={contact}>
         <Button variant="ghost" size="icon">
           <PencilIcon className="h-4 w-4" />
