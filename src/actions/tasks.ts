@@ -2,7 +2,7 @@
 
 import { db } from "@/db";
 import { tasks, users } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, alias } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export async function createTask(data: {
@@ -12,6 +12,7 @@ export async function createTask(data: {
   status?: string;
   priority?: string;
   ownerId?: string;
+  assigneeId?: string;
   leadId?: string;
   contactId?: string;
   companyId?: string;
@@ -23,6 +24,9 @@ export async function createTask(data: {
 }
 
 export async function getTasksByLead(leadId: string) {
+  const creator = alias(users, "creator");
+  const assignee = alias(users, "assignee");
+
   return await db
     .select({
       id: tasks.id,
@@ -32,10 +36,12 @@ export async function getTasksByLead(leadId: string) {
       status: tasks.status,
       priority: tasks.priority,
       createdAt: tasks.createdAt,
-      ownerName: users.name,
+      ownerName: creator.name,
+      assigneeName: assignee.name,
     })
     .from(tasks)
-    .leftJoin(users, eq(tasks.ownerId, users.id))
+    .leftJoin(creator, eq(tasks.ownerId, creator.id))
+    .leftJoin(assignee, eq(tasks.assigneeId, assignee.id))
     .where(eq(tasks.leadId, leadId))
     .orderBy(desc(tasks.createdAt));
 }
@@ -48,4 +54,8 @@ export async function updateTaskStatus(id: string, status: string, leadId?: stri
 export async function deleteTask(id: string, leadId?: string) {
   await db.delete(tasks).where(eq(tasks.id, id));
   if (leadId) revalidatePath(`/dashboard/leads/${leadId}`);
+}
+
+export async function getAllUsers() {
+  return await db.select({ id: users.id, name: users.name }).from(users);
 }

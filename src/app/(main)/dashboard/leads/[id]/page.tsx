@@ -6,14 +6,13 @@ import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getActivitiesByLead, createActivity } from "@/actions/activities";
-import { getTasksByLead, createTask, updateTaskStatus } from "@/actions/tasks";
+import { getTasksByLead, createTask, updateTaskStatus, getAllUsers } from "@/actions/tasks";
 import { revalidatePath } from "next/cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ConvertLeadButton } from "./_components/convert-lead-button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CalendarIcon, UserIcon } from "lucide-react";
+import { CalendarIcon, UserIcon, UserCheckIcon } from "lucide-react";
 
 export default async function LeadDetailPage({
   params,
@@ -32,6 +31,7 @@ export default async function LeadDetailPage({
 
   const leadActivities = await getActivitiesByLead(leadId);
   const leadTasks = await getTasksByLead(leadId);
+  const allUsers = await getAllUsers();
 
   async function handleAddNote(formData: FormData) {
     "use server";
@@ -54,6 +54,7 @@ export default async function LeadDetailPage({
     const description = formData.get("description") as string;
     const priority = formData.get("priority") as string;
     const dueDateStr = formData.get("dueDate") as string;
+    const assigneeId = formData.get("assigneeId") as string;
     
     if (title) {
       await createTask({
@@ -64,6 +65,7 @@ export default async function LeadDetailPage({
         dueDate: dueDateStr ? new Date(dueDateStr) : undefined,
         leadId,
         ownerId: userId,
+        assigneeId: assigneeId || userId, // Default to self if not specified
       });
       revalidatePath(`/dashboard/leads/${leadId}`);
     }
@@ -179,8 +181,8 @@ export default async function LeadDetailPage({
             <form action={handleAddTask} className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/20">
               <Input name="title" placeholder="Task title..." required />
               <Textarea name="description" placeholder="Short description (optional)..." className="h-20" />
-              <div className="flex gap-4">
-                <div className="flex-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
                   <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">Priority</p>
                   <select name="priority" className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors">
                     <option value="low">Low</option>
@@ -188,9 +190,18 @@ export default async function LeadDetailPage({
                     <option value="high">High</option>
                   </select>
                 </div>
-                <div className="flex-1">
+                <div>
                   <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">Due Date</p>
                   <Input name="dueDate" type="date" className="h-9" />
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">Assign To</p>
+                  <select name="assigneeId" className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors">
+                    <option value="">Myself</option>
+                    {allUsers.filter(u => u.id !== userId).map(u => (
+                      <option key={u.id} value={u.id}>{u.name || "Unnamed User"}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <Button type="submit" size="sm" className="mt-2">Create Task</Button>
@@ -204,13 +215,9 @@ export default async function LeadDetailPage({
                   <div key={task.id} className={`flex flex-col gap-2 border p-3 rounded-md transition-all ${task.status === "done" ? "opacity-50 bg-muted/30" : "bg-card"}`}>
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3">
-                        <input 
-                          type="checkbox" 
-                          checked={task.status === "done"} 
-                          className="mt-1 h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                          // Note: In a real app we'd use a form action or a client component here
-                          // For now, let's keep it simple with a hidden button or link if needed
-                        />
+                        <div className="mt-1 h-4 w-4 rounded-full border border-primary flex items-center justify-center">
+                          {task.status === "done" && <div className="w-2 h-2 bg-primary rounded-full" />}
+                        </div>
                         <div>
                           <p className={`font-medium text-sm ${task.status === "done" ? "line-through" : ""}`}>{task.title}</p>
                           {task.description && <p className="text-xs text-muted-foreground mt-1">{task.description}</p>}
@@ -222,15 +229,22 @@ export default async function LeadDetailPage({
                     </div>
                     
                     <div className="flex items-center justify-between mt-1">
-                      <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
-                        {task.dueDate && (
+                      <div className="flex flex-col gap-1 text-[10px] text-muted-foreground">
+                        <div className="flex items-center gap-4">
+                          {task.dueDate && (
+                            <span className="flex items-center gap-1 font-semibold text-foreground/70">
+                              <CalendarIcon className="w-3 h-3" />
+                              Due: {new Date(task.dueDate).toLocaleDateString()}
+                            </span>
+                          )}
                           <span className="flex items-center gap-1">
-                            <CalendarIcon className="w-3 h-3" />
-                            {new Date(task.dueDate).toLocaleDateString()}
+                            <UserIcon className="w-3 h-3" />
+                            By: {task.ownerName || "System"}
                           </span>
-                        )}
-                        <span className="flex items-center gap-1 italic">
-                          Created by {task.ownerName || "System"}
+                        </div>
+                        <span className="flex items-center gap-1 font-medium text-primary/80">
+                          <UserCheckIcon className="w-3 h-3" />
+                          Assigned to: {task.assigneeName || "Myself"}
                         </span>
                       </div>
                       <form action={async () => { "use server"; await toggleTask(task.id, task.status); }}>
