@@ -35,12 +35,13 @@ export default async function LeadDetailPage({
   const leadTasks = await getTasksByLead(leadId);
   const allUsers = await getAllUsers();
 
-  async function handleAddNote(formData: FormData) {
+  async function handleAddActivity(formData: FormData) {
     "use server";
     const content = formData.get("content") as string;
+    const type = formData.get("type") as string;
     if (content) {
       await createActivity({
-        type: "note",
+        type: type || "note",
         content,
         leadId,
         ownerId: userId,
@@ -137,16 +138,28 @@ export default async function LeadDetailPage({
         {/* Notes / Activities */}
         <Card>
           <CardHeader>
-            <CardTitle>Timeline & Notes</CardTitle>
+            <CardTitle>Timeline & Activities</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <form action={handleAddNote} className="flex flex-col gap-2">
+            <form action={handleAddActivity} className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/20">
               <Textarea
                 name="content"
-                placeholder="Add a new note..."
+                placeholder="Log a call, meeting or note..."
                 required
+                className="bg-background"
               />
-              <Button type="submit" className="self-end">Add Note</Button>
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Type:</p>
+                  <select name="type" className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm transition-colors">
+                    <option value="note">Note</option>
+                    <option value="call">Call</option>
+                    <option value="meeting">Meeting</option>
+                    <option value="email">Email</option>
+                  </select>
+                </div>
+                <Button type="submit" size="sm">Log Activity</Button>
+              </div>
             </form>
             
             <div className="space-y-4 mt-6">

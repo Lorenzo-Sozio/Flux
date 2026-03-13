@@ -34,12 +34,13 @@ export default async function CompanyDetailPage({
   const tasksList = await getTasksByCompany(companyId);
   const allUsers = await getAllUsers();
 
-  async function handleAddNote(formData: FormData) {
+  async function handleAddActivity(formData: FormData) {
     "use server";
     const content = formData.get("content") as string;
+    const type = formData.get("type") as string;
     if (content) {
       await createActivity({
-        type: "note",
+        type: type || "note",
         content,
         companyId,
         ownerId: userId,
@@ -121,11 +122,22 @@ export default async function CompanyDetailPage({
       <div className="w-full md:w-2/3 flex flex-col gap-6">
         {/* Notes / Activities */}
         <Card>
-          <CardHeader><CardTitle>Timeline & Notes</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Timeline & Activities</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <form action={handleAddNote} className="flex flex-col gap-2">
-              <Textarea name="content" placeholder="Log a company activity..." required />
-              <Button type="submit" className="self-end">Add Note</Button>
+            <form action={handleAddActivity} className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/20">
+              <Textarea name="content" placeholder="Log a call, meeting or note..." required className="bg-background" />
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Type:</p>
+                  <select name="type" className="h-8 rounded-md border bg-background px-2 text-xs">
+                    <option value="note">Note</option>
+                    <option value="call">Call</option>
+                    <option value="meeting">Meeting</option>
+                    <option value="email">Email</option>
+                  </select>
+                </div>
+                <Button type="submit" size="sm">Log Activity</Button>
+              </div>
             </form>
             <div className="space-y-4 mt-6">
               {activitiesList.map(activity => (

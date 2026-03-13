@@ -67,7 +67,7 @@ export function ActivityModal({ activity, revalidatePathStr }: { activity: any; 
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Edit Activity</DialogTitle>
+          <DialogTitle className="capitalize">Edit {activity.type}</DialogTitle>
         </DialogHeader>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
           <div className="space-y-2">
