@@ -321,6 +321,36 @@ export const campaignLogs = pgTable("campaign_log", {
   status: text("status").default("sent").notNull(), // sent, opened, clicked, failed
 });
 
+// --- CUSTOM FILTERS ---
+export const customFilters = pgTable("custom_filter", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  description: text("description"),
+  entityType: text("entity_type").notNull(), // leads, contacts, companies, deals, activities, tasks
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  criteria: text("criteria").notNull(), // JSON stringified array of filter conditions
+  isPublic: boolean("is_public").default(false), // true = shared with team
+  isPinned: boolean("is_pinned").default(false), // true = shows in quick access
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const customFilterTags = pgTable("custom_filter_tag", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  filterId: text("filter_id").references(() => customFilters.id, { onDelete: "cascade" }).notNull(),
+  tag: text("tag").notNull(), // e.g., "sales", "high-priority", "q2-2026"
+});
+
+export const filterPresets = pgTable("filter_preset", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  description: text("description"),
+  entityType: text("entity_type").notNull(), // leads, contacts, etc.
+  defaultCriteria: text("default_criteria").notNull(), // JSON - predefined filter conditions
+  isSystem: boolean("is_system").default(false), // true = built-in system presets
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 export const activitiesRelations = relations(activities, ({ one }) => ({
   owner: one(users, { fields: [activities.ownerId], references: [users.id] }),
   lead: one(leads, { fields: [activities.leadId], references: [leads.id] }),
@@ -365,4 +395,13 @@ export const contactsRelations = relations(contacts, ({ many, one }) => ({
   tasks: many(tasks),
   campaignLogs: many(campaignLogs),
   company: one(companies, { fields: [contacts.companyId], references: [companies.id] }),
+}));
+
+export const customFiltersRelations = relations(customFilters, ({ one, many }) => ({
+  owner: one(users, { fields: [customFilters.ownerId], references: [users.id] }),
+  tags: many(customFilterTags),
+}));
+
+export const customFilterTagsRelations = relations(customFilterTags, ({ one }) => ({
+  filter: one(customFilters, { fields: [customFilterTags.filterId], references: [customFilters.id] }),
 }));
