@@ -85,6 +85,22 @@ export const sidebarItems: NavGroup[] = [
   },
   {
     id: 2,
+    label: "Marketing",
+    items: [
+      {
+        title: "Templates",
+        url: "/dashboard/marketing/templates",
+        icon: Mail,
+      },
+      {
+        title: "Campaigns",
+        url: "/dashboard/marketing/campaigns",
+        icon: Target,
+      },
+    ],
+  },
+   {
+    id: 3,
     label: "Templates",
     items: [
     {
@@ -112,22 +128,6 @@ export const sidebarItems: NavGroup[] = [
           { title: "Register v1", url: "/auth/v1/register", newTab: true },
           { title: "Register v2", url: "/auth/v2/register", newTab: true },
         ],
-      },
-    ],
-  },
-  {
-    id: 3,
-    label: "Marketing",
-    items: [
-      {
-        title: "Templates",
-        url: "/dashboard/marketing/templates",
-        icon: Mail,
-      },
-      {
-        title: "Campaigns",
-        url: "/dashboard/marketing/campaigns",
-        icon: Target,
       },
     ],
   },
