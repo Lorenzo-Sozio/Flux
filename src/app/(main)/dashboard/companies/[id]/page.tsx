@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, GlobeIcon, PhoneIcon } from "lucide-react";
+import { ActivityModal } from "@/components/crm/activity-modal";
 
 export default async function CompanyDetailPage({
   params,
@@ -133,7 +134,10 @@ export default async function CompanyDetailPage({
                     <p className="text-xs font-semibold flex items-center gap-1 text-primary">
                       <UserIcon className="w-3 h-3" />{activity.ownerName || "System"}
                     </p>
-                    <p className="text-[10px] text-muted-foreground">{new Date(activity.createdAt).toLocaleString()}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-[10px] text-muted-foreground">{new Date(activity.createdAt).toLocaleString()}</p>
+                      <ActivityModal activity={activity} revalidatePathStr={`/dashboard/companies/${companyId}`} />
+                    </div>
                   </div>
                   <p className="text-sm mt-1">{activity.content}</p>
                 </div>
@@ -150,7 +154,7 @@ export default async function CompanyDetailPage({
               <Input name="title" placeholder="New company task..." required />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div><select name="priority" className="w-full h-9 rounded-md border bg-background text-sm"><option value="low">Low</option><option value="normal" selected>Normal</option><option value="high">High</option></select></div>
-                <div><Input name="dueDate" type="date" className="h-9" /></div>
+                <div><Input name="dueDate" type="datetime-local" className="h-9" /></div>
                 <div><select name="assigneeId" className="w-full h-9 rounded-md border bg-background text-sm"><option value="">Myself</option>{allUsers.filter(u => u.id !== userId).map(u => (<option key={u.id} value={u.id}>{u.name}</option>))}</select></div>
               </div>
               <Button type="submit" size="sm">Create Task</Button>
@@ -165,8 +169,8 @@ export default async function CompanyDetailPage({
                   <div className="flex items-center justify-between mt-1">
                     <div className="flex flex-col gap-1 text-[10px] text-muted-foreground">
                       <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-1"><ClockIcon className="w-3 h-3" />Created: {new Date(task.createdAt).toLocaleDateString()}</span>
-                        {task.dueDate && <span className="flex items-center gap-1 font-semibold"><CalendarIcon className="w-3 h-3" />Due: {new Date(task.dueDate).toLocaleDateString()}</span>}
+                        <span className="flex items-center gap-1"><ClockIcon className="w-3 h-3" />Created: {new Date(task.createdAt).toLocaleString()}</span>
+                        {task.dueDate && <span className="flex items-center gap-1 font-semibold"><CalendarIcon className="w-3 h-3" />Due: {new Date(task.dueDate).toLocaleString()}</span>}
                       </div>
                       <span className="flex items-center gap-1 font-medium text-primary/80"><UserCheckIcon className="w-3 h-3" />To: {task.assigneeName || "Myself"}</span>
                     </div>

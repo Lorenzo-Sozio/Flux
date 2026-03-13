@@ -164,7 +164,7 @@ export default async function CalendarPage({
                       <div className={`text-[9px] p-1 rounded border truncate flex flex-col gap-0.5 group hover:shadow-sm transition-all ${getEventStyle(event)}`}>
                         <div className="flex items-center gap-1 font-bold">
                           {getEventIcon(event.type)}
-                          <span className="truncate">{event.displayTitle}</span>
+                          <span className="truncate">{format(new Date(event.date), "HH:mm")} {event.displayTitle}</span>
                         </div>
                         <div className="text-[8px] opacity-80 italic truncate pl-4">
                           @{event.entityName}

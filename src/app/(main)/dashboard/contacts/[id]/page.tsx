@@ -11,8 +11,9 @@ import { revalidatePath } from "next/cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, CheckCircle2Icon, BuildingIcon } from "lucide-react";
+import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, BuildingIcon } from "lucide-react";
 import Link from "next/link";
+import { ActivityModal } from "@/components/crm/activity-modal";
 
 export default async function ContactDetailPage({
   params,
@@ -158,9 +159,13 @@ export default async function ContactDetailPage({
                         <UserIcon className="w-3 h-3" />
                         {activity.ownerName || "System"}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">{new Date(activity.createdAt).toLocaleString()}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] text-muted-foreground">{new Date(activity.createdAt).toLocaleString()}</p>
+                        <ActivityModal activity={activity} revalidatePathStr={`/dashboard/contacts/${contactId}`} />
+                      </div>
                     </div>
                     <p className="text-sm mt-1">{activity.content}</p>
+                    <Badge variant="secondary" className="text-[10px] mt-2 h-4 px-1">{activity.type}</Badge>
                   </div>
                 ))
               )}
@@ -184,8 +189,8 @@ export default async function ContactDetailPage({
                   </select>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase font-bold mb-1 text-muted-foreground">Due Date</p>
-                  <Input name="dueDate" type="date" className="h-9" />
+                  <p className="text-[10px] uppercase font-bold mb-1 text-muted-foreground">Due Date & Time</p>
+                  <Input name="dueDate" type="datetime-local" className="h-9" />
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-bold mb-1 text-muted-foreground">Assign To</p>
@@ -209,8 +214,8 @@ export default async function ContactDetailPage({
                   <div className="flex items-center justify-between mt-1">
                     <div className="flex flex-col gap-1 text-[10px] text-muted-foreground">
                       <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-1"><ClockIcon className="w-3 h-3" />Created: {new Date(task.createdAt).toLocaleDateString()}</span>
-                        {task.dueDate && <span className="flex items-center gap-1 font-semibold"><CalendarIcon className="w-3 h-3" />Due: {new Date(task.dueDate).toLocaleDateString()}</span>}
+                        <span className="flex items-center gap-1"><ClockIcon className="w-3 h-3" />Created: {new Date(task.createdAt).toLocaleString()}</span>
+                        {task.dueDate && <span className="flex items-center gap-1 font-semibold"><CalendarIcon className="w-3 h-3" />Due: {new Date(task.dueDate).toLocaleString()}</span>}
                       </div>
                       <span className="flex items-center gap-1 font-medium text-primary/80"><UserCheckIcon className="w-3 h-3" />To: {task.assigneeName || "Myself"}</span>
                     </div>

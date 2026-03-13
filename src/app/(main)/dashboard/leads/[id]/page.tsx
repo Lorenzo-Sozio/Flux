@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ConvertLeadButton } from "./_components/convert-lead-button";
 import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, CheckCircle2Icon } from "lucide-react";
+import { ActivityModal } from "@/components/crm/activity-modal";
 
 export default async function LeadDetailPage({
   params,
@@ -74,7 +75,7 @@ export default async function LeadDetailPage({
   async function toggleTask(taskId: string, currentStatus: string) {
     "use server";
     const newStatus = currentStatus === "done" ? "todo" : "done";
-    await updateTaskStatus(taskId, newStatus, leadId);
+    await updateTaskStatus(taskId, newStatus, `/dashboard/leads/${leadId}`);
   }
 
   return (
@@ -159,9 +160,12 @@ export default async function LeadDetailPage({
                         <UserIcon className="w-3 h-3" />
                         {activity.ownerName || "System"}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {new Date(activity.createdAt).toLocaleString()}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-[10px] text-muted-foreground">
+                          {new Date(activity.createdAt).toLocaleString()}
+                        </p>
+                        <ActivityModal activity={activity} revalidatePathStr={`/dashboard/leads/${leadId}`} />
+                      </div>
                     </div>
                     <p className="text-sm mt-1">{activity.content}</p>
                     <Badge variant="secondary" className="text-[10px] mt-2 h-4 px-1">{activity.type}</Badge>
@@ -191,8 +195,8 @@ export default async function LeadDetailPage({
                   </select>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">Due Date</p>
-                  <Input name="dueDate" type="date" className="h-9" />
+                  <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">Due Date & Time</p>
+                  <Input name="dueDate" type="datetime-local" className="h-9" />
                 </div>
                 <div>
                   <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">Assign To</p>
@@ -232,18 +236,18 @@ export default async function LeadDetailPage({
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <ClockIcon className="w-3 h-3 text-blue-500" />
-                          Created: {new Date(task.createdAt).toLocaleDateString()}
+                          Created: {new Date(task.createdAt).toLocaleString()}
                         </span>
                         {task.status === "done" && task.completedAt && (
                           <span className="flex items-center gap-1 font-medium text-green-600">
                             <CheckCircle2Icon className="w-3 h-3" />
-                            Completed: {new Date(task.completedAt).toLocaleDateString()}
+                            Completed: {new Date(task.completedAt).toLocaleString()}
                           </span>
                         )}
                         {task.dueDate && (
                           <span className={`flex items-center gap-1 font-semibold ${task.status !== "done" && new Date(task.dueDate) < new Date() ? "text-destructive" : "text-foreground/70"}`}>
                             <CalendarIcon className="w-3 h-3" />
-                            Due: {new Date(task.dueDate).toLocaleDateString()}
+                            Due: {new Date(task.dueDate).toLocaleString()}
                           </span>
                         )}
                       </div>

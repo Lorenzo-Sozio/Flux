@@ -68,6 +68,12 @@ export async function getActivitiesByCompany(companyId: string) {
     .orderBy(desc(activities.createdAt));
 }
 
+export async function updateActivity(id: string, data: Partial<typeof activities.$inferInsert>, revalidatePathStr?: string) {
+  const result = await db.update(activities).set(data).where(eq(activities.id, id)).returning();
+  if (revalidatePathStr) revalidatePath(revalidatePathStr);
+  return result[0];
+}
+
 export async function deleteActivity(id: string, revalidatePathStr?: string) {
   await db.delete(activities).where(eq(activities.id, id));
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
