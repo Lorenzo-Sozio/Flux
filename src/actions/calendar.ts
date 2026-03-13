@@ -2,10 +2,10 @@
 
 import { db } from "@/db";
 import { tasks, activities, leads, contacts, companies, deals } from "@/db/schema";
-import { eq, isNotNull, or, inArray } from "drizzle-orm";
+import { eq, isNotNull, or } from "drizzle-orm";
 
 export async function getCalendarEvents() {
-  // 1. Fetch Tasks
+  // 1. Fetch Tasks with linked entities
   const allTasks = await db
     .select({
       id: tasks.id,
@@ -13,8 +13,6 @@ export async function getCalendarEvents() {
       date: tasks.dueDate,
       status: tasks.status,
       priority: tasks.priority,
-      type: db.select({ val: tasks.status }).from(tasks).limit(0).then(() => "task"), // Dummy but for typing if needed, actually just string "task"
-      entityType: db.select({ val: tasks.id }).from(tasks).limit(0).then(() => "lead"), // Will logic later
       leadName: leads.firstName,
       leadLastName: leads.lastName,
       contactName: contacts.firstName,
@@ -37,10 +35,8 @@ export async function getCalendarEvents() {
   const allActivities = await db
     .select({
       id: activities.id,
-      title: activities.content, // Using content as title for now
+      title: activities.content,
       date: activities.date,
-      status: db.select({ val: activities.id }).from(activities).limit(0).then(() => "active"),
-      priority: db.select({ val: activities.id }).from(activities).limit(0).then(() => "normal"),
       type: activities.type, // 'meeting' or 'call'
       leadName: leads.firstName,
       leadLastName: leads.lastName,
@@ -65,22 +61,40 @@ export async function getCalendarEvents() {
       )
     );
 
-  // Combine and Format
-  const events = [
-    ...allTasks.map(t => ({
-      ...t,
-      type: "task",
-      displayTitle: t.title,
-      entityName: t.leadName ? `${t.leadName} ${t.leadLastName}` : t.contactName ? `${t.contactName} ${t.contactLastName}` : t.companyName || t.dealName || "No Entity",
-      link: t.leadId ? `/dashboard/leads/${t.leadId}` : t.contactId ? `/dashboard/contacts/${t.contactId}` : t.dealId ? `/dashboard/pipeline?dealId=${t.dealId}` : "#"
-    })),
-    ...allActivities.filter(a => a.date).map(a => ({
-      ...a,
-      displayTitle: (a.title || "").substring(0, 50) + ((a.title || "").length > 50 ? "..." : ""),
-      entityName: a.leadName ? `${a.leadName} ${a.leadLastName}` : a.contactName ? `${a.contactName} ${a.contactLastName}` : a.companyName || a.dealName || "No Entity",
-      link: a.leadId ? `/dashboard/leads/${a.leadId}` : a.contactId ? `/dashboard/contacts/${a.contactId}` : a.dealId ? `/dashboard/pipeline?dealId=${a.dealId}` : "#"
-    }))
-  ];
+  // Combine and Format in JavaScript
+  const formattedTasks = allTasks.map(t => ({
+    id: t.id,
+    title: t.title,
+    date: t.date!,
+    type: "task",
+    status: t.status,
+    priority: t.priority,
+    displayTitle: t.title,
+    entityName: t.leadName ? `${t.leadName} ${t.leadLastName}` : 
+                t.contactName ? `${t.contactName} ${t.contactLastName}` : 
+                t.companyName || t.dealName || "No Entity",
+    link: t.leadId ? `/dashboard/leads/${t.leadId}` : 
+          t.contactId ? `/dashboard/contacts/${t.contactId}` : 
+          t.dealId ? `/dashboard/pipeline?dealId=${t.dealId}` : "#",
+    leadId: t.leadId,
+  }));
 
-  return events;
+  const formattedActivities = allActivities.filter(a => a.date).map(a => ({
+    id: a.id,
+    title: a.title || "",
+    date: a.date!,
+    type: a.type, // meeting or call
+    status: "active",
+    priority: "normal",
+    displayTitle: (a.title || "").substring(0, 50) + ((a.title || "").length > 50 ? "..." : ""),
+    entityName: a.leadName ? `${a.leadName} ${a.leadLastName}` : 
+                a.contactName ? `${a.contactName} ${a.contactLastName}` : 
+                a.companyName || a.dealName || "No Entity",
+    link: a.leadId ? `/dashboard/leads/${a.leadId}` : 
+          a.contactId ? `/dashboard/contacts/${a.contactId}` : 
+          a.dealId ? `/dashboard/pipeline?dealId=${a.dealId}` : "#",
+    leadId: a.leadId,
+  }));
+
+  return [...formattedTasks, ...formattedActivities];
 }
