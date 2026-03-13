@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, GlobeIcon, PhoneIcon } from "lucide-react";
 import { ActivityModal } from "@/components/crm/activity-modal";
+import { TaskModal } from "@/components/crm/task-modal";
 
 export default async function CompanyDetailPage({
   params,
@@ -164,7 +165,10 @@ export default async function CompanyDetailPage({
                 <div key={task.id} className={`flex flex-col gap-2 border p-3 rounded-md transition-all ${task.status === "done" ? "opacity-60 bg-muted/30" : "bg-card shadow-sm"}`}>
                   <div className="flex items-start justify-between">
                     <p className={`font-medium text-sm ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>{task.title}</p>
-                    <Badge variant={task.priority === "high" ? "destructive" : task.priority === "low" ? "secondary" : "default"} className="text-[10px] uppercase">{task.priority}</Badge>
+                    <div className="flex items-center gap-1">
+                      <Badge variant={task.priority === "high" ? "destructive" : task.priority === "low" ? "secondary" : "default"} className="text-[10px] uppercase">{task.priority}</Badge>
+                      <TaskModal task={task} users={allUsers} revalidatePathStr={`/dashboard/companies/${companyId}`} />
+                    </div>
                   </div>
                   <div className="flex items-center justify-between mt-1">
                     <div className="flex flex-col gap-1 text-[10px] text-muted-foreground">

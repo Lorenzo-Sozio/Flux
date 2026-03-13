@@ -71,6 +71,13 @@ async function getTasksGeneric(where: { leadId?: string; contactId?: string; com
   return await query.orderBy(desc(tasks.createdAt));
 }
 
+export async function updateTask(id: string, data: Partial<typeof tasks.$inferInsert>, revalidatePathStr?: string) {
+  const result = await db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
+  if (revalidatePathStr) revalidatePath(revalidatePathStr);
+  revalidatePath("/dashboard/calendar");
+  return result[0];
+}
+
 export async function updateTaskStatus(id: string, status: string, revalidatePathStr?: string) {
   const completedAt = status === "done" ? new Date() : null;
   await db.update(tasks).set({ status, completedAt }).where(eq(tasks.id, id));

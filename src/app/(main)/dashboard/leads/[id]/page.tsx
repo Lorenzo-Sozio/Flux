@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ConvertLeadButton } from "./_components/convert-lead-button";
 import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, CheckCircle2Icon } from "lucide-react";
 import { ActivityModal } from "@/components/crm/activity-modal";
+import { TaskModal } from "@/components/crm/task-modal";
 
 export default async function LeadDetailPage({
   params,
@@ -227,9 +228,12 @@ export default async function LeadDetailPage({
                           {task.description && <p className="text-xs text-muted-foreground mt-1">{task.description}</p>}
                         </div>
                       </div>
-                      <Badge variant={task.priority === "high" ? "destructive" : task.priority === "low" ? "secondary" : "default"} className="text-[10px] uppercase">
-                        {task.priority}
-                      </Badge>
+                      <div className="flex items-center gap-1">
+                        <Badge variant={task.priority === "high" ? "destructive" : task.priority === "low" ? "secondary" : "default"} className="text-[10px] uppercase">
+                          {task.priority}
+                        </Badge>
+                        <TaskModal task={task} users={allUsers} revalidatePathStr={`/dashboard/leads/${leadId}`} />
+                      </div>
                     </div>
                     
                     <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-dashed">
