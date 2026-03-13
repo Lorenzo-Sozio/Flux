@@ -60,9 +60,14 @@ export default async function LeadDetailPage({
     <div className="flex flex-col md:flex-row gap-6 p-6">
       {/* Left side: Lead Details */}
       <div className="w-full md:w-1/3 flex flex-col gap-6">
+import { ConvertLeadButton } from "./_components/convert-lead-button";
+
+// ... other imports
+
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Lead Details</CardTitle>
+            {!lead.isConverted && <ConvertLeadButton leadId={lead.id} />}
           </CardHeader>
           <CardContent className="space-y-4">
             <div>

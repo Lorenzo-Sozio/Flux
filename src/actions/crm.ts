@@ -1,11 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { eq } from "drizzle-orm";
 
 import { db } from "@/db";
-import { companies, contacts, leads } from "@/db/schema";
+import { companies, contacts, deals, leads, pipelineStages, users } from "@/db/schema";
 
 // LEADS
 export async function getLeads() {
@@ -39,6 +40,71 @@ export async function updateLead(id: string, data: any) {
 export async function deleteLead(id: string) {
   await db.delete(leads).where(eq(leads.id, id));
   revalidatePath("/dashboard/leads");
+}
+
+export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
+  const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
+  if (!lead) throw new Error("Lead not found");
+
+  // 1. Create or find Company
+  let companyId: string | undefined;
+  if (lead.companyName) {
+    const [existingCompany] = await db.select().from(companies).where(eq(companies.name, lead.companyName));
+    if (existingCompany) {
+      companyId = existingCompany.id;
+    } else {
+      const [newCompany] = await db.insert(companies).values({ name: lead.companyName, ownerId: lead.ownerId }).returning();
+      companyId = newCompany.id;
+    }
+  }
+
+  // 2. Create Contact
+  const [newContact] = await db.insert(contacts).values({
+    firstName: lead.firstName,
+    lastName: lead.lastName,
+    email: lead.email,
+    phone: lead.phone,
+    mobile: lead.mobile,
+    jobTitle: lead.jobTitle,
+    ownerId: lead.ownerId,
+    companyId: companyId,
+    marketingConsent: lead.marketingConsent,
+    consentDate: lead.consentDate,
+    tags: lead.tags,
+  }).returning();
+
+  // 3. Create Deal if requested
+  let dealId: string | undefined;
+  if (shouldCreateDeal) {
+    const [firstStage] = await db.select().from(pipelineStages).orderBy(pipelineStages.order).limit(1);
+    if (!firstStage) throw new Error("No pipeline stages found. Please create one first.");
+
+    const [newDeal] = await db.insert(deals).values({
+      name: `Deal for ${lead.firstName} ${lead.lastName}`,
+      amount: 0, // Default to 0, can be updated later
+      currency: "USD",
+      stageId: firstStage.id,
+      companyId: companyId,
+      contactId: newContact.id,
+      ownerId: lead.ownerId,
+      status: "open",
+    }).returning();
+    dealId = newDeal.id;
+  }
+
+  // 4. Update Lead status
+  await db.update(leads).set({ status: "converted", isConverted: true }).where(eq(leads.id, leadId));
+
+  revalidatePath("/dashboard/leads");
+  revalidatePath("/dashboard/contacts");
+  revalidatePath("/dashboard/companies");
+  revalidatePath("/dashboard/pipeline");
+
+  if (dealId) {
+    redirect(`/dashboard/pipeline?dealId=${dealId}`);
+  } else {
+    redirect(`/dashboard/contacts?contactId=${newContact.id}`);
+  }
 }
 
 // CONTACTS

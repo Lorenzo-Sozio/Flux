@@ -68,7 +68,9 @@ export const verificationTokens = pgTable(
 // --- CRM CORE ENTITIES ---
 
 export const companies = pgTable("company", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   industry: text("industry"),
   website: text("website"),
@@ -96,7 +98,9 @@ export const companies = pgTable("company", {
 })
 
 export const leads = pgTable("lead", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   jobTitle: text("job_title"),
@@ -120,12 +124,15 @@ export const leads = pgTable("lead", {
   marketingConsent: boolean("marketing_consent").default(false),
   consentDate: timestamp("consent_date", { mode: "date" }),
   tags: text("tags").array(),
+  isConverted: boolean("is_converted").default(false).notNull(), // Added this line
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 })
 
 export const contacts = pgTable("contact", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   jobTitle: text("job_title"),
@@ -153,7 +160,9 @@ export const contacts = pgTable("contact", {
 })
 
 export const opportunities = pgTable("opportunity", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }),
   stage: text("stage").default("prospecting").notNull(), // prospecting, qualification, proposal, negotiation, closed_won, closed_lost
@@ -168,7 +177,9 @@ export const opportunities = pgTable("opportunity", {
 
 
 export const products = pgTable("product", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
   sku: text("sku"),
