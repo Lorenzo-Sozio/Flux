@@ -84,6 +84,9 @@ export const companies = pgTable("company", {
   mainPhone: text("main_phone"),
   mainEmail: text("main_email"),
   linkedinUrl: text("linkedin_url"),
+  status: text("status").default("active").notNull(),
+  source: text("source"),
+  leadScore: integer("lead_score"),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
@@ -108,6 +111,7 @@ export const leads = pgTable("lead", {
   status: text("status").default("new").notNull(), // new, contacting, engaged, qualified, unqualified
   source: text("source"), // organic, referral, outbound, event, etc.
   rating: text("rating"), // hot, warm, cold
+  leadScore: integer("lead_score"),
   notes: text("notes"),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -129,6 +133,9 @@ export const contacts = pgTable("contact", {
   state: text("state"),
   zipCode: text("zip_code"),
   country: text("country"),
+  status: text("status").default("active").notNull(),
+  source: text("source"),
+  leadScore: integer("lead_score"),
   notes: text("notes"),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),

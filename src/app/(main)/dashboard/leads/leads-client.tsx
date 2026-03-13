@@ -1,18 +1,21 @@
 "use client";
 
 import { useState } from "react";
+
+import { Trash } from "lucide-react";
+import { toast } from "sonner";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { createLead, deleteLead } from "./actions";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { Trash } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+
+import { createLead, deleteLead } from "./actions";
 
 export function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -22,7 +25,7 @@ export function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
     e.preventDefault();
     setLoading(true);
     const formData = new FormData(e.currentTarget);
-    
+
     try {
       const result = await createLead(formData);
       if (result && !result.success) {
@@ -65,7 +68,10 @@ export function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
           <DialogTrigger asChild>
             <Button>+ Add Lead</Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[700px] h-[80vh] flex flex-col p-0" aria-describedby="new-lead-description">
+          <DialogContent
+            className="sm:max-w-[700px] h-[80vh] flex flex-col p-0"
+            aria-describedby="new-lead-description"
+          >
             <DialogHeader className="px-6 py-4 border-b shrink-0">
               <DialogTitle>New Lead</DialogTitle>
               <p id="new-lead-description" className="text-sm text-muted-foreground hidden">
@@ -84,7 +90,7 @@ export function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
                     <Label htmlFor="lastName">Last Name *</Label>
                     <Input id="lastName" name="lastName" required />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="jobTitle">Job Title</Label>
                     <Input id="jobTitle" name="jobTitle" />
@@ -181,7 +187,7 @@ export function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
                   </div>
                 </div>
               </ScrollArea>
-              
+
               <div className="p-4 border-t bg-zinc-50 dark:bg-zinc-950 mt-auto shrink-0 flex justify-end">
                 <Button type="button" variant="outline" className="mr-2" onClick={() => setIsOpen(false)}>
                   Cancel
@@ -231,11 +237,11 @@ export function LeadsClient({ initialLeads }: { initialLeads: any[] }) {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                     {lead.rating && (
-                       <Badge variant="outline" className="capitalize">
-                         {lead.rating}
-                       </Badge>
-                     )}
+                    {lead.rating && (
+                      <Badge variant="outline" className="capitalize">
+                        {lead.rating}
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => handleDelete(lead.id)}>

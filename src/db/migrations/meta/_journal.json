@@ -8,6 +8,13 @@
       "when": 1773351397757,
       "tag": "0000_melodic_punisher",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1773387389892,
+      "tag": "0001_flippant_red_skull",
+      "breakpoints": true
     }
   ]
 }

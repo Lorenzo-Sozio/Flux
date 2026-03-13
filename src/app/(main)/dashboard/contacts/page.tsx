@@ -1,19 +1,19 @@
-import { getLeads } from "@/actions/crm";
+import { getContacts } from "@/actions/crm";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { LeadActions, LeadModal } from "./_components/lead-modal";
+import { ContactActions, ContactModal } from "./_components/contact-modal";
 
-export default async function LeadsPage() {
-  const allLeads = await getLeads();
+export default async function ContactsPage() {
+  const allContacts = await getContacts();
 
   return (
     <div className="p-8">
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="font-bold text-2xl">Leads</h1>
-        <LeadModal>
-          <Button>Add Lead</Button>
-        </LeadModal>
+        <h1 className="font-bold text-2xl">Contacts</h1>
+        <ContactModal>
+          <Button>Add Contact</Button>
+        </ContactModal>
       </div>
 
       <Table>
@@ -21,31 +21,31 @@ export default async function LeadsPage() {
           <TableRow>
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
-            <TableHead>Company</TableHead>
+            <TableHead>Job Title</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Score</TableHead>
             <TableHead className="w-[100px] text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {allLeads.map((lead) => (
-            <TableRow key={lead.id}>
+          {allContacts.map((contact) => (
+            <TableRow key={contact.id}>
               <TableCell>
-                {lead.firstName} {lead.lastName}
+                {contact.firstName} {contact.lastName}
               </TableCell>
-              <TableCell>{lead.email}</TableCell>
-              <TableCell>{lead.companyName}</TableCell>
-              <TableCell className="capitalize">{lead.status}</TableCell>
-              <TableCell>{lead.leadScore}</TableCell>
+              <TableCell>{contact.email}</TableCell>
+              <TableCell>{contact.jobTitle}</TableCell>
+              <TableCell className="capitalize">{contact.status}</TableCell>
+              <TableCell>{contact.leadScore}</TableCell>
               <TableCell className="text-right">
-                <LeadActions lead={lead} />
+                <ContactActions contact={contact} />
               </TableCell>
             </TableRow>
           ))}
-          {allLeads.length === 0 && (
+          {allContacts.length === 0 && (
             <TableRow>
               <TableCell colSpan={6} className="text-center">
-                No leads found.
+                No contacts found.
               </TableCell>
             </TableRow>
           )}

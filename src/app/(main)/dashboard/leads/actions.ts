@@ -1,19 +1,23 @@
 "use server";
 
-import { db } from "@/db";
-import { leads } from "@/db/schema";
-import { auth } from "@/auth";
-import { eq, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+
+import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
-const emptyStringToNull = z.union([z.string(), z.null(), z.undefined()]).transform(v => !v ? null : v);
+import { auth } from "@/auth";
+import { db } from "@/db";
+import { leads } from "@/db/schema";
+
+const emptyStringToNull = z.union([z.string(), z.null(), z.undefined()]).transform((v) => (!v ? null : v));
 
 const leadSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   jobTitle: emptyStringToNull,
-  email: z.union([z.string().email("Invalid email address"), z.literal(""), z.null(), z.undefined()]).transform(v => !v ? null : v),
+  email: z
+    .union([z.string().email("Invalid email address"), z.literal(""), z.null(), z.undefined()])
+    .transform((v) => (!v ? null : v)),
   phone: emptyStringToNull,
   mobile: emptyStringToNull,
   companyName: emptyStringToNull,
@@ -58,7 +62,17 @@ export async function createLead(formData: FormData) {
       return { success: false, error: error.errors[0].message };
     }
     console.error("Error creating lead:", error);
-    return { success: false, error: error instanceof Error ? error.message : "Failed to create lead" };
+    let errorMsg = "Failed to create lead";
+    if (error instanceof Error) {
+      errorMsg = error.message;
+      if ("cause" in error && error.cause instanceof Error) {
+        errorMsg += ` | Cause: ${error.cause.message}`;
+      } else if ("cause" in error && typeof error.cause === "object" && error.cause !== null) {
+        // NeonDbError stores stuff in cause directly
+        errorMsg += ` | Cause: ${(error.cause as any).message || JSON.stringify(error.cause)}`;
+      }
+    }
+    return { success: false, error: errorMsg };
   }
 }
 
