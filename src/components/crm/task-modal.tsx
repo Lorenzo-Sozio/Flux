@@ -56,7 +56,7 @@ export function TaskModal({ task, users, revalidatePathStr }: { task: any; users
       description: task.description || "",
       priority: task.priority || "normal",
       dueDate: formatDateTime(task.dueDate),
-      assigneeId: task.assigneeId || "",
+      assigneeId: task.assigneeId || "myself",
     },
   });
 
@@ -65,6 +65,7 @@ export function TaskModal({ task, users, revalidatePathStr }: { task: any; users
       setIsSubmitting(true);
       const payload = {
         ...data,
+        assigneeId: data.assigneeId === "myself" ? null : data.assigneeId,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
       };
       await updateTask(task.id, payload as any, revalidatePathStr);
@@ -126,7 +127,7 @@ export function TaskModal({ task, users, revalidatePathStr }: { task: any; users
                   <SelectValue placeholder="Assignee" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Myself</SelectItem>
+                  <SelectItem value="myself">Myself</SelectItem>
                   {users.map(u => (
                     <SelectItem key={u.id} value={u.id}>{u.name || "User"}</SelectItem>
                   ))}
