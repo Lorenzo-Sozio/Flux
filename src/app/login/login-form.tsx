@@ -46,6 +46,15 @@ export function LoginForm() {
   return (
     <Card className="border-zinc-200 dark:border-zinc-800 shadow-sm">
       <CardContent className="pt-6">
+        {/* Demo Credentials */}
+        <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">🔐 Demo Credentials</p>
+          <div className="space-y-1 text-xs text-blue-800 dark:text-blue-200 font-mono">
+            <p><strong>Email:</strong> admin@flux.local</p>
+            <p><strong>Password:</strong> admin</p>
+          </div>
+        </div>
+
         <form onSubmit={onSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
