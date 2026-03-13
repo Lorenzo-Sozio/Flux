@@ -29,6 +29,7 @@ export async function getActivitiesByLead(leadId: string) {
       id: activities.id,
       type: activities.type,
       content: activities.content,
+      date: activities.date,
       createdAt: activities.createdAt,
       ownerName: users.name,
     })
@@ -44,6 +45,7 @@ export async function getActivitiesByContact(contactId: string) {
       id: activities.id,
       type: activities.type,
       content: activities.content,
+      date: activities.date,
       createdAt: activities.createdAt,
       ownerName: users.name,
     })
@@ -59,6 +61,7 @@ export async function getActivitiesByCompany(companyId: string) {
       id: activities.id,
       type: activities.type,
       content: activities.content,
+      date: activities.date,
       createdAt: activities.createdAt,
       ownerName: users.name,
     })

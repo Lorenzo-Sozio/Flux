@@ -176,7 +176,7 @@ export default async function LeadDetailPage({
                       </p>
                       <div className="flex items-center gap-2">
                         <p className="text-[10px] text-muted-foreground">
-                          {new Date(activity.createdAt).toLocaleString()}
+                          {new Date(activity.date || activity.createdAt).toLocaleString()}
                         </p>
                         <ActivityModal activity={activity} revalidatePathStr={`/dashboard/leads/${leadId}`} />
                       </div>

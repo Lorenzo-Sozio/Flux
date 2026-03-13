@@ -148,7 +148,7 @@ export default async function CompanyDetailPage({
                       <UserIcon className="w-3 h-3" />{activity.ownerName || "System"}
                     </p>
                     <div className="flex items-center gap-2">
-                      <p className="text-[10px] text-muted-foreground">{new Date(activity.createdAt).toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground">{new Date(activity.date || activity.createdAt).toLocaleString()}</p>
                       <ActivityModal activity={activity} revalidatePathStr={`/dashboard/companies/${companyId}`} />
                     </div>
                   </div>
