@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getActivitiesByLead, createActivity } from "@/actions/activities";
 import { getTasksByLead, createTask, updateTaskStatus, getAllUsers } from "@/actions/tasks";
+import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
+import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { revalidatePath } from "next/cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,9 +47,13 @@ export default async function LeadDetailPage({
     return notFound();
   }
 
-  const leadActivities = await getActivitiesByLead(leadId);
-  const leadTasks = await getTasksByLead(leadId);
-  const allUsers = await getAllUsers();
+  const [leadActivities, leadTasks, allUsers, customFieldDefs, customFieldVals] = await Promise.all([
+    getActivitiesByLead(leadId),
+    getTasksByLead(leadId),
+    getAllUsers(),
+    getCustomFieldDefinitions("lead"),
+    getCustomFieldValues("lead", leadId),
+  ]);
 
   async function handleAddActivity(formData: FormData) {
     "use server";
@@ -147,6 +153,13 @@ export default async function LeadDetailPage({
             )}
           </CardContent>
         </Card>
+
+        <CustomFieldsPanel
+          entityType="lead"
+          entityId={leadId}
+          definitions={customFieldDefs}
+          values={customFieldVals}
+        />
       </div>
 
       {/* Right side: Timeline & Tasks */}
@@ -219,9 +232,9 @@ export default async function LeadDetailPage({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">Priority</p>
-                  <select name="priority" className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors">
+                  <select name="priority" defaultValue="normal" className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors">
                     <option value="low">Low</option>
-                    <option value="normal" selected>Normal</option>
+                    <option value="normal">Normal</option>
                     <option value="high">High</option>
                   </select>
                 </div>

@@ -1,10 +1,11 @@
 "use server";
 
 import { db } from "@/db";
-import { tasks, users } from "@/db/schema";
-import { eq, desc, isNotNull } from "drizzle-orm";
+import { activities, tasks, users } from "@/db/schema";
+import { eq, desc, isNotNull, and, lte, gte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { revalidatePath } from "next/cache";
+import { createNotificationAction } from "@/actions/auth";
 
 export async function createTask(data: {
   title: string;
@@ -80,7 +81,35 @@ export async function updateTask(id: string, data: Partial<typeof tasks.$inferIn
 
 export async function updateTaskStatus(id: string, status: string, revalidatePathStr?: string) {
   const completedAt = status === "done" ? new Date() : null;
-  await db.update(tasks).set({ status, completedAt }).where(eq(tasks.id, id));
+  const [task] = await db.update(tasks).set({ status, completedAt }).where(eq(tasks.id, id)).returning();
+
+  // When a task is completed, auto-record in the related entity's activity timeline
+  if (status === "done" && task) {
+    const activityPayload = {
+      type: "note" as const,
+      content: `Task completed: "${task.title}"`,
+      date: new Date(),
+      ownerId: task.ownerId ?? undefined,
+      leadId: task.leadId ?? undefined,
+      contactId: task.contactId ?? undefined,
+      companyId: task.companyId ?? undefined,
+      dealId: task.dealId ?? undefined,
+    };
+    await db.insert(activities).values(activityPayload).catch(() => {});
+
+    // In-app notification to assignee (if different from owner)
+    const notifyUserId = task.assigneeId ?? task.ownerId;
+    if (notifyUserId) {
+      await createNotificationAction({
+        userId: notifyUserId,
+        type: "task_due",
+        title: "Task completed",
+        message: `"${task.title}" was marked as done.`,
+        link: "/dashboard/calendar",
+      }).catch(() => {});
+    }
+  }
+
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
   revalidatePath("/dashboard/calendar");
 }
@@ -110,4 +139,18 @@ export async function getCalendarTasks() {
     .from(tasks)
     .where(isNotNull(tasks.dueDate))
     .orderBy(tasks.dueDate);
+}
+
+// Returns tasks due today (for email/notification dispatch)
+export async function getTasksDueToday() {
+  const start = new Date(); start.setHours(0,0,0,0);
+  const end   = new Date(); end.setHours(23,59,59,999);
+  return await db
+    .select({
+      id: tasks.id, title: tasks.title, dueDate: tasks.dueDate,
+      status: tasks.status, ownerId: tasks.ownerId, assigneeId: tasks.assigneeId,
+      leadId: tasks.leadId, contactId: tasks.contactId, companyId: tasks.companyId,
+    })
+    .from(tasks)
+    .where(and(eq(tasks.status, "todo"), gte(tasks.dueDate, start), lte(tasks.dueDate, end)));
 }

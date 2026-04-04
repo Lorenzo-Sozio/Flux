@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getActivitiesByContact, createActivity } from "@/actions/activities";
 import { getTasksByContact, createTask, updateTaskStatus, getAllUsers } from "@/actions/tasks";
+import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { revalidatePath } from "next/cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,7 @@ import { ActivityModal } from "@/components/crm/activity-modal";
 import { FormattedDate } from "@/components/crm/formatted-date";
 import { TaskModal } from "@/components/crm/task-modal";
 import { SendEmailModal } from "@/components/crm/send-email-modal";
+import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { getEmailTemplates } from "@/actions/marketing";
 
 export default async function ContactDetailPage({
@@ -54,9 +56,13 @@ export default async function ContactDetailPage({
   }
 
   const { contact: cData, companyName } = contact;
-  const activitiesList = await getActivitiesByContact(contactId);
-  const tasksList = await getTasksByContact(contactId);
-  const allUsers = await getAllUsers();
+  const [activitiesList, tasksList, allUsers, customFieldDefs, customFieldVals] = await Promise.all([
+    getActivitiesByContact(contactId),
+    getTasksByContact(contactId),
+    getAllUsers(),
+    getCustomFieldDefinitions("contact"),
+    getCustomFieldValues("contact", contactId),
+  ]);
 
   async function handleAddActivity(formData: FormData) {
     "use server";
@@ -153,6 +159,13 @@ export default async function ContactDetailPage({
             </div>
           </CardContent>
         </Card>
+
+        <CustomFieldsPanel
+          entityType="contact"
+          entityId={contactId}
+          definitions={customFieldDefs}
+          values={customFieldVals}
+        />
       </div>
 
       {/* Right side: Timeline & Tasks */}
@@ -211,9 +224,9 @@ export default async function ContactDetailPage({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <p className="text-[10px] uppercase font-bold mb-1 text-muted-foreground">Priority</p>
-                  <select name="priority" className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
+                  <select name="priority" defaultValue="normal" className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
                     <option value="low">Low</option>
-                    <option value="normal" selected>Normal</option>
+                    <option value="normal">Normal</option>
                     <option value="high">High</option>
                   </select>
                 </div>

@@ -5,10 +5,11 @@ import Link from "next/link";
 
 import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sidebar";
 import { auth } from "@/auth";
+import { getNotificationsAction } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
+import { NotificationCenter } from "@/components/notifications/notification-center";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { users } from "@/data/users";
 import { SIDEBAR_COLLAPSIBLE_VALUES, SIDEBAR_VARIANT_VALUES } from "@/lib/preferences/layout";
 import { cn } from "@/lib/utils";
 import { getPreference } from "@/server/server-actions";
@@ -22,6 +23,9 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
   const session = await auth();
   const user = session?.user || { name: "Ospite", email: "" };
   const cookieStore = await cookies();
+  const userNotifications = session?.user?.id
+    ? await getNotificationsAction(session.user.id)
+    : [];
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
   const [variant, collapsible] = await Promise.all([
     getPreference("sidebar_variant", SIDEBAR_VARIANT_VALUES, "inset"),
@@ -56,6 +60,12 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
               <SearchDialog />
             </div>
             <div className="flex items-center gap-2">
+              {session?.user?.id && (
+                <NotificationCenter
+                  notifications={userNotifications}
+                  userId={session.user.id}
+                />
+              )}
               <LayoutControls />
               <ThemeSwitcher />
             </div>

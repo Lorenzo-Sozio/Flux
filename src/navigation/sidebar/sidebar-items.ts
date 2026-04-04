@@ -5,20 +5,16 @@ import {
   ChartBar,
   Contact,
   Fingerprint,
-  Forklift,
   Gauge,
-  GraduationCap,
   Kanban,
   LayoutDashboard,
-  Lock,
   type LucideIcon,
   Mail,
-  MessageSquare,
-  ReceiptText,
-  ShoppingBag,
-  SquareArrowUpRight,
-  Users,
+  Settings,
+  Settings2,
   Target,
+  Users,
+  Webhook,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -49,10 +45,10 @@ export interface NavGroup {
 export const sidebarItems: NavGroup[] = [
   {
     id: 1,
-    label: "Dashboards",
+    label: "CRM",
     items: [
       {
-        title: "CRM",
+        title: "Dashboard",
         url: "/dashboard/crm",
         icon: ChartBar,
       },
@@ -99,27 +95,56 @@ export const sidebarItems: NavGroup[] = [
       },
     ],
   },
-   {
+  {
     id: 3,
-    label: "Templates",
+    label: "Administration",
     items: [
-    {
-        title: "Templates - 1",
+      {
+        title: "Users",
+        url: "/dashboard/users",
+        icon: Users,
+        isNew: true,
+      },
+      {
+        title: "Settings",
+        url: "/dashboard/settings",
+        icon: Settings,
+        subItems: [
+          {
+            title: "Custom Fields",
+            url: "/dashboard/settings/custom-fields",
+            icon: Settings2,
+          },
+          {
+            title: "Webhooks",
+            url: "/dashboard/settings/webhooks",
+            icon: Webhook,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 4,
+    label: "Dashboard Templates",
+    items: [
+      {
+        title: "Default",
         url: "/dashboard/default",
         icon: LayoutDashboard,
       },
       {
-        title: "Templates - Finance",
+        title: "Finance",
         url: "/dashboard/finance",
         icon: Banknote,
       },
       {
-        title: "Templates -Analytics",
+        title: "Analytics",
         url: "/dashboard/analytics",
         icon: Gauge,
       },
       {
-        title: "Authentication",
+        title: "Auth Pages",
         url: "/auth",
         icon: Fingerprint,
         subItems: [
@@ -127,61 +152,8 @@ export const sidebarItems: NavGroup[] = [
           { title: "Login v2", url: "/auth/v2/login", newTab: true },
           { title: "Register v1", url: "/auth/v1/register", newTab: true },
           { title: "Register v2", url: "/auth/v2/register", newTab: true },
+          { title: "Forgot Password", url: "/auth/v1/forgot-password", newTab: true },
         ],
-      },
-    ],
-  },
-  {
-    id: 4,
-    label: "Pages Soon",
-    items: [
-      {
-        title: "Email",
-        url: "/dashboard/coming-soon",
-        icon: Mail,
-        comingSoon: true,
-      },
-      {
-        title: "Chat",
-        url: "/dashboard/coming-soon",
-        icon: MessageSquare,
-        comingSoon: true,
-      },
-      {
-        title: "Kanban",
-        url: "/dashboard/coming-soon",
-        icon: Kanban,
-        comingSoon: true,
-      },
-      {
-        title: "Invoice",
-        url: "/dashboard/coming-soon",
-        icon: ReceiptText,
-        comingSoon: true,
-      },
-      {
-        title: "Users",
-        url: "/dashboard/coming-soon",
-        icon: Users,
-        comingSoon: true,
-      },
-      {
-        title: "Roles",
-        url: "/dashboard/coming-soon",
-        icon: Lock,
-        comingSoon: true,
-      },
-    ],
-  },
-  {
-    id: 5,
-    label: "Misc",
-    items: [
-      {
-        title: "Others",
-        url: "/dashboard/coming-soon",
-        icon: SquareArrowUpRight,
-        comingSoon: true,
       },
     ],
   },

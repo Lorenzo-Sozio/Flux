@@ -167,7 +167,7 @@ export default async function CompanyDetailPage({
             <form action={handleAddTask} className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/20">
               <Input name="title" placeholder="New company task..." required />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div><select name="priority" className="w-full h-9 rounded-md border bg-background text-sm"><option value="low">Low</option><option value="normal" selected>Normal</option><option value="high">High</option></select></div>
+                <div><select name="priority" defaultValue="normal" className="w-full h-9 rounded-md border bg-background text-sm"><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></div>
                 <div><Input name="dueDate" type="datetime-local" className="h-9" /></div>
                 <div><select name="assigneeId" className="w-full h-9 rounded-md border bg-background text-sm"><option value="">Myself</option>{allUsers.filter(u => u.id !== userId).map(u => (<option key={u.id} value={u.id}>{u.name}</option>))}</select></div>
               </div>

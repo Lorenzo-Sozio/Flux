@@ -17,6 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { createEmailTemplate, updateEmailTemplate } from "@/actions/marketing";
 import { Badge } from "@/components/ui/badge";
+import { RichTextEditor } from "@/components/crm/rich-text-editor";
 
 interface TemplateModalProps {
   template?: {
@@ -237,38 +238,45 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
 
           {/* Editor & Preview - Full Width Tabs */}
           <div className="flex-1 overflow-auto border rounded-lg flex flex-col">
-            <Tabs defaultValue="editor" value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+            <Tabs defaultValue="visual" value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
               <TabsList className="w-full justify-start rounded-none border-b bg-muted/50">
-                <TabsTrigger value="editor" className="text-sm font-semibold">📝 HTML Editor</TabsTrigger>
-                <TabsTrigger value="preview" className="text-sm font-semibold">👁️ Live Preview</TabsTrigger>
+                <TabsTrigger value="visual" className="text-sm font-semibold">✏️ Visual Editor</TabsTrigger>
+                <TabsTrigger value="editor" className="text-sm font-semibold">📝 HTML Source</TabsTrigger>
+                <TabsTrigger value="preview" className="text-sm font-semibold">👁️ Preview</TabsTrigger>
               </TabsList>
 
+              {/* Visual (TipTap) Editor */}
+              <TabsContent value="visual" className="flex-1 overflow-auto min-h-0 p-2">
+                <RichTextEditor
+                  value={formData.body}
+                  onChange={(html) => setFormData((f) => ({ ...f, body: html }))}
+                  placeholder="Write your email content using the toolbar above…"
+                  className="min-h-[320px] border-0"
+                />
+              </TabsContent>
+
+              {/* HTML Source */}
               <TabsContent value="editor" className="flex-1 overflow-auto min-h-0">
                 <Textarea
-                  placeholder={`${
-                    formData.isHtml
-                      ? '<div style="font-family: Arial, sans-serif; padding: 20px;"><h1>Welcome, {firstName}!</h1><p>Your account is ready.</p></div>'
-                      : "Write your email content here. Use {firstName}, {lastName}, {email}, {companyName} for placeholders."
-                  }`}
+                  placeholder='<div style="font-family: Arial, sans-serif; padding: 20px;"><h1>Hello {{nome}}!</h1></div>'
                   value={formData.body}
                   onChange={(e) => setFormData({ ...formData, body: e.target.value })}
-                  className="w-full h-full font-mono text-sm border-0 rounded-none resize-none p-4"
+                  className="w-full h-full min-h-[320px] font-mono text-sm border-0 rounded-none resize-none p-4"
                   required
                 />
               </TabsContent>
 
+              {/* Preview */}
               <TabsContent value="preview" className="flex-1 overflow-auto p-8 bg-gradient-to-b from-muted/20 to-muted/40">
                 <div className="max-w-3xl mx-auto">
-                  {formData.isHtml ? (
-                    <div
-                      className="bg-white rounded-lg shadow-lg p-8 font-sans text-sm"
-                      dangerouslySetInnerHTML={{ __html: formData.body }}
-                    />
-                  ) : (
-                    <div className="bg-white rounded-lg shadow-lg p-8 font-sans whitespace-pre-wrap text-sm">
-                      {formData.body}
-                    </div>
-                  )}
+                  <div className="bg-white rounded-lg shadow-lg p-8 font-sans text-sm"
+                    dangerouslySetInnerHTML={{
+                      __html: formData.body
+                        .replace(/\{\{nome\}\}/gi, "Mario")
+                        .replace(/\{\{cognome\}\}/gi, "Rossi")
+                        .replace(/\{\{email\}\}/gi, "mario.rossi@example.com")
+                    }}
+                  />
                 </div>
               </TabsContent>
             </Tabs>

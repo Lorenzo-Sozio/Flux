@@ -41,7 +41,7 @@ export async function createCustomFilter(data: {
   name: string;
   description?: string;
   entityType: string;
-  criteria: Record<string, any>;
+  criteria: Record<string, any> | object;
   isPublic?: boolean;
   isPinned?: boolean;
   tags?: string[];

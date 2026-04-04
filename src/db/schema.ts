@@ -219,6 +219,7 @@ export const pipelineStages = pgTable("pipeline_stage", {
   name: text("name").notNull(),
   order: integer("order").notNull(),
   color: text("color"),
+  defaultProbability: integer("default_probability").default(0),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -228,12 +229,14 @@ export const deals = pgTable("deal", {
   name: text("name").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }),
   currency: text("currency").default("USD").notNull(),
+  probability: integer("probability").default(0),
   expectedCloseDate: timestamp("expected_close_date", { mode: "date" }),
   stageId: text("stage_id").references(() => pipelineStages.id, { onDelete: "restrict" }),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   status: text("status").default("open").notNull(), // open, won, lost
+  notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -410,4 +413,127 @@ export const customFiltersRelations = relations(customFilters, ({ one, many }) =
 
 export const customFilterTagsRelations = relations(customFilterTags, ({ one }) => ({
   filter: one(customFilters, { fields: [customFilterTags.filterId], references: [customFilters.id] }),
+}));
+
+// --- PASSWORD RESET TOKENS ---
+export const passwordResetTokens = pgTable(
+  "password_reset_token",
+  {
+    identifier: text("identifier").notNull(), // user email
+    token: text("token").notNull(),
+    expires: timestamp("expires", { mode: "date" }).notNull(),
+  },
+  (t) => ({ compoundKey: primaryKey({ columns: [t.identifier, t.token] }) })
+);
+
+// --- USER INVITATIONS ---
+export const userInvitations = pgTable("user_invitation", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  email: text("email").notNull(),
+  token: text("token").notNull().unique(),
+  role: text("role").default("user").notNull(), // owner, admin, user, viewer
+  invitedById: text("invited_by_id").references(() => users.id, { onDelete: "set null" }),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  acceptedAt: timestamp("accepted_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// --- IN-APP NOTIFICATIONS ---
+export const notifications = pgTable("notification", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // task_due, deal_won, lead_assigned, email_sent, system
+  title: text("title").notNull(),
+  message: text("message"),
+  link: text("link"), // /dashboard/tasks/123
+  isRead: boolean("is_read").default(false).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// --- CUSTOM FIELD DEFINITIONS ---
+export const customFieldDefinitions = pgTable("custom_field_definition", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),         // e.g. "LinkedIn URL"
+  slug: text("slug").notNull(),          // e.g. "linkedin_url"
+  entityType: text("entity_type").notNull(), // contact, lead, company, deal
+  fieldType: text("field_type").notNull(),   // text, number, date, select, multiselect, boolean, url
+  options: text("options"),              // JSON array for select/multiselect options
+  isRequired: boolean("is_required").default(false).notNull(),
+  order: integer("order").default(0).notNull(),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// --- CUSTOM FIELD VALUES ---
+export const customFieldValues = pgTable("custom_field_value", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  fieldId: text("field_id").notNull().references(() => customFieldDefinitions.id, { onDelete: "cascade" }),
+  entityType: text("entity_type").notNull(), // contact, lead, company, deal
+  entityId: text("entity_id").notNull(),
+  value: text("value"),                       // stored as text, cast on read based on fieldType
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// --- DOCUMENTS / ATTACHMENTS ---
+export const documents = pgTable("document", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  url: text("url").notNull(),             // S3/Uploadthing URL
+  mimeType: text("mime_type"),
+  size: integer("size"),                  // bytes
+  version: integer("version").default(1).notNull(),
+  entityType: text("entity_type"),        // contact, deal, lead, company
+  entityId: text("entity_id"),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// --- WEBHOOKS ---
+export const webhooks = pgTable("webhook", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  events: text("events").array().notNull(), // ["contact.created", "deal.won", ...]
+  secret: text("secret"),                   // for HMAC signature verification
+  isActive: boolean("is_active").default(true).notNull(),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const webhookLogs = pgTable("webhook_log", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  webhookId: text("webhook_id").notNull().references(() => webhooks.id, { onDelete: "cascade" }),
+  event: text("event").notNull(),
+  payload: text("payload"),               // JSON
+  statusCode: integer("status_code"),
+  response: text("response"),
+  sentAt: timestamp("sent_at", { mode: "date" }).defaultNow().notNull(),
+  success: boolean("success").default(false).notNull(),
+});
+
+// Relations for new tables
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, { fields: [notifications.userId], references: [users.id] }),
+}));
+
+export const userInvitationsRelations = relations(userInvitations, ({ one }) => ({
+  invitedBy: one(users, { fields: [userInvitations.invitedById], references: [users.id] }),
+}));
+
+export const customFieldDefinitionsRelations = relations(customFieldDefinitions, ({ many }) => ({
+  values: many(customFieldValues),
+}));
+
+export const customFieldValuesRelations = relations(customFieldValues, ({ one }) => ({
+  field: one(customFieldDefinitions, { fields: [customFieldValues.fieldId], references: [customFieldDefinitions.id] }),
+}));
+
+export const webhooksRelations = relations(webhooks, ({ many }) => ({
+  logs: many(webhookLogs),
+}));
+
+export const webhookLogsRelations = relations(webhookLogs, ({ one }) => ({
+  webhook: one(webhooks, { fields: [webhookLogs.webhookId], references: [webhooks.id] }),
 }));

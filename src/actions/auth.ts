@@ -1,5 +1,279 @@
 "use server";
-import { signOut } from "@/auth";
+
+import { signIn, signOut } from "@/auth";
+import { db } from "@/db";
+import {
+  notifications,
+  passwordResetTokens,
+  userInvitations,
+  users,
+} from "@/db/schema";
+import { sendInvitationEmail, sendPasswordResetEmail } from "@/lib/email";
+import bcrypt from "bcryptjs";
+import { and, eq, gt } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
+
+// ─── Logout ─────────────────────────────────────────────────────────────────
 export async function logoutAction() {
   await signOut({ redirectTo: "/auth/v1/login" });
+}
+
+// ─── Register ────────────────────────────────────────────────────────────────
+export async function registerAction(data: {
+  name?: string;
+  email: string;
+  password: string;
+}) {
+  const { name, email, password } = data;
+
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email));
+
+  if (existing) {
+    return { error: "An account with this email already exists." };
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  await db.insert(users).values({
+    name: name ?? email.split("@")[0],
+    email,
+    password: hashedPassword,
+    role: "user",
+  });
+
+  // Auto sign-in after registration
+  try {
+    await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+  } catch {
+    // redirect is handled by the caller
+  }
+
+  return { success: true };
+}
+
+// ─── Forgot Password ─────────────────────────────────────────────────────────
+export async function forgotPasswordAction(email: string) {
+  const [user] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.email, email));
+
+  // Return success even if user not found (prevents email enumeration)
+  if (!user) return { success: true };
+
+  // Delete existing tokens for this email
+  await db
+    .delete(passwordResetTokens)
+    .where(eq(passwordResetTokens.identifier, email));
+
+  const token = crypto.randomUUID();
+  const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+
+  await db.insert(passwordResetTokens).values({ identifier: email, token, expires });
+
+  await sendPasswordResetEmail(email, token);
+
+  return { success: true };
+}
+
+// ─── Reset Password ───────────────────────────────────────────────────────────
+export async function resetPasswordAction(data: {
+  email: string;
+  token: string;
+  password: string;
+}) {
+  const { email, token, password } = data;
+
+  const [resetToken] = await db
+    .select()
+    .from(passwordResetTokens)
+    .where(
+      and(
+        eq(passwordResetTokens.identifier, email),
+        eq(passwordResetTokens.token, token),
+        gt(passwordResetTokens.expires, new Date()),
+      )
+    );
+
+  if (!resetToken) {
+    return { error: "Invalid or expired reset link. Please request a new one." };
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  await db.update(users).set({ password: hashedPassword }).where(eq(users.email, email));
+
+  // Invalidate the token
+  await db
+    .delete(passwordResetTokens)
+    .where(eq(passwordResetTokens.identifier, email));
+
+  return { success: true };
+}
+
+// ─── Invite User ──────────────────────────────────────────────────────────────
+export async function inviteUserAction(data: {
+  email: string;
+  role: string;
+  invitedById: string;
+  invitedByName: string;
+}) {
+  const { email, role, invitedById, invitedByName } = data;
+
+  // Check user doesn't already exist
+  const [existing] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(eq(users.email, email));
+
+  if (existing) {
+    return { error: "This email is already registered." };
+  }
+
+  // Revoke existing pending invitations
+  await db
+    .delete(userInvitations)
+    .where(and(eq(userInvitations.email, email), eq(userInvitations.acceptedAt, null as any)));
+
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+  await db.insert(userInvitations).values({
+    email,
+    token,
+    role,
+    invitedById,
+    expiresAt,
+  });
+
+  await sendInvitationEmail(email, token, invitedByName, role);
+  revalidatePath("/dashboard/users");
+
+  return { success: true };
+}
+
+// ─── Accept Invitation ────────────────────────────────────────────────────────
+export async function acceptInvitationAction(data: {
+  token: string;
+  name: string;
+  password: string;
+}) {
+  const { token, name, password } = data;
+
+  const [invitation] = await db
+    .select()
+    .from(userInvitations)
+    .where(
+      and(
+        eq(userInvitations.token, token),
+        gt(userInvitations.expiresAt, new Date()),
+      )
+    );
+
+  if (!invitation) {
+    return { error: "Invalid or expired invitation." };
+  }
+
+  if (invitation.acceptedAt) {
+    return { error: "This invitation has already been used." };
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  await db.insert(users).values({
+    name,
+    email: invitation.email,
+    password: hashedPassword,
+    role: invitation.role,
+  });
+
+  // Mark invitation as accepted
+  await db
+    .update(userInvitations)
+    .set({ acceptedAt: new Date() })
+    .where(eq(userInvitations.id, invitation.id));
+
+  return { success: true, email: invitation.email };
+}
+
+// ─── Update User Role ─────────────────────────────────────────────────────────
+export async function updateUserRoleAction(userId: string, role: string) {
+  await db.update(users).set({ role }).where(eq(users.id, userId));
+  revalidatePath("/dashboard/users");
+  return { success: true };
+}
+
+// ─── Delete User ──────────────────────────────────────────────────────────────
+export async function deleteUserAction(userId: string) {
+  await db.delete(users).where(eq(users.id, userId));
+  revalidatePath("/dashboard/users");
+  return { success: true };
+}
+
+// ─── Get All Users ────────────────────────────────────────────────────────────
+export async function getAllUsersAction() {
+  return await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: users.role,
+      emailVerified: users.emailVerified,
+      image: users.image,
+    })
+    .from(users);
+}
+
+// ─── Get Pending Invitations ──────────────────────────────────────────────────
+export async function getPendingInvitationsAction() {
+  return await db
+    .select()
+    .from(userInvitations)
+    .where(
+      and(
+        eq(userInvitations.acceptedAt, null as any),
+        gt(userInvitations.expiresAt, new Date()),
+      )
+    );
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+export async function getNotificationsAction(userId: string) {
+  return await db
+    .select()
+    .from(notifications)
+    .where(eq(notifications.userId, userId))
+    .orderBy(notifications.createdAt);
+}
+
+export async function markNotificationReadAction(notificationId: string) {
+  await db
+    .update(notifications)
+    .set({ isRead: true })
+    .where(eq(notifications.id, notificationId));
+}
+
+export async function markAllNotificationsReadAction(userId: string) {
+  await db
+    .update(notifications)
+    .set({ isRead: true })
+    .where(eq(notifications.userId, userId));
+  revalidatePath("/dashboard");
+}
+
+export async function createNotificationAction(data: {
+  userId: string;
+  type: string;
+  title: string;
+  message?: string;
+  link?: string;
+}) {
+  await db.insert(notifications).values(data);
 }

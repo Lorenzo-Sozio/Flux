@@ -1,6 +1,9 @@
 import { getPipelineData } from "@/actions/pipeline";
 import { getCompanies, getContacts } from "@/actions/crm";
 import { PipelineBoard } from "./components/pipeline-board";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { BarChart2 } from "lucide-react";
 
 export default async function PipelinePage() {
   const [data, companies, contacts] = await Promise.all([
@@ -11,8 +14,15 @@ export default async function PipelinePage() {
 
   return (
     <div className="p-4 sm:p-6 md:p-8 h-full bg-muted/10">
-      <PipelineBoard 
-        initialStages={data.stages} 
+      <div className="mb-4 flex justify-end">
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/dashboard/pipeline/report">
+            <BarChart2 className="mr-2 h-4 w-4" /> Pipeline Report
+          </Link>
+        </Button>
+      </div>
+      <PipelineBoard
+        initialStages={data.stages}
         initialDeals={data.deals}
         companies={companies}
         contacts={contacts}

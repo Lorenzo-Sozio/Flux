@@ -2,15 +2,26 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-
-import { eq } from "drizzle-orm";
-
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { companies, contacts, deals, leads, pipelineStages, users } from "@/db/schema";
+import { dispatchWebhook } from "@/actions/webhooks";
+import { buildWhereClause, LEAD_FIELDS, CONTACT_FIELDS } from "@/lib/filter-engine";
+import { decodeFilter } from "@/lib/filter-types";
+import type { FilterTree } from "@/lib/filter-types";
 
 // LEADS
-export async function getLeads() {
-  return await db.select().from(leads);
+export async function getLeads(encodedFilter?: string | null) {
+  const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
+  const where = tree ? buildWhereClause(tree, LEAD_FIELDS) : undefined;
+  return db.select().from(leads).where(where).orderBy(desc(leads.createdAt));
+}
+
+// CONTACTS
+export async function getContacts(encodedFilter?: string | null) {
+  const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
+  const where = tree ? buildWhereClause(tree, CONTACT_FIELDS) : undefined;
+  return db.select().from(contacts).where(where).orderBy(desc(contacts.createdAt));
 }
 
 export async function createLead(data: any) {
@@ -22,6 +33,7 @@ export async function createLead(data: any) {
   };
   const [newLead] = await db.insert(leads).values(payload).returning();
   revalidatePath("/dashboard/leads");
+  dispatchWebhook("lead.created", { id: newLead.id, email: newLead.email, firstName: newLead.firstName, lastName: newLead.lastName }).catch(() => {});
   return newLead;
 }
 
@@ -107,11 +119,6 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   }
 }
 
-// CONTACTS
-export async function getContacts() {
-  return await db.select().from(contacts);
-}
-
 export async function createContact(data: any) {
   const payload = {
     ...data,
@@ -121,6 +128,7 @@ export async function createContact(data: any) {
   };
   const [newContact] = await db.insert(contacts).values(payload).returning();
   revalidatePath("/dashboard/contacts");
+  dispatchWebhook("contact.created", { id: newContact.id, email: newContact.email, firstName: newContact.firstName, lastName: newContact.lastName }).catch(() => {});
   return newContact;
 }
 
