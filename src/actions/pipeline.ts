@@ -5,6 +5,7 @@ import { deals, pipelineStages } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { dispatchWebhook } from "@/actions/webhooks";
+import { createNotificationAction } from "@/actions/auth";
 
 export async function getPipelineData() {
   let stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
@@ -38,6 +39,7 @@ export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
 
   const [newDeal] = await db.insert(deals).values(payload as any).returning();
   revalidatePath("/dashboard/pipeline");
+  dispatchWebhook("deal.created", { id: newDeal.id, name: newDeal.name, amount: newDeal.amount, stageId: newDeal.stageId }).catch(() => {});
   return newDeal;
 }
 
@@ -82,9 +84,12 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
     .returning();
   revalidatePath("/dashboard/pipeline");
 
-  // Fire webhook on deal won/lost
+  // Fire webhook + notification on deal won/lost
   if (data.status === "won") {
     dispatchWebhook("deal.won", { id: updatedDeal.id, name: updatedDeal.name, amount: updatedDeal.amount }).catch(() => {});
+    if (updatedDeal.ownerId) {
+      createNotificationAction({ userId: updatedDeal.ownerId, type: "deal_won", title: "Deal won! 🏆", message: `"${updatedDeal.name}" has been marked as won.`, link: `/dashboard/pipeline` }).catch(() => {});
+    }
   } else if (data.status === "lost") {
     dispatchWebhook("deal.lost", { id: updatedDeal.id, name: updatedDeal.name }).catch(() => {});
   }

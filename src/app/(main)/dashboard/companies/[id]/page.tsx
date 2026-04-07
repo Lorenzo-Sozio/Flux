@@ -11,7 +11,10 @@ import { revalidatePath } from "next/cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, GlobeIcon, PhoneIcon } from "lucide-react";
+import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, GlobeIcon, PhoneIcon, PencilIcon } from "lucide-react";
+import { DocumentPanel } from "@/components/crm/document-panel";
+import { RecordVisit } from "@/components/crm/record-visit";
+import { CompanyModal } from "@/app/(main)/dashboard/companies/_components/company-modal";
 import { ActivityModal } from "@/components/crm/activity-modal";
 import { TaskModal } from "@/components/crm/task-modal";
 import { FormattedDate } from "@/components/crm/formatted-date";
@@ -82,10 +85,22 @@ export default async function CompanyDetailPage({
 
   return (
     <div className="flex flex-col md:flex-row gap-6 p-6">
+      <RecordVisit
+        type="company"
+        name={company.name || "Company"}
+        href={`/dashboard/companies/${companyId}`}
+      />
       {/* Left side: Company Details */}
       <div className="w-full md:w-1/3 flex flex-col gap-6">
         <Card>
-          <CardHeader><CardTitle>Company Details</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Company Details</CardTitle>
+            <CompanyModal company={company}>
+              <Button variant="ghost" size="icon" title="Edit company">
+                <PencilIcon className="h-4 w-4" />
+              </Button>
+            </CompanyModal>
+          </CardHeader>
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground">Name</p>
@@ -117,6 +132,8 @@ export default async function CompanyDetailPage({
             )}
           </CardContent>
         </Card>
+
+        <DocumentPanel entityType="company" entityId={companyId} />
       </div>
 
       {/* Right side: Timeline & Tasks */}

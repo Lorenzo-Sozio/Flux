@@ -12,13 +12,16 @@ import { revalidatePath } from "next/cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, BuildingIcon } from "lucide-react";
+import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, BuildingIcon, PencilIcon } from "lucide-react";
 import Link from "next/link";
+import { ContactModal } from "@/app/(main)/dashboard/contacts/_components/contact-modal";
 import { ActivityModal } from "@/components/crm/activity-modal";
 import { FormattedDate } from "@/components/crm/formatted-date";
 import { TaskModal } from "@/components/crm/task-modal";
 import { SendEmailModal } from "@/components/crm/send-email-modal";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
+import { DocumentPanel } from "@/components/crm/document-panel";
+import { RecordVisit } from "@/components/crm/record-visit";
 import { getEmailTemplates } from "@/actions/marketing";
 
 export default async function ContactDetailPage({
@@ -111,12 +114,24 @@ export default async function ContactDetailPage({
 
   return (
     <div className="flex flex-col md:flex-row gap-6 p-6">
+      <RecordVisit
+        type="contact"
+        name={[cData.firstName, cData.lastName].filter(Boolean).join(" ") || "Contact"}
+        href={`/dashboard/contacts/${contactId}`}
+      />
       {/* Left side: Contact Details */}
       <div className="w-full md:w-1/3 flex flex-col gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Contact Details</CardTitle>
-            <SendEmailModal entity={cData} templates={templates} ownerId={userId} />
+            <div className="flex items-center gap-1">
+              <ContactModal contact={cData}>
+                <Button variant="ghost" size="icon" title="Edit contact">
+                  <PencilIcon className="h-4 w-4" />
+                </Button>
+              </ContactModal>
+              <SendEmailModal entity={cData} templates={templates} ownerId={userId} />
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
@@ -166,6 +181,8 @@ export default async function ContactDetailPage({
           definitions={customFieldDefs}
           values={customFieldVals}
         />
+
+        <DocumentPanel entityType="contact" entityId={contactId} />
       </div>
 
       {/* Right side: Timeline & Tasks */}

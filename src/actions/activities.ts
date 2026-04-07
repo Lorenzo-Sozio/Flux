@@ -1,9 +1,10 @@
 "use server";
 
 import { db } from "@/db";
-import { activities, users } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { activities, contacts, leads, users } from "@/db/schema";
+import { eq, desc, and, gte, lte, or, isNotNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { sendCallInviteEmail } from "@/lib/email";
 
 export async function createActivity(data: {
   type: string;
@@ -20,6 +21,30 @@ export async function createActivity(data: {
   if (data.contactId) revalidatePath(`/dashboard/contacts/${data.contactId}`);
   if (data.companyId) revalidatePath(`/dashboard/companies/${data.companyId}`);
   if (data.dealId) revalidatePath(`/dashboard/pipeline`);
+
+  // For call activities with a linked contact or lead, send them an email invite
+  if (data.type === "call" && data.date && data.content) {
+    if (data.contactId) {
+      const [contact] = await db
+        .select({ email: contacts.email, firstName: contacts.firstName, lastName: contacts.lastName })
+        .from(contacts)
+        .where(eq(contacts.id, data.contactId));
+      if (contact?.email) {
+        const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "there";
+        sendCallInviteEmail(contact.email, name, data.content, data.date).catch(() => {});
+      }
+    } else if (data.leadId) {
+      const [lead] = await db
+        .select({ email: leads.email, firstName: leads.firstName, lastName: leads.lastName })
+        .from(leads)
+        .where(eq(leads.id, data.leadId));
+      if (lead?.email) {
+        const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "there";
+        sendCallInviteEmail(lead.email, name, data.content, data.date).catch(() => {});
+      }
+    }
+  }
+
   return result[0];
 }
 
@@ -80,4 +105,34 @@ export async function updateActivity(id: string, data: Partial<typeof activities
 export async function deleteActivity(id: string, revalidatePathStr?: string) {
   await db.delete(activities).where(eq(activities.id, id));
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
+}
+
+// Returns call/meeting activities scheduled for today (for cron reminders)
+export async function getActivitiesDueToday() {
+  const start = new Date(); start.setHours(0, 0, 0, 0);
+  const end   = new Date(); end.setHours(23, 59, 59, 999);
+
+  return await db
+    .select({
+      id: activities.id,
+      type: activities.type,
+      content: activities.content,
+      date: activities.date,
+      ownerId: activities.ownerId,
+      contactId: activities.contactId,
+      leadId: activities.leadId,
+      companyId: activities.companyId,
+    })
+    .from(activities)
+    .where(
+      and(
+        isNotNull(activities.date),
+        gte(activities.date, start),
+        lte(activities.date, end),
+        or(
+          eq(activities.type, "call"),
+          eq(activities.type, "meeting"),
+        ),
+      ),
+    );
 }

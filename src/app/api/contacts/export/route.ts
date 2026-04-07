@@ -7,11 +7,11 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const rows = await db
+  const isPrivileged = session.user.role === "admin" || session.user.role === "owner";
+
+  const baseQuery = db
     .select({
       id: contacts.id,
       firstName: contacts.firstName,
@@ -39,7 +39,10 @@ export async function GET() {
     .from(contacts)
     .leftJoin(companies, eq(contacts.companyId, companies.id));
 
-  // Flatten tags array to semicolon-separated string
+  const rows = isPrivileged
+    ? await baseQuery
+    : await baseQuery.where(eq(contacts.ownerId, session.user.id));
+
   const csvData = rows.map((r) => ({
     ...r,
     tags: r.tags ? r.tags.join(";") : "",
@@ -48,7 +51,6 @@ export async function GET() {
   }));
 
   const csv = unparse(csvData);
-
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv",

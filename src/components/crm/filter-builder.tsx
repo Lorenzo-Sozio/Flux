@@ -3,8 +3,12 @@
 import { useState, useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetFooter,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -16,12 +20,10 @@ import {
 import { toast } from "sonner";
 import { createCustomFilter, deleteCustomFilter } from "@/actions/filters";
 import {
-  FilterTree, FilterNode, FilterCondition, FilterGroup,
+  FilterTree, FilterNode, FilterCondition,
   FieldMeta, FieldMetaMap, FilterOperator, FilterValue,
   emptyTree, newCondition, newGroup,
-  updateNode, removeNode, countActive,
-  encodeFilter, decodeFilter,
-  TEXT_OPERATORS, NUMBER_OPERATORS, DATE_OPERATORS, ENUM_OPERATORS, BOOL_OPERATORS,
+  countActive, encodeFilter, decodeFilter,
   operatorsForType, defaultOperatorForType, defaultValueForOperator,
   NO_VALUE_OPERATORS,
 } from "@/lib/filter-types";
@@ -29,9 +31,9 @@ import {
 // ─── Depth colors ─────────────────────────────────────────────────────────────
 
 const DEPTH_COLORS = [
-  "border-primary/40 bg-primary/3",
-  "border-blue-400/40 bg-blue-400/3",
-  "border-purple-400/40 bg-purple-400/3",
+  "border-primary/30 bg-primary/[0.02]",
+  "border-blue-400/30 bg-blue-400/[0.02]",
+  "border-purple-400/30 bg-purple-400/[0.02]",
 ];
 
 // ─── Value input ─────────────────────────────────────────────────────────────
@@ -45,15 +47,16 @@ function ValueInput({
   onChange: (v: FilterValue) => void;
 }) {
   if (NO_VALUE_OPERATORS.includes(operator)) {
-    return <span className="text-xs text-muted-foreground italic px-1">—</span>;
+    return <span className="text-sm text-muted-foreground italic px-1 self-center">—</span>;
   }
 
   if (fieldMeta.type === "text") {
     return (
-      <Input
+      <input
+        type="text"
         value={(value as string) ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        className="h-7 text-xs min-w-0 flex-1"
+        className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="value…"
       />
     );
@@ -63,31 +66,31 @@ function ValueInput({
     if (operator === "between") {
       const [a, b] = (value as [number, number]) ?? [0, 0];
       return (
-        <div className="flex gap-1 items-center flex-1">
-          <Input
+        <div className="flex gap-2 items-center">
+          <input
             type="number"
             value={a ?? ""}
             onChange={(e) => onChange([Number(e.target.value), b])}
-            className="h-7 text-xs"
+            className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             placeholder="from"
           />
-          <span className="text-muted-foreground text-xs">–</span>
-          <Input
+          <span className="text-muted-foreground text-sm shrink-0">–</span>
+          <input
             type="number"
             value={b ?? ""}
             onChange={(e) => onChange([a, Number(e.target.value)])}
-            className="h-7 text-xs"
+            className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
             placeholder="to"
           />
         </div>
       );
     }
     return (
-      <Input
+      <input
         type="number"
         value={(value as number) ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
-        className="h-7 text-xs flex-1"
+        className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         placeholder="number"
       />
     );
@@ -97,41 +100,41 @@ function ValueInput({
     if (operator === "between") {
       const [a, b] = (value as [string, string]) ?? ["", ""];
       return (
-        <div className="flex gap-1 items-center flex-1">
-          <Input
+        <div className="flex gap-2 items-center">
+          <input
             type="date"
             value={a ?? ""}
             onChange={(e) => onChange([e.target.value, b])}
-            className="h-7 text-xs"
+            className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
-          <span className="text-muted-foreground text-xs">–</span>
-          <Input
+          <span className="text-muted-foreground text-sm shrink-0">–</span>
+          <input
             type="date"
             value={b ?? ""}
             onChange={(e) => onChange([a, e.target.value])}
-            className="h-7 text-xs"
+            className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
         </div>
       );
     }
     if (operator === "last_n_days") {
       return (
-        <Input
+        <input
           type="number"
           min={1}
           value={(value as number) ?? 7}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="h-7 text-xs w-20"
+          className="flex h-8 w-24 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           placeholder="days"
         />
       );
     }
     return (
-      <Input
+      <input
         type="date"
         value={(value as string) ?? ""}
         onChange={(e) => onChange(e.target.value)}
-        className="h-7 text-xs flex-1"
+        className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       />
     );
   }
@@ -139,12 +142,12 @@ function ValueInput({
   if (fieldMeta.type === "enum" && fieldMeta.options) {
     const selected = (value as string[]) ?? [];
     return (
-      <div className="flex flex-wrap gap-1 flex-1">
+      <div className="flex flex-wrap gap-1.5 py-0.5">
         {fieldMeta.options.map((opt) => (
           <Badge
             key={opt}
             variant={selected.includes(opt) ? "default" : "outline"}
-            className="cursor-pointer text-[10px] h-5 capitalize font-normal"
+            className="cursor-pointer capitalize font-normal hover:bg-muted"
             onClick={() => {
               const next = selected.includes(opt)
                 ? selected.filter((v) => v !== opt)
@@ -189,24 +192,34 @@ function ConditionRow({
     onChange({ ...condition, operator: op, value: defaultValueForOperator(op) });
   };
 
+  const standardFields = Object.entries(fields).filter(([, f]) => !f.isCustom);
+  const customFieldEntries = Object.entries(fields).filter(([, f]) => f.isCustom);
+
   return (
-    <div className="flex items-start gap-1.5 group">
+    <div className="grid gap-2 items-start" style={{ gridTemplateColumns: "1fr 1fr 1.4fr 32px" }}>
       {/* Field */}
       <select
         value={condition.field}
         onChange={(e) => changeField(e.target.value)}
-        className="h-7 rounded-md border border-input bg-background px-2 text-xs shrink-0 max-w-[140px]"
+        className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
-        {Object.entries(fields).map(([k, f]) => (
+        {standardFields.map(([k, f]) => (
           <option key={k} value={k}>{f.label}</option>
         ))}
+        {customFieldEntries.length > 0 && (
+          <optgroup label="── Custom Fields">
+            {customFieldEntries.map(([k, f]) => (
+              <option key={k} value={k}>{f.label}</option>
+            ))}
+          </optgroup>
+        )}
       </select>
 
       {/* Operator */}
       <select
         value={condition.operator}
         onChange={(e) => changeOp(e.target.value as FilterOperator)}
-        className="h-7 rounded-md border border-input bg-background px-2 text-xs shrink-0 max-w-[140px]"
+        className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
       >
         {operators.map((op) => (
           <option key={op.value} value={op.value}>{op.label}</option>
@@ -214,7 +227,7 @@ function ConditionRow({
       </select>
 
       {/* Value */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0">
         {fieldMeta ? (
           <ValueInput
             fieldMeta={fieldMeta}
@@ -228,9 +241,10 @@ function ConditionRow({
       {/* Remove */}
       <button
         onClick={onRemove}
-        className="h-7 w-7 flex items-center justify-center rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive hover:bg-muted transition-all shrink-0"
+        className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
+        title="Remove condition"
       >
-        <X className="h-3 w-3" />
+        <X className="h-3.5 w-3.5" />
       </button>
     </div>
   );
@@ -264,7 +278,6 @@ function GroupNode({
 
   const addGroup = () => {
     const g = newGroup();
-    // Start the group with one empty condition
     g.conditions = [newCondition(firstField, firstType)];
     onConditionsChange([...conditions, g]);
   };
@@ -277,16 +290,16 @@ function GroupNode({
     onConditionsChange(conditions.filter((c) => c.id !== id));
   };
 
-  const colorClass = DEPTH_COLORS[depth % DEPTH_COLORS.length];
+  const colorClass = DEPTH_COLORS[Math.min(depth, DEPTH_COLORS.length - 1)];
 
   return (
-    <div className={`rounded-md border-l-2 pl-3 pr-2 py-2 space-y-2 ${colorClass}`}>
-      {/* Group header: AND / OR toggle */}
+    <div className={`rounded-lg border-l-2 pl-4 pr-3 py-3 space-y-3 ${colorClass}`}>
+      {/* Group header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">
           <button
             onClick={() => onLogicChange("AND")}
-            className={`h-5 px-2 text-[10px] font-bold rounded transition-colors ${
+            className={`h-6 px-2.5 text-xs font-semibold rounded transition-colors ${
               logic === "AND"
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -296,7 +309,7 @@ function GroupNode({
           </button>
           <button
             onClick={() => onLogicChange("OR")}
-            className={`h-5 px-2 text-[10px] font-bold rounded transition-colors ${
+            className={`h-6 px-2.5 text-xs font-semibold rounded transition-colors ${
               logic === "OR"
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -304,21 +317,36 @@ function GroupNode({
           >
             OR
           </button>
+          <span className="text-xs text-muted-foreground ml-1">
+            {logic === "AND" ? "All conditions must match" : "Any condition must match"}
+          </span>
         </div>
         {onRemove && (
           <button
             onClick={onRemove}
-            className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted"
+            className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
+            title="Remove group"
           >
             <X className="h-3 w-3" />
           </button>
         )}
       </div>
 
+      {/* Column headers (only at root level, depth 0) */}
+      {depth === 0 && conditions.some((n) => n.type === "condition") && (
+        <div className="grid gap-2 text-[11px] font-medium text-muted-foreground px-0.5"
+          style={{ gridTemplateColumns: "1fr 1fr 1.4fr 32px" }}>
+          <span>Field</span>
+          <span>Operator</span>
+          <span>Value</span>
+          <span />
+        </div>
+      )}
+
       {/* Conditions */}
       {conditions.length === 0 && (
-        <p className="text-[10px] text-muted-foreground italic px-1">
-          No conditions — add one below
+        <p className="text-sm text-muted-foreground italic px-1">
+          No conditions yet — add one below.
         </p>
       )}
 
@@ -326,9 +354,11 @@ function GroupNode({
         {conditions.map((node, i) => (
           <div key={node.id}>
             {i > 0 && (
-              <div className="flex items-center gap-2 py-0.5 px-1">
+              <div className="flex items-center gap-2 py-1">
                 <div className="flex-1 h-px bg-border" />
-                <span className="text-[9px] font-bold text-muted-foreground">{logic}</span>
+                <span className="text-[10px] font-bold text-muted-foreground bg-background border border-border rounded px-1.5 py-0.5">
+                  {logic}
+                </span>
                 <div className="flex-1 h-px bg-border" />
               </div>
             )}
@@ -356,19 +386,21 @@ function GroupNode({
       </div>
 
       {/* Add buttons */}
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex items-center gap-3 pt-1">
         <button
           onClick={addCondition}
-          className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium"
+          className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium"
         >
-          <Plus className="h-3 w-3" /> Add condition
+          <Plus className="h-3.5 w-3.5" />
+          Add condition
         </button>
         {depth < 2 && (
           <button
             onClick={addGroup}
-            className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground font-medium"
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-medium"
           >
-            <FolderPlus className="h-3 w-3" /> Add group
+            <FolderPlus className="h-3.5 w-3.5" />
+            Add group
           </button>
         )}
       </div>
@@ -380,13 +412,13 @@ function GroupNode({
 
 type SavedFilter = { id: string; name: string; criteria: string };
 
-// ─── Main sheet component ─────────────────────────────────────────────────────
+// ─── Main component ───────────────────────────────────────────────────────────
 
 interface FilterBuilderProps {
   entityType: "contacts" | "leads" | "companies";
   fields: FieldMetaMap;
   savedFilters: SavedFilter[];
-  basePath: string; // e.g. "/dashboard/contacts"
+  basePath: string;
 }
 
 export function FilterBuilder({
@@ -403,13 +435,11 @@ export function FilterBuilder({
   const [saveName, setSaveName] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Decode current tree from URL
   const encoded = searchParams.get("filter");
   const [tree, setTree] = useState<FilterTree>(() =>
     encoded ? decodeFilter(encoded) ?? emptyTree() : emptyTree()
   );
 
-  // Sync when sheet opens (URL may have changed externally)
   const handleOpenChange = (o: boolean) => {
     if (o) {
       const enc = searchParams.get("filter");
@@ -453,14 +483,10 @@ export function FilterBuilder({
 
   const handleSave = async () => {
     if (!saveName.trim()) { toast.error("Enter a name for this filter."); return; }
-    if (countActive(tree.conditions) === 0) { toast.error("No conditions to save."); return; }
+    if (countActive(tree.conditions) === 0) { toast.error("No active conditions to save."); return; }
     setSaving(true);
     try {
-      await createCustomFilter({
-        name: saveName.trim(),
-        entityType,
-        criteria: tree as any,
-      });
+      await createCustomFilter({ name: saveName.trim(), entityType, criteria: tree as any });
       setSaved((prev) => [
         ...prev,
         { id: Math.random().toString(36), name: saveName.trim(), criteria: JSON.stringify(tree) },
@@ -485,136 +511,154 @@ export function FilterBuilder({
   };
 
   return (
-    <Sheet open={open} onOpenChange={handleOpenChange}>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="relative gap-2">
-          <SlidersHorizontal className="h-4 w-4" />
-          Filters
-          {activeCount > 0 && (
-            <Badge className="h-4 min-w-4 px-1 text-[10px] flex items-center justify-center absolute -top-1.5 -right-1.5">
-              {activeCount}
-            </Badge>
-          )}
-        </Button>
-      </SheetTrigger>
-
-      <SheetContent
-        side="right"
-        className="w-[440px] max-w-[95vw] flex flex-col p-0 gap-0 overflow-hidden"
+    <>
+      {/* Trigger button */}
+      <Button
+        variant="outline"
+        size="sm"
+        className="relative gap-2"
+        onClick={() => handleOpenChange(true)}
       >
-        <SheetHeader className="px-4 py-3 border-b shrink-0">
-          <SheetTitle className="flex items-center gap-2 text-sm">
-            <SlidersHorizontal className="h-4 w-4" />
-            Advanced Filters
-            {activeCount > 0 && (
-              <Badge variant="secondary" className="text-[10px]">
-                {activeCount} active
-              </Badge>
-            )}
-          </SheetTitle>
-        </SheetHeader>
+        <SlidersHorizontal className="h-4 w-4" />
+        Filters
+        {activeCount > 0 && (
+          <Badge className="h-4 min-w-4 px-1 text-[10px] flex items-center justify-center absolute -top-1.5 -right-1.5">
+            {activeCount}
+          </Badge>
+        )}
+      </Button>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent
+          className="flex flex-col p-0 gap-0 overflow-hidden"
+          style={{ maxWidth: "min(760px, 95vw)", width: "100%", maxHeight: "85vh" }}
+        >
+          {/* Header */}
+          <DialogHeader className="px-5 py-4 border-b shrink-0">
+            <DialogTitle className="flex items-center gap-2.5">
+              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+              Advanced Filters
+              {activeCount > 0 && (
+                <Badge variant="secondary" className="text-xs font-normal">
+                  {activeCount} active condition{activeCount !== 1 ? "s" : ""}
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
 
-          {/* Saved presets */}
-          {saved.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground">
-                Saved Filters
-              </p>
-              {saved.map((f) => (
-                <div key={f.id} className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="flex-1 justify-start h-7 text-xs gap-1"
-                    onClick={() => loadPreset(f.criteria)}
-                  >
-                    <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                    {f.name}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => handleDeleteSaved(f.id)}
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
+          {/* Scrollable body */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-5">
+
+            {/* Saved presets */}
+            {saved.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs uppercase font-semibold tracking-wider text-muted-foreground">
+                  Saved Filters
+                </p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {saved.map((f) => (
+                    <div key={f.id} className="flex items-center gap-1 border rounded-md overflow-hidden">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="flex-1 justify-start h-8 text-sm gap-1.5 rounded-none font-normal"
+                        onClick={() => loadPreset(f.criteria)}
+                      >
+                        <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <span className="truncate">{f.name}</span>
+                      </Button>
+                      <button
+                        className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted transition-colors shrink-0"
+                        onClick={() => handleDeleteSaved(f.id)}
+                        title="Delete preset"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              <Separator />
-            </div>
-          )}
+                <Separator />
+              </div>
+            )}
 
-          {/* Root AND/OR toggle */}
-          <div className="space-y-2">
-            <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground">
-              Conditions
-            </p>
-            <GroupNode
-              conditions={tree.conditions}
-              logic={tree.logic}
-              onLogicChange={(l) => setTree((t) => ({ ...t, logic: l }))}
-              onConditionsChange={(c) => setTree((t) => ({ ...t, conditions: c }))}
-              fields={fields}
-              depth={0}
-            />
-          </div>
-
-          <Separator />
-
-          {/* Save current filter */}
-          <div className="space-y-1.5">
-            <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground">
-              Save as Preset
-            </p>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Filter name…"
-                value={saveName}
-                onChange={(e) => setSaveName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSave()}
-                className="h-8 text-sm"
+            {/* Conditions */}
+            <div className="space-y-2">
+              <p className="text-xs uppercase font-semibold tracking-wider text-muted-foreground">
+                Conditions
+              </p>
+              <GroupNode
+                conditions={tree.conditions}
+                logic={tree.logic}
+                onLogicChange={(l) => setTree((t) => ({ ...t, logic: l }))}
+                onConditionsChange={(c) => setTree((t) => ({ ...t, conditions: c }))}
+                fields={fields}
+                depth={0}
               />
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8 px-3 gap-1 shrink-0"
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <BookmarkPlus className="h-3.5 w-3.5" />
-                }
-                Save
-              </Button>
+            </div>
+
+            <Separator />
+
+            {/* Save as preset */}
+            <div className="space-y-2">
+              <p className="text-xs uppercase font-semibold tracking-wider text-muted-foreground">
+                Save as Preset
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Filter name…"
+                  value={saveName}
+                  onChange={(e) => setSaveName(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                  className="flex h-9 flex-1 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-9 px-4 gap-1.5 shrink-0"
+                  onClick={handleSave}
+                  disabled={saving}
+                >
+                  {saving
+                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    : <BookmarkPlus className="h-3.5 w-3.5" />
+                  }
+                  Save
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        <SheetFooter className="p-3 border-t flex gap-2 shrink-0">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearFilters}
-            className="gap-1"
-          >
-            <X className="h-3.5 w-3.5" />
-            Clear All
-          </Button>
-          <Button
-            size="sm"
-            onClick={applyFilters}
-            disabled={isPending}
-            className="flex-1"
-          >
-            {isPending && <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />}
-            Apply Filters
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          {/* Footer */}
+          <DialogFooter className="px-5 py-3 border-t flex items-center gap-2 shrink-0">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearFilters}
+              className="gap-1.5 mr-auto"
+            >
+              <X className="h-3.5 w-3.5" />
+              Clear All
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={applyFilters}
+              disabled={isPending}
+              className="min-w-[120px]"
+            >
+              {isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Apply Filters
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

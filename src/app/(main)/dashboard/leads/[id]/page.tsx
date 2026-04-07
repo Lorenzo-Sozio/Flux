@@ -9,12 +9,15 @@ import { getActivitiesByLead, createActivity } from "@/actions/activities";
 import { getTasksByLead, createTask, updateTaskStatus, getAllUsers } from "@/actions/tasks";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
+import { DocumentPanel } from "@/components/crm/document-panel";
+import { RecordVisit } from "@/components/crm/record-visit";
 import { revalidatePath } from "next/cache";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ConvertLeadButton } from "./_components/convert-lead-button";
-import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, CheckCircle2Icon } from "lucide-react";
+import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, CheckCircle2Icon, PencilIcon } from "lucide-react";
+import { LeadModal } from "@/app/(main)/dashboard/leads/_components/lead-modal";
 import { ActivityModal } from "@/components/crm/activity-modal";
 import { TaskModal } from "@/components/crm/task-modal";
 import { FormattedDate } from "@/components/crm/formatted-date";
@@ -102,12 +105,22 @@ export default async function LeadDetailPage({
 
   return (
     <div className="flex flex-col md:flex-row gap-6 p-6">
+      <RecordVisit
+        type="lead"
+        name={[lead.firstName, lead.lastName].filter(Boolean).join(" ") || "Lead"}
+        href={`/dashboard/leads/${leadId}`}
+      />
       {/* Left side: Lead Details */}
       <div className="w-full md:w-1/3 flex flex-col gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Lead Details</CardTitle>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-1">
+              <LeadModal lead={lead}>
+                <Button variant="ghost" size="icon" title="Edit lead">
+                  <PencilIcon className="h-4 w-4" />
+                </Button>
+              </LeadModal>
               <SendEmailModal entity={lead} templates={templates} ownerId={userId} />
               {!lead.isConverted && <ConvertLeadButton leadId={lead.id} />}
             </div>
@@ -160,6 +173,8 @@ export default async function LeadDetailPage({
           definitions={customFieldDefs}
           values={customFieldVals}
         />
+
+        <DocumentPanel entityType="lead" entityId={leadId} />
       </div>
 
       {/* Right side: Timeline & Tasks */}

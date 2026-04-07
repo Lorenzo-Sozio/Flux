@@ -6,6 +6,7 @@ import { eq, desc, isNotNull, and, lte, gte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { revalidatePath } from "next/cache";
 import { createNotificationAction } from "@/actions/auth";
+import { dispatchWebhook } from "@/actions/webhooks";
 
 export async function createTask(data: {
   title: string;
@@ -96,6 +97,9 @@ export async function updateTaskStatus(id: string, status: string, revalidatePat
       dealId: task.dealId ?? undefined,
     };
     await db.insert(activities).values(activityPayload).catch(() => {});
+
+    // Webhook dispatch
+    dispatchWebhook("task.completed", { id: task.id, title: task.title, contactId: task.contactId ?? null, leadId: task.leadId ?? null, dealId: task.dealId ?? null }).catch(() => {});
 
     // In-app notification to assignee (if different from owner)
     const notifyUserId = task.assigneeId ?? task.ownerId;

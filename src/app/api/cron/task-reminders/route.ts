@@ -11,19 +11,28 @@
  * The scheduler should pass the header: Authorization: Bearer <CRON_SECRET>
  */
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getTasksDueToday } from "@/actions/tasks";
+import { getActivitiesDueToday } from "@/actions/activities";
 import { createNotificationAction } from "@/actions/auth";
-import { sendTaskDueEmail } from "@/lib/email";
+import { sendTaskDueEmail, sendActivityReminderEmail } from "@/lib/email";
 
 export async function GET(req: NextRequest) {
-  // Protect with secret so only the scheduler can trigger this
+  // Protect with secret so only the scheduler can trigger this (timing-safe)
   const secret = process.env.CRON_SECRET;
   if (secret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) {
+    const authHeader = req.headers.get("authorization") ?? "";
+    const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+    let authorized = false;
+    try {
+      const a = Buffer.from(provided);
+      const b = Buffer.from(secret);
+      authorized = a.length === b.length && timingSafeEqual(a, b);
+    } catch {}
+    if (!authorized) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }
@@ -65,10 +74,49 @@ export async function GET(req: NextRequest) {
     notified++;
   }
 
+  // ── Activity reminders (calls & meetings today) ──────────────────────────
+  const dueActivities = await getActivitiesDueToday();
+  let activitiesNotified = 0;
+
+  for (const activity of dueActivities) {
+    if (!activity.ownerId) continue;
+
+    const [user] = await db
+      .select({ email: users.email, name: users.name })
+      .from(users)
+      .where(eq(users.id, activity.ownerId));
+
+    if (!user) continue;
+
+    const typeLabel = activity.type === "call" ? "Call" : "Meeting";
+    const description = activity.content ?? typeLabel;
+
+    let link = "/dashboard/calendar";
+    if (activity.contactId) link = `/dashboard/contacts/${activity.contactId}`;
+    else if (activity.leadId) link = `/dashboard/leads/${activity.leadId}`;
+    else if (activity.companyId) link = `/dashboard/companies/${activity.companyId}`;
+
+    await createNotificationAction({
+      userId: activity.ownerId,
+      type: "task_due",
+      title: `${typeLabel} today: "${description}"`,
+      message: `You have a ${typeLabel.toLowerCase()} scheduled today.`,
+      link,
+    }).catch(() => {});
+
+    if (user.email && activity.date) {
+      await sendActivityReminderEmail(user.email, activity.type, description, activity.date, link).catch(() => {});
+    }
+
+    activitiesNotified++;
+  }
+
   return NextResponse.json({
     ok: true,
     tasksFound: dueTasks.length,
     notified,
+    activitiesFound: dueActivities.length,
+    activitiesNotified,
     timestamp: new Date().toISOString(),
   });
 }

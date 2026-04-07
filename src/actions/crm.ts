@@ -2,26 +2,50 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, getTableColumns } from "drizzle-orm";
 import { db } from "@/db";
 import { companies, contacts, deals, leads, pipelineStages, users } from "@/db/schema";
 import { dispatchWebhook } from "@/actions/webhooks";
-import { buildWhereClause, LEAD_FIELDS, CONTACT_FIELDS } from "@/lib/filter-engine";
+import { createNotificationAction } from "@/actions/auth";
+import { buildWhereClause, LEAD_FIELDS, CONTACT_FIELDS, COMPANY_FIELDS, customFieldsToRegistry } from "@/lib/filter-engine";
 import { decodeFilter } from "@/lib/filter-types";
 import type { FilterTree } from "@/lib/filter-types";
+import { customFieldDefinitions } from "@/db/schema";
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+export async function getAllUsers() {
+  return db
+    .select({ id: users.id, name: users.name, email: users.email })
+    .from(users)
+    .orderBy(users.name);
+}
 
 // LEADS
 export async function getLeads(encodedFilter?: string | null) {
   const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
-  const where = tree ? buildWhereClause(tree, LEAD_FIELDS) : undefined;
-  return db.select().from(leads).where(where).orderBy(desc(leads.createdAt));
+  const base = db
+    .select({ ...getTableColumns(leads), ownerName: users.name })
+    .from(leads)
+    .leftJoin(users, eq(leads.ownerId, users.id));
+  if (!tree) return base.orderBy(desc(leads.createdAt));
+  const customDefs = await db.select().from(customFieldDefinitions).where(eq(customFieldDefinitions.entityType, "lead"));
+  const registry = { ...LEAD_FIELDS, ...customFieldsToRegistry(customDefs) };
+  const where = buildWhereClause(tree, registry, leads.id);
+  return base.where(where).orderBy(desc(leads.createdAt));
 }
 
 // CONTACTS
 export async function getContacts(encodedFilter?: string | null) {
   const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
-  const where = tree ? buildWhereClause(tree, CONTACT_FIELDS) : undefined;
-  return db.select().from(contacts).where(where).orderBy(desc(contacts.createdAt));
+  const base = db
+    .select({ ...getTableColumns(contacts), ownerName: users.name })
+    .from(contacts)
+    .leftJoin(users, eq(contacts.ownerId, users.id));
+  if (!tree) return base.orderBy(desc(contacts.createdAt));
+  const customDefs = await db.select().from(customFieldDefinitions).where(eq(customFieldDefinitions.entityType, "contact"));
+  const registry = { ...CONTACT_FIELDS, ...customFieldsToRegistry(customDefs) };
+  const where = buildWhereClause(tree, registry, contacts.id);
+  return base.where(where).orderBy(desc(contacts.createdAt));
 }
 
 export async function createLead(data: any) {
@@ -38,6 +62,13 @@ export async function createLead(data: any) {
 }
 
 export async function updateLead(id: string, data: any) {
+  // Notify new assignee if ownerId changed
+  if (data.ownerId) {
+    const [cur] = await db.select({ ownerId: leads.ownerId, firstName: leads.firstName, lastName: leads.lastName }).from(leads).where(eq(leads.id, id));
+    if (cur && cur.ownerId !== data.ownerId) {
+      createNotificationAction({ userId: data.ownerId, type: "lead_assigned", title: "Lead assigned to you", message: `${cur.firstName} ${cur.lastName} has been assigned to you.`, link: `/dashboard/leads/${id}` }).catch(() => {});
+    }
+  }
   const payload = {
     ...data,
     marketingConsent: data.marketingConsent ?? false,
@@ -106,6 +137,7 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
 
   // 4. Update Lead status
   await db.update(leads).set({ status: "converted", isConverted: true }).where(eq(leads.id, leadId));
+  dispatchWebhook("lead.converted", { leadId, contactId: newContact.id, companyId: companyId ?? null, dealId: dealId ?? null }).catch(() => {});
 
   revalidatePath("/dashboard/leads");
   revalidatePath("/dashboard/contacts");
@@ -133,6 +165,13 @@ export async function createContact(data: any) {
 }
 
 export async function updateContact(id: string, data: any) {
+  // Notify new assignee if ownerId changed
+  if (data.ownerId) {
+    const [cur] = await db.select({ ownerId: contacts.ownerId, firstName: contacts.firstName, lastName: contacts.lastName }).from(contacts).where(eq(contacts.id, id));
+    if (cur && cur.ownerId !== data.ownerId) {
+      createNotificationAction({ userId: data.ownerId, type: "lead_assigned", title: "Contact assigned to you", message: `${cur.firstName} ${cur.lastName} has been assigned to you.`, link: `/dashboard/contacts/${id}` }).catch(() => {});
+    }
+  }
   const payload = {
     ...data,
     marketingConsent: data.marketingConsent ?? false,
@@ -141,17 +180,28 @@ export async function updateContact(id: string, data: any) {
   };
   const [updatedContact] = await db.update(contacts).set(payload).where(eq(contacts.id, id)).returning();
   revalidatePath("/dashboard/contacts");
+  dispatchWebhook("contact.updated", { id: updatedContact.id, email: updatedContact.email, firstName: updatedContact.firstName, lastName: updatedContact.lastName }).catch(() => {});
   return updatedContact;
 }
 
 export async function deleteContact(id: string) {
   await db.delete(contacts).where(eq(contacts.id, id));
   revalidatePath("/dashboard/contacts");
+  dispatchWebhook("contact.deleted", { id }).catch(() => {});
 }
 
 // COMPANIES
-export async function getCompanies() {
-  return await db.select().from(companies);
+export async function getCompanies(encodedFilter?: string | null) {
+  const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
+  const base = db
+    .select({ ...getTableColumns(companies), ownerName: users.name })
+    .from(companies)
+    .leftJoin(users, eq(companies.ownerId, users.id));
+  if (!tree) return base.orderBy(desc(companies.createdAt));
+  const customDefs = await db.select().from(customFieldDefinitions).where(eq(customFieldDefinitions.entityType, "company"));
+  const registry = { ...COMPANY_FIELDS, ...customFieldsToRegistry(customDefs) };
+  const where = buildWhereClause(tree, registry, companies.id);
+  return base.where(where).orderBy(desc(companies.createdAt));
 }
 
 export async function createCompany(data: any) {
@@ -167,6 +217,13 @@ export async function createCompany(data: any) {
 }
 
 export async function updateCompany(id: string, data: any) {
+  // Notify new assignee if ownerId changed
+  if (data.ownerId) {
+    const [cur] = await db.select({ ownerId: companies.ownerId, name: companies.name }).from(companies).where(eq(companies.id, id));
+    if (cur && cur.ownerId !== data.ownerId) {
+      createNotificationAction({ userId: data.ownerId, type: "lead_assigned", title: "Company assigned to you", message: `${cur.name} has been assigned to you.`, link: `/dashboard/companies/${id}` }).catch(() => {});
+    }
+  }
   const payload = {
     ...data,
     vatNumber: data.vatNumber,

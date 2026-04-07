@@ -18,9 +18,8 @@ export async function GET(req: NextRequest) {
   const logId = req.nextUrl.searchParams.get("log");
 
   if (logId) {
-    // Fire-and-forget update
     db.update(campaignLogs)
-      .set({ status: "opened" })
+      .set({ status: "opened", openedAt: new Date() })
       .where(eq(campaignLogs.id, logId))
       .catch(() => {});
   }

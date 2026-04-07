@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Settings2, Webhook } from "lucide-react";
+import { Settings2, Webhook, Mail } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
@@ -36,6 +36,17 @@ export default async function SettingsPage() {
               <CardTitle>Webhooks</CardTitle>
               <CardDescription>
                 Send real-time HTTP notifications to external services on CRM events.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
+        <Link href="/dashboard/settings/email">
+          <Card className="cursor-pointer transition-shadow hover:shadow-md">
+            <CardHeader>
+              <Mail className="mb-2 h-8 w-8 text-primary" />
+              <CardTitle>Email</CardTitle>
+              <CardDescription>
+                Configure SMTP or Resend for sending marketing campaigns and system emails.
               </CardDescription>
             </CardHeader>
           </Card>

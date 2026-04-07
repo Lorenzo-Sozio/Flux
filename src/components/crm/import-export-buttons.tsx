@@ -15,8 +15,26 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
+const IMPORT_HINTS: Record<string, { required: string; optional: string; dedup: string }> = {
+  contacts: {
+    required: "firstName, lastName",
+    optional: "email, phone, company, jobTitle, city, country, source, tags (;-separated), notes, marketingConsent (yes/no)",
+    dedup: "email",
+  },
+  leads: {
+    required: "firstName, lastName",
+    optional: "email, phone, companyName, jobTitle, city, country, source, rating (hot/warm/cold), tags (;-separated), notes",
+    dedup: "email",
+  },
+  companies: {
+    required: "name",
+    optional: "industry, website, type, city, country, mainEmail, mainPhone, vatNumber, sdiCode, source, tags (;-separated)",
+    dedup: "name",
+  },
+};
+
 interface Props {
-  entityType: "contacts" | "leads";
+  entityType: "contacts" | "leads" | "companies";
   onImportSuccess?: (result: { created: number; skipped: number; duplicates: string[] }) => void;
 }
 
@@ -86,14 +104,21 @@ export function ImportExportButtons({ entityType, onImportSuccess }: Props) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Import {entityType}</DialogTitle>
-            <DialogDescription>
-              Upload a CSV file. Required columns: <code>firstName</code>, <code>lastName</code>.
-              Optional: <code>email</code>, <code>phone</code>, <code>company</code>, <code>jobTitle</code>,
-              <code>city</code>, <code>country</code>, <code>source</code>, <code>tags</code> (semicolon-separated),
-              <code>notes</code>, <code>marketingConsent</code> (yes/no).
-              <br />
-              <br />
-              Duplicates are detected by <strong>email</strong> and skipped automatically.
+            <DialogDescription asChild>
+              <div className="text-sm text-muted-foreground space-y-1.5">
+                <p>
+                  <strong>Required:</strong>{" "}
+                  {IMPORT_HINTS[entityType]?.required.split(", ").map((c) => (
+                    <code key={c} className="mx-0.5 bg-muted px-1 rounded text-xs">{c}</code>
+                  ))}
+                </p>
+                <p>
+                  <strong>Optional:</strong> {IMPORT_HINTS[entityType]?.optional}
+                </p>
+                <p>
+                  Duplicates detected by <strong>{IMPORT_HINTS[entityType]?.dedup}</strong> and skipped automatically.
+                </p>
+              </div>
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">

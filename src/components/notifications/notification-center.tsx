@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useCallback } from "react";
 import { Bell, CheckCheck, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import {
@@ -42,9 +42,28 @@ interface Props {
   userId: string;
 }
 
+const POLL_INTERVAL_MS = 60_000; // 60 seconds
+
 export function NotificationCenter({ notifications: initial, userId }: Props) {
   const [items, setItems] = useState(initial);
   const [isPending, startTransition] = useTransition();
+
+  // Poll for new notifications every 60s
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications");
+      if (!res.ok) return;
+      const data = await res.json();
+      setItems(data.notifications ?? []);
+    } catch {
+      // Silently ignore network errors during polling
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = setInterval(fetchNotifications, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [fetchNotifications]);
 
   const unreadCount = items.filter((n) => !n.isRead).length;
 

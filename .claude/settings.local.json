@@ -4,7 +4,8 @@
       "Bash(npm install:*)",
       "Bash(npx tsx:*)",
       "Bash(npx tsc:*)",
-      "Bash(node -e ':*)"
+      "Bash(node -e ':*)",
+      "Bash(ls \"c:/React/Flux/.env\"*)"
     ]
   }
 }

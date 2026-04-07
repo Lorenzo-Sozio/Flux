@@ -327,7 +327,53 @@ export const campaignLogs = pgTable("campaign_log", {
   leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
   sentAt: timestamp("sent_at", { mode: "date" }).defaultNow().notNull(),
-  status: text("status").default("sent").notNull(), // sent, opened, clicked, failed
+  status: text("status").default("queued").notNull(), // queued, sent, opened, clicked, bounced, complained, failed, unsubscribed
+  openedAt: timestamp("opened_at", { mode: "date" }),
+  clickedAt: timestamp("clicked_at", { mode: "date" }),
+  errorMessage: text("error_message"),
+  messageId: text("message_id"), // provider message ID (for webhook correlation)
+});
+
+// --- EMAIL SETTINGS ---
+export const emailSettings = pgTable("email_settings", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  provider: text("provider").notNull().default("resend"), // resend | smtp
+  resendApiKey: text("resend_api_key"),
+  smtpHost: text("smtp_host"),
+  smtpPort: integer("smtp_port").default(587),
+  smtpUser: text("smtp_user"),
+  smtpPassword: text("smtp_password"),
+  smtpSecure: boolean("smtp_secure").default(false),
+  fromEmail: text("from_email").notNull().default("noreply@yourdomain.com"),
+  fromName: text("from_name").notNull().default("CRM"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// --- EMAIL QUEUE ---
+export const emailJobs = pgTable("email_job", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  campaignId: text("campaign_id").references(() => marketingCampaigns.id, { onDelete: "cascade" }),
+  campaignLogId: text("campaign_log_id").references(() => campaignLogs.id, { onDelete: "cascade" }),
+  toEmail: text("to_email").notNull(),
+  subject: text("subject").notNull(),
+  htmlBody: text("html_body").notNull(), // fully rendered HTML (personalised + tracking)
+  status: text("status").notNull().default("pending"), // pending, processing, sent, failed, cancelled
+  attempts: integer("attempts").notNull().default(0),
+  maxAttempts: integer("max_attempts").notNull().default(3),
+  lastError: text("last_error"),
+  scheduledAt: timestamp("scheduled_at", { mode: "date" }).defaultNow(),
+  processedAt: timestamp("processed_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// --- EMAIL SUPPRESSIONS (unsubscribes + bounces) ---
+export const emailSuppressions = pgTable("email_suppression", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  email: text("email").notNull().unique(),
+  reason: text("reason").notNull().default("unsubscribe"), // unsubscribe | bounce_hard | bounce_soft | complaint
+  campaignId: text("campaign_id"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 // --- CUSTOM FILTERS ---

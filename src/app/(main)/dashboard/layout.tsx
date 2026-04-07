@@ -18,6 +18,7 @@ import { getPreference } from "@/server/server-actions";
 import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
+import { RecentlyVisited } from "@/components/crm/recently-visited";
 
 export default async function Layout({ children }: Readonly<{ children: ReactNode }>) {
   const session = await auth();
@@ -60,6 +61,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
               <SearchDialog />
             </div>
             <div className="flex items-center gap-2">
+              <RecentlyVisited />
               {session?.user?.id && (
                 <NotificationCenter
                   notifications={userNotifications}

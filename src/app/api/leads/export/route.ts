@@ -1,14 +1,20 @@
 import { auth } from "@/auth";
 import { db } from "@/db";
 import { leads } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { unparse } from "papaparse";
 import { NextResponse } from "next/server";
 
 export async function GET() {
   const session = await auth();
-  if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const rows = await db.select().from(leads);
+  const isPrivileged = session.user.role === "admin" || session.user.role === "owner";
+
+  // Admins/owners export all leads; regular users export only their own.
+  const rows = isPrivileged
+    ? await db.select().from(leads)
+    : await db.select().from(leads).where(eq(leads.ownerId, session.user.id));
 
   const csvData = rows.map((r) => ({
     ...r,
