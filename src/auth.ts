@@ -1,4 +1,5 @@
 import NextAuth from "next-auth"
+import type { DefaultSession } from "next-auth"
 import { DrizzleAdapter } from "@auth/drizzle-adapter"
 import { db } from "./db"
 import { accounts, sessions, users, verificationTokens } from "./db/schema"
@@ -7,6 +8,18 @@ import GoogleProvider from "next-auth/providers/google"
 import { eq } from "drizzle-orm"
 import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
+
+// Type Role definito localmente (allineato con @auth/core/types)
+type Role = "admin" | "editor" | "viewer"
+
+declare module "next-auth" {
+  interface User {
+    role?: Role;
+  }
+  interface Session {
+    user: User & DefaultSession["user"];
+  }
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -40,12 +53,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const isValid = await bcrypt.compare(credentials.password as string, user.password)
         if (!isValid) return null
         
-        return { 
-          id: user.id, 
-          name: user.name, 
-          email: user.email, 
-          role: user.role 
-        }
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role as Role,
+        } as const
       },
     }),
   ],

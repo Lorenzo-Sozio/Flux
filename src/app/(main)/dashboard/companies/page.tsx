@@ -29,6 +29,8 @@ export default async function CompaniesPage({
 
   const session = await auth();
   const canEdit = session?.user?.role !== "viewer";
+  
+  //const canEdit = ((session?.user as { role?: string })?.role) !== "viewer";
 
   const [allCompanies, savedFilters, customDefs] = await Promise.all([
     getCompanies(encoded),
