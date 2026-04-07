@@ -10,7 +10,7 @@ import bcrypt from "bcryptjs"
 import { authConfig } from "./auth.config"
 
 // Type Role definito localmente (allineato con @auth/core/types)
-type Role = "admin" | "editor" | "viewer"
+type Role = "admin" | "editor" | "viewer" | "owner"
 
 declare module "next-auth" {
   interface User {
