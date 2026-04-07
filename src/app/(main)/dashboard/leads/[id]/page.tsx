@@ -223,7 +223,7 @@ export default async function LeadDetailPage({
                         <p className="text-[10px] text-muted-foreground">
                           <FormattedDate date={activity.date || activity.createdAt} />
                         </p>
-                        <ActivityModal activity={activity} revalidatePathStr={`/dashboard/leads/${leadId}`} />
+                        <ActivityModal mode="edit" activity={activity} revalidatePathStr={`/dashboard/leads/${leadId}`} />
                       </div>
                     </div>
                     <p className="text-sm mt-1">{activity.content}</p>

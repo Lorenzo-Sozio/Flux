@@ -220,7 +220,7 @@ export default async function ContactDetailPage({
                       </p>
                       <div className="flex items-center gap-2">
                         <p className="text-[10px] text-muted-foreground"><FormattedDate date={activity.date || activity.createdAt} /></p>
-                        <ActivityModal activity={activity} revalidatePathStr={`/dashboard/contacts/${contactId}`} />
+                        <ActivityModal mode="edit" activity={activity} revalidatePathStr={`/dashboard/contacts/${contactId}`} />
                       </div>
                     </div>
                     <p className="text-sm mt-1">{activity.content}</p>
