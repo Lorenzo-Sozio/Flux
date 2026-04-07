@@ -4,8 +4,12 @@ import { PipelineBoard } from "./components/pipeline-board";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { BarChart2 } from "lucide-react";
+import { auth } from "@/auth";
 
 export default async function PipelinePage() {
+  const session = await auth();
+  const canEdit = session?.user?.role !== "viewer";
+
   const [data, companies, contacts] = await Promise.all([
     getPipelineData(),
     getCompanies(),
@@ -26,6 +30,7 @@ export default async function PipelinePage() {
         initialDeals={data.deals}
         companies={companies}
         contacts={contacts}
+        canEdit={canEdit}
       />
     </div>
   );

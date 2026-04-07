@@ -13,7 +13,7 @@ import { and, eq } from "drizzle-orm";
 import { unlink } from "fs/promises";
 import { join } from "path";
 
-const VALID_ENTITY_TYPES = new Set(["contact", "lead", "company"]);
+const VALID_ENTITY_TYPES = new Set(["contact", "lead", "company", "deal"]);
 
 export async function GET(req: NextRequest) {
   const session = await auth();

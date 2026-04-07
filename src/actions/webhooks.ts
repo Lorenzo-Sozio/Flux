@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { webhookLogs, webhooks } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
+import { requireAdminAccess } from "@/lib/auth-guard";
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────
 
@@ -18,6 +19,7 @@ export async function createWebhook(data: {
   events: string[];
   ownerId: string;
 }) {
+  await requireAdminAccess();
   const secret = crypto.randomBytes(32).toString("hex");
   const [wh] = await db.insert(webhooks).values({ ...data, secret }).returning();
   revalidatePath("/dashboard/settings/webhooks");
@@ -25,12 +27,14 @@ export async function createWebhook(data: {
 }
 
 export async function updateWebhook(id: string, data: Partial<{ name: string; url: string; events: string[]; isActive: boolean }>) {
+  await requireAdminAccess();
   const [wh] = await db.update(webhooks).set({ ...data, updatedAt: new Date() }).where(eq(webhooks.id, id)).returning();
   revalidatePath("/dashboard/settings/webhooks");
   return wh;
 }
 
 export async function deleteWebhook(id: string) {
+  await requireAdminAccess();
   await db.delete(webhooks).where(eq(webhooks.id, id));
   revalidatePath("/dashboard/settings/webhooks");
 }

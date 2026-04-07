@@ -19,7 +19,7 @@ import { readFile } from "fs/promises";
 import { join, basename, normalize } from "path";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   // ── Auth ─────────────────────────────────────────────────────────────────────
@@ -29,6 +29,7 @@ export async function GET(
   }
 
   const { id } = await params;
+  const view = req.nextUrl.searchParams.get("view") === "1";
 
   // Validate ID format to reject path traversal attempts at the param level
   if (!id || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) {
@@ -67,8 +68,10 @@ export async function GET(
   // RFC 5987 encoding for non-ASCII characters
   const safeAscii   = doc.name.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_");
   const encodedName = encodeURIComponent(doc.name);
+  // PDFs with ?view=1 are served inline (browser renders them); all others force download.
+  const disposition = view && doc.mimeType === "application/pdf" ? "inline" : "attachment";
   const contentDisposition =
-    `attachment; filename="${safeAscii}"; filename*=UTF-8''${encodedName}`;
+    `${disposition}; filename="${safeAscii}"; filename*=UTF-8''${encodedName}`;
 
   return new NextResponse(fileBuffer.buffer as ArrayBuffer, {
     status: 200,

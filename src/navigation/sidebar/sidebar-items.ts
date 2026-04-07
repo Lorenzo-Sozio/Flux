@@ -3,6 +3,7 @@ import {
   Building2,
   Calendar,
   ChartBar,
+  CheckSquare,
   Contact,
   Fingerprint,
   Gauge,
@@ -10,9 +11,11 @@ import {
   LayoutDashboard,
   type LucideIcon,
   Mail,
+  MailOpen,
   Settings,
   Settings2,
   Target,
+  TrendingUp,
   Users,
   Webhook,
 } from "lucide-react";
@@ -56,11 +59,23 @@ export const sidebarItems: NavGroup[] = [
         title: "Pipeline",
         url: "/dashboard/pipeline",
         icon: Kanban,
+        subItems: [
+          {
+            title: "Report",
+            url: "/dashboard/pipeline/report",
+            icon: TrendingUp,
+          },
+        ],
       },
       {
         title: "Calendar",
         url: "/dashboard/calendar",
         icon: Calendar,
+      },
+      {
+        title: "Tasks",
+        url: "/dashboard/tasks",
+        icon: CheckSquare,
       },
       {
         title: "Leads",
@@ -114,6 +129,11 @@ export const sidebarItems: NavGroup[] = [
             title: "Custom Fields",
             url: "/dashboard/settings/custom-fields",
             icon: Settings2,
+          },
+          {
+            title: "Email",
+            url: "/dashboard/settings/email",
+            icon: MailOpen,
           },
           {
             title: "Webhooks",

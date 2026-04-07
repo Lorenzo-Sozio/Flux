@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
+import { requireWriteAccess } from "@/lib/auth-guard";
 import { db } from "@/db";
 import {
   campaignLogs,
@@ -34,12 +35,14 @@ export async function getEmailTemplates() {
 }
 
 export async function createEmailTemplate(data: any) {
+  await requireWriteAccess();
   const [t] = await db.insert(emailTemplates).values(data).returning();
   revalidatePath("/dashboard/marketing/templates");
   return t;
 }
 
 export async function updateEmailTemplate(id: string, data: any) {
+  await requireWriteAccess();
   const [t] = await db
     .update(emailTemplates)
     .set({ ...data, updatedAt: new Date() })
@@ -50,6 +53,7 @@ export async function updateEmailTemplate(id: string, data: any) {
 }
 
 export async function deleteEmailTemplate(id: string) {
+  await requireWriteAccess();
   await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
   revalidatePath("/dashboard/marketing/templates");
 }
@@ -61,12 +65,14 @@ export async function getMarketingCampaigns() {
 }
 
 export async function createMarketingCampaign(data: any) {
+  await requireWriteAccess();
   const [c] = await db.insert(marketingCampaigns).values(data).returning();
   revalidatePath("/dashboard/marketing/campaigns");
   return c;
 }
 
 export async function updateMarketingCampaign(id: string, data: any) {
+  await requireWriteAccess();
   const [c] = await db
     .update(marketingCampaigns)
     .set({ ...data, updatedAt: new Date() })
@@ -77,6 +83,7 @@ export async function updateMarketingCampaign(id: string, data: any) {
 }
 
 export async function deleteMarketingCampaign(id: string) {
+  await requireWriteAccess();
   await db.delete(marketingCampaigns).where(eq(marketingCampaigns.id, id));
   revalidatePath("/dashboard/marketing/campaigns");
 }
@@ -100,6 +107,7 @@ export async function sendCampaignAction(data: {
   recipientType: "contacts" | "leads";
   recipientIds?: string[];
 }) {
+  await requireWriteAccess();
   const { campaignId, recipientType, recipientIds } = data;
 
   const [campaign] = await db

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { updateDealStage } from "@/actions/pipeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,11 +39,13 @@ export function PipelineBoard({
   initialDeals,
   companies,
   contacts,
+  canEdit = true,
 }: {
   initialStages: Stage[];
   initialDeals: Deal[];
   companies: any[];
   contacts: any[];
+  canEdit?: boolean;
 }) {
   const [isMounted, setIsMounted] = useState(false);
   const [deals, setDeals] = useState(initialDeals);
@@ -90,11 +93,13 @@ export function PipelineBoard({
           <h2 className="text-xl font-bold">Sales Pipeline</h2>
           <p className="text-sm text-muted-foreground">Drag and drop deals to change their progress</p>
         </div>
-        <DealModal stages={initialStages} companies={companies} contacts={contacts}>
-          <Button size="sm" className="gap-2">
-            <PlusIcon className="w-4 h-4" /> New Deal
-          </Button>
-        </DealModal>
+        {canEdit && (
+          <DealModal stages={initialStages} companies={companies} contacts={contacts}>
+            <Button size="sm" className="gap-2">
+              <PlusIcon className="w-4 h-4" /> New Deal
+            </Button>
+          </DealModal>
+        )}
       </div>
 
       <DragDropContext onDragEnd={onDragEnd}>
@@ -144,14 +149,22 @@ export function PipelineBoard({
                               }`} style={{ borderLeftColor: stage.color || '#3b82f6' }}>
                                 <CardHeader className="p-3 pb-1">
                                   <div className="flex justify-between items-start gap-2">
-                                    <CardTitle className="text-sm font-bold leading-tight group-hover:text-primary transition-colors cursor-pointer">
-                                      {deal.name}
+                                    <CardTitle className="text-sm font-bold leading-tight">
+                                      <Link
+                                        href={`/dashboard/pipeline/${deal.id}`}
+                                        className="hover:text-primary transition-colors"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {deal.name}
+                                      </Link>
                                     </CardTitle>
-                                    <DealModal deal={deal} stages={initialStages} companies={companies} contacts={contacts}>
-                                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <PencilIcon className="h-3 w-3" />
-                                      </Button>
-                                    </DealModal>
+                                    {canEdit && (
+                                      <DealModal deal={deal} stages={initialStages} companies={companies} contacts={contacts}>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit deal">
+                                          <PencilIcon className="h-3 w-3" />
+                                        </Button>
+                                      </DealModal>
+                                    )}
                                   </div>
                                 </CardHeader>
                                 <CardContent className="p-3 pt-0 flex flex-col gap-2">

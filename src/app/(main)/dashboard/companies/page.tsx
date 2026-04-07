@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
 import { CompanyActions, CompanyModal } from "./_components/company-modal";
+import { auth } from "@/auth";
 
 const TYPE_COLORS: Record<string, string> = {
   customer: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -25,6 +26,9 @@ export default async function CompaniesPage({
 }) {
   const params = await searchParams;
   const encoded = params.filter ?? null;
+
+  const session = await auth();
+  const canEdit = session?.user?.role !== "viewer";
 
   const [allCompanies, savedFilters, customDefs] = await Promise.all([
     getCompanies(encoded),
@@ -61,9 +65,11 @@ export default async function CompaniesPage({
             basePath="/dashboard/companies"
           />
           <ImportExportButtons entityType="companies" />
-          <CompanyModal>
-            <Button>Add Company</Button>
-          </CompanyModal>
+          {canEdit && (
+            <CompanyModal>
+              <Button>Add Company</Button>
+            </CompanyModal>
+          )}
         </div>
       </div>
 
@@ -120,7 +126,7 @@ export default async function CompaniesPage({
                 )}
               </TableCell>
               <TableCell className="text-right">
-                <CompanyActions company={company} />
+                {canEdit && <CompanyActions company={company} />}
               </TableCell>
             </TableRow>
           ))}

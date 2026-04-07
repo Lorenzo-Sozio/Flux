@@ -11,6 +11,7 @@ import { buildWhereClause, LEAD_FIELDS, CONTACT_FIELDS, COMPANY_FIELDS, customFi
 import { decodeFilter } from "@/lib/filter-types";
 import type { FilterTree } from "@/lib/filter-types";
 import { customFieldDefinitions } from "@/db/schema";
+import { requireWriteAccess } from "@/lib/auth-guard";
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export async function getAllUsers() {
@@ -49,6 +50,7 @@ export async function getContacts(encodedFilter?: string | null) {
 }
 
 export async function createLead(data: any) {
+  await requireWriteAccess();
   const payload = {
     ...data,
     marketingConsent: data.marketingConsent ?? false,
@@ -62,6 +64,7 @@ export async function createLead(data: any) {
 }
 
 export async function updateLead(id: string, data: any) {
+  await requireWriteAccess();
   // Notify new assignee if ownerId changed
   if (data.ownerId) {
     const [cur] = await db.select({ ownerId: leads.ownerId, firstName: leads.firstName, lastName: leads.lastName }).from(leads).where(eq(leads.id, id));
@@ -81,11 +84,13 @@ export async function updateLead(id: string, data: any) {
 }
 
 export async function deleteLead(id: string) {
+  await requireWriteAccess();
   await db.delete(leads).where(eq(leads.id, id));
   revalidatePath("/dashboard/leads");
 }
 
 export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
+  await requireWriteAccess();
   const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
   if (!lead) throw new Error("Lead not found");
 
@@ -152,6 +157,7 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
 }
 
 export async function createContact(data: any) {
+  await requireWriteAccess();
   const payload = {
     ...data,
     marketingConsent: data.marketingConsent ?? false,
@@ -165,6 +171,7 @@ export async function createContact(data: any) {
 }
 
 export async function updateContact(id: string, data: any) {
+  await requireWriteAccess();
   // Notify new assignee if ownerId changed
   if (data.ownerId) {
     const [cur] = await db.select({ ownerId: contacts.ownerId, firstName: contacts.firstName, lastName: contacts.lastName }).from(contacts).where(eq(contacts.id, id));
@@ -185,6 +192,7 @@ export async function updateContact(id: string, data: any) {
 }
 
 export async function deleteContact(id: string) {
+  await requireWriteAccess();
   await db.delete(contacts).where(eq(contacts.id, id));
   revalidatePath("/dashboard/contacts");
   dispatchWebhook("contact.deleted", { id }).catch(() => {});
@@ -205,6 +213,7 @@ export async function getCompanies(encodedFilter?: string | null) {
 }
 
 export async function createCompany(data: any) {
+  await requireWriteAccess();
   const payload = {
     ...data,
     vatNumber: data.vatNumber,
@@ -217,6 +226,7 @@ export async function createCompany(data: any) {
 }
 
 export async function updateCompany(id: string, data: any) {
+  await requireWriteAccess();
   // Notify new assignee if ownerId changed
   if (data.ownerId) {
     const [cur] = await db.select({ ownerId: companies.ownerId, name: companies.name }).from(companies).where(eq(companies.id, id));
@@ -236,6 +246,7 @@ export async function updateCompany(id: string, data: any) {
 }
 
 export async function deleteCompany(id: string) {
+  await requireWriteAccess();
   await db.delete(companies).where(eq(companies.id, id));
   revalidatePath("/dashboard/companies");
 }

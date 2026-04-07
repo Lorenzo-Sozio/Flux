@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Eye,
   File,
   FileText,
   FileSpreadsheet,
@@ -26,7 +27,7 @@ interface DocumentRecord {
 }
 
 interface Props {
-  entityType: "contact" | "lead" | "company";
+  entityType: "contact" | "lead" | "company" | "deal";
   entityId: string;
 }
 
@@ -307,6 +308,19 @@ export function DocumentPanel({ entityType, entityId }: Props) {
                     {new Date(doc.createdAt).toLocaleDateString()}
                   </p>
                 </div>
+                {/* View in new tab — PDFs only */}
+                {doc.mimeType === "application/pdf" && (
+                  <a
+                    href={`/api/documents/${doc.id}?view=1`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="Open PDF"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <Eye className="h-3.5 w-3.5" />
+                  </a>
+                )}
                 {/* Download — served via authenticated API route */}
                 <a
                   href={`/api/documents/${doc.id}`}

@@ -37,7 +37,7 @@ const taskSchema = z.object({
 
 type TaskFormValues = z.infer<typeof taskSchema>;
 
-export function TaskModal({ task, users, revalidatePathStr }: { task: any; users: any[]; revalidatePathStr: string }) {
+export function TaskModal({ task, users, revalidatePathStr, onUpdated }: { task: any; users: any[]; revalidatePathStr: string; onUpdated?: (updated: any) => void }) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -72,8 +72,9 @@ export function TaskModal({ task, users, revalidatePathStr }: { task: any; users
         assigneeId: data.assigneeId === "myself" ? null : data.assigneeId,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
       };
-      await updateTask(task.id, payload as any, revalidatePathStr);
+      const updated = await updateTask(task.id, payload as any, revalidatePathStr);
       toast.success("Task updated successfully!");
+      onUpdated?.(updated);
       setOpen(false);
     } catch (error) {
       toast.error("Failed to update task.");

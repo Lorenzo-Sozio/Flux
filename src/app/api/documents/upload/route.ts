@@ -39,7 +39,7 @@ const ALLOWED: Record<string, string[]> = {
 };
 
 /** CRM entity types that accept attachments */
-const VALID_ENTITY_TYPES = new Set(["contact", "lead", "company"]);
+const VALID_ENTITY_TYPES = new Set(["contact", "lead", "company", "deal"]);
 
 /**
  * Verify file magic bytes against the declared MIME type.

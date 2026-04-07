@@ -153,8 +153,17 @@ export async function inviteUserAction(data: {
     expiresAt,
   });
 
-  await sendInvitationEmail(email, token, invitedByName, role);
+  const emailResult = await sendInvitationEmail(email, token, invitedByName, role);
   revalidatePath("/dashboard/users");
+
+  if (!emailResult.success) {
+    // Invitation is saved in DB — share the link manually if email failed
+    return {
+      success: false,
+      emailError: emailResult.error ?? "Unknown email error",
+      inviteUrl: emailResult.inviteUrl,
+    };
+  }
 
   return { success: true };
 }
@@ -205,6 +214,8 @@ export async function acceptInvitationAction(data: {
 
 // ─── Update User Role ─────────────────────────────────────────────────────────
 export async function updateUserRoleAction(userId: string, role: string) {
+  const { requireAdminAccess } = await import("@/lib/auth-guard");
+  await requireAdminAccess();
   await db.update(users).set({ role }).where(eq(users.id, userId));
   revalidatePath("/dashboard/users");
   return { success: true };
@@ -212,6 +223,8 @@ export async function updateUserRoleAction(userId: string, role: string) {
 
 // ─── Delete User ──────────────────────────────────────────────────────────────
 export async function deleteUserAction(userId: string) {
+  const { requireAdminAccess } = await import("@/lib/auth-guard");
+  await requireAdminAccess();
   await db.delete(users).where(eq(users.id, userId));
   revalidatePath("/dashboard/users");
   return { success: true };
@@ -276,4 +289,64 @@ export async function createNotificationAction(data: {
   link?: string;
 }) {
   await db.insert(notifications).values(data);
+}
+
+// ─── Change Own Password ──────────────────────────────────────────────────────
+export async function changePasswordAction(data: {
+  currentPassword: string;
+  newPassword: string;
+}) {
+  const { auth } = await import("@/auth");
+  const session = await auth();
+  if (!session?.user?.id) return { error: "Not authenticated." };
+
+  const [user] = await db
+    .select({ id: users.id, password: users.password })
+    .from(users)
+    .where(eq(users.id, session.user.id));
+
+  if (!user) return { error: "User not found." };
+  if (!user.password) return { error: "This account uses social login — password change is not available." };
+
+  const valid = await bcrypt.compare(data.currentPassword, user.password);
+  if (!valid) return { error: "Current password is incorrect." };
+
+  if (data.newPassword.length < 8) return { error: "New password must be at least 8 characters." };
+
+  const hashed = await bcrypt.hash(data.newPassword, 12);
+  await db.update(users).set({ password: hashed }).where(eq(users.id, user.id));
+
+  return { success: true };
+}
+
+// ─── Admin: Send Password Reset to Another User ───────────────────────────────
+export async function adminSendPasswordResetAction(targetUserId: string) {
+  const { requireAdminAccess } = await import("@/lib/auth-guard");
+  await requireAdminAccess();
+
+  const [user] = await db
+    .select({ id: users.id, email: users.email })
+    .from(users)
+    .where(eq(users.id, targetUserId));
+
+  if (!user?.email) return { error: "User not found." };
+
+  // Reuse the existing forgot-password flow
+  await db.delete(passwordResetTokens).where(eq(passwordResetTokens.identifier, user.email));
+
+  const token = crypto.randomUUID();
+  const expires = new Date(Date.now() + 1000 * 60 * 60 * 24); // 24 hours
+
+  await db.insert(passwordResetTokens).values({ identifier: user.email, token, expires });
+
+  const emailResult = await sendPasswordResetEmail(user.email, token);
+
+  if (!emailResult?.success) {
+    // Return the reset URL so admin can share it manually
+    const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+    const resetUrl = `${APP_URL}/auth/v1/reset-password?token=${token}&email=${encodeURIComponent(user.email)}`;
+    return { success: false, emailError: true, resetUrl };
+  }
+
+  return { success: true };
 }

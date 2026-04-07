@@ -86,8 +86,8 @@ async function sendViaResend(options: SendOptions, config: EmailConfig): Promise
   const apiKey = config.resendApiKey ?? process.env.RESEND_API_KEY;
 
   if (!apiKey) {
-    console.log("[DEV] Email (no API key) →", options.to, "|", options.subject);
-    return { success: true, messageId: `dev-${Date.now()}` };
+    console.warn("[EMAIL] Resend API key not configured. Email not sent to:", options.to);
+    return { success: false, error: "Resend API key not configured. Set RESEND_API_KEY in your environment or configure an email provider in Settings → Email." };
   }
 
   try {

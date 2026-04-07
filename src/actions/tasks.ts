@@ -1,12 +1,13 @@
 "use server";
 
 import { db } from "@/db";
-import { activities, tasks, users } from "@/db/schema";
-import { eq, desc, isNotNull, and, lte, gte } from "drizzle-orm";
+import { activities, companies, contacts, leads, tasks, users } from "@/db/schema";
+import { eq, desc, isNotNull, and, lte, gte, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { revalidatePath } from "next/cache";
 import { createNotificationAction } from "@/actions/auth";
 import { dispatchWebhook } from "@/actions/webhooks";
+import { requireWriteAccess } from "@/lib/auth-guard";
 
 export async function createTask(data: {
   title: string;
@@ -21,6 +22,7 @@ export async function createTask(data: {
   companyId?: string;
   dealId?: string;
 }) {
+  await requireWriteAccess();
   const result = await db.insert(tasks).values(data).returning();
   if (data.leadId) revalidatePath(`/dashboard/leads/${data.leadId}`);
   if (data.contactId) revalidatePath(`/dashboard/contacts/${data.contactId}`);
@@ -41,7 +43,11 @@ export async function getTasksByCompany(companyId: string) {
   return await getTasksGeneric({ companyId });
 }
 
-async function getTasksGeneric(where: { leadId?: string; contactId?: string; companyId?: string }) {
+export async function getTasksByDeal(dealId: string) {
+  return await getTasksGeneric({ dealId });
+}
+
+async function getTasksGeneric(where: { leadId?: string; contactId?: string; companyId?: string; dealId?: string }) {
   const creator = alias(users, "creator");
   const assignee = alias(users, "assignee");
 
@@ -68,12 +74,15 @@ async function getTasksGeneric(where: { leadId?: string; contactId?: string; com
     query = query.where(eq(tasks.contactId, where.contactId)) as any;
   } else if (where.companyId) {
     query = query.where(eq(tasks.companyId, where.companyId)) as any;
+  } else if (where.dealId) {
+    query = query.where(eq(tasks.dealId, where.dealId)) as any;
   }
 
   return await query.orderBy(desc(tasks.createdAt));
 }
 
 export async function updateTask(id: string, data: Partial<typeof tasks.$inferInsert>, revalidatePathStr?: string) {
+  await requireWriteAccess();
   const result = await db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
   revalidatePath("/dashboard/calendar");
@@ -81,6 +90,7 @@ export async function updateTask(id: string, data: Partial<typeof tasks.$inferIn
 }
 
 export async function updateTaskStatus(id: string, status: string, revalidatePathStr?: string) {
+  await requireWriteAccess();
   const completedAt = status === "done" ? new Date() : null;
   const [task] = await db.update(tasks).set({ status, completedAt }).where(eq(tasks.id, id)).returning();
 
@@ -119,6 +129,7 @@ export async function updateTaskStatus(id: string, status: string, revalidatePat
 }
 
 export async function deleteTask(id: string, revalidatePathStr?: string) {
+  await requireWriteAccess();
   await db.delete(tasks).where(eq(tasks.id, id));
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
   revalidatePath("/dashboard/calendar");
@@ -146,6 +157,60 @@ export async function getCalendarTasks() {
 }
 
 // Returns tasks due today (for email/notification dispatch)
+/** All tasks visible to the current user (admin = all, user = own+assigned). */
+export async function getAllTasks(userId: string, role: string) {
+  const ownerAlias = alias(users, "owner");
+  const assigneeAlias = alias(users, "assignee");
+  const leadAlias = alias(leads, "lead");
+  const contactAlias = alias(contacts, "contact");
+  const companyAlias = alias(companies, "company");
+
+  const base = db
+    .select({
+      id: tasks.id,
+      title: tasks.title,
+      description: tasks.description,
+      dueDate: tasks.dueDate,
+      status: tasks.status,
+      priority: tasks.priority,
+      createdAt: tasks.createdAt,
+      completedAt: tasks.completedAt,
+      ownerId: tasks.ownerId,
+      assigneeId: tasks.assigneeId,
+      ownerName: ownerAlias.name,
+      assigneeName: assigneeAlias.name,
+      leadId: tasks.leadId,
+      contactId: tasks.contactId,
+      companyId: tasks.companyId,
+      dealId: tasks.dealId,
+      leadName: leadAlias.firstName,
+      leadLastName: leadAlias.lastName,
+      contactName: contactAlias.firstName,
+      contactLastName: contactAlias.lastName,
+      companyName: companyAlias.name,
+    })
+    .from(tasks)
+    .leftJoin(ownerAlias, eq(tasks.ownerId, ownerAlias.id))
+    .leftJoin(assigneeAlias, eq(tasks.assigneeId, assigneeAlias.id))
+    .leftJoin(leadAlias, eq(tasks.leadId, leadAlias.id))
+    .leftJoin(contactAlias, eq(tasks.contactId, contactAlias.id))
+    .leftJoin(companyAlias, eq(tasks.companyId, companyAlias.id));
+
+  const isPrivileged = role === "admin" || role === "owner";
+  const result = isPrivileged
+    ? await base.orderBy(desc(tasks.createdAt))
+    : await base
+        .where(
+          and(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            sql`(${tasks.ownerId} = ${userId} OR ${tasks.assigneeId} = ${userId})` as any,
+          ),
+        )
+        .orderBy(desc(tasks.createdAt));
+
+  return result;
+}
+
 export async function getTasksDueToday() {
   const start = new Date(); start.setHours(0,0,0,0);
   const end   = new Date(); end.setHours(23,59,59,999);

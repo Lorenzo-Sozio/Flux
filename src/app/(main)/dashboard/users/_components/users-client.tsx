@@ -7,6 +7,8 @@ import {
   getPendingInvitationsAction,
   inviteUserAction,
   updateUserRoleAction,
+  changePasswordAction,
+  adminSendPasswordResetAction,
 } from "@/actions/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -38,7 +40,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getInitials } from "@/lib/utils";
-import { Mail, Plus, Shield, Trash2, UserCog } from "lucide-react";
+import { Copy, Info, KeyRound, Mail, Plus, RotateCcw, Shield, Trash2, UserCog } from "lucide-react";
 
 type User = {
   id: string;
@@ -78,6 +80,19 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("user");
   const [isInviting, setIsInviting] = useState(false);
+  const [fallbackInviteUrl, setFallbackInviteUrl] = useState<string | null>(null);
+
+  // Change own password
+  const [changePwOpen, setChangePwOpen] = useState(false);
+  const [currentPw, setCurrentPw] = useState("");
+  const [newPw, setNewPw] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [isChangingPw, setIsChangingPw] = useState(false);
+
+  // Admin reset password
+  const [resetTarget, setResetTarget] = useState<User | null>(null);
+  const [resetFallbackUrl, setResetFallbackUrl] = useState<string | null>(null);
+  const [isSendingReset, setIsSendingReset] = useState(false);
 
   const handleInvite = async () => {
     if (!inviteEmail) return;
@@ -90,16 +105,27 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
         invitedById: currentUserId,
         invitedByName: me?.name ?? "Admin",
       });
-      if (result?.error) {
+
+      // DB-level error (e.g. email already exists)
+      if ("error" in result && result.error) {
         toast.error(result.error);
         return;
       }
+
+      // Email delivery failed — invitation is saved, show manual link
+      if (!result.success && "inviteUrl" in result && result.inviteUrl) {
+        setFallbackInviteUrl(result.inviteUrl);
+        toast.warning("Invitation saved but email could not be delivered. Copy the link below.");
+        return;
+      }
+
       toast.success(`Invitation sent to ${inviteEmail}`);
       setInviteOpen(false);
       setInviteEmail("");
       setInviteRole("user");
-    } catch {
-      toast.error("Failed to send invitation.");
+      setFallbackInviteUrl(null);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to send invitation.");
     } finally {
       setIsInviting(false);
     }
@@ -126,6 +152,40 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
     }
   };
 
+  const handleChangePassword = async () => {
+    if (newPw !== confirmPw) { toast.error("Passwords do not match."); return; }
+    if (newPw.length < 8) { toast.error("Password must be at least 8 characters."); return; }
+    setIsChangingPw(true);
+    try {
+      const result = await changePasswordAction({ currentPassword: currentPw, newPassword: newPw });
+      if ("error" in result) { toast.error(result.error); return; }
+      toast.success("Password changed successfully.");
+      setChangePwOpen(false);
+      setCurrentPw(""); setNewPw(""); setConfirmPw("");
+    } catch { toast.error("Failed to change password."); }
+    finally { setIsChangingPw(false); }
+  };
+
+  const handleAdminSendReset = async (user: User) => {
+    setResetTarget(user);
+    setResetFallbackUrl(null);
+    setIsSendingReset(true);
+    try {
+      const result = await adminSendPasswordResetAction(user.id);
+      if (result.success) {
+        toast.success(`Reset link sent to ${user.email}`);
+        setResetTarget(null);
+      } else if ("resetUrl" in result && result.resetUrl) {
+        setResetFallbackUrl(result.resetUrl as string);
+        toast.warning("Email not delivered — copy the link below.");
+      } else if ("error" in result) {
+        toast.error(result.error as string);
+        setResetTarget(null);
+      }
+    } catch { toast.error("Failed to send reset link."); setResetTarget(null); }
+    finally { setIsSendingReset(false); }
+  };
+
   const availableRoles = currentUserRole === "owner"
     ? ["owner", "admin", "user", "viewer"]
     : ["user", "viewer"];
@@ -142,6 +202,14 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
           Invite User
         </Button>
       </div>
+
+      {/* Role management notice for non-admins */}
+      {currentUserRole === "user" || currentUserRole === "viewer" ? (
+        <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
+          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>Role management is available to <strong>admin</strong> and <strong>owner</strong> users only. Contact your workspace administrator to change roles.</span>
+        </div>
+      ) : null}
 
       {/* Active Users */}
       <Card>
@@ -179,12 +247,8 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                     </div>
                   </TableCell>
                   <TableCell>
-                    {user.id === currentUserId || currentUserRole === "user" ? (
-                      <Badge variant="outline" className={ROLE_COLORS[user.role] ?? ""}>
-                        <Shield className="mr-1 h-3 w-3" />
-                        {user.role}
-                      </Badge>
-                    ) : (
+                    {/* Admin/owner can change other users' roles; own role and viewer roles are read-only */}
+                    {(currentUserRole === "owner" || currentUserRole === "admin") && user.id !== currentUserId ? (
                       <Select
                         defaultValue={user.role}
                         onValueChange={(val) => handleRoleChange(user.id, val)}
@@ -201,6 +265,11 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                           ))}
                         </SelectContent>
                       </Select>
+                    ) : (
+                      <Badge variant="outline" className={ROLE_COLORS[user.role] ?? ""}>
+                        <Shield className="mr-1 h-3 w-3" />
+                        {user.role}
+                      </Badge>
                     )}
                   </TableCell>
                   <TableCell>
@@ -210,16 +279,45 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                   </TableCell>
                   {currentUserRole !== "viewer" && (
                     <TableCell className="text-right">
-                      {user.id !== currentUserId && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(user.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <div className="flex items-center justify-end gap-1">
+                        {user.id === currentUserId ? (
+                          // Own row: change password
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            title="Change password"
+                            onClick={() => setChangePwOpen(true)}
+                          >
+                            <KeyRound className="h-3.5 w-3.5" />
+                          </Button>
+                        ) : (
+                          <>
+                            {/* Admin: send password reset */}
+                            {(currentUserRole === "owner" || currentUserRole === "admin") && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                title="Send password reset"
+                                onClick={() => handleAdminSendReset(user)}
+                                disabled={isSendingReset && resetTarget?.id === user.id}
+                              >
+                                <RotateCcw className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(user.id)}
+                              title="Delete user"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   )}
                 </TableRow>
@@ -292,7 +390,7 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
       </Card>
 
       {/* Invite Dialog */}
-      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+      <Dialog open={inviteOpen} onOpenChange={(open) => { setInviteOpen(open); if (!open) setFallbackInviteUrl(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Invite Team Member</DialogTitle>
@@ -309,11 +407,12 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                 placeholder="colleague@company.com"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
+                disabled={!!fallbackInviteUrl}
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="invite-role">Role</Label>
-              <Select value={inviteRole} onValueChange={setInviteRole}>
+              <Select value={inviteRole} onValueChange={setInviteRole} disabled={!!fallbackInviteUrl}>
                 <SelectTrigger id="invite-role">
                   <SelectValue />
                 </SelectTrigger>
@@ -326,14 +425,103 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Fallback: email delivery failed — show manual invite link */}
+            {fallbackInviteUrl && (
+              <div className="rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-950/30 dark:border-orange-800 p-3 space-y-2">
+                <p className="text-sm font-medium text-orange-800 dark:text-orange-300">
+                  Email delivery failed — share this link manually:
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs bg-background rounded border px-2 py-1.5 truncate select-all">
+                    {fallbackInviteUrl}
+                  </code>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-8 w-8 shrink-0"
+                    onClick={() => { navigator.clipboard.writeText(fallbackInviteUrl); toast.success("Link copied!"); }}
+                    title="Copy link"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Check your email provider configuration in Settings → Email.
+                </p>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setInviteOpen(false)}>
-              Cancel
+            <Button variant="outline" onClick={() => { setInviteOpen(false); setFallbackInviteUrl(null); }}>
+              {fallbackInviteUrl ? "Close" : "Cancel"}
             </Button>
-            <Button onClick={handleInvite} disabled={isInviting || !inviteEmail}>
-              {isInviting ? "Sending…" : "Send Invitation"}
+            {!fallbackInviteUrl && (
+              <Button onClick={handleInvite} disabled={isInviting || !inviteEmail}>
+                {isInviting ? "Sending…" : "Send Invitation"}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Change Own Password Dialog ────────────────────────────────────── */}
+      <Dialog open={changePwOpen} onOpenChange={(o) => { setChangePwOpen(o); if (!o) { setCurrentPw(""); setNewPw(""); setConfirmPw(""); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Change Password</DialogTitle>
+            <DialogDescription>Enter your current password and choose a new one.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>Current Password</Label>
+              <Input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} autoComplete="current-password" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>New Password</Label>
+              <Input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} autoComplete="new-password" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Confirm New Password</Label>
+              <Input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} autoComplete="new-password" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangePwOpen(false)}>Cancel</Button>
+            <Button onClick={handleChangePassword} disabled={isChangingPw || !currentPw || !newPw || !confirmPw}>
+              {isChangingPw ? "Saving…" : "Save Password"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Admin: Reset Password Fallback Dialog ─────────────────────────── */}
+      <Dialog open={!!resetFallbackUrl} onOpenChange={(o) => { if (!o) { setResetFallbackUrl(null); setResetTarget(null); } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Email Not Delivered</DialogTitle>
+            <DialogDescription>
+              The reset link was generated but could not be emailed to <strong>{resetTarget?.email}</strong>. Share it manually:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs bg-muted rounded border px-2 py-1.5 truncate select-all break-all">
+                {resetFallbackUrl}
+              </code>
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-8 w-8 shrink-0"
+                onClick={() => { navigator.clipboard.writeText(resetFallbackUrl!); toast.success("Link copied!"); }}
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">Link expires in 24 hours. Configure email in Settings → Email to avoid this.</p>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => { setResetFallbackUrl(null); setResetTarget(null); }}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

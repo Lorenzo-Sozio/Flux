@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
 import { ContactActions, ContactModal } from "./_components/contact-modal";
+import { auth } from "@/auth";
 
 export default async function ContactsPage({
   searchParams,
@@ -18,6 +19,9 @@ export default async function ContactsPage({
 }) {
   const params = await searchParams;
   const encoded = params.filter ?? null;
+
+  const session = await auth();
+  const canEdit = session?.user?.role !== "viewer";
 
   const [allContacts, savedFilters, customDefs] = await Promise.all([
     getContacts(encoded),
@@ -54,9 +58,11 @@ export default async function ContactsPage({
             basePath="/dashboard/contacts"
           />
           <ImportExportButtons entityType="contacts" />
-          <ContactModal>
-            <Button>Add Contact</Button>
-          </ContactModal>
+          {canEdit && (
+            <ContactModal>
+              <Button>Add Contact</Button>
+            </ContactModal>
+          )}
         </div>
       </div>
 
@@ -102,7 +108,7 @@ export default async function ContactsPage({
                 )}
               </TableCell>
               <TableCell className="text-right">
-                <ContactActions contact={contact} />
+                {canEdit && <ContactActions contact={contact} />}
               </TableCell>
             </TableRow>
           ))}

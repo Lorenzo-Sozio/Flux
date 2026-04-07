@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { customFieldDefinitions, customFieldValues } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
 
 export type FieldType = "text" | "number" | "date" | "select" | "multiselect" | "boolean" | "url";
 export type EntityType = "contact" | "lead" | "company" | "deal";
@@ -27,6 +28,7 @@ export async function createCustomFieldDefinition(data: {
   isRequired?: boolean;
   ownerId?: string;
 }) {
+  await requireAdminAccess();
   const [field] = await db
     .insert(customFieldDefinitions)
     .values({
@@ -47,6 +49,7 @@ export async function updateCustomFieldDefinition(
     order: number;
   }>
 ) {
+  await requireAdminAccess();
   const [updated] = await db
     .update(customFieldDefinitions)
     .set({
@@ -61,6 +64,7 @@ export async function updateCustomFieldDefinition(
 }
 
 export async function deleteCustomFieldDefinition(id: string) {
+  await requireAdminAccess();
   // Cascade deletes values too (FK constraint)
   await db.delete(customFieldDefinitions).where(eq(customFieldDefinitions.id, id));
   revalidatePath("/dashboard/settings/custom-fields");
@@ -86,6 +90,7 @@ export async function upsertCustomFieldValue(data: {
   entityId: string;
   value: string;
 }) {
+  await requireWriteAccess();
   // Try update first
   const existing = await db
     .select({ id: customFieldValues.id })

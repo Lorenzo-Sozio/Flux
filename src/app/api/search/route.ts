@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       contacts: foundContacts.map((c) => ({ ...c, label: `${c.firstName} ${c.lastName}`, sub: c.email, url: `/dashboard/contacts/${c.id}`, entity: "contact" })),
       leads: foundLeads.map((l) => ({ ...l, label: `${l.firstName} ${l.lastName}`, sub: l.companyName ?? l.email, url: `/dashboard/leads/${l.id}`, entity: "lead" })),
       companies: foundCompanies.map((c) => ({ ...c, label: c.name, sub: c.industry, url: `/dashboard/companies/${c.id}`, entity: "company" })),
-      deals: foundDeals.map((d) => ({ ...d, label: d.name, sub: d.status, url: `/dashboard/pipeline`, entity: "deal" })),
+      deals: foundDeals.map((d) => ({ ...d, label: d.name, sub: d.status, url: `/dashboard/pipeline/${d.id}`, entity: "deal" })),
     },
   });
 }

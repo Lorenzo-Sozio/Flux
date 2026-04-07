@@ -13,8 +13,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { and, eq, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { campaignLogs, emailJobs, marketingCampaigns } from "@/db/schema";
+import { campaignLogs, emailJobs, marketingCampaigns, users } from "@/db/schema";
 import { sendEmail, getEmailConfig } from "@/lib/email-provider";
+import { sendActivityReminderEmail } from "@/lib/email";
+import { getActivitiesWithPendingReminder } from "@/actions/activities";
+import { createNotificationAction } from "@/actions/auth";
 
 const BATCH_SIZE = parseInt(process.env.EMAILS_PER_WORKER_RUN ?? "30");
 
@@ -120,7 +123,44 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ processed: jobs.length, sent, failed });
+  // ── Activity reminder notifications ──────────────────────────────────────
+  const pendingReminders = await getActivitiesWithPendingReminder(2);
+  let remindersDispatched = 0;
+
+  for (const activity of pendingReminders) {
+    if (!activity.ownerId || !activity.date) continue;
+
+    const [user] = await db
+      .select({ email: users.email, name: users.name })
+      .from(users)
+      .where(eq(users.id, activity.ownerId));
+
+    if (!user) continue;
+
+    const typeLabel = activity.type === "call" ? "Call" : activity.type === "meeting" ? "Meeting" : "Activity";
+    const description = activity.content ?? typeLabel;
+
+    let link = "/dashboard/calendar";
+    if (activity.contactId) link = `/dashboard/contacts/${activity.contactId}`;
+    else if (activity.leadId) link = `/dashboard/leads/${activity.leadId}`;
+    else if (activity.companyId) link = `/dashboard/companies/${activity.companyId}`;
+
+    await createNotificationAction({
+      userId: activity.ownerId,
+      type: "task_due",
+      title: `Upcoming ${typeLabel}: "${description}"`,
+      message: `Scheduled for ${activity.date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
+      link,
+    }).catch(() => {});
+
+    if (user.email) {
+      await sendActivityReminderEmail(user.email, activity.type, description, activity.date, link).catch(() => {});
+    }
+
+    remindersDispatched++;
+  }
+
+  return NextResponse.json({ processed: jobs.length, sent, failed, remindersDispatched });
 }
 
 async function handleJobFailure(job: typeof emailJobs.$inferSelect, error: string, now: Date) {

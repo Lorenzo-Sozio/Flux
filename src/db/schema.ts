@@ -269,6 +269,9 @@ export const activities = pgTable("activity", {
   type: text("type").notNull(), // note, call, meeting, email
   content: text("content"),
   date: timestamp("date", { mode: "date" }),
+  durationMinutes: integer("duration_minutes"),           // call/meeting duration
+  reminderMinutes: integer("reminder_minutes"),           // minutes before date to remind (null = off)
+  participants: text("participants"),                     // comma-separated names/emails for meetings
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "cascade" }),

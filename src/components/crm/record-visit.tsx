@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 
 export type HistoryItem = {
-  type: "contact" | "lead" | "company";
+  type: "contact" | "lead" | "company" | "deal";
   name: string;
   href: string;
   visitedAt: number;

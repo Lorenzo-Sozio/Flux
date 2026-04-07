@@ -16,42 +16,45 @@ function sanitizeHeader(value: string): string {
 
 // ─── Password Reset ───────────────────────────────────────────────────────────
 
-export async function sendPasswordResetEmail(email: string, token: string) {
+export async function sendPasswordResetEmail(
+  email: string,
+  token: string,
+): Promise<{ success: boolean; error?: string }> {
   const resetUrl = `${APP_URL}/auth/v1/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
-  if (!process.env.RESEND_API_KEY && !process.env.SMTP_HOST) {
-    console.log("[DEV] Password reset link:", resetUrl);
-    return;
-  }
-
-  await sendEmail({
-    to: email,
+  const result = await sendEmail({
+    to: sanitizeHeader(email),
     subject: "Reset your password",
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2>Reset your password</h2>
-        <p>Click the button below to reset your password. This link expires in 1 hour.</p>
+        <p>Click the button below to reset your password. This link expires in 24 hours.</p>
         <a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">
           Reset Password
         </a>
         <p style="margin-top:16px;color:#6b7280;font-size:13px">If you didn't request this, you can safely ignore it.</p>
       </div>`,
   });
+
+  if (!result.success) console.error("[EMAIL] Password reset send failed:", result.error);
+  else console.log("[EMAIL] Password reset sent to", email, "| link:", resetUrl);
+
+  return result;
 }
 
 // ─── Invitation ───────────────────────────────────────────────────────────────
 
-export async function sendInvitationEmail(email: string, token: string, invitedByName: string, role: string) {
+export async function sendInvitationEmail(
+  email: string,
+  token: string,
+  invitedByName: string,
+  role: string,
+): Promise<{ success: boolean; inviteUrl: string; error?: string }> {
   const inviteUrl = `${APP_URL}/auth/v1/accept-invitation?token=${token}`;
-
-  if (!process.env.RESEND_API_KEY && !process.env.SMTP_HOST) {
-    console.log("[DEV] Invitation link:", inviteUrl);
-    return;
-  }
-
   const safeName = sanitizeHeader(invitedByName);
   const safeRole = sanitizeHeader(role);
-  await sendEmail({
+
+  const result = await sendEmail({
     to: sanitizeHeader(email),
     subject: `${safeName} invited you to join the CRM`,
     html: `
@@ -64,6 +67,14 @@ export async function sendInvitationEmail(email: string, token: string, invitedB
         <p style="margin-top:16px;color:#6b7280;font-size:13px">This invitation expires in 7 days.</p>
       </div>`,
   });
+
+  if (!result.success) {
+    console.error("[EMAIL] Invitation send failed:", result.error);
+  } else {
+    console.log("[EMAIL] Invitation sent to", email, "| link:", inviteUrl);
+  }
+
+  return { ...result, inviteUrl };
 }
 
 // ─── Email Verification ───────────────────────────────────────────────────────

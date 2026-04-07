@@ -1,11 +1,12 @@
 "use server";
 
 import { db } from "@/db";
-import { deals, pipelineStages } from "@/db/schema";
+import { companies, contacts, deals, pipelineStages, users } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { dispatchWebhook } from "@/actions/webhooks";
 import { createNotificationAction } from "@/actions/auth";
+import { requireWriteAccess } from "@/lib/auth-guard";
 
 export async function getPipelineData() {
   let stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
@@ -28,6 +29,7 @@ export async function getPipelineData() {
 }
 
 export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
+  await requireWriteAccess();
   if (!data.name || !data.stageId) throw new Error("Name and Stage are required.");
   
   const payload = {
@@ -44,6 +46,7 @@ export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
 }
 
 export async function updateDealStage(dealId: string, newStageId: string) {
+  await requireWriteAccess();
   // Auto-set probability based on the destination stage's default
   const [stage] = await db
     .select({ defaultProbability: pipelineStages.defaultProbability })
@@ -72,6 +75,7 @@ export async function updateDealStage(dealId: string, newStageId: string) {
 }
 
 export async function updateDeal(dealId: string, data: Partial<typeof deals.$inferInsert>) {
+  await requireWriteAccess();
   const payload = {
     ...data,
     amount: data.amount ? String(data.amount) : undefined,
@@ -95,6 +99,29 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
   }
 
   return updatedDeal;
+}
+
+// ─── Deal Detail ─────────────────────────────────────────────────────────────
+
+export async function getDealById(dealId: string) {
+  const [row] = await db
+    .select({
+      deal: deals,
+      stageName: pipelineStages.name,
+      stageColor: pipelineStages.color,
+      companyName: companies.name,
+      contactFirstName: contacts.firstName,
+      contactLastName: contacts.lastName,
+      contactEmail: contacts.email,
+      ownerName: users.name,
+    })
+    .from(deals)
+    .leftJoin(pipelineStages, eq(deals.stageId, pipelineStages.id))
+    .leftJoin(companies, eq(deals.companyId, companies.id))
+    .leftJoin(contacts, eq(deals.contactId, contacts.id))
+    .leftJoin(users, eq(deals.ownerId, users.id))
+    .where(eq(deals.id, dealId));
+  return row ?? null;
 }
 
 // ─── Pipeline Report ──────────────────────────────────────────────────────────

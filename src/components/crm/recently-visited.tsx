@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { History, User, Building2, UserCheck, Trash2 } from "lucide-react";
+import { History, User, Building2, UserCheck, Kanban, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -35,6 +35,11 @@ const TYPE_CONFIG: Record<
     label: "Company",
     icon: Building2,
     color: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
+  },
+  deal: {
+    label: "Deal",
+    icon: Kanban,
+    color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
   },
 };
 

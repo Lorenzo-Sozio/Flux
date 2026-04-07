@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import Link from "next/link";
 import { LeadActions, LeadModal } from "./_components/lead-modal";
+import { auth } from "@/auth";
 
 const RATING_COLORS: Record<string, string> = {
   hot:  "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
@@ -24,6 +25,9 @@ export default async function LeadsPage({
 }) {
   const params = await searchParams;
   const encoded = params.filter ?? null;
+
+  const session = await auth();
+  const canEdit = session?.user?.role !== "viewer";
 
   const [allLeads, savedFilters, customDefs] = await Promise.all([
     getLeads(encoded),
@@ -60,9 +64,11 @@ export default async function LeadsPage({
             basePath="/dashboard/leads"
           />
           <ImportExportButtons entityType="leads" />
-          <LeadModal>
-            <Button>Add Lead</Button>
-          </LeadModal>
+          {canEdit && (
+            <LeadModal>
+              <Button>Add Lead</Button>
+            </LeadModal>
+          )}
         </div>
       </div>
 
@@ -120,7 +126,7 @@ export default async function LeadsPage({
                 )}
               </TableCell>
               <TableCell className="text-right">
-                <LeadActions lead={lead} />
+                {canEdit && <LeadActions lead={lead} />}
               </TableCell>
             </TableRow>
           ))}
