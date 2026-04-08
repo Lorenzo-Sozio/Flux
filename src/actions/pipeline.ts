@@ -4,9 +4,11 @@ import { db } from "@/db";
 import { companies, contacts, deals, pipelineStages, users } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { dispatchWebhook } from "@/actions/webhooks";
 import { createNotificationAction } from "@/actions/auth";
 import { requireWriteAccess } from "@/lib/auth-guard";
+import { runAutomations } from "@/components/crm/automation/rule-engine";
 
 export async function getPipelineData() {
   let stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
@@ -42,11 +44,25 @@ export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
   const [newDeal] = await db.insert(deals).values(payload as any).returning();
   revalidatePath("/dashboard/pipeline");
   dispatchWebhook("deal.created", { id: newDeal.id, name: newDeal.name, amount: newDeal.amount, stageId: newDeal.stageId }).catch(() => {});
+
+  // Run automation rules after response is sent (zero-latency)
+  after(() => runAutomations({
+    entityType: "deal",
+    entityId:   newDeal.id,
+    event:      "onCreate",
+    oldData:    {},
+    newData:    newDeal as Record<string, unknown>,
+  }));
+
   return newDeal;
 }
 
 export async function updateDealStage(dealId: string, newStageId: string) {
   await requireWriteAccess();
+
+  // Capture old state BEFORE the update (needed for "changed" operators)
+  const [oldDeal] = await db.select().from(deals).where(eq(deals.id, dealId));
+
   // Auto-set probability based on the destination stage's default
   const [stage] = await db
     .select({ defaultProbability: pipelineStages.defaultProbability })
@@ -71,11 +87,24 @@ export async function updateDealStage(dealId: string, newStageId: string) {
   }).catch(() => {});
 
   revalidatePath("/dashboard/pipeline");
+
+  after(() => runAutomations({
+    entityType: "deal",
+    entityId:   updatedDeal.id,
+    event:      "onUpdate",
+    oldData:    (oldDeal ?? {}) as Record<string, unknown>,
+    newData:    updatedDeal as Record<string, unknown>,
+  }));
+
   return updatedDeal;
 }
 
 export async function updateDeal(dealId: string, data: Partial<typeof deals.$inferInsert>) {
   await requireWriteAccess();
+
+  // Capture old state BEFORE the update
+  const [oldDeal] = await db.select().from(deals).where(eq(deals.id, dealId));
+
   const payload = {
     ...data,
     amount: data.amount ? String(data.amount) : undefined,
@@ -97,6 +126,14 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
   } else if (data.status === "lost") {
     dispatchWebhook("deal.lost", { id: updatedDeal.id, name: updatedDeal.name }).catch(() => {});
   }
+
+  after(() => runAutomations({
+    entityType: "deal",
+    entityId:   updatedDeal.id,
+    event:      "onUpdate",
+    oldData:    (oldDeal ?? {}) as Record<string, unknown>,
+    newData:    updatedDeal as Record<string, unknown>,
+  }));
 
   return updatedDeal;
 }

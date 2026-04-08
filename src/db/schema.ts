@@ -586,3 +586,46 @@ export const webhooksRelations = relations(webhooks, ({ many }) => ({
 export const webhookLogsRelations = relations(webhookLogs, ({ one }) => ({
   webhook: one(webhooks, { fields: [webhookLogs.webhookId], references: [webhooks.id] }),
 }));
+
+// --- AUTOMATION RULES ---
+export const automationRules = pgTable("automation_rule", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true).notNull(),
+  targetEntity: text("target_entity").notNull(), // "deal" | "lead" | "contact" | "company"
+  triggerOn: text("trigger_on").array().notNull(), // ["onCreate", "onUpdate"]
+  conditionLogic: text("condition_logic").default("AND").notNull(), // "AND" | "OR" (deprecated, use conditionExpression)
+  conditions: text("conditions").notNull(), // JSON: Condition[]
+  // NEW: Espressione logica avanzata (es: "(C0 OR C1) AND C2")
+  conditionExpression: text("condition_expression"), // Advanced logic with parentheses
+  actions: text("actions").notNull(),       // JSON: AutomationAction[]
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const automationLogs = pgTable("automation_log", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  ruleId: text("rule_id").notNull().references(() => automationRules.id, { onDelete: "cascade" }),
+  entityType: text("entity_type").notNull(),
+  entityId: text("entity_id").notNull(),
+  event: text("event").notNull(), // "onCreate" | "onUpdate"
+  success: boolean("success").notNull(),
+  actionsExecuted: integer("actions_executed").default(0).notNull(),
+  errorMessage: text("error_message"),
+  loopDetected: boolean("loop_detected").default(false).notNull(),
+  loopInfo: text("loop_info"), // JSON: { triggeredRules: string[], depth: number, chain: string[] }
+  retryCount: integer("retry_count").default(0).notNull(),
+  retryInfo: text("retry_info"), // JSON: { attempts: number, maxAttempts: number, lastError: string, exponentialBackoff: boolean }
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const automationRulesRelations = relations(automationRules, ({ one, many }) => ({
+  owner: one(users, { fields: [automationRules.ownerId], references: [users.id] }),
+  logs: many(automationLogs),
+}));
+
+export const automationLogsRelations = relations(automationLogs, ({ one }) => ({
+  rule: one(automationRules, { fields: [automationLogs.ruleId], references: [automationRules.id] }),
+}));

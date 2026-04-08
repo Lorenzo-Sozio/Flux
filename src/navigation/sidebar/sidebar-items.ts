@@ -18,6 +18,7 @@ import {
   TrendingUp,
   Users,
   Webhook,
+  Zap,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -96,6 +97,18 @@ export const sidebarItems: NavGroup[] = [
   },
   {
     id: 2,
+    label: "Automation",
+    items: [
+      {
+        title: "Rules",
+        url: "/dashboard/automation",
+        icon: Zap,
+        isNew: true,
+      },
+    ],
+  },
+  {
+    id: 4,
     label: "Marketing",
     items: [
       {
@@ -111,7 +124,7 @@ export const sidebarItems: NavGroup[] = [
     ],
   },
   {
-    id: 3,
+    id: 5,
     label: "Administration",
     items: [
       {
@@ -145,14 +158,9 @@ export const sidebarItems: NavGroup[] = [
     ],
   },
   {
-    id: 4,
+    id: 6,
     label: "Dashboard Templates",
     items: [
-      {
-        title: "Default",
-        url: "/dashboard/default",
-        icon: LayoutDashboard,
-      },
       {
         title: "Finance",
         url: "/dashboard/finance",
