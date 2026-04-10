@@ -229,10 +229,83 @@ export async function getCampaignReport(campaignId: string) {
 
   return {
     campaign,
+    logs,
     stats: {
       total, queued, sent, opened, clicked, bounced, complained, unsubscribed, failed,
       openRate: sent > 0 ? ((opened / sent) * 100).toFixed(1) : "0",
       clickRate: sent > 0 ? ((clicked / sent) * 100).toFixed(1) : "0",
     },
   };
+}
+
+// ─── Batch stats for campaign list ───────────────────────────────────────────
+
+export async function getCampaignsWithStats() {
+  const campaigns = await db
+    .select()
+    .from(marketingCampaigns)
+    .orderBy(marketingCampaigns.createdAt);
+
+  const allLogs = await db.select().from(campaignLogs);
+
+  return campaigns.map((c) => {
+    const logs = allLogs.filter((l) => l.campaignId === c.id);
+    const sent = logs.filter((l) => !["failed", "queued"].includes(l.status)).length;
+    const opened = logs.filter((l) => ["opened", "clicked"].includes(l.status)).length;
+    const clicked = logs.filter((l) => l.status === "clicked").length;
+    return {
+      ...c,
+      stats: {
+        total: logs.length,
+        sent,
+        opened,
+        clicked,
+        openRate: sent > 0 ? ((opened / sent) * 100).toFixed(1) : "0",
+        clickRate: sent > 0 ? ((clicked / sent) * 100).toFixed(1) : "0",
+      },
+    };
+  });
+}
+
+// ─── Eligible recipient counts ────────────────────────────────────────────────
+
+export async function getEligibleRecipientCounts() {
+  const suppressions = await db.select({ email: emailSuppressions.email }).from(emailSuppressions);
+  const suppressedEmails = new Set(suppressions.map((s) => s.email.toLowerCase()));
+
+  const allContacts = await db
+    .select({ email: contacts.email })
+    .from(contacts)
+    .where(eq(contacts.marketingConsent, true));
+
+  const allLeads = await db
+    .select({ email: leads.email })
+    .from(leads)
+    .where(and(eq(leads.marketingConsent, true), eq(leads.isConverted, false)));
+
+  const eligibleContacts = allContacts.filter(
+    (c) => c.email && !suppressedEmails.has(c.email.toLowerCase()),
+  ).length;
+
+  const eligibleLeads = allLeads.filter(
+    (l) => l.email && !suppressedEmails.has(l.email.toLowerCase()),
+  ).length;
+
+  return { contacts: eligibleContacts, leads: eligibleLeads };
+}
+
+// ─── Duplicate a campaign ─────────────────────────────────────────────────────
+
+export async function duplicateCampaignAction(id: string) {
+  await requireWriteAccess();
+  const [original] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, id));
+  if (!original) throw new Error("Campaign not found");
+
+  const [copy] = await db
+    .insert(marketingCampaigns)
+    .values({ name: `${original.name} (Copy)`, description: original.description, templateId: original.templateId, status: "draft" })
+    .returning();
+
+  revalidatePath("/dashboard/marketing/campaigns");
+  return copy;
 }

@@ -10,34 +10,14 @@
  * - Supporta loop detection e retry logic
  */
 
-import { z } from 'zod'
 import cron, { type ScheduledTask } from 'node-cron'
 import { db } from '@/db'
-import { automationRules, automationLogs, deals, leads, contacts, companies } from '@/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { automationRules, deals, leads, contacts, companies } from '@/db/schema'
+import { eq } from 'drizzle-orm'
 import { runAutomations } from './rule-engine'
 import { TargetEntity } from '../../crm/automation/types'
-
-// ============================================================================
-// TYPES
-// ============================================================================
-
-/**
- * Metadata per attivare uno scheduled trigger su una rule
- * Memorizzato nel campo `triggerOn` della rule come ["scheduled:0 8 * * *"]
- */
-export const SCHEDULED_TRIGGER_PREFIX = 'scheduled:'
-
-export function parseScheduledTrigger(triggerStr: string): string | null {
-  if (triggerStr.startsWith(SCHEDULED_TRIGGER_PREFIX)) {
-    return triggerStr.substring(SCHEDULED_TRIGGER_PREFIX.length)
-  }
-  return null
-}
-
-export function encodeScheduledTrigger(cronExpression: string): string {
-  return `${SCHEDULED_TRIGGER_PREFIX}${cronExpression}`
-}
+import { parseScheduledTrigger } from './scheduler-utils'
+export { SCHEDULED_TRIGGER_PREFIX, parseScheduledTrigger, encodeScheduledTrigger } from './scheduler-utils'
 
 interface RegisteredCronJob {
   ruleId: string

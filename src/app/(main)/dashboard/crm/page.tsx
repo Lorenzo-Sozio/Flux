@@ -3,13 +3,13 @@ import { getDashboardStats } from "@/actions/dashboard";
 import { getLeads } from "@/actions/crm";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import CRMCharts from "@/components/dashboard/CRMCharts.client";
-import { 
-  TrendingUpIcon, 
-  UsersIcon, 
-  TargetIcon, 
-  AlertCircleIcon, 
-  CalendarIcon,
-  CheckCircle2Icon
+import {
+  TrendingUpIcon,
+  UsersIcon,
+  TargetIcon,
+  AlertCircleIcon,
+  FileTextIcon,
+  HeadphonesIcon,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -34,53 +34,95 @@ export default async function CRMPage() {
       </div>
 
       {/* Metric Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="border-l-4 border-l-blue-500 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pipeline Value</CardTitle>
-            <TrendingUpIcon className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">€{stats.totalDealValue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground mt-1">Total value of open deals</p>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        <Link href="/dashboard/pipeline" className="group">
+          <Card className="border-l-4 border-l-blue-500 shadow-sm transition-shadow group-hover:shadow-md cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Pipeline Value</CardTitle>
+              <TrendingUpIcon className="h-4 w-4 text-blue-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">€{stats.totalDealValue.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground mt-1">Total value of open deals</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="border-l-4 border-l-green-500 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Active Leads</CardTitle>
-            <UsersIcon className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.activeLeadsCount}</div>
-            <p className="text-xs text-muted-foreground mt-1">New or currently in contact</p>
-          </CardContent>
-        </Card>
+        <Link href="/dashboard/leads" className="group">
+          <Card className="border-l-4 border-l-green-500 shadow-sm transition-shadow group-hover:shadow-md cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Active Leads</CardTitle>
+              <UsersIcon className="h-4 w-4 text-green-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.activeLeadsCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">New or currently in contact</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="border-l-4 border-l-orange-500 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Conversion Rate</CardTitle>
-            <TargetIcon className="h-4 w-4 text-orange-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.conversionRate}%</div>
-            <p className="text-xs text-muted-foreground mt-1">Overall lead to customer ratio</p>
-          </CardContent>
-        </Card>
+        <Link href="/dashboard/leads" className="group">
+          <Card className="border-l-4 border-l-orange-500 shadow-sm transition-shadow group-hover:shadow-md cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Conversion Rate</CardTitle>
+              <TargetIcon className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.conversionRate}%</div>
+              <p className="text-xs text-muted-foreground mt-1">Overall lead to customer ratio</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        <Card className="border-l-4 border-l-red-500 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Tasks</CardTitle>
-            <AlertCircleIcon className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.todayTasks + stats.overdueTasks}</div>
-            <div className="flex gap-2 mt-1">
-              <span className="text-[10px] text-red-600 font-bold uppercase">{stats.overdueTasks} Overdue</span>
-              <span className="text-[10px] text-muted-foreground uppercase">{stats.todayTasks} Today</span>
-            </div>
-          </CardContent>
-        </Card>
+        <Link href="/dashboard/tasks" className="group">
+          <Card className="border-l-4 border-l-red-500 shadow-sm transition-shadow group-hover:shadow-md cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Pending Tasks</CardTitle>
+              <AlertCircleIcon className="h-4 w-4 text-red-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.todayTasks + stats.overdueTasks}</div>
+              <div className="flex gap-2 mt-1">
+                <span className="text-[10px] text-red-600 font-bold uppercase">{stats.overdueTasks} Overdue</span>
+                <span className="text-[10px] text-muted-foreground uppercase">{stats.todayTasks} Today</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/dashboard/quotes" className="group">
+          <Card className="border-l-4 border-l-violet-500 shadow-sm transition-shadow group-hover:shadow-md cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Quotes Pipeline</CardTitle>
+              <FileTextIcon className="h-4 w-4 text-violet-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">€{stats.quotesPipelineValue.toLocaleString()}</div>
+              <div className="flex gap-2 mt-1">
+                <span className="text-[10px] text-muted-foreground uppercase">{stats.quotesOpenCount} open quotes</span>
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/dashboard/support/tickets" className="group">
+          <Card className="border-l-4 border-l-amber-500 shadow-sm transition-shadow group-hover:shadow-md cursor-pointer">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Open Tickets</CardTitle>
+              <HeadphonesIcon className="h-4 w-4 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.openTicketsCount}</div>
+              <div className="flex gap-2 mt-1">
+                {stats.urgentTicketsCount > 0 ? (
+                  <span className="text-[10px] text-red-600 font-bold uppercase">{stats.urgentTicketsCount} Urgent</span>
+                ) : (
+                  <span className="text-[10px] text-muted-foreground uppercase">No urgent tickets</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Charts (rendered client-side) */}
@@ -110,8 +152,12 @@ export default async function CRMPage() {
             </TableHeader>
             <TableBody>
               {recentLeads.map((lead) => (
-                <TableRow key={lead.id}>
-                  <TableCell className="font-medium">{lead.firstName} {lead.lastName}</TableCell>
+                <TableRow key={lead.id} className="cursor-pointer hover:bg-muted/50">
+                  <TableCell className="font-medium">
+                    <Link href={`/dashboard/leads/${lead.id}`} className="hover:underline">
+                      {lead.firstName} {lead.lastName}
+                    </Link>
+                  </TableCell>
                   <TableCell>{lead.companyName || "N/A"}</TableCell>
                   <TableCell>
                     <Badge variant={lead.status === 'new' ? 'default' : 'secondary'} className="capitalize">
@@ -122,9 +168,9 @@ export default async function CRMPage() {
                     {new Date(lead.createdAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
-                     <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/dashboard/leads/${lead.id}`}>View Details</Link>
-                     </Button>
+                    <Button variant="ghost" size="sm" asChild>
+                      <Link href={`/dashboard/leads/${lead.id}`}>View →</Link>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

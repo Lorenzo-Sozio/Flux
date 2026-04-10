@@ -2,14 +2,12 @@ import { db } from "@/db"
 import { automationRules, automationLogs } from "@/db/schema"
 import { and, eq } from "drizzle-orm"
 import { z } from "zod"
-import { ConditionEvaluator } from "./condition-evaluator"
-import { ActionDispatcher }   from "./action-dispatcher"
+import { ActionDispatcher } from "./action-dispatcher"
 import { ActionSchema, ConditionSchema } from "../../crm/automation/types"
 import { checkLoopDetection, recordRuleExecution, formatRuleChain, createExecutionContext, type ExecutionContext } from "./loop-detector"
 import { validateExpression, compileExpression } from "./condition-parser"
 import type { RuleContext } from "../../crm/automation/types"
 
-const evaluator  = new ConditionEvaluator()
 const dispatcher = new ActionDispatcher()
 
 // ─── Condition Evaluation Helper ───────────────────────────────────────────────
@@ -195,6 +193,7 @@ async function executeRule(
 ): Promise<void> {
   let success         = false
   let actionsExecuted = 0
+  let totalRetries    = 0
   let errorMessage: string | undefined
 
   try {
@@ -212,6 +211,8 @@ async function executeRule(
         success:         false,
         actionsExecuted: 0,
         errorMessage:    errorMessage,
+        loopDetected:    true,
+        retryCount:      0,
       }).catch((logErr) => {
         console.error("[RuleEngine] Failed to write automation log:", logErr)
       })
@@ -240,8 +241,11 @@ async function executeRule(
     const actions = z.array(ActionSchema).parse(JSON.parse(rule.actions))
 
     // 5. Dispatch con execution context per propagare la catena
-    actionsExecuted = await dispatcher.dispatchAll(actions, context, nextExecCtx)
-    success         = true
+    const dispatched = await dispatcher.dispatchAll(actions, context, nextExecCtx)
+    actionsExecuted  = dispatched.actionsExecuted
+    totalRetries     = dispatched.totalRetries
+    if (dispatched.lastError) errorMessage = dispatched.lastError
+    success = actionsExecuted > 0 || actions.length === 0
 
     console.log(`[RuleEngine] Rule "${rule.name}" executed ${actionsExecuted} action(s) on ${context.entityType}:${context.entityId}. Chain: ${formatRuleChain(nextExecCtx)}`)
   } catch (err) {
@@ -257,6 +261,15 @@ async function executeRule(
       success,
       actionsExecuted,
       errorMessage:    errorMessage ?? null,
+      retryCount:      totalRetries,
+      retryInfo:       totalRetries > 0
+        ? JSON.stringify({
+            attempts:           totalRetries,
+            maxAttempts:        actionsExecuted * 3,
+            exponentialBackoff: true,
+            lastError:          errorMessage ?? null,
+          })
+        : null,
     }).catch((logErr) => {
       // Never let a logging failure propagate — the action already ran
       console.error("[RuleEngine] Failed to write automation log:", logErr)

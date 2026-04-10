@@ -89,9 +89,9 @@ function formatCronDescription(cronExpr: string): string {
   const minute = parts[0];
   const hour = parts[1];
   const dayOfMonth = parts[2];
-  const dayOfWeek = parts[5];
+  const dayOfWeek = parts[4];
 
-  // Casi comuni
+  // Common patterns
   if (dayOfMonth === "*" && dayOfWeek === "*") {
     return `Daily at ${hour}:${minute.padStart(2, "0")}`;
   }

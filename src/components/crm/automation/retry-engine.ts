@@ -76,20 +76,33 @@ export async function executeWithRetry<T>(
   fn: () => Promise<T>,
   config: RetryConfig = DEFAULT_RETRY_CONFIG,
 ): Promise<T> {
+  const { result } = await executeWithRetryTracked(fn, config)
+  return result
+}
+
+/**
+ * Like executeWithRetry but also returns the number of retry attempts made.
+ * `attempts` is 0 when the first call succeeds, 1 when one retry was needed, etc.
+ */
+export async function executeWithRetryTracked<T>(
+  fn: () => Promise<T>,
+  config: RetryConfig = DEFAULT_RETRY_CONFIG,
+): Promise<{ result: T; attempts: number }> {
   let lastError: Error | undefined
+  let attempts = 0
 
   for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
     try {
-      return await fn()
+      const result = await fn()
+      return { result, attempts }
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err))
+      attempts = attempt + 1
 
-      // Se è il tentativo finale, non fare backoff
       if (attempt === config.maxRetries) {
         break
       }
 
-      // Calcola il delay e dormi
       const delayMs = calculateBackoffDelay(attempt, config)
       console.warn(
         `[RetryEngine] Attempt ${attempt + 1}/${config.maxRetries + 1} failed. ` +
@@ -100,7 +113,6 @@ export async function executeWithRetry<T>(
     }
   }
 
-  // Tutti i tentativi falliti
   throw new Error(
     `Failed after ${config.maxRetries + 1} attempts. Last error: ${lastError?.message}`,
   )

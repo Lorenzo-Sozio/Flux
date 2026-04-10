@@ -4,7 +4,9 @@ import {
   Calendar,
   ChartBar,
   CheckSquare,
+  Clock,
   Contact,
+  FileText,
   Fingerprint,
   Gauge,
   Kanban,
@@ -12,6 +14,7 @@ import {
   type LucideIcon,
   Mail,
   MailOpen,
+  MessageSquare,
   Settings,
   Settings2,
   Target,
@@ -60,13 +63,6 @@ export const sidebarItems: NavGroup[] = [
         title: "Pipeline",
         url: "/dashboard/pipeline",
         icon: Kanban,
-        subItems: [
-          {
-            title: "Report",
-            url: "/dashboard/pipeline/report",
-            icon: TrendingUp,
-          },
-        ],
       },
       {
         title: "Calendar",
@@ -97,12 +93,42 @@ export const sidebarItems: NavGroup[] = [
   },
   {
     id: 2,
+    label: "Sales",
+    items: [
+      {
+        title: "Quotes",
+        url: "/dashboard/quotes",
+        icon: FileText,
+        isNew: true,
+      },
+    ],
+  },
+  {
+    id: 2.5,
     label: "Automation",
     items: [
       {
         title: "Rules",
         url: "/dashboard/automation",
         icon: Zap,
+        isNew: true,
+      },
+    ],
+  },
+  {
+    id: 3,
+    label: "Support",
+    items: [
+      {
+        title: "Tickets",
+        url: "/dashboard/support/tickets",
+        icon: MessageSquare,
+        isNew: true,
+      },
+      {
+        title: "SLA Management",
+        url: "/dashboard/settings/sla",
+        icon: Clock,
         isNew: true,
       },
     ],

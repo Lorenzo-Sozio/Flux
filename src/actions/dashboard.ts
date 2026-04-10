@@ -1,8 +1,8 @@
 "use server";
 
 import { db } from "@/db";
-import { deals, leads, tasks, pipelineStages, contacts } from "@/db/schema";
-import { eq, sql, and, isNull, gte, lt } from "drizzle-orm";
+import { deals, leads, tasks, pipelineStages, quotes, tickets } from "@/db/schema";
+import { eq, sql, and, gte, lt } from "drizzle-orm";
 
 export async function getDashboardStats() {
   // 1. Total Deal Value
@@ -79,6 +79,32 @@ export async function getDashboardStats() {
     value: Number(r.count)
   }));
 
+  // 7. Quotes pipeline: total value of quotes awaiting response (sent + viewed)
+  const quotesPipelineResult = await db
+    .select({ total: sql<number>`coalesce(sum(CAST(${quotes.totalAmount} AS NUMERIC)), 0)` })
+    .from(quotes)
+    .where(sql`${quotes.status} IN ('sent', 'viewed')`);
+  const quotesPipelineValue = Number(quotesPipelineResult[0]?.total || 0);
+
+  const quotesOpenCountResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(quotes)
+    .where(sql`${quotes.status} IN ('draft', 'sent', 'viewed')`);
+  const quotesOpenCount = Number(quotesOpenCountResult[0]?.count || 0);
+
+  // 8. Support tickets: open count + urgent count
+  const openTicketsResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(tickets)
+    .where(sql`${tickets.status} IN ('open', 'in_progress', 'waiting')`);
+  const openTicketsCount = Number(openTicketsResult[0]?.count || 0);
+
+  const urgentTicketsResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(tickets)
+    .where(and(sql`${tickets.status} IN ('open', 'in_progress', 'waiting')`, eq(tickets.priority, "urgent")));
+  const urgentTicketsCount = Number(urgentTicketsResult[0]?.count || 0);
+
   return {
     totalDealValue,
     activeLeadsCount,
@@ -86,6 +112,10 @@ export async function getDashboardStats() {
     overdueTasks,
     todayTasks,
     dealDistribution,
-    leadsBySource
+    leadsBySource,
+    quotesPipelineValue,
+    quotesOpenCount,
+    openTicketsCount,
+    urgentTicketsCount,
   };
 }

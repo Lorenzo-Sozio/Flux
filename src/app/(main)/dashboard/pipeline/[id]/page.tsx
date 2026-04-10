@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { getDealById, updateDeal, getPipelineData } from "@/actions/pipeline";
 import { getActivitiesByDeal, createActivity } from "@/actions/activities";
 import { getTasksByDeal, createTask, updateTaskStatus, getAllUsers } from "@/actions/tasks";
+import { getQuotesByDeal } from "@/actions/quotes";
 import { revalidatePath } from "next/cache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,18 +20,23 @@ import { ActivityModal } from "@/components/crm/activity-modal";
 import { TaskModal } from "@/components/crm/task-modal";
 import { DocumentPanel } from "@/components/crm/document-panel";
 import { RecordVisit } from "@/components/crm/record-visit";
+import { CreateQuoteButton } from "@/components/crm/create-quote-button";
+import { db } from "@/db";
+import { products } from "@/db/schema";
 
 export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: dealId } = await params;
   const session = await auth();
   const userId = session?.user?.id;
 
-  const [row, { stages }, activitiesList, tasksList, allUsers] = await Promise.all([
+  const [row, { stages }, activitiesList, tasksList, allUsers, quotesList, productsList] = await Promise.all([
     getDealById(dealId),
     getPipelineData(),
     getActivitiesByDeal(dealId),
     getTasksByDeal(dealId),
     getAllUsers(),
+    getQuotesByDeal(dealId),
+    db.query.products.findMany(),
   ]);
 
   if (!row) return notFound();
@@ -186,6 +192,41 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
 
         {/* Documents */}
         <DocumentPanel entityType="deal" entityId={dealId} />
+
+        {/* Quotes */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-base">Quotes & Proposals</CardTitle>
+            <CreateQuoteButton
+              dealId={dealId}
+              companyId={deal.companyId || ""}
+              contactId={deal.contactId || ""}
+              products={productsList.map(p => ({ id: p.id, name: p.name, price: p.price?.toString() || "0" }))}
+            />
+          </CardHeader>
+          <CardContent>
+            {quotesList.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No quotes yet. Create one to start proposal management.</p>
+            ) : (
+              <div className="space-y-2">
+                {quotesList.map((quote) => (
+                  <Link key={quote.id} href={`/dashboard/quotes/${quote.id}`}>
+                    <div className="flex items-center justify-between p-3 rounded-md border hover:bg-accent cursor-pointer transition-colors">
+                      <div>
+                        <p className="font-medium text-sm">{quote.quoteNumber}</p>
+                        <p className="text-xs text-muted-foreground">{new Date(quote.issuedAt).toLocaleDateString()}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{quote.status}</Badge>
+                        <span className="font-semibold text-sm">{quote.currency} {parseFloat(quote.totalAmount).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* ── Main content ──────────────────────────────────────────────────── */}

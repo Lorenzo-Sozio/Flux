@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import { CheckCircle2, AlertCircle, Clock, ChevronDown, AlertTriangle, RotateCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,9 +95,9 @@ export function AutomationLogs({ logs, rules = [], limit = 20 }: AutomationLogsP
               const loopInfo = log.loopInfo ? JSON.parse(log.loopInfo) : null;
               const retryInfo = log.retryInfo ? JSON.parse(log.retryInfo) : null;
               const isExpanded = expandedId === log.id;
-              
+
               return (
-                <tbody key={log.id}>
+                <Fragment key={log.id}>
                   <TableRow className="border-muted/50 hover:bg-muted/30 cursor-pointer" onClick={() => setExpandedId(isExpanded ? null : log.id)}>
                     {/* Expand button */}
                     <TableCell className="w-6">
@@ -209,7 +209,7 @@ export function AutomationLogs({ logs, rules = [], limit = 20 }: AutomationLogsP
                       </TableCell>
                     </TableRow>
                   )}
-                </tbody>
+                </Fragment>
               );
             })}
           </TableBody>

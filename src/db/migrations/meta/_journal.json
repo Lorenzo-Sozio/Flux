@@ -36,6 +36,13 @@
       "when": 1773401497854,
       "tag": "0004_add_marketing_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1775636704529,
+      "tag": "0005_flowery_silver_fox",
+      "breakpoints": true
     }
   ]
 }

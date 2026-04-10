@@ -121,16 +121,23 @@ export type AutomationAction = z.infer<typeof ActionSchema>
 
 // ─── Full Rule (form + server validation) ─────────────────────────────────────
 
+// A trigger item is either a known event ("onCreate" | "onUpdate")
+// or a scheduled cron string in the form "scheduled:0 8 * * *".
+const TriggerItemSchema = z.union([
+  z.enum(TRIGGER_EVENTS),
+  z.string().regex(/^scheduled:.+/, "Scheduled trigger must be in the form 'scheduled:<cron>'"),
+])
+
 export const AutomationRuleFormSchema = z.object({
   name:                 z.string().min(1, "Name is required").max(255),
   description:          z.string().max(1000).optional(),
   isActive:             z.boolean().default(true),
   targetEntity:         z.enum(TARGET_ENTITIES),
-  triggerOn:            z.array(z.enum(TRIGGER_EVENTS)).min(1, "Select at least one trigger event"),
+  triggerOn:            z.array(TriggerItemSchema).min(1, "Select at least one trigger event"),
   // Legacy: supporto backward compatibility
   conditionLogic:       z.enum(["AND", "OR"]).default("AND").optional(),
   conditions:           z.array(ConditionSchema).min(1, "At least one condition is required"),
-  // NEW: Espressione logica avanzata per condizioni complesse
+  // Espressione logica avanzata per condizioni complesse
   // Esempi: "(C0 AND C1) OR C2", "NOT C0 AND (C1 OR C2)"
   conditionExpression:  z.string().max(1000).optional(),
   actions:              z.array(ActionSchema).min(1, "At least one action is required"),

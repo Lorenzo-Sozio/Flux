@@ -16,29 +16,40 @@ import type { ExecutionContext } from "../../crm/automation/loop-detector"
  */
 export class ActionDispatcher {
 
-  /** Run all actions sequentially; returns the count of successful ones. */
-  async dispatchAll(actions: AutomationAction[], context: RuleContext, executionCtx: ExecutionContext): Promise<number> {
-    let count = 0
+  /** Run all actions sequentially; returns execution stats. */
+  async dispatchAll(
+    actions: AutomationAction[],
+    context: RuleContext,
+    executionCtx: ExecutionContext,
+  ): Promise<{ actionsExecuted: number; totalRetries: number; lastError?: string }> {
+    let actionsExecuted = 0
+    let totalRetries    = 0
+    let lastError: string | undefined
+
     for (const action of actions) {
       try {
-        await this.dispatch(action, context, executionCtx)
-        count++
+        const retries = await this.dispatch(action, context, executionCtx)
+        actionsExecuted++
+        totalRetries += retries
       } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err)
         console.error(`[ActionDispatcher] "${action.type}" failed for ${context.entityType}:${context.entityId}`, err)
       }
     }
-    return count
+
+    return { actionsExecuted, totalRetries, lastError }
   }
 
   // ─── Router ──────────────────────────────────────────────────────────────────
 
-  private async dispatch(action: AutomationAction, context: RuleContext, executionCtx: ExecutionContext): Promise<void> {
+  // Returns the number of retries consumed by this action (0 for non-HTTP actions).
+  private async dispatch(action: AutomationAction, context: RuleContext, executionCtx: ExecutionContext): Promise<number> {
     switch (action.type) {
-      case "create_task":        return this.createTask(action, context)
-      case "send_notification":  return this.sendNotification(action, context)
+      case "create_task":        await this.createTask(action, context);                          return 0
+      case "send_notification":  await this.sendNotification(action, context);                    return 0
       case "send_email":         return this.sendEmail(action, context)
       case "send_webhook":       return this.sendWebhookAction(action, context)
-      case "update_field":       return this.updateField(action, context, executionCtx)
+      case "update_field":       await this.updateField(action, context, executionCtx);           return 0
       // TypeScript exhaustiveness: no `default` — new action types require an explicit case.
     }
   }
@@ -106,10 +117,10 @@ export class ActionDispatcher {
   private async sendEmail(
     action: Extract<AutomationAction, { type: "send_email" }>,
     context: RuleContext,
-  ): Promise<void> {
+  ): Promise<number> {
     const { to, cc, bcc, subject, body, trackOpens, trackClicks } = action.params
 
-    await sendAutomationEmailWithContext(
+    return sendAutomationEmailWithContext(
       to,
       cc,
       bcc,
@@ -126,21 +137,19 @@ export class ActionDispatcher {
   private async sendWebhookAction(
     action: Extract<AutomationAction, { type: "send_webhook" }>,
     context: RuleContext,
-  ): Promise<void> {
+  ): Promise<number> {
     const { url, method, headers, body, retryCount, timeoutMs } = action.params
 
-    // Prepara il contesto per merge fields
-    const mergeContext: Record<string, any> = {
+    const mergeContext: Record<string, unknown> = {
       [context.entityType]: context.newData,
       entityId: context.entityId,
       entityType: context.entityType,
     }
 
-    // Esegui il webhook
     const result = await sendWebhook(
       {
         url,
-        method: (method as any) || "POST",
+        method: (method as "GET" | "POST" | "PUT" | "DELETE" | "PATCH") ?? "POST",
         headers,
         body,
         retryCount: retryCount ?? 3,
@@ -154,6 +163,7 @@ export class ActionDispatcher {
     }
 
     console.log(`[ActionDispatcher] Webhook sent to ${url}:`, result.statusCode)
+    return result.retryCount
   }
 
   // ─── Action: update_field ─────────────────────────────────────────────────────

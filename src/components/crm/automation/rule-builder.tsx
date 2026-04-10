@@ -39,6 +39,7 @@ import {
 } from "@/actions/automation";
 import { getAllUsers } from "@/actions/crm";
 import { ConditionExpressionEditor } from "./condition-expression-editor";
+import { parseScheduledTrigger, SCHEDULED_TRIGGER_PREFIX } from "./scheduler-utils";
 
 // ── Update-field options per entity ──────────────────────────────────────────
 
@@ -175,9 +176,9 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
         name:           rule.name,
         description:    rule.description ?? "",
         isActive:       rule.isActive,
-        targetEntity:   rule.targetEntity as any,
-        triggerOn:      (rule.triggerOn ?? []) as any,
-        conditionLogic: (rule.conditionLogic ?? "AND") as any,
+        targetEntity:   rule.targetEntity as AutomationRuleFormData["targetEntity"],
+        triggerOn:      (rule.triggerOn ?? []) as AutomationRuleFormData["triggerOn"],
+        conditionLogic: (rule.conditionLogic ?? "AND") as "AND" | "OR",
         conditions:     JSON.parse(rule.conditions),
         actions:        JSON.parse(rule.actions),
       }
@@ -370,40 +371,61 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                       control={control}
                       name="triggerOn"
                       render={({ field }) => {
-                        const scheduledTrigger = field.value?.find((t: string) => t.startsWith("scheduled:"));
+                        const scheduledTrigger = field.value?.find((t: string) =>
+                          t.startsWith(SCHEDULED_TRIGGER_PREFIX)
+                        );
+                        const cronExpr = scheduledTrigger
+                          ? parseScheduledTrigger(scheduledTrigger)
+                          : null;
+
+                        // Derive HH:MM from stored cron ("30 9 * * *" → "09:30")
+                        const timeValue = (() => {
+                          if (!cronExpr) return "08:00";
+                          const parts = cronExpr.split(" ");
+                          const h = parts[1]?.padStart(2, "0") ?? "08";
+                          const m = parts[0]?.padStart(2, "0") ?? "00";
+                          return `${h}:${m}`;
+                        })();
+
                         return (
                           <div className="space-y-2">
                             <label className="text-xs font-medium">Daily Schedule (time)</label>
                             <div className="flex gap-2">
                               <Input
                                 type="time"
-                                defaultValue="08:00"
+                                value={timeValue}
                                 className="h-8 text-sm flex-1"
-                                onChange={(e) => {
-                                  const [hours, minutes] = e.target.value.split(":");
-                                  // Format: "scheduled:0 8 * * *" (cron format)
+                                onChange={(ev) => {
+                                  const [hours, minutes] = ev.target.value.split(":");
                                   const cron = `${parseInt(minutes)} ${parseInt(hours)} * * *`;
-                                  const encoded = `scheduled:${cron}`;
-                                  const next = field.value?.filter((t: string) => !t.startsWith("scheduled:")) ?? [];
+                                  const encoded = `${SCHEDULED_TRIGGER_PREFIX}${cron}`;
+                                  const next = field.value?.filter((t: string) =>
+                                    !t.startsWith(SCHEDULED_TRIGGER_PREFIX)
+                                  ) ?? [];
                                   field.onChange([...next, encoded]);
                                 }}
                               />
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  const next = field.value?.filter((t: string) => !t.startsWith("scheduled:")) ?? [];
-                                  field.onChange(next);
-                                }}
-                                className={cn(scheduledTrigger ? "text-destructive" : "")}
-                              >
-                                {scheduledTrigger ? "Remove" : "Clear"}
-                              </Button>
+                              {scheduledTrigger && (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-destructive"
+                                  onClick={() => {
+                                    field.onChange(
+                                      field.value?.filter((t: string) =>
+                                        !t.startsWith(SCHEDULED_TRIGGER_PREFIX)
+                                      ) ?? []
+                                    );
+                                  }}
+                                >
+                                  Remove
+                                </Button>
+                              )}
                             </div>
                             {scheduledTrigger && (
                               <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                                ✓ Scheduled: {scheduledTrigger.replace("scheduled:", "")}
+                                Scheduled daily at {timeValue}
                               </p>
                             )}
                           </div>

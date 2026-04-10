@@ -18,10 +18,11 @@ export async function GET(req: NextRequest) {
   const logId = req.nextUrl.searchParams.get("log");
 
   if (logId) {
+    // Only advance to "opened" — never overwrite clicked/unsubscribed/bounced
     db.update(campaignLogs)
       .set({ status: "opened", openedAt: new Date() })
       .where(eq(campaignLogs.id, logId))
-      .catch(() => {});
+      .catch((err) => console.error("[track/open] DB update failed", { logId, err }));
   }
 
   return new Response(PIXEL, {

@@ -10,15 +10,18 @@ import { AutomationRuleFormSchema, type AutomationRuleFormData } from "@/compone
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 export async function getAutomationRules() {
+  await requireWriteAccess()
   return db.select().from(automationRules).orderBy(desc(automationRules.createdAt))
 }
 
 export async function getAutomationRuleById(id: string) {
+  await requireWriteAccess()
   const [rule] = await db.select().from(automationRules).where(eq(automationRules.id, id))
   return rule ?? null
 }
 
 export async function getAutomationLogs(ruleId: string, limit = 50) {
+  await requireWriteAccess()
   return db
     .select()
     .from(automationLogs)
@@ -31,6 +34,7 @@ export async function getAutomationLogs(ruleId: string, limit = 50) {
  * Fetch recent logs across all rules (for dashboard overview)
  */
 export async function getRecentAutomationLogs(limit = 50) {
+  await requireWriteAccess()
   return db
     .select()
     .from(automationLogs)

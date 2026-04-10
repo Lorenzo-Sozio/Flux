@@ -15,11 +15,13 @@
 import { db } from "@/db"
 import { deals, leads, contacts, companies, users } from "@/db/schema"
 import { eq } from "drizzle-orm"
-import { executeWithRetry, DEFAULT_RETRY_CONFIG } from "../../crm/automation/retry-engine"
+import { executeWithRetryTracked } from "../../crm/automation/retry-engine"
 import type { RuleContext } from "../../crm/automation/types"
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const RESEND_API_URL = "https://api.resend.com/emails"
+const AUTOMATION_FROM_EMAIL =
+  process.env.AUTOMATION_FROM_EMAIL ?? "automation@fluxcrm.app"
 
 /**
  * Merge fields helper
@@ -90,16 +92,13 @@ export async function sendAutomationEmail(
   body: string,
   trackOpens: boolean,
   trackClicks: boolean,
-): Promise<{ success: boolean; messageId?: string; error?: string }> {
+): Promise<{ success: boolean; messageId?: string; error?: string; retryCount: number }> {
   if (!RESEND_API_KEY) {
-    return {
-      success: false,
-      error: "RESEND_API_KEY not configured",
-    }
+    return { success: false, error: "RESEND_API_KEY not configured", retryCount: 0 }
   }
 
   try {
-    const result = await executeWithRetry(
+    const { result, attempts } = await executeWithRetryTracked(
       async () => {
         const response = await fetch(RESEND_API_URL, {
           method: "POST",
@@ -108,19 +107,13 @@ export async function sendAutomationEmail(
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            from: "automation@flux.local", // Customizable
+            from: AUTOMATION_FROM_EMAIL,
             to,
             cc: cc ? cc.split(",").map((e) => e.trim()) : undefined,
             bcc: bcc ? bcc.split(",").map((e) => e.trim()) : undefined,
             subject,
             html: body,
-            tags: [
-              {
-                name: "source",
-                value: "automation",
-              },
-            ],
-            // Tracking
+            tags: [{ name: "source", value: "automation" }],
             track_opens: trackOpens,
             track_clicks: trackClicks,
           }),
@@ -129,30 +122,21 @@ export async function sendAutomationEmail(
         if (!response.ok) {
           const errData = await response.json()
           throw new Error(
-            `Resend API error: ${response.status} - ${
-              errData.message || response.statusText
-            }`,
+            `Resend API error: ${response.status} - ${errData.message || response.statusText}`,
           )
         }
 
         return response.json()
       },
-      {
-        maxRetries: 3,
-        initialDelayMs: 1000,
-        maxDelayMs: 10000,
-        strategy: "exponential",
-      },
+      { maxRetries: 3, initialDelayMs: 1000, maxDelayMs: 10000, strategy: "exponential" },
     )
 
-    return {
-      success: true,
-      messageId: result.id,
-    }
+    return { success: true, messageId: result.id, retryCount: attempts }
   } catch (err) {
     return {
       success: false,
       error: err instanceof Error ? err.message : String(err),
+      retryCount: 0,
     }
   }
 }
@@ -160,6 +144,7 @@ export async function sendAutomationEmail(
 /**
  * Prepara e invia un'email nell'ambito di un'automazione
  */
+/** Resolves merge fields, sends the email, and returns the number of retries consumed. */
 export async function sendAutomationEmailWithContext(
   to: string,
   cc: string | undefined,
@@ -169,7 +154,7 @@ export async function sendAutomationEmailWithContext(
   trackOpens: boolean,
   trackClicks: boolean,
   context: RuleContext,
-): Promise<void> {
+): Promise<number> {
   // Carica i dati per il merge
   const entityData = await loadEntityData(context.entityType, context.entityId)
   const ownerData = await loadOwnerData((entityData as any).ownerId)
@@ -195,7 +180,6 @@ export async function sendAutomationEmailWithContext(
     )
   }
 
-  // Invia
   const result = await sendAutomationEmail(
     finalTo,
     finalCc,
@@ -209,4 +193,6 @@ export async function sendAutomationEmailWithContext(
   if (!result.success) {
     throw new Error(`Failed to send email: ${result.error}`)
   }
+
+  return result.retryCount
 }

@@ -532,9 +532,133 @@ export const documents = pgTable("document", {
   mimeType: text("mime_type"),
   size: integer("size"),                  // bytes
   version: integer("version").default(1).notNull(),
-  entityType: text("entity_type"),        // contact, deal, lead, company
+  entityType: text("entity_type"),        // contact, deal, lead, company, quote
   entityId: text("entity_id"),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// --- QUOTES & PROPOSALS ---
+export const quotes = pgTable("quote", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  quoteNumber: text("quote_number").notNull().unique(),
+  dealId: text("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
+  companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  status: text("status").default("draft").notNull(), // draft, sent, viewed, accepted, declined, expired, converted
+  subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull(),
+  discountAmount: numeric("discount_amount", { precision: 12, scale: 2 }).default("0"),
+  discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }).default("0"),
+  taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
+  taxPercent: numeric("tax_percent", { precision: 5, scale: 2 }).default("0"),
+  totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
+  currency: text("currency").default("USD").notNull(),
+  issuedAt: timestamp("issued_at", { mode: "date" }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { mode: "date" }),
+  sentAt: timestamp("sent_at", { mode: "date" }),
+  viewedAt: timestamp("viewed_at", { mode: "date" }),
+  acceptedAt: timestamp("accepted_at", { mode: "date" }),
+  declinedAt: timestamp("declined_at", { mode: "date" }),
+  declineReason: text("decline_reason"),
+  version: integer("version").default(1).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const quoteItems = pgTable("quote_item", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  quoteId: text("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
+  description: text("description"),
+  quantity: integer("quantity").notNull(),
+  unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }).default("0"),
+  discountAmount: numeric("discount_amount", { precision: 12, scale: 2 }).default("0"),
+  taxPercent: numeric("tax_percent", { precision: 5, scale: 2 }).default("0"),
+  taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
+  totalPrice: numeric("total_price", { precision: 12, scale: 2 }).notNull(),
+});
+
+export const quoteActivities = pgTable("quote_activity", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  quoteId: text("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  type: text("type").notNull(), // sent, viewed, opened_email, clicked_email, accepted, declined, reminded, created, updated
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+  email: text("email"),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// --- SUPPORT TICKETS & CASES (Omnichannel) ---
+export const tickets = pgTable("ticket", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  ticketNumber: text("ticket_number").notNull().unique(),
+  subject: text("subject").notNull(),
+  description: text("description"),
+  channel: text("channel").notNull(), // email, chat, phone, social
+  priority: text("priority").default("normal").notNull(), // low, normal, high, urgent
+  severity: text("severity").default("normal").notNull(), // low, normal, high, critical
+  status: text("status").default("open").notNull(), // open, in_progress, waiting, resolved, closed
+  contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+  assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  slaId: text("sla_id").references(() => slas.id, { onDelete: "set null" }),
+  firstResponseAt: timestamp("first_response_at", { mode: "date" }),
+  resolvedAt: timestamp("resolved_at", { mode: "date" }),
+  closedAt: timestamp("closed_at", { mode: "date" }),
+  tags: text("tags").array().default([]),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const ticketMessages = pgTable("ticket_message", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  ticketId: text("ticket_id").notNull().references(() => tickets.id, { onDelete: "cascade" }),
+  senderId: text("sender_id").references(() => users.id, { onDelete: "set null" }),
+  senderEmail: text("sender_email"),
+  senderName: text("sender_name"),
+  channel: text("channel").notNull(), // email, chat, phone, social
+  content: text("content").notNull(),
+  isPublic: boolean("is_public").default(true).notNull(),
+  attachmentIds: text("attachment_ids").array().default([]), // document IDs
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const slas = pgTable("sla", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  description: text("description"),
+  priority: text("priority").notNull(), // low, normal, high, urgent
+  firstResponseTimeMinutes: integer("first_response_time_minutes").notNull(),
+  resolutionTimeMinutes: integer("resolution_time_minutes").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const chatChannels = pgTable("chat_channel", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  type: text("type").notNull(), // live_chat, whatsapp, telegram, slack
+  isActive: boolean("is_active").default(true).notNull(),
+  config: text("config"), // JSON: API keys, webhook URLs, etc.
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const chatSessions = pgTable("chat_session", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  ticketId: text("ticket_id").references(() => tickets.id, { onDelete: "cascade" }),
+  channelId: text("channel_id").references(() => chatChannels.id),
+  visitorId: text("visitor_id"),
+  visitorEmail: text("visitor_email"),
+  visitorName: text("visitor_name"),
+  status: text("status").default("active").notNull(), // active, waiting, assigned, closed
+  assignedAgentId: text("assigned_agent_id").references(() => users.id),
+  startedAt: timestamp("started_at", { mode: "date" }).defaultNow().notNull(),
+  endedAt: timestamp("ended_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -585,6 +709,55 @@ export const webhooksRelations = relations(webhooks, ({ many }) => ({
 
 export const webhookLogsRelations = relations(webhookLogs, ({ one }) => ({
   webhook: one(webhooks, { fields: [webhookLogs.webhookId], references: [webhooks.id] }),
+}));
+
+// --- QUOTE RELATIONS ---
+export const quotesRelations = relations(quotes, ({ one, many }) => ({
+  deal: one(deals, { fields: [quotes.dealId], references: [deals.id] }),
+  company: one(companies, { fields: [quotes.companyId], references: [companies.id] }),
+  contact: one(contacts, { fields: [quotes.contactId], references: [contacts.id] }),
+  owner: one(users, { fields: [quotes.ownerId], references: [users.id] }),
+  items: many(quoteItems),
+  activities: many(quoteActivities),
+}));
+
+export const quoteItemsRelations = relations(quoteItems, ({ one }) => ({
+  quote: one(quotes, { fields: [quoteItems.quoteId], references: [quotes.id] }),
+  product: one(products, { fields: [quoteItems.productId], references: [products.id] }),
+}));
+
+export const quoteActivitiesRelations = relations(quoteActivities, ({ one }) => ({
+  quote: one(quotes, { fields: [quoteActivities.quoteId], references: [quotes.id] }),
+  user: one(users, { fields: [quoteActivities.userId], references: [users.id] }),
+}));
+
+// --- SUPPORT/TICKET RELATIONS ---
+export const ticketsRelations = relations(tickets, ({ one, many }) => ({
+  contact: one(contacts, { fields: [tickets.contactId], references: [contacts.id] }),
+  company: one(companies, { fields: [tickets.companyId], references: [companies.id] }),
+  assignee: one(users, { fields: [tickets.assigneeId], references: [users.id] }),
+  owner: one(users, { fields: [tickets.ownerId], references: [users.id] }),
+  sla: one(slas, { fields: [tickets.slaId], references: [slas.id] }),
+  messages: many(ticketMessages),
+}));
+
+export const ticketMessagesRelations = relations(ticketMessages, ({ one }) => ({
+  ticket: one(tickets, { fields: [ticketMessages.ticketId], references: [tickets.id] }),
+  sender: one(users, { fields: [ticketMessages.senderId], references: [users.id] }),
+}));
+
+export const slasRelations = relations(slas, ({ many }) => ({
+  tickets: many(tickets),
+}));
+
+export const chatChannelsRelations = relations(chatChannels, ({ many }) => ({
+  sessions: many(chatSessions),
+}));
+
+export const chatSessionsRelations = relations(chatSessions, ({ one }) => ({
+  ticket: one(tickets, { fields: [chatSessions.ticketId], references: [tickets.id] }),
+  channel: one(chatChannels, { fields: [chatSessions.channelId], references: [chatChannels.id] }),
+  assignedAgent: one(users, { fields: [chatSessions.assignedAgentId], references: [users.id] }),
 }));
 
 // --- AUTOMATION RULES ---

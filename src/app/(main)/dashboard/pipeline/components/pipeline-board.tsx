@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DealModal } from "@/components/crm/deal-modal";
 import { Button } from "@/components/ui/button";
-import { PlusIcon, DollarSignIcon, PencilIcon } from "lucide-react";
+import { PlusIcon, DollarSignIcon, PencilIcon, BarChart2 } from "lucide-react";
 
 type Deal = {
   id: string;
@@ -70,7 +70,7 @@ export function PipelineBoard({
 
     const deal = { ...newDeals[dealIndex] };
     deal.stageId = destination.droppableId;
-    
+
     newDeals.splice(dealIndex, 1); // remove from old position
     // We don't have true sorting logic for deals yet, just simple filtering
     // So we just update the stageId
@@ -93,15 +93,23 @@ export function PipelineBoard({
           <h2 className="text-xl font-bold">Sales Pipeline</h2>
           <p className="text-sm text-muted-foreground">Drag and drop deals to change their progress</p>
         </div>
-        {canEdit && (
-          <DealModal stages={initialStages} companies={companies} contacts={contacts}>
-            <Button size="sm" className="gap-2">
-              <PlusIcon className="w-4 h-4" /> New Deal
-            </Button>
-          </DealModal>
-        )}
-      </div>
 
+        {/* Raggruppa i bottoni in un container flex */}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/dashboard/pipeline/report">
+              <BarChart2 className="mr-2 h-4 w-4" /> Pipeline Report
+            </Link>
+          </Button>
+          {canEdit && (
+            <DealModal stages={initialStages} companies={companies} contacts={contacts}>
+              <Button size="sm" className="gap-2">
+                <PlusIcon className="w-4 h-4" /> New Deal
+              </Button>
+            </DealModal>
+          )}
+        </div>
+      </div>
       <DragDropContext onDragEnd={onDragEnd}>
         <div className="flex-1 flex gap-4 w-full pb-4">
           {initialStages.map((stage) => {
@@ -130,9 +138,8 @@ export function PipelineBoard({
                     <div
                       {...provided.droppableProps}
                       ref={provided.innerRef}
-                      className={`flex-1 overflow-y-auto p-3 flex flex-col gap-3 transition-colors ${
-                        snapshot.isDraggingOver ? "bg-primary/5" : "bg-transparent"
-                      }`}
+                      className={`flex-1 overflow-y-auto p-3 flex flex-col gap-3 transition-colors ${snapshot.isDraggingOver ? "bg-primary/5" : "bg-transparent"
+                        }`}
                     >
                       {stageDeals.map((deal, index) => (
                         <Draggable key={deal.id} draggableId={deal.id} index={index}>
@@ -144,9 +151,8 @@ export function PipelineBoard({
                               style={{ ...provided.draggableProps.style }}
                               className="group"
                             >
-                              <Card className={`relative transition-all border-l-4 ${
-                                snapshot.isDragging ? "shadow-xl ring-2 ring-primary/20 rotate-1 scale-[1.02]" : "hover:shadow-md"
-                              }`} style={{ borderLeftColor: stage.color || '#3b82f6' }}>
+                              <Card className={`relative transition-all border-l-4 ${snapshot.isDragging ? "shadow-xl ring-2 ring-primary/20 rotate-1 scale-[1.02]" : "hover:shadow-md"
+                                }`} style={{ borderLeftColor: stage.color || '#3b82f6' }}>
                                 <CardHeader className="p-3 pb-1">
                                   <div className="flex justify-between items-start gap-2">
                                     <CardTitle className="text-sm font-bold leading-tight">

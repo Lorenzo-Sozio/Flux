@@ -7,7 +7,7 @@
  * - Timeout configurabile
  */
 
-import { executeWithRetry, DEFAULT_RETRY_CONFIG } from './retry-engine'
+import { executeWithRetryTracked } from './retry-engine'
 import { replaceMergeFields } from './email-service'
 
 interface WebhookPayload {
@@ -24,6 +24,7 @@ interface WebhookResult {
   statusCode?: number
   message: string
   responseBody?: unknown
+  retryCount: number
 }
 
 /**
@@ -76,7 +77,7 @@ export async function sendWebhook(
   }
 
   // Esegui con retry logic
-  return executeWithRetry(
+  const { result, attempts } = await executeWithRetryTracked(
     async () => {
       const response = await fetch(resolvedUrl, fetchOptions)
 
@@ -92,7 +93,7 @@ export async function sendWebhook(
       }
 
       return {
-        success: true,
+        success: true as const,
         statusCode: response.status,
         message: 'Webhook sent successfully',
         responseBody,
@@ -105,6 +106,8 @@ export async function sendWebhook(
       strategy: 'exponential',
     }
   )
+
+  return { ...result, retryCount: attempts }
 }
 
 /**

@@ -1,0 +1,560 @@
+"use client";
+
+import React, { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm, useFieldArray } from "react-hook-form";
+import { z } from "zod";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { ChevronLeft, Plus, Trash2, Loader2, FileText } from "lucide-react";
+import { toast } from "sonner";
+import { createQuoteAction, getQuoteFormData } from "@/actions/quotes";
+import { CreateQuoteSchema } from "@/actions/quotes-validation";
+
+type FormValues = z.infer<typeof CreateQuoteSchema>;
+
+export default function NewQuotePage() {
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState<Awaited<ReturnType<typeof getQuoteFormData>> | null>(null);
+  const [isFormDataLoading, setIsFormDataLoading] = useState(true);
+
+  useEffect(() => {
+    getQuoteFormData()
+      .then(setFormData)
+      .catch(() => toast.error("Failed to load form data"))
+      .finally(() => setIsFormDataLoading(false));
+  }, []);
+
+  const form = useForm<FormValues>({
+    resolver: zodResolver(CreateQuoteSchema),
+    defaultValues: {
+      dealId: "",
+      companyId: "",
+      contactId: "",
+      items: [
+        { productId: "", description: "", quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 0 },
+      ],
+      notes: "",
+      discountPercent: 0,
+      taxPercent: 0,
+    },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "items",
+  });
+
+  const selectedDealId = form.watch("dealId");
+
+  // Auto-fill companyId when a deal is selected
+  function handleDealChange(dealId: string) {
+    form.setValue("dealId", dealId);
+    const deal = formData?.deals.find((d) => d.id === dealId);
+    form.setValue("companyId", deal?.companyId ?? "");
+  }
+
+  function handleProductSelect(index: number, productId: string) {
+    if (productId === "_custom") {
+      form.setValue(`items.${index}.productId`, "");
+      return;
+    }
+    const product = formData?.products.find((p) => p.id === productId);
+    if (product) {
+      form.setValue(`items.${index}.productId`, product.id);
+      form.setValue(`items.${index}.unitPrice`, parseFloat(product.price ?? "0") || 0);
+      if (!form.getValues(`items.${index}.description`)) {
+        form.setValue(`items.${index}.description`, product.name);
+      }
+    }
+  }
+
+  // Live subtotal preview
+  const items = form.watch("items");
+  const discountPct = form.watch("discountPercent") ?? 0;
+  const taxPct = form.watch("taxPercent") ?? 0;
+
+  const totals = useMemo(() => {
+    const subtotal = (items ?? []).reduce((sum, item) => {
+      const qty = Number(item.quantity) || 0;
+      const price = Number(item.unitPrice) || 0;
+      const disc = Number(item.discountPercent) || 0;
+      const tax = Number(item.taxPercent) || 0;
+      const lineSubtotal = qty * price;
+      const afterDisc = lineSubtotal * (1 - disc / 100);
+      return sum + afterDisc * (1 + tax / 100);
+    }, 0);
+
+    const discountAmount = subtotal * (Number(discountPct) / 100);
+    const afterDiscount = subtotal - discountAmount;
+    const taxAmount = afterDiscount * (Number(taxPct) / 100);
+    const total = afterDiscount + taxAmount;
+
+    return { subtotal, discountAmount, taxAmount, total };
+  }, [items, discountPct, taxPct]);
+
+  async function onSubmit(data: FormValues) {
+    setIsSubmitting(true);
+    try {
+      const result = await createQuoteAction(data);
+      toast.success(`Quote ${result.quoteNumber} created`);
+      router.push(`/dashboard/quotes/${result.quoteId}`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to create quote");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="p-6 max-w-3xl mx-auto space-y-5">
+      {/* Header */}
+      <div>
+        <Link
+          href="/dashboard/quotes"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Back to Quotes
+        </Link>
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+            <FileText className="h-5 w-5 text-primary" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">New Quote</h1>
+            <p className="text-sm text-muted-foreground">Create a quote for a deal</p>
+          </div>
+        </div>
+      </div>
+
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+
+          {/* Deal + Customer */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Deal & Customer
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <FormField
+                control={form.control}
+                name="dealId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Deal <span className="text-destructive">*</span></FormLabel>
+                    <Select
+                      disabled={isFormDataLoading}
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        handleDealChange(val);
+                      }}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder={isFormDataLoading ? "Loading…" : "Select a deal"} />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {formData?.deals.map((deal) => (
+                          <SelectItem key={deal.id} value={deal.id}>
+                            {deal.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="companyId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Company <span className="text-destructive">*</span></FormLabel>
+                    <Select
+                      disabled={isFormDataLoading}
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a company" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {formData?.companies.map((company) => (
+                          <SelectItem key={company.id} value={company.id}>
+                            {company.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Line Items */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+              <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Line Items
+              </CardTitle>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!selectedDealId}
+                onClick={() =>
+                  append({ productId: "", description: "", quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 0 })
+                }
+              >
+                <Plus className="mr-2 h-3.5 w-3.5" />
+                Add Item
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {fields.map((field, index) => (
+                <div key={field.id} className="rounded-lg border bg-muted/20 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">Item {index + 1}</span>
+                    {fields.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => remove(index)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.productId`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Product</FormLabel>
+                          <Select
+                            onValueChange={(val) => {
+                              field.onChange(val === "_custom" ? "" : val);
+                              handleProductSelect(index, val);
+                            }}
+                            value={field.value || "_custom"}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-8 text-sm">
+                                <SelectValue placeholder="Select product" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="_custom">Custom item</SelectItem>
+                              {formData?.products.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.quantity`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Qty</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="1"
+                              step="1"
+                              className="h-8 text-sm"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name={`items.${index}.description`}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Description</FormLabel>
+                        <FormControl>
+                          <Input className="h-8 text-sm" placeholder="Describe the item" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.unitPrice`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Unit Price</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              className="h-8 text-sm"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.discountPercent`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Discount %</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="100"
+                              placeholder="0"
+                              className="h-8 text-sm"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`items.${index}.taxPercent`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs">Tax %</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              max="100"
+                              placeholder="0"
+                              className="h-8 text-sm"
+                              {...field}
+                              onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          {/* Adjustments + Preview */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {/* Quote adjustments */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Adjustments
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="discountPercent"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Quote Discount %</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          placeholder="0"
+                          className="h-8 text-sm"
+                          {...field}
+                          onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="taxPercent"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Quote Tax %</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          max="100"
+                          placeholder="0"
+                          className="h-8 text-sm"
+                          {...field}
+                          onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="expiresAt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">Expires On</FormLabel>
+                      <FormControl>
+                        <Input type="date" className="h-8 text-sm" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
+            {/* Live total preview */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  Total Preview
+                </CardTitle>
+                <CardDescription className="text-xs">Updates as you type</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Subtotal</span>
+                  <span className="tabular-nums font-medium">
+                    ${totals.subtotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                {totals.discountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-amber-600">
+                    <span>Discount ({discountPct}%)</span>
+                    <span className="tabular-nums">
+                      −${totals.discountAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                {totals.taxAmount > 0 && (
+                  <div className="flex justify-between text-sm text-slate-600">
+                    <span>Tax ({taxPct}%)</span>
+                    <span className="tabular-nums">
+                      +${totals.taxAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                <Separator />
+                <div className="flex justify-between">
+                  <span className="font-semibold">Total</span>
+                  <span className="text-lg font-bold tabular-nums">
+                    ${totals.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Notes */}
+          <Card className="border-0 shadow-sm">
+            <CardContent className="pt-5">
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Notes (optional)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Add any notes or terms for the customer…"
+                        className="text-sm resize-none"
+                        rows={3}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Submit */}
+          <div className="flex gap-3 justify-end">
+            <Button type="button" variant="outline" onClick={() => router.back()}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Create Quote
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
+  );
+}

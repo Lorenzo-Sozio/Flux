@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { Zap, TrendingUp, AlertTriangle, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 
 interface Rule {
   id: string;
@@ -130,6 +131,3 @@ export function AutomationOverview({ rules, logs }: AutomationOverviewProps) {
   );
 }
 
-function cn(...classes: (string | false | undefined)[]) {
-  return classes.filter(Boolean).join(" ");
-}
