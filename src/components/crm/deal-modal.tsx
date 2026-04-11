@@ -100,7 +100,7 @@ export function DealModal({
   onSuccess?: () => void;
 }) {
   const [open, setOpen]         = useState(false);
-  const [userList, setUserList] = useState<{ id: string; name: string | null; email: string | null }[]>([]);
+  const [userList, setUserList] = useState<{ id: string; name: string | null }[]>([]);
   const isEditing   = !!deal;
   const searchParams = useSearchParams();
 
@@ -294,7 +294,7 @@ export function DealModal({
                         <SelectContent>
                           <SelectItem value="__none__">— Unassigned —</SelectItem>
                           {userList.map((u) => (
-                            <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                            <SelectItem key={u.id} value={u.id}>{u.name ?? u.id}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
