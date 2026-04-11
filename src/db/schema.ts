@@ -794,6 +794,22 @@ export const automationLogs = pgTable("automation_log", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// --- USER ACTIVITY LOG (audit trail for reports) ---
+export const userActivityLogs = pgTable("user_activity_log", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
+  action: text("action").notNull(), // e.g. "login", "create_deal", "complete_task", "send_campaign"
+  entityType: text("entity_type"),  // "deal" | "contact" | "lead" | "task" | "quote" | "ticket" | "campaign"
+  entityId: text("entity_id"),
+  metadata: text("metadata"),       // JSON string for extra context
+  ipAddress: text("ip_address"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const userActivityLogsRelations = relations(userActivityLogs, ({ one }) => ({
+  user: one(users, { fields: [userActivityLogs.userId], references: [users.id] }),
+}));
+
 export const automationRulesRelations = relations(automationRules, ({ one, many }) => ({
   owner: one(users, { fields: [automationRules.ownerId], references: [users.id] }),
   logs: many(automationLogs),

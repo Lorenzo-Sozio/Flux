@@ -5,6 +5,7 @@ import { getDealById, updateDeal, getPipelineData } from "@/actions/pipeline";
 import { getActivitiesByDeal, createActivity } from "@/actions/activities";
 import { getTasksByDeal, createTask, updateTaskStatus, getAllUsers } from "@/actions/tasks";
 import { getQuotesByDeal } from "@/actions/quotes";
+import { getCompanies, getContacts } from "@/actions/crm";
 import { revalidatePath } from "next/cache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,7 @@ import { TaskModal } from "@/components/crm/task-modal";
 import { DocumentPanel } from "@/components/crm/document-panel";
 import { RecordVisit } from "@/components/crm/record-visit";
 import { CreateQuoteButton } from "@/components/crm/create-quote-button";
+import { DealEditButton } from "@/components/crm/deal-edit-button";
 import { db } from "@/db";
 import { products } from "@/db/schema";
 
@@ -29,7 +31,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   const session = await auth();
   const userId = session?.user?.id;
 
-  const [row, { stages }, activitiesList, tasksList, allUsers, quotesList, productsList] = await Promise.all([
+  const [row, { stages }, activitiesList, tasksList, allUsers, quotesList, productsList, companiesList, contactsList] = await Promise.all([
     getDealById(dealId),
     getPipelineData(),
     getActivitiesByDeal(dealId),
@@ -37,6 +39,8 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     getAllUsers(),
     getQuotesByDeal(dealId),
     db.query.products.findMany(),
+    getCompanies(),
+    getContacts(),
   ]);
 
   if (!row) return notFound();
@@ -103,9 +107,17 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-2">
                 <CardTitle className="text-xl leading-snug">{deal.name}</CardTitle>
-                <Badge className={statusColors[deal.status] ?? ""} variant="outline">
-                  {deal.status}
-                </Badge>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge className={statusColors[deal.status] ?? ""} variant="outline">
+                    {deal.status}
+                  </Badge>
+                  <DealEditButton
+                    deal={deal}
+                    stages={stages}
+                    companies={companiesList}
+                    contacts={contactsList}
+                  />
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
