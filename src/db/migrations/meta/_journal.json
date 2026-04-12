@@ -57,6 +57,13 @@
       "when": 1775865559763,
       "tag": "0007_lucky_ultimatum",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1776012118735,
+      "tag": "0008_happy_dazzler",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   deleteUserAction,
@@ -40,7 +40,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getInitials } from "@/lib/utils";
-import { Copy, Info, KeyRound, Mail, Plus, RotateCcw, Shield, Trash2, UserCog } from "lucide-react";
+import { Copy, Info, KeyRound, Mail, Pencil, Plus, RotateCcw, Shield, Trash2, UserCog, Users } from "lucide-react";
+import { GroupModal } from "./group-modal";
+import { getUserGroups } from "@/actions/user-groups";
 
 type User = {
   id: string;
@@ -73,9 +75,16 @@ interface Props {
   currentUserRole: string;
 }
 
+type Group = Awaited<ReturnType<typeof getUserGroups>>[number];
+
 export function UsersClient({ users: initialUsers, pendingInvitations: initialInvitations, currentUserId, currentUserRole }: Props) {
   const [users, setUsers] = useState(initialUsers);
   const [invitations] = useState(initialInvitations);
+  const [groups, setGroups] = useState<Group[]>([]);
+
+  useEffect(() => {
+    getUserGroups().then(setGroups).catch(() => {});
+  }, []);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("user");
@@ -386,6 +395,77 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
               </div>
             ))}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ── User Groups ───────────────────────────────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              User Groups ({groups.length})
+            </CardTitle>
+            {["admin", "owner"].includes(currentUserRole) && (
+              <GroupModal onSaved={() => getUserGroups().then(setGroups)}>
+                <Button size="sm" variant="outline">
+                  <Plus className="mr-2 h-3.5 w-3.5" />New Group
+                </Button>
+              </GroupModal>
+            )}
+          </div>
+          <CardDescription className="text-xs">
+            Groups let you assign records to a team rather than a single user.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {groups.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              No groups yet. Create one to start assigning records to teams.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {groups.map((g) => (
+                <div key={g.id} className="rounded-lg border p-3 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="inline-block h-3 w-3 rounded-full shrink-0"
+                      style={{ backgroundColor: g.color }}
+                    />
+                    <span className="font-medium text-sm truncate flex-1">{g.name}</span>
+                    {["admin", "owner"].includes(currentUserRole) && (
+                      <GroupModal
+                        group={{ ...g, description: g.description ?? null }}
+                        onSaved={() => getUserGroups().then(setGroups)}
+                      >
+                        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0">
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </GroupModal>
+                    )}
+                  </div>
+                  {g.description && (
+                    <p className="text-xs text-muted-foreground line-clamp-2">{g.description}</p>
+                  )}
+                  <div className="flex flex-wrap gap-1">
+                    {g.members.slice(0, 4).map((m) => (
+                      <Badge key={m.id} variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
+                        {m.name || m.email || "—"}
+                      </Badge>
+                    ))}
+                    {g.members.length > 4 && (
+                      <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
+                        +{g.members.length - 4} more
+                      </Badge>
+                    )}
+                    {g.members.length === 0 && (
+                      <span className="text-[10px] text-muted-foreground">No members</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
 

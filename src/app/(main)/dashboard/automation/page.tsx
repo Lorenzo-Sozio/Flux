@@ -1,8 +1,9 @@
-import { getAutomationRules, getRecentAutomationLogs } from "@/actions/automation"
+import { getAutomationRules, getRecentAutomationLogs, getAutomationEmailLogs } from "@/actions/automation"
 import { auth } from "@/auth"
 import { AutomationClient } from "./_components/automation-client"
 import { AutomationLogs } from "./_components/automation-logs"
 import { AutomationOverview } from "./_components/automation-overview"
+import { AutomationEmailLogs } from "./_components/automation-email-logs"
 
 export const metadata = { title: "Automation Rules" }
 
@@ -10,9 +11,10 @@ export default async function AutomationPage() {
   const session = await auth()
   const canEdit = session?.user?.role !== "viewer"
 
-  const [rules, logs] = await Promise.all([
+  const [rules, logs, emailLogs] = await Promise.all([
     getAutomationRules(),
     getRecentAutomationLogs(50),
+    getAutomationEmailLogs(100),
   ])
 
   return (
@@ -20,6 +22,7 @@ export default async function AutomationPage() {
       <AutomationOverview rules={rules} logs={logs} />
       <AutomationClient rules={rules} canEdit={canEdit} />
       <AutomationLogs logs={logs} rules={rules} limit={20} />
+      <AutomationEmailLogs logs={emailLogs} />
     </div>
   )
 }

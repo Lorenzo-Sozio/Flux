@@ -1,8 +1,8 @@
 "use server"
 
 import { db } from "@/db"
-import { automationRules, automationLogs } from "@/db/schema"
-import { eq, desc } from "drizzle-orm"
+import { automationRules, automationLogs, campaignLogs, contacts, leads } from "@/db/schema"
+import { eq, desc, isNull } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
 import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard"
 import { AutomationRuleFormSchema, type AutomationRuleFormData } from "@/components/crm/automation/types"
@@ -40,6 +40,41 @@ export async function getRecentAutomationLogs(limit = 50) {
     .from(automationLogs)
     .orderBy(desc(automationLogs.createdAt))
     .limit(limit)
+}
+
+/**
+ * Automation email send log (campaignId IS NULL = sent by automation, not a campaign).
+ */
+export async function getAutomationEmailLogs(limit = 100) {
+  await requireWriteAccess()
+  const rows = await db
+    .select({
+      id:         campaignLogs.id,
+      status:     campaignLogs.status,
+      sentAt:     campaignLogs.sentAt,
+      openedAt:   campaignLogs.openedAt,
+      clickedAt:  campaignLogs.clickedAt,
+      errorMessage: campaignLogs.errorMessage,
+      contactId:  campaignLogs.contactId,
+      leadId:     campaignLogs.leadId,
+      contactName: contacts.firstName,
+      contactEmail: contacts.email,
+      leadFirstName: leads.firstName,
+      leadEmail:   leads.email,
+    })
+    .from(campaignLogs)
+    .leftJoin(contacts, eq(campaignLogs.contactId, contacts.id))
+    .leftJoin(leads,    eq(campaignLogs.leadId,    leads.id))
+    .where(isNull(campaignLogs.campaignId))
+    .orderBy(desc(campaignLogs.sentAt))
+    .limit(limit)
+
+  return rows.map((r) => ({
+    ...r,
+    recipientName:  r.contactName ?? r.leadFirstName ?? "—",
+    recipientEmail: r.contactEmail ?? r.leadEmail ?? "—",
+    recipientType:  r.contactId ? "contact" : r.leadId ? "lead" : null,
+  }))
 }
 
 // ─── Create ───────────────────────────────────────────────────────────────────

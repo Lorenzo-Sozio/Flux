@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Send, Users, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Eye, Loader2, MousePointerClick, Send, ShieldCheck, Users, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { sendCampaignAction, getEligibleRecipientCounts } from "@/actions/marketing";
@@ -178,6 +178,19 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
                   No eligible recipients. Make sure contacts/leads have marketing consent and a valid email address.
                 </p>
               )}
+            </div>
+
+            {/* Tracking notice */}
+            <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800 px-3 py-2.5 text-xs text-emerald-800 dark:text-emerald-300">
+              <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0" />
+              <div>
+                <span className="font-semibold">Tracking enabled —</span> open and click tracking is automatically
+                applied to every email in this campaign. Results appear in the campaign&#39;s Send&nbsp;Log.
+                <div className="flex gap-3 mt-1.5 text-[11px] font-medium opacity-80">
+                  <span className="flex items-center gap-1"><Eye className="h-3 w-3" />Open tracking</span>
+                  <span className="flex items-center gap-1"><MousePointerClick className="h-3 w-3" />Click tracking</span>
+                </div>
+              </div>
             </div>
 
             <DialogFooter>

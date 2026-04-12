@@ -21,6 +21,27 @@ export const users = pgTable("user", {
   role: text("role").default("user").notNull(),
 })
 
+// ─── User Groups ──────────────────────────────────────────────────────────────
+
+export const userGroups = pgTable("user_group", {
+  id:          text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name:        text("name").notNull(),
+  description: text("description"),
+  color:       text("color").default("#6366f1").notNull(),
+  createdAt:   timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt:   timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+})
+
+export const userGroupMembers = pgTable(
+  "user_group_member",
+  {
+    groupId:   text("group_id").notNull().references(() => userGroups.id, { onDelete: "cascade" }),
+    userId:    text("user_id").notNull().references(() => users.id,       { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.groupId, t.userId] }) }),
+)
+
 export const accounts = pgTable(
   "account",
   {
@@ -89,7 +110,8 @@ export const companies = pgTable("company", {
   status: text("status").default("active").notNull(),
   source: text("source"),
   leadScore: integer("lead_score"),
-  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  ownerId:  text("owner_id").references(() => users.id,       { onDelete: "set null" }),
+  groupId:  text("group_id").references(() => userGroups.id,  { onDelete: "set null" }),
   vatNumber: text("vat_number"),
   sdiCode: text("sdi_code"),
   tags: text("tags").array(),
@@ -120,7 +142,8 @@ export const leads = pgTable("lead", {
   rating: text("rating"), // hot, warm, cold
   leadScore: integer("lead_score"),
   notes: text("notes"),
-  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  ownerId:  text("owner_id").references(() => users.id,      { onDelete: "set null" }),
+  groupId:  text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
   marketingConsent: boolean("marketing_consent").default(false),
   consentDate: timestamp("consent_date", { mode: "date" }),
   tags: text("tags").array(),
@@ -151,7 +174,8 @@ export const contacts = pgTable("contact", {
   leadScore: integer("lead_score"),
   notes: text("notes"),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
-  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  ownerId:   text("owner_id").references(() => users.id,       { onDelete: "set null" }),
+  groupId:   text("group_id").references(() => userGroups.id,  { onDelete: "set null" }),
   marketingConsent: boolean("marketing_consent").default(false),
   consentDate: timestamp("consent_date", { mode: "date" }),
   tags: text("tags").array(),
@@ -233,8 +257,9 @@ export const deals = pgTable("deal", {
   expectedCloseDate: timestamp("expected_close_date", { mode: "date" }),
   stageId: text("stage_id").references(() => pipelineStages.id, { onDelete: "restrict" }),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
-  contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
-  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  contactId: text("contact_id").references(() => contacts.id,  { onDelete: "set null" }),
+  ownerId:   text("owner_id").references(() => users.id,       { onDelete: "set null" }),
+  groupId:   text("group_id").references(() => userGroups.id,  { onDelete: "set null" }),
   status: text("status").default("open").notNull(), // open, won, lost
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -817,4 +842,15 @@ export const automationRulesRelations = relations(automationRules, ({ one, many 
 
 export const automationLogsRelations = relations(automationLogs, ({ one }) => ({
   rule: one(automationRules, { fields: [automationLogs.ruleId], references: [automationRules.id] }),
+}));
+
+// ─── User Groups relations ────────────────────────────────────────────────────
+
+export const userGroupsRelations = relations(userGroups, ({ many }) => ({
+  members: many(userGroupMembers),
+}));
+
+export const userGroupMembersRelations = relations(userGroupMembers, ({ one }) => ({
+  group: one(userGroups, { fields: [userGroupMembers.groupId], references: [userGroups.id] }),
+  user:  one(users,      { fields: [userGroupMembers.userId],  references: [users.id]       }),
 }));

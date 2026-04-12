@@ -5,17 +5,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { campaignLogs } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, notInArray, sql } from "drizzle-orm";
+
+// Statuses that must never be downgraded by a click event
+const PROTECTED_STATUSES = ["unsubscribed", "bounced", "complained"];
 
 export async function GET(req: NextRequest) {
   const logId = req.nextUrl.searchParams.get("log");
   const url = req.nextUrl.searchParams.get("url");
 
   if (logId) {
+    const now = new Date();
+    // Set status → "clicked" and record timestamps.
+    // Guard: only on first click (clickedAt IS NULL) AND never overwrite negative statuses.
+    // openedAt: COALESCE preserves the original open timestamp if pixel already fired.
     db.update(campaignLogs)
-      .set({ status: "clicked", clickedAt: new Date() })
-      .where(eq(campaignLogs.id, logId))
-      .catch(() => {});
+      .set({
+        status: "clicked",
+        clickedAt: now,
+        openedAt: sql`COALESCE(${campaignLogs.openedAt}, ${now})`,
+      })
+      .where(
+        and(
+          eq(campaignLogs.id, logId),
+          isNull(campaignLogs.clickedAt),
+          notInArray(campaignLogs.status, PROTECTED_STATUSES),
+        ),
+      )
+      .catch((err) => console.error("[track/click] DB update failed", { logId, err }));
   }
 
   if (!url) {

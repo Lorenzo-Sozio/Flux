@@ -1,5 +1,5 @@
 import { db } from "@/db"
-import { tasks, notifications, deals, leads, contacts, companies } from "@/db/schema"
+import { tasks, notifications, deals, leads, contacts, companies, emailTemplates } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { runAutomations } from "../../crm/automation/rule-engine"
 import { sendAutomationEmailWithContext } from "../../crm/automation/email-service"
@@ -118,7 +118,27 @@ export class ActionDispatcher {
     action: Extract<AutomationAction, { type: "send_email" }>,
     context: RuleContext,
   ): Promise<number> {
-    const { to, cc, bcc, subject, body, trackOpens, trackClicks } = action.params
+    const { to, cc, bcc, trackOpens, trackClicks, templateId } = action.params
+    let { subject, body } = action.params
+
+    // If a templateId is set, load the template from DB (always uses latest content)
+    if (templateId) {
+      const [tpl] = await db
+        .select({ subject: emailTemplates.subject, body: emailTemplates.body })
+        .from(emailTemplates)
+        .where(eq(emailTemplates.id, templateId))
+
+      if (tpl) {
+        subject = tpl.subject
+        body    = tpl.body
+      } else {
+        console.warn(`[ActionDispatcher] send_email: templateId "${templateId}" not found — falling back to stored subject/body`)
+      }
+    }
+
+    if (!subject || !body) {
+      throw new Error("send_email action is missing subject or body (and no valid template was found)")
+    }
 
     return sendAutomationEmailWithContext(
       to,

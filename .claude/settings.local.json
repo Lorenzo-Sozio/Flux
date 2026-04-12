@@ -16,7 +16,8 @@
       "Bash(grep -n \"type:\" /c/React/Flux/src/components/crm/*.tsx)",
       "Bash(xargs -I {} find {} -type f)",
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
-      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")"
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(npx drizzle-kit:*)"
     ]
   }
 }

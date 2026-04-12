@@ -9,7 +9,8 @@ import { toast } from "sonner";
 import { Loader2Icon, PencilIcon, TrashIcon, EyeIcon, BuildingIcon, TagIcon, MapPinIcon, ReceiptIcon } from "lucide-react";
 import Link from "next/link";
 
-import { createCompany, deleteCompany, updateCompany, getAllUsers } from "@/actions/crm";
+import { createCompany, deleteCompany, updateCompany } from "@/actions/crm";
+import { AssigneeSelect, encodeAssignee, decodeAssignee } from "@/components/crm/assignee-select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,8 @@ const companySchema = z.object({
   type:          z.string().default("prospect"),
   status:        z.string().default("active"),
   ownerId:       z.string().optional().nullable(),
+  groupId:       z.string().optional().nullable(),
+  assigneeValue: z.string().optional(),
   industry:      z.string().optional(),
   employeeCount: z.coerce.number().optional().nullable(),
   annualRevenue: z.coerce.number().optional().nullable(),
@@ -75,8 +78,7 @@ function F({
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export function CompanyModal({ company, children }: { company?: any; children: React.ReactNode }) {
-  const [open, setOpen]         = useState(false);
-  const [userList, setUserList] = useState<{ id: string; name: string | null; email: string | null }[]>([]);
+  const [open, setOpen] = useState(false);
   const isEditing = !!company;
   const searchParams = useSearchParams();
 
@@ -84,9 +86,6 @@ export function CompanyModal({ company, children }: { company?: any; children: R
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
   }, [isEditing, searchParams]);
 
-  useEffect(() => {
-    if (open) getAllUsers().then(setUserList);
-  }, [open]);
 
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
@@ -105,6 +104,8 @@ export function CompanyModal({ company, children }: { company?: any; children: R
       source:        company?.source        || "",
       leadScore:     company?.leadScore     ?? null,
       ownerId:       company?.ownerId       || null,
+      groupId:       company?.groupId       || null,
+      assigneeValue: encodeAssignee(company?.ownerId, company?.groupId),
       tags:          company?.tags          ? company.tags.join(", ") : "",
       street:        company?.street        || "",
       city:          company?.city          || "",
@@ -128,11 +129,13 @@ export function CompanyModal({ company, children }: { company?: any; children: R
 
   const onSubmit = async (data: CompanyFormValues) => {
     try {
+      const { ownerId, groupId } = decodeAssignee(data.assigneeValue);
+      const payload = { ...data, ownerId, groupId, assigneeValue: undefined };
       if (isEditing) {
-        await updateCompany(company.id, data);
+        await updateCompany(company.id, payload);
         toast.success("Company updated.");
       } else {
-        await createCompany(data);
+        await createCompany(payload);
         toast.success("Company created.");
       }
       setOpen(false);
@@ -239,17 +242,9 @@ export function CompanyModal({ company, children }: { company?: any; children: R
               {/* ── CRM Tab ──────────────────────────────────────────────── */}
               <TabsContent value="crm" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
                 <div className="col-span-2">
-                  <F label="Assigned To" error={e.ownerId?.message}>
-                    <Controller control={control} name="ownerId" render={({ field }) => (
-                      <Select onValueChange={(v) => field.onChange(v === "__none__" ? null : v)} value={field.value ?? "__none__"}>
-                        <SelectTrigger><SelectValue placeholder="— Unassigned —" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">— Unassigned —</SelectItem>
-                          {userList.map((u) => (
-                            <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <F label="Assigned To">
+                    <Controller control={control} name="assigneeValue" render={({ field }) => (
+                      <AssigneeSelect value={field.value ?? null} onChange={field.onChange} />
                     )} />
                   </F>
                 </div>

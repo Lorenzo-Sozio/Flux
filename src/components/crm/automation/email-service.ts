@@ -13,10 +13,21 @@
  */
 
 import { db } from "@/db"
-import { deals, leads, contacts, companies, users } from "@/db/schema"
+import { campaignLogs, deals, leads, contacts, companies, users } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { executeWithRetryTracked } from "../../crm/automation/retry-engine"
 import type { RuleContext } from "../../crm/automation/types"
+
+const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000"
+
+/** Wraps external links for click tracking (same helper as marketing.ts). */
+function wrapLinksForTracking(html: string, logId: string): string {
+  return html.replace(/href="(https?:\/\/[^"]+)"/gi, (match, url: string) => {
+    if (url.includes("/api/track/") || url.includes("/api/unsubscribe")) return match
+    const tracked = `${APP_URL}/api/track/click?log=${encodeURIComponent(logId)}&url=${encodeURIComponent(url)}`
+    return `href="${tracked}"`
+  })
+}
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const RESEND_API_URL = "https://api.resend.com/emails"
@@ -90,8 +101,6 @@ export async function sendAutomationEmail(
   bcc: string | undefined,
   subject: string,
   body: string,
-  trackOpens: boolean,
-  trackClicks: boolean,
 ): Promise<{ success: boolean; messageId?: string; error?: string; retryCount: number }> {
   if (!RESEND_API_KEY) {
     return { success: false, error: "RESEND_API_KEY not configured", retryCount: 0 }
@@ -114,8 +123,6 @@ export async function sendAutomationEmail(
             subject,
             html: body,
             tags: [{ name: "source", value: "automation" }],
-            track_opens: trackOpens,
-            track_clicks: trackClicks,
           }),
         })
 
@@ -155,7 +162,7 @@ export async function sendAutomationEmailWithContext(
   trackClicks: boolean,
   context: RuleContext,
 ): Promise<number> {
-  // Carica i dati per il merge
+  // Load entity data for merge fields
   const entityData = await loadEntityData(context.entityType, context.entityId)
   const ownerData = await loadOwnerData((entityData as any).ownerId)
 
@@ -166,32 +173,55 @@ export async function sendAutomationEmailWithContext(
     updatedAt: entityData.updatedAt?.toISOString(),
   }
 
-  // Sostituisci i merge fields
-  const finalTo = replaceMergeFields(to, mergeData)
-  const finalCc = cc ? replaceMergeFields(cc, mergeData) : undefined
-  const finalBcc = bcc ? replaceMergeFields(bcc, mergeData) : undefined
+  // Resolve merge fields
+  const finalTo      = replaceMergeFields(to, mergeData)
+  const finalCc      = cc      ? replaceMergeFields(cc,      mergeData) : undefined
+  const finalBcc     = bcc     ? replaceMergeFields(bcc,     mergeData) : undefined
   const finalSubject = replaceMergeFields(subject, mergeData)
-  const finalBody = replaceMergeFields(body, mergeData)
+  let   finalBody    = replaceMergeFields(body,    mergeData)
 
-  // Valida l'email finale
   if (!finalTo.includes("@")) {
-    throw new Error(
-      `Invalid recipient email after merge: ${finalTo} (original: ${to})`,
-    )
+    throw new Error(`Invalid recipient email after merge: ${finalTo} (original: ${to})`)
   }
 
-  const result = await sendAutomationEmail(
-    finalTo,
-    finalCc,
-    finalBcc,
-    finalSubject,
-    finalBody,
-    trackOpens,
-    trackClicks,
-  )
+  // Create a campaign_log record (campaignId = null → automation email)
+  // This allows the same /api/track/* endpoints to record opens/clicks.
+  const [log] = await db
+    .insert(campaignLogs)
+    .values({
+      campaignId: null,
+      contactId:  context.entityType === "contact" ? context.entityId : null,
+      leadId:     context.entityType === "lead"    ? context.entityId : null,
+      status:     "sent",
+      sentAt:     new Date(),
+    })
+    .returning()
+
+  // Self-host tracking: inject pixel and wrap links before sending
+  if (trackClicks) {
+    finalBody = wrapLinksForTracking(finalBody, log.id)
+  }
+  if (trackOpens) {
+    finalBody = `${finalBody}\n<img src="${APP_URL}/api/track/open?log=${encodeURIComponent(log.id)}" width="1" height="1" alt="" style="display:none" />`
+  }
+
+  const result = await sendAutomationEmail(finalTo, finalCc, finalBcc, finalSubject, finalBody)
 
   if (!result.success) {
+    // Mark the log as failed
+    await db
+      .update(campaignLogs)
+      .set({ status: "failed", errorMessage: result.error ?? "Unknown error" })
+      .where(eq(campaignLogs.id, log.id))
     throw new Error(`Failed to send email: ${result.error}`)
+  }
+
+  // Store the provider message ID for future webhook correlation
+  if (result.messageId) {
+    await db
+      .update(campaignLogs)
+      .set({ messageId: result.messageId })
+      .where(eq(campaignLogs.id, log.id))
   }
 
   return result.retryCount

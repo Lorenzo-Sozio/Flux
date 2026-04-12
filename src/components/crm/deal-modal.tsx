@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import { createDeal, updateDeal } from "@/actions/pipeline";
-import { getAllUsers } from "@/actions/tasks";
+import { AssigneeSelect, encodeAssignee, decodeAssignee } from "@/components/crm/assignee-select";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -49,6 +49,8 @@ const dealSchema = z.object({
   companyId:          z.string().optional().nullable(),
   contactId:          z.string().optional().nullable(),
   ownerId:            z.string().optional().nullable(),
+  groupId:            z.string().optional().nullable(),
+  assigneeValue:      z.string().optional(),
   notes:              z.string().optional(),
 });
 
@@ -99,14 +101,9 @@ export function DealModal({
   children?: React.ReactNode;
   onSuccess?: () => void;
 }) {
-  const [open, setOpen]         = useState(false);
-  const [userList, setUserList] = useState<{ id: string; name: string | null }[]>([]);
+  const [open, setOpen] = useState(false);
   const isEditing   = !!deal;
   const searchParams = useSearchParams();
-
-  useEffect(() => {
-    if (open) getAllUsers().then(setUserList);
-  }, [open]);
 
   useEffect(() => {
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
@@ -131,6 +128,8 @@ export function DealModal({
       companyId:         deal?.companyId         || null,
       contactId:         deal?.contactId         || null,
       ownerId:           deal?.ownerId           || null,
+      groupId:           deal?.groupId           || null,
+      assigneeValue:     encodeAssignee(deal?.ownerId, deal?.groupId),
       notes:             deal?.notes             || "",
     },
   });
@@ -140,18 +139,21 @@ export function DealModal({
 
   const tabErrors = {
     deal:    !!(e.name || e.amount || e.currency || e.status),
-    details: !!(e.stageId || e.probability || e.expectedCloseDate || e.companyId || e.contactId || e.ownerId),
+    details: !!(e.stageId || e.probability || e.expectedCloseDate || e.companyId || e.contactId),
     notes:   !!e.notes,
   };
 
   const onSubmit = async (data: DealFormValues) => {
     try {
+      const { ownerId, groupId } = decodeAssignee(data.assigneeValue);
       const payload = {
         ...data,
         expectedCloseDate: data.expectedCloseDate ? new Date(data.expectedCloseDate) : null,
         companyId:  data.companyId  || null,
         contactId:  data.contactId  || null,
-        ownerId:    data.ownerId    || null,
+        ownerId,
+        groupId,
+        assigneeValue: undefined,
       };
 
       if (isEditing) {
@@ -287,17 +289,9 @@ export function DealModal({
                   <Input {...register("expectedCloseDate")} type="date" />
                 </F>
                 <div className="col-span-2">
-                  <F label="Assigned To" error={e.ownerId?.message}>
-                    <Controller control={control} name="ownerId" render={({ field }) => (
-                      <Select onValueChange={(v) => field.onChange(v === "__none__" ? null : v)} value={field.value ?? "__none__"}>
-                        <SelectTrigger><SelectValue placeholder="— Unassigned —" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">— Unassigned —</SelectItem>
-                          {userList.map((u) => (
-                            <SelectItem key={u.id} value={u.id}>{u.name ?? u.id}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <F label="Assigned To">
+                    <Controller control={control} name="assigneeValue" render={({ field }) => (
+                      <AssigneeSelect value={field.value ?? null} onChange={field.onChange} />
                     )} />
                   </F>
                 </div>

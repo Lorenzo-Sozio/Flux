@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { campaignLogs } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, notInArray } from "drizzle-orm";
 
 // 1x1 transparent GIF
 const PIXEL = Buffer.from(
@@ -14,15 +14,38 @@ const PIXEL = Buffer.from(
   "base64"
 );
 
+// Statuses that block advancing to "opened"
+const PROTECTED_STATUSES = ["opened", "clicked", "unsubscribed", "bounced", "complained"];
+
 export async function GET(req: NextRequest) {
   const logId = req.nextUrl.searchParams.get("log");
 
   if (logId) {
-    // Only advance to "opened" — never overwrite clicked/unsubscribed/bounced
+    const now = new Date();
+
+    // 1. Advance status to "opened" only when not already at a higher state
     db.update(campaignLogs)
-      .set({ status: "opened", openedAt: new Date() })
-      .where(eq(campaignLogs.id, logId))
-      .catch((err) => console.error("[track/open] DB update failed", { logId, err }));
+      .set({ status: "opened", openedAt: now })
+      .where(
+        and(
+          eq(campaignLogs.id, logId),
+          notInArray(campaignLogs.status, PROTECTED_STATUSES),
+        ),
+      )
+      .catch((err) => console.error("[track/open] status advance failed", { logId, err }));
+
+    // 2. Backfill openedAt when it is still null (e.g. status is already "clicked"
+    //    because user clicked a link before the pixel loaded — Apple Mail, etc.)
+    db.update(campaignLogs)
+      .set({ openedAt: now })
+      .where(
+        and(
+          eq(campaignLogs.id, logId),
+          isNull(campaignLogs.openedAt),
+          notInArray(campaignLogs.status, ["unsubscribed", "bounced", "complained"]),
+        ),
+      )
+      .catch((err) => console.error("[track/open] openedAt backfill failed", { logId, err }));
   }
 
   return new Response(PIXEL, {

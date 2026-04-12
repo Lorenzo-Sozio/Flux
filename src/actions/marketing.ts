@@ -215,24 +215,60 @@ export async function getCampaignReport(campaignId: string) {
   const [campaign] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, campaignId));
   if (!campaign) return null;
 
-  const logs = await db.select().from(campaignLogs).where(eq(campaignLogs.campaignId, campaignId));
+  // Join with contacts and leads to get recipient names/emails
+  const rawLogs = await db
+    .select({
+      id:               campaignLogs.id,
+      status:           campaignLogs.status,
+      sentAt:           campaignLogs.sentAt,
+      openedAt:         campaignLogs.openedAt,
+      clickedAt:        campaignLogs.clickedAt,
+      errorMessage:     campaignLogs.errorMessage,
+      contactId:        campaignLogs.contactId,
+      leadId:           campaignLogs.leadId,
+      contactFirstName: contacts.firstName,
+      contactLastName:  contacts.lastName,
+      contactEmail:     contacts.email,
+      leadFirstName:    leads.firstName,
+      leadLastName:     leads.lastName,
+      leadEmail:        leads.email,
+    })
+    .from(campaignLogs)
+    .leftJoin(contacts, eq(campaignLogs.contactId, contacts.id))
+    .leftJoin(leads,    eq(campaignLogs.leadId,    leads.id))
+    .where(eq(campaignLogs.campaignId, campaignId));
 
-  const total = logs.length;
-  const queued = logs.filter((l) => l.status === "queued").length;
-  const sent = logs.filter((l) => !["failed", "queued"].includes(l.status)).length;
-  const opened = logs.filter((l) => ["opened", "clicked"].includes(l.status)).length;
-  const clicked = logs.filter((l) => l.status === "clicked").length;
-  const bounced = logs.filter((l) => l.status === "bounced").length;
-  const complained = logs.filter((l) => l.status === "complained").length;
+  const logs = rawLogs.map((r) => ({
+    id:            r.id,
+    status:        r.status,
+    sentAt:        r.sentAt,
+    openedAt:      r.openedAt,
+    clickedAt:     r.clickedAt,
+    errorMessage:  r.errorMessage,
+    contactId:     r.contactId,
+    leadId:        r.leadId,
+    recipientName: [r.contactFirstName ?? r.leadFirstName, r.contactLastName ?? r.leadLastName]
+      .filter(Boolean).join(" ") || "—",
+    recipientEmail: r.contactEmail ?? r.leadEmail ?? "—",
+    recipientType:  r.contactId ? ("contact" as const) : r.leadId ? ("lead" as const) : null,
+  }));
+
+  const total       = logs.length;
+  const queued      = logs.filter((l) => l.status === "queued").length;
+  const sent        = logs.filter((l) => !["failed", "queued"].includes(l.status)).length;
+  const opened      = logs.filter((l) => ["opened", "clicked"].includes(l.status)).length;
+  const clicked     = logs.filter((l) => l.status === "clicked").length;
+  const bounced     = logs.filter((l) => l.status === "bounced").length;
+  const complained  = logs.filter((l) => l.status === "complained").length;
   const unsubscribed = logs.filter((l) => l.status === "unsubscribed").length;
-  const failed = logs.filter((l) => l.status === "failed").length;
+  const failed      = logs.filter((l) => l.status === "failed").length;
 
   return {
     campaign,
     logs,
     stats: {
       total, queued, sent, opened, clicked, bounced, complained, unsubscribed, failed,
-      openRate: sent > 0 ? ((opened / sent) * 100).toFixed(1) : "0",
+      openRate:  sent > 0 ? ((opened  / sent) * 100).toFixed(1) : "0",
       clickRate: sent > 0 ? ((clicked / sent) * 100).toFixed(1) : "0",
     },
   };

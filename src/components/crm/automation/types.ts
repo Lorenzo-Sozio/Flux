@@ -69,7 +69,11 @@ export const UpdateFieldActionSchema = z.object({
   type: z.literal("update_field"),
   params: z.object({
     // Only non-destructive, non-relational scalar fields are allowed
-    field: z.enum(["status", "probability", "notes", "rating", "type"]),
+    field: z.enum([
+      "status", "probability", "notes", "rating", "type",
+      // extended
+      "source", "leadScore", "currency", "industry", "jobTitle",
+    ]),
     value: z.string().max(500),
   }),
 })
@@ -77,14 +81,16 @@ export const UpdateFieldActionSchema = z.object({
 export const SendEmailActionSchema = z.object({
   type: z.literal("send_email"),
   params: z.object({
+    // When set, subject/body are loaded from the template at execution time
+    templateId: z.string().optional(),
     // Email recipients can use merge fields: {{contact.email}}, {{lead.email}}, etc.
     to: z.string().min(1).max(500),
     cc: z.string().max(500).optional(),
     bcc: z.string().max(500).optional(),
-    // Subject can use merge fields
-    subject: z.string().min(1).max(255),
-    // Body HTML can use merge fields
-    body: z.string().min(1).max(10000),
+    // Subject can use merge fields; required unless templateId is set
+    subject: z.string().max(255).optional().default(""),
+    // Body HTML can use merge fields; required unless templateId is set
+    body: z.string().max(10000).optional().default(""),
     // Track opens/clicks
     trackOpens: z.boolean().default(false),
     trackClicks: z.boolean().default(false),

@@ -9,7 +9,8 @@ import { toast } from "sonner";
 import { Loader2Icon, PencilIcon, TrashIcon, EyeIcon, UserIcon, TagIcon, MapPinIcon, FileTextIcon } from "lucide-react";
 import Link from "next/link";
 
-import { createLead, deleteLead, updateLead, getAllUsers } from "@/actions/crm";
+import { createLead, deleteLead, updateLead } from "@/actions/crm";
+import { AssigneeSelect, encodeAssignee, decodeAssignee } from "@/components/crm/assignee-select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -31,6 +32,8 @@ const leadSchema = z.object({
   industry:         z.string().optional(),
   website:          z.string().optional(),
   ownerId:          z.string().optional().nullable(),
+  groupId:          z.string().optional().nullable(),
+  assigneeValue:    z.string().optional(),
   status:           z.string().default("new"),
   source:           z.string().optional(),
   rating:           z.string().optional(),
@@ -91,14 +94,9 @@ function F({
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export function LeadModal({ lead, children }: { lead?: any; children: React.ReactNode }) {
-  const [open, setOpen]   = useState(false);
-  const [userList, setUserList] = useState<{ id: string; name: string | null; email: string | null }[]>([]);
+  const [open, setOpen] = useState(false);
   const isEditing = !!lead;
   const searchParams = useSearchParams();
-
-  useEffect(() => {
-    if (open) getAllUsers().then(setUserList);
-  }, [open]);
 
   useEffect(() => {
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
@@ -117,6 +115,8 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
       industry:         lead?.industry         || "",
       website:          lead?.website          || "",
       ownerId:          lead?.ownerId          || null,
+      groupId:          lead?.groupId          || null,
+      assigneeValue:    encodeAssignee(lead?.ownerId, lead?.groupId),
       status:           lead?.status           || "new",
       source:           lead?.source           || "",
       rating:           lead?.rating           || "",
@@ -144,11 +144,13 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
 
   const onSubmit = async (data: LeadFormValues) => {
     try {
+      const { ownerId, groupId } = decodeAssignee(data.assigneeValue);
+      const payload = { ...data, ownerId, groupId, assigneeValue: undefined };
       if (isEditing) {
-        await updateLead(lead.id, data);
+        await updateLead(lead.id, payload);
         toast.success("Lead updated.");
       } else {
-        await createLead(data);
+        await createLead(payload);
         toast.success("Lead created.");
       }
       setOpen(false);
@@ -229,17 +231,9 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
               {/* ── CRM Tab ──────────────────────────────────────────────── */}
               <TabsContent value="crm" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
                 <div className="col-span-2">
-                  <F label="Assigned To" error={e.ownerId?.message}>
-                    <Controller control={control} name="ownerId" render={({ field }) => (
-                      <Select onValueChange={(v) => field.onChange(v === "__none__" ? null : v)} value={field.value ?? "__none__"}>
-                        <SelectTrigger><SelectValue placeholder="— Unassigned —" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none__">— Unassigned —</SelectItem>
-                          {userList.map((u) => (
-                            <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                  <F label="Assigned To">
+                    <Controller control={control} name="assigneeValue" render={({ field }) => (
+                      <AssigneeSelect value={field.value ?? null} onChange={field.onChange} />
                     )} />
                   </F>
                 </div>

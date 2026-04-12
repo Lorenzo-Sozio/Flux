@@ -38,6 +38,7 @@ import {
   updateAutomationRule,
 } from "@/actions/automation";
 import { getAllUsers } from "@/actions/crm";
+import { getEmailTemplates } from "@/actions/marketing";
 import { ConditionExpressionEditor } from "./condition-expression-editor";
 import { parseScheduledTrigger, SCHEDULED_TRIGGER_PREFIX } from "./scheduler-utils";
 
@@ -45,32 +46,49 @@ import { parseScheduledTrigger, SCHEDULED_TRIGGER_PREFIX } from "./scheduler-uti
 
 type UpdField = { value: string; label: string; kind: "enum" | "number" | "text" | "textarea"; options?: { value: string; label: string }[] };
 
+const SOURCE_OPTIONS = [
+  { value: "website",        label: "Website" },
+  { value: "referral",       label: "Referral" },
+  { value: "linkedin",       label: "LinkedIn" },
+  { value: "cold_outreach",  label: "Cold Outreach" },
+  { value: "trade_show",     label: "Trade Show" },
+  { value: "advertisement",  label: "Advertisement" },
+  { value: "email_campaign", label: "Email Campaign" },
+  { value: "other",          label: "Other" },
+];
+
 const UPDATE_FIELDS_BY_ENTITY: Record<string, UpdField[]> = {
   deal: [
-    { value: "status", label: "Status", kind: "enum", options: [{ value: "open", label: "Open" }, { value: "won", label: "Won" }, { value: "lost", label: "Lost" }] },
-    { value: "probability", label: "Probability (%)", kind: "number" },
-    { value: "notes", label: "Notes", kind: "textarea" },
+    { value: "status",      label: "Status",           kind: "enum",     options: [{ value: "open", label: "Open" }, { value: "won", label: "Won" }, { value: "lost", label: "Lost" }] },
+    { value: "probability", label: "Probability (%)",  kind: "number" },
+    { value: "currency",    label: "Currency",          kind: "enum",     options: [{ value: "EUR", label: "EUR (€)" }, { value: "USD", label: "USD ($)" }, { value: "GBP", label: "GBP (£)" }] },
+    { value: "notes",       label: "Notes",             kind: "textarea" },
   ],
   lead: [
-    { value: "status", label: "Status", kind: "enum", options: [
+    { value: "status",    label: "Status",             kind: "enum", options: [
       { value: "new", label: "New" }, { value: "contacting", label: "Contacting" },
       { value: "engaged", label: "Engaged" }, { value: "qualified", label: "Qualified" },
       { value: "unqualified", label: "Unqualified" },
     ]},
-    { value: "rating", label: "Rating", kind: "enum", options: [{ value: "hot", label: "🔥 Hot" }, { value: "warm", label: "☀️ Warm" }, { value: "cold", label: "❄️ Cold" }] },
-    { value: "notes", label: "Notes", kind: "textarea" },
+    { value: "rating",    label: "Rating",             kind: "enum", options: [{ value: "hot", label: "🔥 Hot" }, { value: "warm", label: "☀️ Warm" }, { value: "cold", label: "❄️ Cold" }] },
+    { value: "source",    label: "Source",             kind: "enum", options: SOURCE_OPTIONS },
+    { value: "leadScore", label: "Lead Score (0–100)", kind: "number" },
+    { value: "notes",     label: "Notes",              kind: "textarea" },
   ],
   contact: [
-    { value: "status", label: "Status", kind: "text" },
-    { value: "notes", label: "Notes", kind: "textarea" },
+    { value: "status",    label: "Status",             kind: "text" },
+    { value: "source",    label: "Source",             kind: "enum", options: SOURCE_OPTIONS },
+    { value: "jobTitle",  label: "Job Title",          kind: "text" },
+    { value: "leadScore", label: "Lead Score (0–100)", kind: "number" },
+    { value: "notes",     label: "Notes",              kind: "textarea" },
   ],
   company: [
-    { value: "status", label: "Status", kind: "text" },
-    { value: "type", label: "Type", kind: "enum", options: [
+    { value: "status",   label: "Status",   kind: "text" },
+    { value: "type",     label: "Type",     kind: "enum", options: [
       { value: "prospect", label: "Prospect" }, { value: "customer", label: "Customer" },
-      { value: "partner", label: "Partner" }, { value: "vendor", label: "Vendor" },
+      { value: "partner",  label: "Partner"  }, { value: "vendor",   label: "Vendor"   },
     ]},
-    { value: "notes", label: "Notes", kind: "textarea" },
+    { value: "industry", label: "Industry", kind: "text" },
   ],
 };
 
@@ -164,11 +182,19 @@ interface RuleModalProps {
 
 export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
   const [open, setOpen] = useState(false);
-  const [userList, setUserList] = useState<{ id: string; name: string | null; email: string | null }[]>([]);
+  const [userList, setUserList]         = useState<{ id: string; name: string | null; email: string | null }[]>([]);
+  const [templateList, setTemplateList] = useState<{ id: string; name: string; subject: string; body: string; category: string }[]>([]);
   const isEditing = !!rule;
 
   useEffect(() => {
-    if (open) getAllUsers().then(setUserList);
+    if (open) {
+      getAllUsers().then(setUserList);
+      getEmailTemplates().then((tpls) =>
+        setTemplateList(
+          tpls.map((t) => ({ id: t.id, name: t.name, subject: t.subject, body: t.body, category: t.category }))
+        )
+      );
+    }
   }, [open]);
 
   const defaultValues: AutomationRuleFormData = rule
@@ -795,40 +821,113 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                       {/* ── send_email params ── */}
                       {actionType === "send_email" && (
                         <div className="space-y-3">
+                          {/* Template selector */}
+                          <Controller
+                            control={control}
+                            name={`actions.${index}.params.templateId` as any}
+                            render={({ field: f }) => {
+                              const activeTpl = templateList.find((t) => t.id === f.value);
+                              return (
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                      Email Template
+                                    </label>
+                                    {activeTpl && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          f.onChange(undefined);
+                                        }}
+                                        className="text-[11px] text-muted-foreground hover:text-destructive underline"
+                                      >
+                                        Clear
+                                      </button>
+                                    )}
+                                  </div>
+                                  <Select
+                                    value={f.value ?? "__none__"}
+                                    onValueChange={(v) => {
+                                      if (v === "__none__") {
+                                        f.onChange(undefined);
+                                        return;
+                                      }
+                                      const tpl = templateList.find((t) => t.id === v);
+                                      if (!tpl) return;
+                                      f.onChange(v);
+                                      // Pre-fill subject/body from template
+                                      setValue(`actions.${index}.params.subject` as any, tpl.subject);
+                                      setValue(`actions.${index}.params.body` as any, tpl.body);
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-8 text-sm bg-background">
+                                      <SelectValue placeholder="— No template (manual) —" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="__none__">— No template (manual) —</SelectItem>
+                                      {templateList.length > 0 && (
+                                        <>
+                                          <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Templates</div>
+                                          {templateList.map((t) => (
+                                            <SelectItem key={t.id} value={t.id}>
+                                              <span className="flex items-center gap-2">
+                                                <Badge variant="outline" className="text-[10px] py-0 px-1 h-4">{t.category}</Badge>
+                                                {t.name}
+                                              </span>
+                                            </SelectItem>
+                                          ))}
+                                        </>
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                  {activeTpl && (
+                                    <p className="text-[11px] text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded px-2 py-1">
+                                      ✓ Template content will be loaded at execution time — subject &amp; body below are editable overrides.
+                                    </p>
+                                  )}
+                                </div>
+                              );
+                            }}
+                          />
+
+                          <div className="h-px bg-border/50" />
+
                           <F label="To" required error={actionErrs?.to?.message}>
-                            <Input 
-                              className="h-8 text-sm bg-background" 
+                            <Input
+                              className="h-8 text-sm bg-background"
                               placeholder="e.g. {{contact.email}} or email@example.com"
-                              {...register(`actions.${index}.params.to` as any)} 
+                              {...register(`actions.${index}.params.to` as any)}
                             />
                           </F>
-                          <F label="CC">
-                            <Input 
-                              className="h-8 text-sm bg-background" 
-                              placeholder="Optional, comma-separated"
-                              {...register(`actions.${index}.params.cc` as any)} 
-                            />
-                          </F>
-                          <F label="BCC">
-                            <Input 
-                              className="h-8 text-sm bg-background" 
-                              placeholder="Optional, comma-separated"
-                              {...register(`actions.${index}.params.bcc` as any)} 
-                            />
-                          </F>
-                          <F label="Subject" required error={actionErrs?.subject?.message}>
-                            <Input 
-                              className="h-8 text-sm bg-background" 
+                          <div className="grid grid-cols-2 gap-x-4">
+                            <F label="CC">
+                              <Input
+                                className="h-8 text-sm bg-background"
+                                placeholder="Optional, comma-separated"
+                                {...register(`actions.${index}.params.cc` as any)}
+                              />
+                            </F>
+                            <F label="BCC">
+                              <Input
+                                className="h-8 text-sm bg-background"
+                                placeholder="Optional, comma-separated"
+                                {...register(`actions.${index}.params.bcc` as any)}
+                              />
+                            </F>
+                          </div>
+                          <F label="Subject" error={actionErrs?.subject?.message}>
+                            <Input
+                              className="h-8 text-sm bg-background"
                               placeholder="e.g. Deal {{deal.name}} needs review"
-                              {...register(`actions.${index}.params.subject` as any)} 
+                              {...register(`actions.${index}.params.subject` as any)}
                             />
                           </F>
-                          <F label="Body (HTML)" required error={actionErrs?.body?.message}>
-                            <Textarea 
-                              rows={5} 
+                          <F label="Body (HTML)" error={actionErrs?.body?.message}>
+                            <Textarea
+                              rows={5}
                               placeholder="HTML content with {{merge.fields}}…"
                               className="resize-none text-sm bg-background font-mono text-xs"
-                              {...register(`actions.${index}.params.body` as any)} 
+                              {...register(`actions.${index}.params.body` as any)}
                             />
                           </F>
                           <div className="grid grid-cols-2 gap-3">
@@ -837,8 +936,8 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                               name={`actions.${index}.params.trackOpens` as any}
                               render={({ field: f }) => (
                                 <div className="flex items-center gap-2 rounded border px-3 py-2">
-                                  <Checkbox 
-                                    checked={f.value ?? false} 
+                                  <Checkbox
+                                    checked={f.value ?? false}
                                     onCheckedChange={f.onChange}
                                   />
                                   <span className="text-xs">Track Opens</span>
@@ -850,8 +949,8 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                               name={`actions.${index}.params.trackClicks` as any}
                               render={({ field: f }) => (
                                 <div className="flex items-center gap-2 rounded border px-3 py-2">
-                                  <Checkbox 
-                                    checked={f.value ?? false} 
+                                  <Checkbox
+                                    checked={f.value ?? false}
                                     onCheckedChange={f.onChange}
                                   />
                                   <span className="text-xs">Track Clicks</span>
