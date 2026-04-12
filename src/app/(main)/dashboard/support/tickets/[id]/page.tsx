@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -174,7 +174,8 @@ function MessageBubble({ msg }: { msg: any }) {
   );
 }
 
-export default function TicketDetailPage({ params }: { params: { id: string } }) {
+export default function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = React.use(params);
   const router = useRouter();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -197,7 +198,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
 
   const loadTicket = async () => {
     try {
-      const data = await getTicketById(params.id);
+      const data = await getTicketById(id);
       if (data) {
         setTicket(data);
         const sorted = [...(data.messages ?? [])].sort(
@@ -216,7 +217,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   useEffect(() => {
     loadTicket();
     getAgents().then(setAgents).catch(() => {});
-  }, [params.id]);
+  }, [id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -226,7 +227,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     if (!replyContent.trim()) return;
     setSending(true);
     try {
-      await addTicketMessageAction(params.id, {
+      await addTicketMessageAction(id, {
         content: replyContent,
         channel: ticket?.channel ?? "email",
         isPublic: !isInternal,
@@ -242,7 +243,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
 
   const handleStatusChange = async (status: string) => {
     try {
-      await updateTicketAction(params.id, { status: status as "open" | "in_progress" | "waiting" | "resolved" | "closed" });
+      await updateTicketAction(id, { status: status as "open" | "in_progress" | "waiting" | "resolved" | "closed" });
       setTicket((prev: any) => ({ ...prev, status }));
       toast.success("Status updated");
     } catch (err: any) {
@@ -252,7 +253,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
 
   const handlePriorityChange = async (priority: string) => {
     try {
-      await updateTicketAction(params.id, { priority: priority as "low" | "normal" | "high" | "urgent" });
+      await updateTicketAction(id, { priority: priority as "low" | "normal" | "high" | "urgent" });
       setTicket((prev: any) => ({ ...prev, priority }));
       toast.success("Priority updated");
     } catch (err: any) {
@@ -262,7 +263,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
 
   const handleEscalate = async () => {
     try {
-      const result = await escalateTicketAction(params.id);
+      const result = await escalateTicketAction(id);
       if (result.alreadyMaxPriority) {
         toast.info("Ticket is already at maximum priority (Urgent)");
         return;
@@ -278,7 +279,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
     setReassigning(true);
     try {
       const newAssigneeId = selectedAssignee === "unassigned" ? null : selectedAssignee;
-      await reassignTicketAction(params.id, newAssigneeId);
+      await reassignTicketAction(id, newAssigneeId);
       const newAgent = agents.find((a) => a.id === newAssigneeId);
       setTicket((prev: any) => ({ ...prev, assigneeId: newAssigneeId, assignee: newAgent ?? null }));
       setReassignOpen(false);
@@ -293,7 +294,7 @@ export default function TicketDetailPage({ params }: { params: { id: string } })
   const handleDelete = async () => {
     setDeleting(true);
     try {
-      await deleteTicketAction(params.id);
+      await deleteTicketAction(id);
       toast.success("Ticket deleted");
       router.push("/dashboard/support/tickets");
     } catch (err: any) {

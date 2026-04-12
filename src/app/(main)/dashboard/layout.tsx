@@ -19,6 +19,7 @@ import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
 import { RecentlyVisited } from "@/components/crm/recently-visited";
+import { ChatWidget } from "@/components/chat/chat-widget";
 
 export default async function Layout({ children }: Readonly<{ children: ReactNode }>) {
   const session = await auth();
@@ -75,6 +76,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
         </header>
         <div className="h-full p-4 md:p-6">{children}</div>
       </SidebarInset>
+      {session?.user?.id && <ChatWidget userId={session.user.id} />}
     </SidebarProvider>
   );
 }

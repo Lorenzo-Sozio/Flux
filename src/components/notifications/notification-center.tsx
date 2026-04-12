@@ -34,6 +34,7 @@ const TYPE_ICONS: Record<string, string> = {
   deal_won: "🏆",
   lead_assigned: "👤",
   email_sent: "📧",
+  chat_message: "💬",
   system: "ℹ️",
 };
 

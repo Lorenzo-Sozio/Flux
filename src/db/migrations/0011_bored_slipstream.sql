@@ -1,0 +1,1 @@
+ALTER TABLE "dm_conversation_member" ADD COLUMN "muted_until" timestamp;

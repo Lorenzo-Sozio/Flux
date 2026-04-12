@@ -17,7 +17,8 @@
       "Bash(xargs -I {} find {} -type f)",
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
-      "Bash(npx drizzle-kit:*)"
+      "Bash(npx drizzle-kit:*)",
+      "Bash(echo \"Exit: $?\")"
     ]
   }
 }

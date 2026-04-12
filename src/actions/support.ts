@@ -76,6 +76,7 @@ export async function createTicketAction(data: z.infer<typeof CreateTicketSchema
         status: "open",
         contactId: validated.contactId,
         companyId: validated.companyId,
+        leadId: validated.leadId,
         ownerId: session.user.id,
         tags: validated.tags,
       })
@@ -116,16 +117,6 @@ export async function getTicketById(ticketId: string) {
 
     if (!ticket) {
       throw new Error("Ticket not found");
-    }
-
-    // Check permission: owner, assigned agent, or admin
-    const isAuthorized =
-      session.user.id === ticket.ownerId ||
-      session.user.id === ticket.assigneeId ||
-      session.user.role === "admin";
-
-    if (!isAuthorized) {
-      throw new Error("Unauthorized");
     }
 
     return ticket;

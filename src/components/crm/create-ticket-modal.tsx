@@ -1,24 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import {
   ArrowDown,
+  Building2,
+  Check,
   ChevronDown,
   ChevronRight,
+  ChevronsUpDown,
   Headphones,
   Loader2,
   Mail,
   MessageCircle,
   Minus,
   Phone,
+  UserCircle,
+  UserSearch,
   Users,
   X,
   Zap,
 } from "lucide-react";
+import { getContactsForSelect, getCompaniesForSelect, getLeadsForSelect } from "@/actions/crm";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +50,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -174,6 +193,135 @@ function TagsInput({
   );
 }
 
+// ── Anagrafica picker ────────────────────────────────────────────────────────
+
+interface AnagraficaPickerProps {
+  recordType: RecordType;
+  onTypeChange: (t: RecordType) => void;
+  options: AnyOption[];
+  selectedId: string | null;
+  onSelect: (id: string | null) => void;
+  popoverOpen: boolean;
+  onPopoverOpenChange: (open: boolean) => void;
+}
+
+function AnagraficaPicker({
+  recordType,
+  onTypeChange,
+  options,
+  selectedId,
+  onSelect,
+  popoverOpen,
+  onPopoverOpenChange,
+}: AnagraficaPickerProps) {
+  const selectedOption = options.find((o) => o.id === selectedId) ?? null;
+  const TypeIcon = RECORD_TYPES.find((t) => t.value === recordType)?.icon ?? UserCircle;
+
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-medium flex items-center gap-1.5">
+        <TypeIcon className="h-3.5 w-3.5 text-muted-foreground" />
+        Link to record
+        <span className="text-muted-foreground font-normal">(optional)</span>
+      </label>
+
+      {/* Type toggle */}
+      <div className="flex rounded-md border overflow-hidden text-xs font-medium">
+        {RECORD_TYPES.map((rt) => {
+          const Icon = rt.icon;
+          const active = recordType === rt.value;
+          return (
+            <button
+              key={rt.value}
+              type="button"
+              onClick={() => onTypeChange(rt.value)}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 py-1.5 px-2 transition-colors select-none",
+                active
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
+                "not-last:border-r"
+              )}
+            >
+              <Icon className="h-3 w-3 shrink-0" />
+              {rt.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Searchable record picker */}
+      <Popover open={popoverOpen} onOpenChange={onPopoverOpenChange}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            role="combobox"
+            aria-expanded={popoverOpen}
+            className={cn(
+              "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs ring-offset-background",
+              "hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+              "transition-colors"
+            )}
+          >
+            {selectedOption ? (
+              <span className="flex items-center gap-2 min-w-0">
+                <TypeIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="truncate font-medium">{selectedOption.label}</span>
+                {selectedOption.sub && (
+                  <span className="text-muted-foreground truncate text-xs">{selectedOption.sub}</span>
+                )}
+              </span>
+            ) : (
+              <span className="text-muted-foreground">Search {RECORD_TYPES.find((t) => t.value === recordType)?.label.toLowerCase()}…</span>
+            )}
+            <div className="flex items-center gap-1 ml-2 shrink-0">
+              {selectedOption && (
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); onSelect(null); }}
+                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onSelect(null); } }}
+                  className="rounded-sm p-0.5 hover:bg-muted text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </span>
+              )}
+              <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+          <Command>
+            <CommandInput placeholder={`Search ${RECORD_TYPES.find((t) => t.value === recordType)?.label.toLowerCase()}…`} />
+            <CommandList>
+              <CommandEmpty>No results found.</CommandEmpty>
+              <CommandGroup>
+                {options.map((opt) => (
+                  <CommandItem
+                    key={opt.id}
+                    value={`${opt.label} ${opt.sub ?? ""}`}
+                    onSelect={() => {
+                      onSelect(opt.id === selectedId ? null : opt.id);
+                      onPopoverOpenChange(false);
+                    }}
+                    className="flex items-center justify-between gap-2"
+                  >
+                    <span className="flex flex-col min-w-0">
+                      <span className="truncate font-medium">{opt.label}</span>
+                      {opt.sub && <span className="text-xs text-muted-foreground truncate">{opt.sub}</span>}
+                    </span>
+                    <Check className={cn("h-4 w-4 shrink-0", opt.id === selectedId ? "opacity-100" : "opacity-0")} />
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────────────────────
 
 interface CreateTicketModalProps {
@@ -182,6 +330,23 @@ interface CreateTicketModalProps {
   defaultContactId?: string;
   defaultCompanyId?: string;
   onSuccess?: (ticketId: string) => void;
+}
+
+type RecordType = "contact" | "company" | "lead";
+type ContactOption = { id: string; firstName: string | null; lastName: string | null; email: string | null };
+type CompanyOption = { id: string; name: string };
+type LeadOption = { id: string; firstName: string | null; lastName: string | null; email: string | null };
+type AnyOption = { id: string; label: string; sub?: string };
+
+const RECORD_TYPES: { value: RecordType; label: string; icon: React.ElementType }[] = [
+  { value: "contact", label: "Contact", icon: UserCircle },
+  { value: "company", label: "Company", icon: Building2 },
+  { value: "lead", label: "Lead", icon: UserSearch },
+];
+
+function toOption(item: ContactOption | LeadOption, _type: "contact" | "lead"): AnyOption {
+  const name = [item.firstName, item.lastName].filter(Boolean).join(" ") || item.email || item.id;
+  return { id: item.id, label: name, sub: item.email ?? undefined };
 }
 
 export function CreateTicketModal({
@@ -195,6 +360,27 @@ export function CreateTicketModal({
   const [isLoading, setIsLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  // Anagrafica state
+  const [recordType, setRecordType] = useState<RecordType>("contact");
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [contactOptions, setContactOptions] = useState<ContactOption[]>([]);
+  const [companyOptions, setCompanyOptions] = useState<CompanyOption[]>([]);
+  const [leadOptions, setLeadOptions] = useState<LeadOption[]>([]);
+
+  useEffect(() => {
+    if (!open) return;
+    getContactsForSelect().then(setContactOptions).catch(() => {});
+    getCompaniesForSelect().then(setCompanyOptions).catch(() => {});
+    getLeadsForSelect().then(setLeadOptions).catch(() => {});
+  }, [open]);
+
+  // Build the flat option list for the current type
+  const currentOptions: AnyOption[] = recordType === "company"
+    ? companyOptions.map((c) => ({ id: c.id, label: c.name }))
+    : recordType === "lead"
+      ? leadOptions.map((l) => toOption(l, "lead"))
+      : contactOptions.map((c) => toOption(c, "contact"));
+
   const form = useForm<z.infer<typeof CreateTicketSchema>>({
     resolver: zodResolver(CreateTicketSchema),
     defaultValues: {
@@ -203,8 +389,8 @@ export function CreateTicketModal({
       channel: "email",
       priority: "normal",
       severity: "normal",
-      contactId: defaultContactId ?? "",
-      companyId: defaultCompanyId ?? "",
+      contactId: defaultContactId ?? undefined,
+      companyId: defaultCompanyId ?? undefined,
       tags: [],
     },
   });
@@ -220,6 +406,8 @@ export function CreateTicketModal({
       onOpenChange(false);
       form.reset();
       setShowAdvanced(false);
+
+      router.refresh();
 
       toast.success(`Ticket ${result.ticketNumber} opened`, {
         description: "Your support ticket has been created.",
@@ -289,6 +477,36 @@ export function CreateTicketModal({
                     <FormMessage />
                   </FormItem>
                 )}
+              />
+
+              {/* ── Linked record (anagrafica) ── */}
+              <AnagraficaPicker
+                recordType={recordType}
+                onTypeChange={(t) => {
+                  setRecordType(t);
+                  setPopoverOpen(false);
+                  form.setValue("contactId", undefined);
+                  form.setValue("companyId", undefined);
+                  form.setValue("leadId", undefined);
+                }}
+                options={currentOptions}
+                selectedId={
+                  recordType === "contact" ? (form.watch("contactId") ?? null)
+                  : recordType === "company" ? (form.watch("companyId") ?? null)
+                  : (form.watch("leadId") ?? null)
+                }
+                onSelect={(id) => {
+                  form.setValue("contactId", undefined);
+                  form.setValue("companyId", undefined);
+                  form.setValue("leadId", undefined);
+                  if (id) {
+                    if (recordType === "contact") form.setValue("contactId", id);
+                    else if (recordType === "company") form.setValue("companyId", id);
+                    else form.setValue("leadId", id);
+                  }
+                }}
+                popoverOpen={popoverOpen}
+                onPopoverOpenChange={setPopoverOpen}
               />
 
               {/* Channel */}

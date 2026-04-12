@@ -629,6 +629,7 @@ export const tickets = pgTable("ticket", {
   status: text("status").default("open").notNull(), // open, in_progress, waiting, resolved, closed
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+  leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
   assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   slaId: text("sla_id").references(() => slas.id, { onDelete: "set null" }),
@@ -760,6 +761,7 @@ export const quoteActivitiesRelations = relations(quoteActivities, ({ one }) => 
 export const ticketsRelations = relations(tickets, ({ one, many }) => ({
   contact: one(contacts, { fields: [tickets.contactId], references: [contacts.id] }),
   company: one(companies, { fields: [tickets.companyId], references: [companies.id] }),
+  lead: one(leads, { fields: [tickets.leadId], references: [leads.id] }),
   assignee: one(users, { fields: [tickets.assigneeId], references: [users.id] }),
   owner: one(users, { fields: [tickets.ownerId], references: [users.id] }),
   sla: one(slas, { fields: [tickets.slaId], references: [slas.id] }),
@@ -853,4 +855,48 @@ export const userGroupsRelations = relations(userGroups, ({ many }) => ({
 export const userGroupMembersRelations = relations(userGroupMembers, ({ one }) => ({
   group: one(userGroups, { fields: [userGroupMembers.groupId], references: [userGroups.id] }),
   user:  one(users,      { fields: [userGroupMembers.userId],  references: [users.id]       }),
+}));
+
+// ─── Internal DM / Group Chat ─────────────────────────────────────────────────
+
+export const dmConversations = pgTable("dm_conversation", {
+  id:        text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  type:      text("type").notNull(), // "direct" | "group"
+  name:      text("name"),          // only for group conversations
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const dmConversationMembers = pgTable("dm_conversation_member", {
+  id:             text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  conversationId: text("conversation_id").notNull().references(() => dmConversations.id, { onDelete: "cascade" }),
+  userId:         text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  lastReadAt:     timestamp("last_read_at",  { mode: "date" }),
+  mutedUntil:     timestamp("muted_until",   { mode: "date" }), // null = not muted
+  joinedAt:       timestamp("joined_at",     { mode: "date" }).defaultNow().notNull(),
+});
+
+export const dmMessages = pgTable("dm_message", {
+  id:             text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  conversationId: text("conversation_id").notNull().references(() => dmConversations.id, { onDelete: "cascade" }),
+  senderId:       text("sender_id").references(() => users.id, { onDelete: "set null" }),
+  content:        text("content").notNull(),
+  createdAt:      timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// ─── DM relations ─────────────────────────────────────────────────────────────
+
+export const dmConversationsRelations = relations(dmConversations, ({ many }) => ({
+  members:  many(dmConversationMembers),
+  messages: many(dmMessages),
+}));
+
+export const dmConversationMembersRelations = relations(dmConversationMembers, ({ one }) => ({
+  conversation: one(dmConversations, { fields: [dmConversationMembers.conversationId], references: [dmConversations.id] }),
+  user:         one(users,           { fields: [dmConversationMembers.userId],         references: [users.id]           }),
+}));
+
+export const dmMessagesRelations = relations(dmMessages, ({ one }) => ({
+  conversation: one(dmConversations, { fields: [dmMessages.conversationId], references: [dmConversations.id] }),
+  sender:       one(users,           { fields: [dmMessages.senderId],       references: [users.id]           }),
 }));

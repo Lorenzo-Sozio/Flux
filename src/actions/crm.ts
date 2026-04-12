@@ -250,3 +250,26 @@ export async function deleteCompany(id: string) {
   await db.delete(companies).where(eq(companies.id, id));
   revalidatePath("/dashboard/companies");
 }
+
+// ── Lightweight lists for FK select dropdowns ─────────────────────────────────
+
+export async function getContactsForSelect() {
+  return db
+    .select({ id: contacts.id, firstName: contacts.firstName, lastName: contacts.lastName, email: contacts.email })
+    .from(contacts)
+    .orderBy(contacts.firstName, contacts.lastName);
+}
+
+export async function getCompaniesForSelect() {
+  return db
+    .select({ id: companies.id, name: companies.name })
+    .from(companies)
+    .orderBy(companies.name);
+}
+
+export async function getLeadsForSelect() {
+  return db
+    .select({ id: leads.id, firstName: leads.firstName, lastName: leads.lastName, email: leads.email })
+    .from(leads)
+    .orderBy(leads.firstName, leads.lastName);
+}

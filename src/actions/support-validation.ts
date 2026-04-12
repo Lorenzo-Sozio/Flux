@@ -8,8 +8,9 @@ export const CreateTicketSchema = z.object({
   channel: z.enum(["email", "chat", "phone", "social"]),
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
   severity: z.enum(["low", "normal", "high", "critical"]).default("normal"),
-  contactId: z.string().optional(),
-  companyId: z.string().optional(),
+  contactId: z.string().optional().transform((v) => v === "" ? undefined : v),
+  companyId: z.string().optional().transform((v) => v === "" ? undefined : v),
+  leadId: z.string().optional().transform((v) => v === "" ? undefined : v),
   tags: z.array(z.string()).default([]),
 });
 
