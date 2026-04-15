@@ -11,6 +11,7 @@ export const CreateTicketSchema = z.object({
   contactId: z.string().optional().transform((v) => v === "" ? undefined : v),
   companyId: z.string().optional().transform((v) => v === "" ? undefined : v),
   leadId: z.string().optional().transform((v) => v === "" ? undefined : v),
+  assigneeId: z.string().optional().transform((v) => v === "" ? undefined : v),
   tags: z.array(z.string()).default([]),
 });
 

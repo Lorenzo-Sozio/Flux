@@ -251,6 +251,21 @@ export async function leaveConversation(conversationId: string) {
     .where(and(eq(dmConversationMembers.conversationId, conversationId), eq(dmConversationMembers.userId, me.id)));
 }
 
+// ── Delete conversation ───────────────────────────────────────────────────────
+
+export async function deleteConversation(conversationId: string) {
+  const me = await requireSession();
+
+  // Verify membership before deleting
+  const membership = await db.query.dmConversationMembers.findFirst({
+    where: and(eq(dmConversationMembers.conversationId, conversationId), eq(dmConversationMembers.userId, me.id)),
+  });
+  if (!membership) throw new Error("Not a member");
+
+  // Cascade deletes members + messages automatically
+  await db.delete(dmConversations).where(eq(dmConversations.id, conversationId));
+}
+
 // ── Users picker ──────────────────────────────────────────────────────────────
 
 export async function getChatUsers() {

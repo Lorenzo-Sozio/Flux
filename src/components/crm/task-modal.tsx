@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
 import { toast } from "sonner";
 import { PencilIcon, Loader2Icon } from "lucide-react";
@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { AssigneeSelect, encodeAssignee, decodeAssignee } from "@/components/crm/assignee-select";
 import { updateTask } from "@/actions/tasks";
 
 const taskSchema = z.object({
@@ -32,12 +33,12 @@ const taskSchema = z.object({
   description: z.string().optional(),
   priority: z.string().default("normal"),
   dueDate: z.string().optional(),
-  assigneeId: z.string().optional(),
+  assigneeValue: z.string().optional(),
 });
 
 type TaskFormValues = z.infer<typeof taskSchema>;
 
-export function TaskModal({ task, users, revalidatePathStr, onUpdated }: { task: any; users: any[]; revalidatePathStr: string; onUpdated?: (updated: any) => void }) {
+export function TaskModal({ task, users: _users, revalidatePathStr, onUpdated }: { task: any; users?: any[]; revalidatePathStr: string; onUpdated?: (updated: any) => void }) {
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -60,17 +61,20 @@ export function TaskModal({ task, users, revalidatePathStr, onUpdated }: { task:
       description: task.description || "",
       priority: task.priority || "normal",
       dueDate: formatDateTime(task.dueDate),
-      assigneeId: task.assigneeId || "myself",
+      assigneeValue: encodeAssignee(task.assigneeId, null),
     },
   });
 
   const onSubmit = async (data: TaskFormValues) => {
     try {
       setIsSubmitting(true);
+      const { ownerId } = decodeAssignee(data.assigneeValue);
       const payload = {
-        ...data,
-        assigneeId: data.assigneeId === "myself" ? null : data.assigneeId,
+        title: data.title,
+        description: data.description,
+        priority: data.priority,
         dueDate: data.dueDate ? new Date(data.dueDate) : null,
+        assigneeId: ownerId ?? null,
       };
       const updated = await updateTask(task.id, payload as any, revalidatePathStr);
       toast.success("Task updated successfully!");
@@ -124,20 +128,13 @@ export function TaskModal({ task, users, revalidatePathStr, onUpdated }: { task:
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Assign To</label>
-              <Select 
-                onValueChange={(val) => form.setValue("assigneeId", val)} 
-                defaultValue={form.getValues("assigneeId") || ""}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Assignee" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="myself">Myself</SelectItem>
-                  {users.map(u => (
-                    <SelectItem key={u.id} value={u.id}>{u.name || "User"}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Controller
+                control={form.control}
+                name="assigneeValue"
+                render={({ field }) => (
+                  <AssigneeSelect value={field.value ?? null} onChange={field.onChange} />
+                )}
+              />
             </div>
           </div>
 

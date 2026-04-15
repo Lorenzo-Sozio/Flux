@@ -18,7 +18,9 @@
       "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
       "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
       "Bash(npx drizzle-kit:*)",
-      "Bash(echo \"Exit: $?\")"
+      "Bash(echo \"Exit: $?\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(xargs grep:*)"
     ]
   }
 }

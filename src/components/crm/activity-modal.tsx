@@ -66,7 +66,7 @@ const TYPE_CONFIG = {
 } as const;
 
 const REMINDER_OPTIONS = [
-  { label: "No reminder", value: "" },
+  { label: "No reminder", value: "__none__" },
   { label: "15 min before", value: "15" },
   { label: "30 min before", value: "30" },
   { label: "1 hour before", value: "60" },
@@ -75,7 +75,7 @@ const REMINDER_OPTIONS = [
 ];
 
 const DURATION_OPTIONS = [
-  { label: "—",         value: "" },
+  { label: "—",         value: "__none__" },
   { label: "15 min",   value: "15" },
   { label: "30 min",   value: "30" },
   { label: "45 min",   value: "45" },
@@ -280,8 +280,8 @@ export function ActivityModal(props: Props) {
                     name="durationMinutes"
                     render={({ field }) => (
                       <Select
-                        value={field.value != null ? String(field.value) : ""}
-                        onValueChange={(v) => field.onChange(v ? Number(v) : null)}
+                        value={field.value != null ? String(field.value) : "__none__"}
+                        onValueChange={(v) => field.onChange(v === "__none__" ? null : Number(v))}
                       >
                         <SelectTrigger className="h-9">
                           <SelectValue placeholder="—" />
@@ -378,8 +378,8 @@ export function ActivityModal(props: Props) {
                 name="reminderMinutes"
                 render={({ field }) => (
                   <Select
-                    value={field.value != null ? String(field.value) : ""}
-                    onValueChange={(v) => field.onChange(v ? Number(v) : null)}
+                    value={field.value != null ? String(field.value) : "__none__"}
+                    onValueChange={(v) => field.onChange(v === "__none__" ? null : Number(v))}
                   >
                     <SelectTrigger className="h-9">
                       <SelectValue placeholder="No reminder" />

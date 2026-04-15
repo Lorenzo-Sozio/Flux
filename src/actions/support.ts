@@ -77,6 +77,7 @@ export async function createTicketAction(data: z.infer<typeof CreateTicketSchema
         contactId: validated.contactId,
         companyId: validated.companyId,
         leadId: validated.leadId,
+        assigneeId: validated.assigneeId,
         ownerId: session.user.id,
         tags: validated.tags,
       })

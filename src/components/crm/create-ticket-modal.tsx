@@ -18,6 +18,7 @@ import {
   MessageCircle,
   Minus,
   Phone,
+  UserCheck,
   UserCircle,
   UserSearch,
   Users,
@@ -25,6 +26,7 @@ import {
   Zap,
 } from "lucide-react";
 import { getContactsForSelect, getCompaniesForSelect, getLeadsForSelect } from "@/actions/crm";
+import { AssigneeSelect, encodeAssignee, decodeAssignee } from "@/components/crm/assignee-select";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -391,6 +393,7 @@ export function CreateTicketModal({
       severity: "normal",
       contactId: defaultContactId ?? undefined,
       companyId: defaultCompanyId ?? undefined,
+      assigneeId: undefined,
       tags: [],
     },
   });
@@ -508,6 +511,22 @@ export function CreateTicketModal({
                 popoverOpen={popoverOpen}
                 onPopoverOpenChange={setPopoverOpen}
               />
+
+              {/* Assign to */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium flex items-center gap-1.5">
+                  <UserCheck className="h-3.5 w-3.5 text-muted-foreground" />
+                  Assign to
+                  <span className="text-muted-foreground font-normal">(optional)</span>
+                </label>
+                <AssigneeSelect
+                  value={encodeAssignee(form.watch("assigneeId"), null)}
+                  onChange={(encoded) => {
+                    const { ownerId } = decodeAssignee(encoded);
+                    form.setValue("assigneeId", ownerId ?? undefined);
+                  }}
+                />
+              </div>
 
               {/* Channel */}
               <FormField

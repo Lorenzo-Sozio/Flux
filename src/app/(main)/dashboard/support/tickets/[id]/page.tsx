@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
 import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
+import { AssigneeSelect, encodeAssignee, decodeAssignee } from "@/components/crm/assignee-select";
 import {
   getTicketById,
   addTicketMessageAction,
@@ -57,7 +58,6 @@ import {
   deleteTicketAction,
   reassignTicketAction,
   escalateTicketAction,
-  getAgents,
 } from "@/actions/support";
 
 const CHANNEL_ICONS: Record<string, React.ReactNode> = {
@@ -181,7 +181,6 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
   const [ticket, setTicket] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
-  const [agents, setAgents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Reply form
@@ -192,7 +191,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   // Dialogs
   const [reassignOpen, setReassignOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selectedAssignee, setSelectedAssignee] = useState<string>("unassigned");
+  const [selectedAssignee, setSelectedAssignee] = useState<string>("__none__");
   const [reassigning, setReassigning] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -205,7 +204,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
           (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
         setMessages(sorted);
-        setSelectedAssignee(data.assigneeId ?? "unassigned");
+        setSelectedAssignee(encodeAssignee(data.assigneeId, null));
       }
     } catch (error) {
       console.error("Failed to load ticket:", error);
@@ -216,7 +215,6 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
   useEffect(() => {
     loadTicket();
-    getAgents().then(setAgents).catch(() => {});
   }, [id]);
 
   useEffect(() => {
@@ -278,12 +276,11 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   const handleReassign = async () => {
     setReassigning(true);
     try {
-      const newAssigneeId = selectedAssignee === "unassigned" ? null : selectedAssignee;
-      await reassignTicketAction(id, newAssigneeId);
-      const newAgent = agents.find((a) => a.id === newAssigneeId);
-      setTicket((prev: any) => ({ ...prev, assigneeId: newAssigneeId, assignee: newAgent ?? null }));
+      const { ownerId } = decodeAssignee(selectedAssignee);
+      await reassignTicketAction(id, ownerId);
+      await loadTicket();
       setReassignOpen(false);
-      toast.success(newAgent ? `Reassigned to ${newAgent.name}` : "Assignee removed");
+      toast.success(ownerId ? "Ticket reassigned" : "Assignee removed");
     } catch (err: any) {
       toast.error(err.message ?? "Failed to reassign ticket");
     } finally {
@@ -725,34 +722,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             </DialogDescription>
           </DialogHeader>
 
-          <Select value={selectedAssignee} onValueChange={setSelectedAssignee}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select agent..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unassigned">
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  <User className="h-3.5 w-3.5" />
-                  Unassigned
-                </span>
-              </SelectItem>
-              {agents.map((agent) => (
-                <SelectItem key={agent.id} value={agent.id}>
-                  <span className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary">
-                      {(agent.name ?? agent.email ?? "?")
-                        .split(" ")
-                        .map((n: string) => n[0])
-                        .join("")
-                        .toUpperCase()
-                        .slice(0, 2)}
-                    </div>
-                    {agent.name ?? agent.email}
-                  </span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <AssigneeSelect value={selectedAssignee} onChange={setSelectedAssignee} />
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setReassignOpen(false)}>

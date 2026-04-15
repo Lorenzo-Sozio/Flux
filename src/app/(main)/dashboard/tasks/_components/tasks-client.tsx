@@ -4,6 +4,7 @@ import { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import {
   CheckCircle2,
   Circle,
@@ -16,6 +17,7 @@ import {
   Building2,
   UserCheck,
   Kanban,
+  List,
   ChevronDown,
 } from "lucide-react";
 
@@ -103,6 +105,105 @@ function isDueToday(task: Task) {
     d.getDate() === today.getDate();
 }
 
+// ─── Board column config ────────────────────────────────────────────────────────
+
+const BOARD_COLUMNS = [
+  { id: "todo",        label: "To Do",       color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
+  { id: "in_progress", label: "In Progress", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+  { id: "done",        label: "Done",        color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
+] as const;
+
+// ─── Task card (for board view) ─────────────────────────────────────────────────
+
+function TaskCard({ task, index, onToggle, onDelete }: {
+  task: Task;
+  index: number;
+  onToggle: (task: Task) => void;
+  onDelete: (id: string) => void;
+}) {
+  const overdue = isOverdue(task);
+  const today   = isDueToday(task);
+  const done    = task.status === "done";
+  const entity  = entityLink(task);
+  const priority = PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG] ?? PRIORITY_CONFIG.normal;
+
+  return (
+    <Draggable draggableId={task.id} index={index}>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          {...provided.dragHandleProps}
+          className={cn(
+            "rounded-lg border bg-background p-3 shadow-xs space-y-2 cursor-grab active:cursor-grabbing select-none",
+            snapshot.isDragging && "shadow-lg ring-2 ring-primary/20",
+            done && "opacity-60",
+          )}
+        >
+          {/* Title row */}
+          <div className="flex items-start gap-2">
+            <button
+              type="button"
+              onClick={() => onToggle(task)}
+              className="mt-0.5 shrink-0 text-muted-foreground hover:text-primary"
+            >
+              {done
+                ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                : <Circle className="h-3.5 w-3.5" />}
+            </button>
+            <p className={cn("text-sm font-medium leading-snug flex-1 min-w-0", done && "line-through text-muted-foreground")}>
+              {task.title}
+            </p>
+          </div>
+
+          {/* Description */}
+          {task.description && (
+            <p className="text-xs text-muted-foreground line-clamp-2 pl-5">{task.description}</p>
+          )}
+
+          {/* Meta row */}
+          <div className="flex items-center gap-1.5 flex-wrap pl-5">
+            <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-4", priority.class)}>
+              {priority.label}
+            </Badge>
+            {task.dueDate && (
+              <span className={cn(
+                "text-[10px]",
+                overdue ? "text-destructive font-semibold" :
+                today   ? "text-orange-500 font-semibold" :
+                "text-muted-foreground",
+              )}>
+                {overdue && <AlertCircle className="inline h-2.5 w-2.5 mr-0.5 -mt-0.5" />}
+                {new Date(task.dueDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
+              </span>
+            )}
+            {entity && (
+              <Link href={entity.href} className="text-[10px] text-muted-foreground hover:text-foreground flex items-center gap-0.5">
+                <entity.icon className="h-2.5 w-2.5 shrink-0" />
+                <span className="truncate max-w-[80px]">{entity.label}</span>
+              </Link>
+            )}
+          </div>
+
+          {/* Assignee + delete */}
+          <div className="flex items-center justify-between pl-5">
+            <span className="text-[10px] text-muted-foreground">
+              {task.assigneeName ?? task.ownerName ?? ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => onDelete(task.id)}
+              className="text-muted-foreground/40 hover:text-destructive transition-colors"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        </div>
+      )}
+    </Draggable>
+  );
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -116,6 +217,7 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
   const [, startTransition] = useTransition();
   const [tasks, setTasks] = useState(initialTasks);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [viewMode, setViewMode] = useState<"list" | "board">("list");
 
   // ── Filters
   const [search, setSearch] = useState("");
@@ -198,6 +300,18 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
     router.refresh();
   };
 
+  const handleDragEnd = (result: DropResult) => {
+    const { destination, source, draggableId } = result;
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+    const newStatus = destination.droppableId as Task["status"];
+    startTransition(async () => {
+      await updateTaskStatus(draggableId, newStatus);
+      setTasks((prev) => prev.map((t) => t.id === draggableId ? { ...t, status: newStatus } : t));
+    });
+  };
+
   return (
     <div className="space-y-5">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
@@ -206,7 +320,36 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
           <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
           <p className="text-muted-foreground text-sm">All tasks across leads, contacts and deals.</p>
         </div>
-        <NewTaskDialog users={users} currentUserId={currentUserId} onCreated={handleCreated} />
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center rounded-md border bg-muted/30 p-0.5 gap-0.5">
+            <button
+              type="button"
+              onClick={() => setViewMode("list")}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors",
+                viewMode === "list"
+                  ? "bg-background shadow-xs text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <List className="h-3.5 w-3.5" /> List
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode("board")}
+              className={cn(
+                "flex items-center gap-1.5 px-2.5 py-1.5 rounded text-xs font-medium transition-colors",
+                viewMode === "board"
+                  ? "bg-background shadow-xs text-foreground"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Kanban className="h-3.5 w-3.5" /> Board
+            </button>
+          </div>
+          <NewTaskDialog users={users} currentUserId={currentUserId} onCreated={handleCreated} />
+        </div>
       </div>
 
       {/* ── Stats cards ─────────────────────────────────────────────────────── */}
@@ -290,7 +433,68 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
         )}
       </div>
 
+      {/* ── Board view ──────────────────────────────────────────────────────── */}
+      {viewMode === "board" && (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {BOARD_COLUMNS.map((col) => {
+              const colTasks = filtered.filter((t) => {
+                if (col.id === "todo")        return t.status !== "done" && t.status !== "in_progress";
+                if (col.id === "in_progress") return t.status === "in_progress";
+                return t.status === "done";
+              });
+              return (
+                <div key={col.id} className="flex flex-col gap-2">
+                  {/* Column header */}
+                  <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-2">
+                      <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold", col.color)}>
+                        {col.label}
+                      </span>
+                    </div>
+                    <span className="text-xs text-muted-foreground tabular-nums">{colTasks.length}</span>
+                  </div>
+
+                  {/* Drop zone */}
+                  <Droppable droppableId={col.id}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className={cn(
+                          "flex flex-col gap-2 min-h-[200px] rounded-xl border-2 border-dashed p-2 transition-colors",
+                          snapshot.isDraggingOver
+                            ? "border-primary/40 bg-primary/5"
+                            : "border-transparent bg-muted/20",
+                        )}
+                      >
+                        {colTasks.map((task, idx) => (
+                          <TaskCard
+                            key={task.id}
+                            task={task}
+                            index={idx}
+                            onToggle={handleToggleStatus}
+                            onDelete={handleDelete}
+                          />
+                        ))}
+                        {provided.placeholder}
+                        {colTasks.length === 0 && !snapshot.isDraggingOver && (
+                          <p className="text-xs text-muted-foreground/40 text-center py-6">
+                            Drop tasks here
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </Droppable>
+                </div>
+              );
+            })}
+          </div>
+        </DragDropContext>
+      )}
+
       {/* ── Table ───────────────────────────────────────────────────────────── */}
+      {viewMode === "list" && <>
       <div className="rounded-md border overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -453,6 +657,7 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
       <p className="text-xs text-muted-foreground text-right">
         Showing {filtered.length} of {tasks.length} tasks
       </p>
+      </>}
     </div>
   );
 }

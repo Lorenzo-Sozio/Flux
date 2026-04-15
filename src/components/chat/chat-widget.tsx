@@ -13,6 +13,7 @@ import {
   Plus,
   Search,
   Send,
+  Trash2,
   User,
   Users,
   Volume2,
@@ -44,6 +45,7 @@ import {
   getChatUsers,
   muteConversation,
   leaveConversation,
+  deleteConversation,
 } from "@/actions/chat-internal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -119,12 +121,14 @@ function ConvItem({
   onClick,
   onMute,
   onLeave,
+  onDelete,
 }: {
   conv: Conversation;
   myId: string;
   onClick: () => void;
   onMute: (convId: string, minutes: number | null) => void;
   onLeave: (convId: string) => void;
+  onDelete: (convId: string) => void;
 }) {
   const isGroup   = conv.type === "group";
   const last      = conv.messages[0];
@@ -231,6 +235,14 @@ function ConvItem({
                 </DropdownMenuItem>
               </>
             )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => onDelete(conv.id)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-2" />
+              Delete
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -396,6 +408,16 @@ export function ChatWidget({ userId }: { userId: string }) {
       await leaveConversation(convId);
       setConversations((prev) => prev.filter((c) => c.id !== convId));
       if (view.kind === "thread" && view.conv.id === convId) setView({ kind: "list" });
+    } catch {}
+  };
+
+  const handleDelete = async (convId: string) => {
+    if (!confirm("Delete this conversation? All messages will be permanently removed.")) return;
+    try {
+      await deleteConversation(convId);
+      setConversations((prev) => prev.filter((c) => c.id !== convId));
+      if (view.kind === "thread" && view.conv.id === convId) setView({ kind: "list" });
+      loadUnread();
     } catch {}
   };
 
@@ -635,6 +657,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                               onClick={() => openThread(conv)}
                               onMute={handleMute}
                               onLeave={handleLeave}
+                              onDelete={handleDelete}
                             />
                           </React.Fragment>
                         );
@@ -650,6 +673,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                         onClick={() => openThread(conv)}
                         onMute={handleMute}
                         onLeave={handleLeave}
+                        onDelete={handleDelete}
                       />
                     ))
                   )}
