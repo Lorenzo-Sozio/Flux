@@ -1,14 +1,21 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+
 import { subDays } from "date-fns";
 import { BarChart3 } from "lucide-react";
 
 import {
-  getReportKPIs, getActivityByUser, getActivityByAction,
-  getDailyActivityTrend, getTaskPerformanceByUser,
-  getRecentActivityLog, getCampaignPerformanceSummary,
+  getActivityByAction,
+  getActivityByUser,
+  getCampaignPerformanceSummary,
+  getDailyActivityTrend,
+  getRecentActivityLog,
+  getReportKPIs,
   getReportUsers,
+  getSalesReport,
+  getTaskPerformanceByUser,
 } from "@/actions/reports";
+import { auth } from "@/auth";
+
 import { ReportsClient } from "./_components/reports-client";
 
 export default async function ReportsPage() {
@@ -19,10 +26,10 @@ export default async function ReportsPage() {
   if (!["admin", "owner"].includes(role ?? "")) redirect("/dashboard");
 
   const defaultFrom = subDays(new Date(), 29).toISOString().split("T")[0];
-  const defaultTo   = new Date().toISOString().split("T")[0];
-  const filters     = { from: defaultFrom, to: defaultTo };
+  const defaultTo = new Date().toISOString().split("T")[0];
+  const filters = { from: defaultFrom, to: defaultTo };
 
-  const [users, kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf] =
+  const [users, kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf, salesReport] =
     await Promise.all([
       getReportUsers(),
       getReportKPIs(filters),
@@ -32,6 +39,7 @@ export default async function ReportsPage() {
       getTaskPerformanceByUser(filters),
       getRecentActivityLog({ ...filters, limit: 100 }),
       getCampaignPerformanceSummary(filters),
+      getSalesReport(filters),
     ]);
 
   return (
@@ -48,7 +56,7 @@ export default async function ReportsPage() {
 
       <ReportsClient
         users={users}
-        initial={{ kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf }}
+        initial={{ kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf, salesReport }}
       />
     </div>
   );

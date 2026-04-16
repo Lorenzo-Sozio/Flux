@@ -1,20 +1,23 @@
 "use server";
 
+import { and, count, desc, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
+
 import { db } from "@/db";
 import {
-  users,
-  tasks,
+  campaignLogs,
+  contacts,
   deals,
   leads,
-  contacts,
-  quotes,
-  tickets,
   marketingCampaigns,
-  campaignLogs,
+  orders,
+  pipelineStages,
+  quotes,
+  tasks,
+  tickets,
   userActivityLogs,
+  users,
 } from "@/db/schema";
 import { requireAdminAccess } from "@/lib/auth-guard";
-import { eq, gte, lte, and, sql, desc, count, isNotNull } from "drizzle-orm";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,10 +57,7 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
   await requireAdminAccess();
   const { from, to, userId } = filters;
 
-  const actConditions = [
-    ...dateRange(from, to),
-    ...(userId ? [eq(userActivityLogs.userId, userId)] : []),
-  ];
+  const actConditions = [...dateRange(from, to), ...(userId ? [eq(userActivityLogs.userId, userId)] : [])];
 
   // Total logged actions in period
   const [activityCount] = await db
@@ -79,10 +79,7 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
     .where(and(...taskConditions));
 
   // Tasks total (to compute completion rate)
-  const taskTotalConditions = [
-    ...taskDateRange(from, to),
-    ...(userId ? [eq(tasks.assigneeId, userId)] : []),
-  ];
+  const taskTotalConditions = [...taskDateRange(from, to), ...(userId ? [eq(tasks.assigneeId, userId)] : [])];
   const [tasksTotal] = await db
     .select({ count: count() })
     .from(tasks)
@@ -149,18 +146,17 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
   const completedTasks = Number(tasksCompleted.count);
 
   return {
-    activityCount:    Number(activityCount.count),
-    tasksCompleted:   completedTasks,
-    tasksTotal:       totalTasks,
+    activityCount: Number(activityCount.count),
+    tasksCompleted: completedTasks,
+    tasksTotal: totalTasks,
     taskCompletionRate: totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0,
-    dealsCreated:     Number(dealsCreated.count),
-    dealsWon:         Number(dealsWon.count),
-    dealWinRate:      Number(dealsCreated.count) > 0
-      ? Math.round((Number(dealsWon.count) / Number(dealsCreated.count)) * 100)
-      : 0,
-    leadsCreated:     Number(leadsCreated.count),
-    quotesCreated:    Number(quotesCreated.count),
-    openTickets:      Number(openTickets.count),
+    dealsCreated: Number(dealsCreated.count),
+    dealsWon: Number(dealsWon.count),
+    dealWinRate:
+      Number(dealsCreated.count) > 0 ? Math.round((Number(dealsWon.count) / Number(dealsCreated.count)) * 100) : 0,
+    leadsCreated: Number(leadsCreated.count),
+    quotesCreated: Number(quotesCreated.count),
+    openTickets: Number(openTickets.count),
   };
 }
 
@@ -174,10 +170,10 @@ export async function getActivityByUser(filters: ReportFilters = {}) {
 
   const rows = await db
     .select({
-      userId:    userActivityLogs.userId,
-      userName:  users.name,
+      userId: userActivityLogs.userId,
+      userName: users.name,
       userEmail: users.email,
-      count:     count(),
+      count: count(),
     })
     .from(userActivityLogs)
     .leftJoin(users, eq(userActivityLogs.userId, users.id))
@@ -186,10 +182,10 @@ export async function getActivityByUser(filters: ReportFilters = {}) {
     .orderBy(desc(count()));
 
   return rows.map((r) => ({
-    userId:    r.userId ?? "system",
-    userName:  r.userName ?? r.userEmail ?? "Unknown",
+    userId: r.userId ?? "system",
+    userName: r.userName ?? r.userEmail ?? "Unknown",
     userEmail: r.userEmail ?? "",
-    count:     Number(r.count),
+    count: Number(r.count),
   }));
 }
 
@@ -199,10 +195,7 @@ export async function getActivityByAction(filters: ReportFilters = {}) {
   await requireAdminAccess();
   const { from, to, userId } = filters;
 
-  const conditions = [
-    ...dateRange(from, to),
-    ...(userId ? [eq(userActivityLogs.userId, userId)] : []),
-  ];
+  const conditions = [...dateRange(from, to), ...(userId ? [eq(userActivityLogs.userId, userId)] : [])];
 
   const rows = await db
     .select({ action: userActivityLogs.action, count: count() })
@@ -220,14 +213,11 @@ export async function getDailyActivityTrend(filters: ReportFilters = {}) {
   await requireAdminAccess();
   const { from, to, userId } = filters;
 
-  const conditions = [
-    ...dateRange(from, to),
-    ...(userId ? [eq(userActivityLogs.userId, userId)] : []),
-  ];
+  const conditions = [...dateRange(from, to), ...(userId ? [eq(userActivityLogs.userId, userId)] : [])];
 
   const rows = await db
     .select({
-      day:   sql<string>`DATE(${userActivityLogs.createdAt})`,
+      day: sql<string>`DATE(${userActivityLogs.createdAt})`,
       count: count(),
     })
     .from(userActivityLogs)
@@ -244,18 +234,13 @@ export async function getTaskPerformanceByUser(filters: ReportFilters = {}) {
   await requireAdminAccess();
   const { from, to, userId } = filters;
 
-  const allUsers = await db
-    .select({ id: users.id, name: users.name, email: users.email })
-    .from(users);
+  const allUsers = await db.select({ id: users.id, name: users.name, email: users.email }).from(users);
 
   const results = await Promise.all(
     allUsers.map(async (u) => {
       if (userId && u.id !== userId) return null;
 
-      const baseConditions = [
-        eq(tasks.assigneeId, u.id),
-        ...taskDateRange(from, to),
-      ];
+      const baseConditions = [eq(tasks.assigneeId, u.id), ...taskDateRange(from, to)];
 
       const [total] = await db
         .select({ count: count() })
@@ -278,22 +263,16 @@ export async function getTaskPerformanceByUser(filters: ReportFilters = {}) {
       const overdue = await db
         .select({ count: count() })
         .from(tasks)
-        .where(
-          and(
-            eq(tasks.assigneeId, u.id),
-            eq(tasks.status, "todo"),
-            lte(tasks.dueDate!, new Date()),
-          ),
-        );
+        .where(and(eq(tasks.assigneeId, u.id), eq(tasks.status, "todo"), lte(tasks.dueDate!, new Date())));
 
       const t = Number(total.count);
       const c = Number(completed.count);
       return {
-        userId:         u.id,
-        userName:       u.name ?? u.email ?? "Unknown",
-        tasksTotal:     t,
+        userId: u.id,
+        userName: u.name ?? u.email ?? "Unknown",
+        tasksTotal: t,
         tasksCompleted: c,
-        tasksOverdue:   Number(overdue[0].count),
+        tasksOverdue: Number(overdue[0].count),
         completionRate: t > 0 ? Math.round((c / t) * 100) : 0,
       };
     }),
@@ -311,22 +290,19 @@ export async function getRecentActivityLog(filters: ReportFilters & { limit?: nu
   await requireAdminAccess();
   const { from, to, userId, limit = 100 } = filters;
 
-  const conditions = [
-    ...dateRange(from, to),
-    ...(userId ? [eq(userActivityLogs.userId, userId)] : []),
-  ];
+  const conditions = [...dateRange(from, to), ...(userId ? [eq(userActivityLogs.userId, userId)] : [])];
 
   const rows = await db
     .select({
-      id:         userActivityLogs.id,
-      action:     userActivityLogs.action,
+      id: userActivityLogs.id,
+      action: userActivityLogs.action,
       entityType: userActivityLogs.entityType,
-      entityId:   userActivityLogs.entityId,
-      metadata:   userActivityLogs.metadata,
-      ipAddress:  userActivityLogs.ipAddress,
-      createdAt:  userActivityLogs.createdAt,
-      userName:   users.name,
-      userEmail:  users.email,
+      entityId: userActivityLogs.entityId,
+      metadata: userActivityLogs.metadata,
+      ipAddress: userActivityLogs.ipAddress,
+      createdAt: userActivityLogs.createdAt,
+      userName: users.name,
+      userEmail: users.email,
     })
     .from(userActivityLogs)
     .leftJoin(users, eq(userActivityLogs.userId, users.id))
@@ -336,7 +312,7 @@ export async function getRecentActivityLog(filters: ReportFilters & { limit?: nu
 
   return rows.map((r) => ({
     ...r,
-    userName:  r.userName ?? r.userEmail ?? "System",
+    userName: r.userName ?? r.userEmail ?? "System",
     userEmail: r.userEmail ?? "",
   }));
 }
@@ -349,6 +325,120 @@ export async function getReportUsers() {
     .select({ id: users.id, name: users.name, email: users.email, role: users.role })
     .from(users)
     .orderBy(users.name);
+}
+
+// ─── Sales report ────────────────────────────────────────────────────────────
+
+export async function getSalesReport(filters: ReportFilters = {}) {
+  await requireAdminAccess();
+  const { from, to } = filters;
+
+  const dealConditions = [
+    eq(deals.status, "won"),
+    ...(from ? [gte(deals.updatedAt, new Date(from))] : []),
+    ...(to ? [lte(deals.updatedAt, new Date(`${to}T23:59:59`))] : []),
+  ];
+
+  const quoteConditions = [
+    eq(quotes.status, "accepted"),
+    ...(from ? [gte(quotes.updatedAt, new Date(from))] : []),
+    ...(to ? [lte(quotes.updatedAt, new Date(`${to}T23:59:59`))] : []),
+  ];
+
+  const orderConditions = [
+    eq(orders.status, "completed"),
+    ...(from ? [gte(orders.orderDate, new Date(from))] : []),
+    ...(to ? [lte(orders.orderDate, new Date(`${to}T23:59:59`))] : []),
+  ];
+
+  // Aggregate totals
+  const [[dealsWon], [quotesAccepted], [ordersCompleted]] = await Promise.all([
+    db
+      .select({
+        count: sql<number>`count(*)::int`,
+        revenue: sql<number>`coalesce(sum(cast(${deals.amount} as numeric)), 0)`,
+      })
+      .from(deals)
+      .where(and(...dealConditions)),
+
+    db
+      .select({
+        count: sql<number>`count(*)::int`,
+        revenue: sql<number>`coalesce(sum(cast(${quotes.totalAmount} as numeric)), 0)`,
+      })
+      .from(quotes)
+      .where(and(...quoteConditions)),
+
+    db
+      .select({
+        count: sql<number>`count(*)::int`,
+        revenue: sql<number>`coalesce(sum(cast(${orders.totalAmount} as numeric)), 0)`,
+      })
+      .from(orders)
+      .where(and(...orderConditions)),
+  ]);
+
+  // Revenue by pipeline stage (won deals)
+  const stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
+  const revenueByStage = await Promise.all(
+    stages.map(async (stage) => {
+      const [row] = await db
+        .select({
+          revenue: sql<number>`coalesce(sum(cast(${deals.amount} as numeric)), 0)`,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(deals)
+        .where(
+          and(
+            eq(deals.stageId, stage.id),
+            eq(deals.status, "won"),
+            ...(from ? [gte(deals.updatedAt, new Date(from))] : []),
+            ...(to ? [lte(deals.updatedAt, new Date(`${to}T23:59:59`))] : []),
+          ),
+        );
+      return {
+        name: stage.name,
+        color: stage.color ?? "#3b82f6",
+        revenue: Number(row?.revenue ?? 0),
+        count: Number(row?.count ?? 0),
+      };
+    }),
+  );
+
+  // Monthly revenue from won deals (last 12 months or filtered range)
+  const monthlyRows = await db
+    .select({
+      month: sql<string>`to_char(${deals.updatedAt}, 'YYYY-MM')`,
+      revenue: sql<number>`coalesce(sum(cast(${deals.amount} as numeric)), 0)`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(deals)
+    .where(
+      and(
+        eq(deals.status, "won"),
+        ...(from
+          ? [gte(deals.updatedAt, new Date(from))]
+          : [gte(deals.updatedAt, new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1))]),
+        ...(to ? [lte(deals.updatedAt, new Date(`${to}T23:59:59`))] : []),
+      ),
+    )
+    .groupBy(sql`to_char(${deals.updatedAt}, 'YYYY-MM')`)
+    .orderBy(sql`to_char(${deals.updatedAt}, 'YYYY-MM')`);
+
+  const monthlyRevenue = monthlyRows.map((r) => ({
+    month: r.month,
+    revenue: Number(r.revenue),
+    count: Number(r.count),
+  }));
+
+  return {
+    dealsWon: { count: Number(dealsWon.count), revenue: Number(dealsWon.revenue) },
+    quotesAccepted: { count: Number(quotesAccepted.count), revenue: Number(quotesAccepted.revenue) },
+    ordersCompleted: { count: Number(ordersCompleted.count), revenue: Number(ordersCompleted.revenue) },
+    totalRevenue: Number(dealsWon.revenue) + Number(ordersCompleted.revenue),
+    revenueByStage: revenueByStage.filter((s) => s.count > 0),
+    monthlyRevenue,
+  };
 }
 
 // ─── Campaign performance summary ─────────────────────────────────────────────
@@ -379,9 +469,14 @@ export async function getCampaignPerformanceSummary(filters: ReportFilters = {})
     const opened = logs.filter((l) => ["opened", "clicked"].includes(l.status)).length;
     const clicked = logs.filter((l) => l.status === "clicked").length;
     return {
-      id: c.id, name: c.name, status: c.status,
-      total: logs.length, sent, opened, clicked,
-      openRate:  sent > 0 ? ((opened  / sent) * 100).toFixed(1) : "0",
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      total: logs.length,
+      sent,
+      opened,
+      clicked,
+      openRate: sent > 0 ? ((opened / sent) * 100).toFixed(1) : "0",
       clickRate: sent > 0 ? ((clicked / sent) * 100).toFixed(1) : "0",
     };
   });

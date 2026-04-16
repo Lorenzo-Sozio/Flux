@@ -20,7 +20,9 @@
       "Bash(npx drizzle-kit:*)",
       "Bash(echo \"Exit: $?\")",
       "Bash(echo \"exit: $?\")",
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(npm run *)",
+      "Bash(npx biome *)"
     ]
   }
 }

@@ -1,38 +1,62 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
-import {
-  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
+import { useCallback, useState, useTransition } from "react";
+
 import { format, subDays } from "date-fns";
 import {
-  Activity, CheckCircle2, TrendingUp, Users, FileText,
-  Ticket, Target, Download, RefreshCw, AlertTriangle,
-  Medal, MousePointerClick, Eye,
+  Activity,
+  AlertTriangle,
+  CheckCircle2,
+  DollarSign,
+  Download,
+  Eye,
+  FileText,
+  Medal,
+  MousePointerClick,
+  RefreshCw,
+  ShoppingCart,
+  Target,
+  Ticket,
+  TrendingUp,
+  Users,
 } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { toast } from "sonner";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+  getActivityByAction,
+  getActivityByUser,
+  getCampaignPerformanceSummary,
+  getDailyActivityTrend,
+  getRecentActivityLog,
+  getReportKPIs,
+  getSalesReport,
+  getTaskPerformanceByUser,
+} from "@/actions/reports";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
-
-import {
-  getReportKPIs, getActivityByUser, getActivityByAction,
-  getDailyActivityTrend, getTaskPerformanceByUser,
-  getRecentActivityLog, getCampaignPerformanceSummary,
-} from "@/actions/reports";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 type User = { id: string; name: string | null; email: string | null; role: string };
@@ -44,6 +68,7 @@ type DailyTrend = Awaited<ReturnType<typeof getDailyActivityTrend>>;
 type TaskPerf = Awaited<ReturnType<typeof getTaskPerformanceByUser>>;
 type LogEntry = Awaited<ReturnType<typeof getRecentActivityLog>>[number];
 type CampaignPerf = Awaited<ReturnType<typeof getCampaignPerformanceSummary>>;
+type SalesReport = Awaited<ReturnType<typeof getSalesReport>>;
 
 interface InitialData {
   kpis: KPIs;
@@ -53,6 +78,7 @@ interface InitialData {
   taskPerf: TaskPerf;
   recentLog: LogEntry[];
   campaignPerf: CampaignPerf;
+  salesReport: SalesReport;
 }
 
 interface Props {
@@ -64,24 +90,50 @@ interface Props {
 const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899"];
 
 const ACTION_LABELS: Record<string, string> = {
-  login: "Login", create_deal: "Create Deal", update_deal: "Update Deal",
-  win_deal: "Win Deal", lose_deal: "Lose Deal", delete_deal: "Delete Deal",
-  create_lead: "Create Lead", update_lead: "Update Lead", convert_lead: "Convert Lead",
-  delete_lead: "Delete Lead", create_contact: "Create Contact", update_contact: "Update Contact",
-  delete_contact: "Delete Contact", create_company: "Create Company", create_task: "Create Task",
-  complete_task: "Complete Task", delete_task: "Delete Task", create_quote: "Create Quote",
-  send_quote: "Send Quote", accept_quote: "Accept Quote", delete_quote: "Delete Quote",
-  create_ticket: "Create Ticket", resolve_ticket: "Resolve Ticket", close_ticket: "Close Ticket",
-  launch_campaign: "Launch Campaign", create_automation: "Create Automation",
+  login: "Login",
+  create_deal: "Create Deal",
+  update_deal: "Update Deal",
+  win_deal: "Win Deal",
+  lose_deal: "Lose Deal",
+  delete_deal: "Delete Deal",
+  create_lead: "Create Lead",
+  update_lead: "Update Lead",
+  convert_lead: "Convert Lead",
+  delete_lead: "Delete Lead",
+  create_contact: "Create Contact",
+  update_contact: "Update Contact",
+  delete_contact: "Delete Contact",
+  create_company: "Create Company",
+  create_task: "Create Task",
+  complete_task: "Complete Task",
+  delete_task: "Delete Task",
+  create_quote: "Create Quote",
+  send_quote: "Send Quote",
+  accept_quote: "Accept Quote",
+  delete_quote: "Delete Quote",
+  create_ticket: "Create Ticket",
+  resolve_ticket: "Resolve Ticket",
+  close_ticket: "Close Ticket",
+  launch_campaign: "Launch Campaign",
+  create_automation: "Create Automation",
   trigger_automation: "Trigger Automation",
 };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 function StatCard({
-  title, value, sub, icon: Icon, color, trend,
+  title,
+  value,
+  sub,
+  icon: Icon,
+  color,
+  trend,
 }: {
-  title: string; value: string | number; sub?: string;
-  icon: React.ElementType; color: string; trend?: number;
+  title: string;
+  value: string | number;
+  sub?: string;
+  icon: React.ElementType;
+  color: string;
+  trend?: number;
 }) {
   return (
     <Card className={`border-l-4 shadow-sm ${color}`}>
@@ -105,12 +157,12 @@ function StatCard({
 // ─── Main Component ────────────────────────────────────────────────────────────
 export function ReportsClient({ users, initial }: Props) {
   const defaultFrom = format(subDays(new Date(), 29), "yyyy-MM-dd");
-  const defaultTo   = format(new Date(), "yyyy-MM-dd");
+  const defaultTo = format(new Date(), "yyyy-MM-dd");
 
-  const [from, setFrom]       = useState(defaultFrom);
-  const [to, setTo]           = useState(defaultTo);
-  const [userId, setUserId]   = useState("all");
-  const [data, setData]       = useState(initial);
+  const [from, setFrom] = useState(defaultFrom);
+  const [to, setTo] = useState(defaultTo);
+  const [userId, setUserId] = useState("all");
+  const [data, setData] = useState(initial);
   const [isPending, startTransition] = useTransition();
 
   const refresh = useCallback(() => {
@@ -121,7 +173,7 @@ export function ReportsClient({ users, initial }: Props) {
           to,
           userId: userId === "all" ? undefined : userId,
         };
-        const [kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf] =
+        const [kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf, salesReport] =
           await Promise.all([
             getReportKPIs(filters),
             getActivityByUser(filters),
@@ -130,8 +182,9 @@ export function ReportsClient({ users, initial }: Props) {
             getTaskPerformanceByUser(filters),
             getRecentActivityLog({ ...filters, limit: 100 }),
             getCampaignPerformanceSummary(filters),
+            getSalesReport(filters),
           ]);
-        setData({ kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf });
+        setData({ kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf, salesReport });
       } catch {
         toast.error("Failed to refresh report data");
       }
@@ -146,7 +199,7 @@ export function ReportsClient({ users, initial }: Props) {
     window.open(`/api/reports/export?${params}`, "_blank");
   };
 
-  const { kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf } = data;
+  const { kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf, salesReport } = data;
 
   return (
     <div className="space-y-6">
@@ -194,40 +247,86 @@ export function ReportsClient({ users, initial }: Props) {
 
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
-        <StatCard title="Tracked Actions" value={kpis.activityCount} icon={Activity}
-          color="border-l-blue-500" sub="Total audit events in period" />
-        <StatCard title="Tasks Completed" value={`${kpis.tasksCompleted} / ${kpis.tasksTotal}`}
-          icon={CheckCircle2} color="border-l-green-500"
-          sub={`${kpis.taskCompletionRate}% completion rate`} />
-        <StatCard title="Deals Won" value={`${kpis.dealsWon} / ${kpis.dealsCreated}`}
-          icon={TrendingUp} color="border-l-violet-500"
-          sub={`${kpis.dealWinRate}% win rate`} />
-        <StatCard title="New Leads" value={kpis.leadsCreated}
-          icon={Users} color="border-l-orange-500" sub="Leads added in period" />
-        <StatCard title="Quotes Created" value={kpis.quotesCreated}
-          icon={FileText} color="border-l-cyan-500" sub="All statuses" />
-        <StatCard title="Open Tickets" value={kpis.openTickets}
-          icon={Ticket} color="border-l-amber-500" sub="Open + in progress + waiting" />
-        <StatCard title="Win Rate" value={`${kpis.dealWinRate}%`}
-          icon={Target} color="border-l-emerald-500" sub="Deals won vs. created" />
-        <StatCard title="Task Rate" value={`${kpis.taskCompletionRate}%`}
-          icon={CheckCircle2} color="border-l-pink-500" sub="Tasks done vs. total" />
+        <StatCard
+          title="Tracked Actions"
+          value={kpis.activityCount}
+          icon={Activity}
+          color="border-l-blue-500"
+          sub="Total audit events in period"
+        />
+        <StatCard
+          title="Tasks Completed"
+          value={`${kpis.tasksCompleted} / ${kpis.tasksTotal}`}
+          icon={CheckCircle2}
+          color="border-l-green-500"
+          sub={`${kpis.taskCompletionRate}% completion rate`}
+        />
+        <StatCard
+          title="Deals Won"
+          value={`${kpis.dealsWon} / ${kpis.dealsCreated}`}
+          icon={TrendingUp}
+          color="border-l-violet-500"
+          sub={`${kpis.dealWinRate}% win rate`}
+        />
+        <StatCard
+          title="New Leads"
+          value={kpis.leadsCreated}
+          icon={Users}
+          color="border-l-orange-500"
+          sub="Leads added in period"
+        />
+        <StatCard
+          title="Quotes Created"
+          value={kpis.quotesCreated}
+          icon={FileText}
+          color="border-l-cyan-500"
+          sub="All statuses"
+        />
+        <StatCard
+          title="Open Tickets"
+          value={kpis.openTickets}
+          icon={Ticket}
+          color="border-l-amber-500"
+          sub="Open + in progress + waiting"
+        />
+        <StatCard
+          title="Win Rate"
+          value={`${kpis.dealWinRate}%`}
+          icon={Target}
+          color="border-l-emerald-500"
+          sub="Deals won vs. created"
+        />
+        <StatCard
+          title="Task Rate"
+          value={`${kpis.taskCompletionRate}%`}
+          icon={CheckCircle2}
+          color="border-l-pink-500"
+          sub="Tasks done vs. total"
+        />
       </div>
 
       {/* Tabs */}
       <Tabs defaultValue="activity">
-        <TabsList className="w-full max-w-xl">
+        <TabsList className="w-full max-w-2xl">
           <TabsTrigger value="activity" className="flex-1 gap-1.5">
-            <Activity className="h-3.5 w-3.5" />Activity
+            <Activity className="h-3.5 w-3.5" />
+            Activity
           </TabsTrigger>
           <TabsTrigger value="performance" className="flex-1 gap-1.5">
-            <Medal className="h-3.5 w-3.5" />Performance
+            <Medal className="h-3.5 w-3.5" />
+            Performance
+          </TabsTrigger>
+          <TabsTrigger value="sales" className="flex-1 gap-1.5">
+            <DollarSign className="h-3.5 w-3.5" />
+            Sales
           </TabsTrigger>
           <TabsTrigger value="campaigns" className="flex-1 gap-1.5">
-            <Target className="h-3.5 w-3.5" />Campaigns
+            <Target className="h-3.5 w-3.5" />
+            Campaigns
           </TabsTrigger>
           <TabsTrigger value="log" className="flex-1 gap-1.5">
-            <FileText className="h-3.5 w-3.5" />Audit Log
+            <FileText className="h-3.5 w-3.5" />
+            Audit Log
           </TabsTrigger>
         </TabsList>
 
@@ -247,14 +346,25 @@ export function ReportsClient({ users, initial }: Props) {
                   <ResponsiveContainer width="100%" height={220}>
                     <LineChart data={dailyTrend}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="day" tick={{ fontSize: 11 }} tickFormatter={(v) => format(new Date(v), "MMM d")} />
+                      <XAxis
+                        dataKey="day"
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(v) => format(new Date(v), "MMM d")}
+                      />
                       <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                       <Tooltip
                         contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", fontSize: 12 }}
                         labelFormatter={(v) => format(new Date(v), "MMM d, yyyy")}
                       />
-                      <Line type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2}
-                        dot={{ r: 3 }} activeDot={{ r: 5 }} name="Actions" />
+                      <Line
+                        type="monotone"
+                        dataKey="count"
+                        stroke="#3b82f6"
+                        strokeWidth={2}
+                        dot={{ r: 3 }}
+                        activeDot={{ r: 5 }}
+                        name="Actions"
+                      />
                     </LineChart>
                   </ResponsiveContainer>
                 )}
@@ -274,8 +384,13 @@ export function ReportsClient({ users, initial }: Props) {
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={activityByAction.slice(0, 10)} layout="vertical" margin={{ left: 8, right: 8 }}>
                       <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
-                      <YAxis type="category" dataKey="action" tick={{ fontSize: 10 }} width={110}
-                        tickFormatter={(v) => ACTION_LABELS[v] ?? v} />
+                      <YAxis
+                        type="category"
+                        dataKey="action"
+                        tick={{ fontSize: 10 }}
+                        width={110}
+                        tickFormatter={(v) => ACTION_LABELS[v] ?? v}
+                      />
                       <Tooltip
                         contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", fontSize: 12 }}
                         formatter={(v, _n, props) => [v, ACTION_LABELS[props.payload.action] ?? props.payload.action]}
@@ -313,8 +428,7 @@ export function ReportsClient({ users, initial }: Props) {
                             <span className="text-sm font-medium truncate">{u.userName}</span>
                             <span className="text-xs font-semibold tabular-nums ml-2">{u.count}</span>
                           </div>
-                          <Progress value={max > 0 ? (u.count / max) * 100 : 0}
-                            className="h-1.5" />
+                          <Progress value={max > 0 ? (u.count / max) * 100 : 0} className="h-1.5" />
                         </div>
                       </div>
                     );
@@ -351,13 +465,18 @@ export function ReportsClient({ users, initial }: Props) {
                       <TableRow key={u.userId}>
                         <TableCell className="font-medium text-sm">{u.userName}</TableCell>
                         <TableCell className="text-right tabular-nums text-sm">{u.tasksTotal}</TableCell>
-                        <TableCell className="text-right tabular-nums text-sm text-green-600 font-medium">{u.tasksCompleted}</TableCell>
+                        <TableCell className="text-right tabular-nums text-sm text-green-600 font-medium">
+                          {u.tasksCompleted}
+                        </TableCell>
                         <TableCell className="text-right tabular-nums text-sm">
                           {u.tasksOverdue > 0 ? (
                             <span className="text-red-500 font-medium flex items-center justify-end gap-1">
-                              <AlertTriangle className="h-3 w-3" />{u.tasksOverdue}
+                              <AlertTriangle className="h-3 w-3" />
+                              {u.tasksOverdue}
                             </span>
-                          ) : "—"}
+                          ) : (
+                            "—"
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
@@ -376,6 +495,102 @@ export function ReportsClient({ users, initial }: Props) {
           </Card>
         </TabsContent>
 
+        {/* ── Sales tab ────────────────────────────────────────────── */}
+        <TabsContent value="sales" className="space-y-5 mt-5">
+          {/* Revenue KPI cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="Total Revenue"
+              value={`€${salesReport.totalRevenue.toLocaleString()}`}
+              icon={DollarSign}
+              color="border-l-green-500"
+              sub="Deals won + Orders completed"
+            />
+            <StatCard
+              title="Deals Won"
+              value={salesReport.dealsWon.count}
+              icon={TrendingUp}
+              color="border-l-blue-500"
+              sub={`€${salesReport.dealsWon.revenue.toLocaleString()} revenue`}
+            />
+            <StatCard
+              title="Quotes Accepted"
+              value={salesReport.quotesAccepted.count}
+              icon={FileText}
+              color="border-l-violet-500"
+              sub={`€${salesReport.quotesAccepted.revenue.toLocaleString()} value`}
+            />
+            <StatCard
+              title="Orders Completed"
+              value={salesReport.ordersCompleted.count}
+              icon={ShoppingCart}
+              color="border-l-orange-500"
+              sub={`€${salesReport.ordersCompleted.revenue.toLocaleString()} revenue`}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Monthly revenue trend */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">Monthly Revenue (Deals Won)</CardTitle>
+                <CardDescription className="text-xs">Revenue from closed-won deals by month</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {salesReport.monthlyRevenue.length === 0 ? (
+                  <EmptyChart />
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={salesReport.monthlyRevenue}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                      <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", fontSize: 12 }}
+                        formatter={(v: number) => [`€${v.toLocaleString()}`, "Revenue"]}
+                      />
+                      <Bar dataKey="revenue" fill="#22c55e" radius={[4, 4, 0, 0]} name="Revenue" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Revenue by stage */}
+            <Card className="border-0 shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">Revenue by Pipeline Stage</CardTitle>
+                <CardDescription className="text-xs">Won deal revenue grouped by last stage</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {salesReport.revenueByStage.length === 0 ? (
+                  <EmptyChart />
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={salesReport.revenueByStage} layout="vertical" margin={{ left: 8, right: 8 }}>
+                      <XAxis
+                        type="number"
+                        tick={{ fontSize: 11 }}
+                        tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`}
+                      />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
+                      <Tooltip
+                        contentStyle={{ borderRadius: 8, fontSize: 12 }}
+                        formatter={(v: number) => [`€${v.toLocaleString()}`, "Revenue"]}
+                      />
+                      <Bar dataKey="revenue" radius={[0, 4, 4, 0]}>
+                        {salesReport.revenueByStage.map((entry, i) => (
+                          <Cell key={`cell-${i}`} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
         {/* ── Campaigns tab ────────────────────────────────────────── */}
         <TabsContent value="campaigns" className="space-y-5 mt-5">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -391,7 +606,11 @@ export function ReportsClient({ users, initial }: Props) {
                   <ResponsiveContainer width="100%" height={240}>
                     <BarChart data={campaignPerf.filter((c) => c.sent > 0)}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis dataKey="name" tick={{ fontSize: 10 }} tickFormatter={(v) => v.length > 14 ? `${v.slice(0, 14)}…` : v} />
+                      <XAxis
+                        dataKey="name"
+                        tick={{ fontSize: 10 }}
+                        tickFormatter={(v) => (v.length > 14 ? `${v.slice(0, 14)}…` : v)}
+                      />
                       <YAxis tick={{ fontSize: 11 }} unit="%" />
                       <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
                       <Legend />
@@ -421,14 +640,14 @@ export function ReportsClient({ users, initial }: Props) {
                         cx="50%"
                         cy="50%"
                         outerRadius={90}
-                        label={({ name, percent }) =>
-                          `${name.slice(0, 12)} ${(percent * 100).toFixed(0)}%`
-                        }
+                        label={({ name, percent }) => `${name.slice(0, 12)} ${(percent * 100).toFixed(0)}%`}
                         labelLine={false}
                       >
-                        {campaignPerf.filter((c) => c.sent > 0).map((_e, i) => (
-                          <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                        ))}
+                        {campaignPerf
+                          .filter((c) => c.sent > 0)
+                          .map((_e, i) => (
+                            <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                          ))}
                       </Pie>
                       <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
                     </PieChart>
@@ -454,10 +673,16 @@ export function ReportsClient({ users, initial }: Props) {
                       <TableHead className="text-xs font-semibold">Status</TableHead>
                       <TableHead className="text-xs font-semibold text-right">Recipients</TableHead>
                       <TableHead className="text-xs font-semibold text-right">
-                        <span className="flex items-center justify-end gap-1"><Eye className="h-3 w-3" />Opens</span>
+                        <span className="flex items-center justify-end gap-1">
+                          <Eye className="h-3 w-3" />
+                          Opens
+                        </span>
                       </TableHead>
                       <TableHead className="text-xs font-semibold text-right">
-                        <span className="flex items-center justify-end gap-1"><MousePointerClick className="h-3 w-3" />Clicks</span>
+                        <span className="flex items-center justify-end gap-1">
+                          <MousePointerClick className="h-3 w-3" />
+                          Clicks
+                        </span>
                       </TableHead>
                       <TableHead className="text-xs font-semibold text-right">Open%</TableHead>
                       <TableHead className="text-xs font-semibold text-right">Click%</TableHead>
@@ -468,7 +693,9 @@ export function ReportsClient({ users, initial }: Props) {
                       <TableRow key={c.id}>
                         <TableCell className="font-medium text-sm">{c.name}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="text-xs capitalize">{c.status}</Badge>
+                          <Badge variant="outline" className="text-xs capitalize">
+                            {c.status}
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-sm">{c.sent}</TableCell>
                         <TableCell className="text-right tabular-nums text-sm text-violet-600">{c.opened}</TableCell>
@@ -526,9 +753,7 @@ export function ReportsClient({ users, initial }: Props) {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
-                        {entry.entityType ? (
-                          <span className="capitalize">{entry.entityType}</span>
-                        ) : "—"}
+                        {entry.entityType ? <span className="capitalize">{entry.entityType}</span> : "—"}
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground font-mono">
                         {entry.ipAddress ?? "—"}

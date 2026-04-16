@@ -1,39 +1,33 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import Link from "next/link";
-import {
-  AlertCircle,
-  CheckCircle2,
-  Clock,
-  Mail,
-  MessageCircle,
-  MessageSquare,
-  Phone,
-  Users,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { MetricCard } from "@/components/crm/metric-card";
-import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
-import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
-import { SLAGauge } from "@/components/crm/sla-gauge";
-import { getTickets, getSLAs } from "@/actions/support";
+
+import { AlertCircle, CheckCircle2, Clock, Mail, MessageCircle, MessageSquare, Phone, Users } from "lucide-react";
+
+import { getSLAs, getTickets } from "@/actions/support";
 import { CreateTicketButton } from "@/components/crm/create-ticket-button";
+import { MetricCard } from "@/components/crm/metric-card";
+import { SLAGauge } from "@/components/crm/sla-gauge";
+import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
+import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const CHANNEL_META: Record<string, { label: string; icon: React.ElementType; color: string; barClass: string }> = {
-  email:  { label: "Email",  icon: Mail,          color: "#3b82f6", barClass: "bg-blue-500" },
-  chat:   { label: "Chat",   icon: MessageCircle, color: "#22c55e", barClass: "bg-green-500" },
-  phone:  { label: "Phone",  icon: Phone,         color: "#f97316", barClass: "bg-orange-500" },
-  social: { label: "Social", icon: Users,         color: "#a855f7", barClass: "bg-purple-500" },
+  email: { label: "Email", icon: Mail, color: "#3b82f6", barClass: "bg-blue-500" },
+  chat: { label: "Chat", icon: MessageCircle, color: "#22c55e", barClass: "bg-green-500" },
+  phone: { label: "Phone", icon: Phone, color: "#f97316", barClass: "bg-orange-500" },
+  social: { label: "Social", icon: Users, color: "#a855f7", barClass: "bg-purple-500" },
 };
 
 const PRIORITY_BORDER: Record<string, string> = {
   urgent: "border-l-red-500",
-  high:   "border-l-orange-500",
+  high: "border-l-orange-500",
   normal: "border-l-blue-500",
-  low:    "border-l-green-500",
+  low: "border-l-green-500",
 };
 
 export default function SupportDashboard() {
@@ -44,10 +38,7 @@ export default function SupportDashboard() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [ticketData, slaData] = await Promise.all([
-          getTickets({ limit: 100 }),
-          getSLAs()
-        ]);
+        const [ticketData, slaData] = await Promise.all([getTickets({ limit: 100 }), getSLAs()]);
         setTickets(ticketData);
         setSLAs(slaData);
       } catch (error) {
@@ -64,7 +55,21 @@ export default function SupportDashboard() {
   const totalTickets = tickets.length;
   const resolvedTickets = tickets.filter((t) => t.status === "resolved");
   const resolutionRate = totalTickets > 0 ? Math.round((resolvedTickets.length / totalTickets) * 100) : 0;
-  const avgResolutionTime = "4h 32m";
+
+  const avgResolutionTime = (() => {
+    const withTime = resolvedTickets.filter((t) => t.resolvedAt && t.createdAt);
+    if (withTime.length === 0) return "—";
+    const totalMs = withTime.reduce(
+      (sum, t) => sum + (new Date(t.resolvedAt).getTime() - new Date(t.createdAt).getTime()),
+      0,
+    );
+    const avgMs = totalMs / withTime.length;
+    const totalMins = Math.round(avgMs / 60_000);
+    if (totalMins < 60) return `${totalMins}m`;
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    return m > 0 ? `${h}h ${m}m` : `${h}h`;
+  })();
 
   // Calculate real SLA metrics
   const calculateSLAMetrics = () => {
@@ -116,9 +121,7 @@ export default function SupportDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Support Center</h1>
-          <p className="text-muted-foreground mt-1">
-            Manage customer tickets and monitor SLA performance
-          </p>
+          <p className="text-muted-foreground mt-1">Manage customer tickets and monitor SLA performance</p>
         </div>
         <CreateTicketButton />
       </div>
@@ -157,15 +160,12 @@ export default function SupportDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* ── Left: ticket lists ─────────────────────────────────── */}
         <div className="lg:col-span-2 space-y-5">
-
           {/* Open Tickets */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <div>
                 <CardTitle className="text-base">Open Tickets</CardTitle>
-                <CardDescription className="text-xs mt-0.5">
-                  Recent issues awaiting a response
-                </CardDescription>
+                <CardDescription className="text-xs mt-0.5">Recent issues awaiting a response</CardDescription>
               </div>
               <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
                 <Link href="/dashboard/support/tickets">View all</Link>
@@ -174,7 +174,9 @@ export default function SupportDashboard() {
             <CardContent className="pt-0">
               {loading ? (
                 <div className="space-y-2">
-                  {[1, 2, 3].map((i) => <Skeleton key={i} className="h-16 w-full rounded-lg" />)}
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                  ))}
                 </div>
               ) : openTickets.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-10 text-center">
@@ -187,9 +189,7 @@ export default function SupportDashboard() {
               ) : (
                 <div className="space-y-2">
                   {openTickets.slice(0, 5).map((ticket) => {
-                    const daysAgo = Math.floor(
-                      (Date.now() - new Date(ticket.createdAt).getTime()) / 86_400_000
-                    );
+                    const daysAgo = Math.floor((Date.now() - new Date(ticket.createdAt).getTime()) / 86_400_000);
                     const dateLabel = daysAgo === 0 ? "Today" : `${daysAgo}d ago`;
                     const ChannelIcon = CHANNEL_META[ticket.channel]?.icon ?? MessageSquare;
                     const borderClass = PRIORITY_BORDER[ticket.priority] ?? "border-l-blue-500";
@@ -202,9 +202,7 @@ export default function SupportDashboard() {
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <span className="font-mono text-[11px] text-muted-foreground">
-                              {ticket.ticketNumber}
-                            </span>
+                            <span className="font-mono text-[11px] text-muted-foreground">{ticket.ticketNumber}</span>
                             <TicketPriorityBadge
                               priority={ticket.priority}
                               showIcon={false}
@@ -221,9 +219,7 @@ export default function SupportDashboard() {
                             </span>
                           </div>
                         </div>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap mt-0.5">
-                          {dateLabel}
-                        </span>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap mt-0.5">{dateLabel}</span>
                       </Link>
                     );
                   })}
@@ -248,12 +244,12 @@ export default function SupportDashboard() {
             <CardContent className="pt-0">
               {loading ? (
                 <div className="space-y-2">
-                  {[1, 2].map((i) => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
+                  {[1, 2].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full rounded-lg" />
+                  ))}
                 </div>
               ) : resolvedTickets.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  No resolved tickets yet.
-                </p>
+                <p className="text-sm text-muted-foreground text-center py-6">No resolved tickets yet.</p>
               ) : (
                 <div className="divide-y">
                   {resolvedTickets.slice(0, 4).map((ticket) => (
@@ -294,8 +290,8 @@ export default function SupportDashboard() {
             </CardHeader>
             <CardContent className="space-y-6 pb-6">
               <SLAGauge label="On-time Resolution" percentage={onTimeResolution} color="green" />
-              <SLAGauge label="First Response"     percentage={firstResponseTime} color="green" />
-              <SLAGauge label="Satisfaction"        percentage={satisfaction}      color="green" />
+              <SLAGauge label="First Response" percentage={firstResponseTime} color="green" />
+              <SLAGauge label="Satisfaction" percentage={satisfaction} color="green" />
             </CardContent>
           </Card>
 
@@ -308,7 +304,9 @@ export default function SupportDashboard() {
             <CardContent className="space-y-3">
               {loading ? (
                 <div className="space-y-3">
-                  {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-8 w-full" />)}
+                  {[1, 2, 3, 4].map((i) => (
+                    <Skeleton key={i} className="h-8 w-full" />
+                  ))}
                 </div>
               ) : (
                 Object.entries(channels).map(([key, count]) => {
@@ -325,9 +323,7 @@ export default function SupportDashboard() {
                         </span>
                         <span className="tabular-nums font-semibold">
                           {count}
-                          <span className="text-muted-foreground font-normal ml-1">
-                            ({pct}%)
-                          </span>
+                          <span className="text-muted-foreground font-normal ml-1">({pct}%)</span>
                         </span>
                       </div>
                       <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">

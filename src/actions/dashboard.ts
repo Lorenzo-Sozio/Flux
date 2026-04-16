@@ -1,8 +1,20 @@
 "use server";
 
+import { and, desc, eq, gte, isNotNull, lt, sql } from "drizzle-orm";
+
 import { db } from "@/db";
-import { deals, leads, tasks, pipelineStages, quotes, tickets } from "@/db/schema";
-import { eq, sql, and, gte, lt } from "drizzle-orm";
+import {
+  activities,
+  companies,
+  contacts,
+  deals,
+  leads,
+  pipelineStages,
+  quotes,
+  tasks,
+  tickets,
+  users,
+} from "@/db/schema";
 
 export async function getDashboardStats() {
   // 1. Total Deal Value
@@ -25,7 +37,7 @@ export async function getDashboardStats() {
     .select({ count: sql<number>`count(*)` })
     .from(leads)
     .where(eq(leads.status, "converted"));
-  
+
   const totalLeads = Number(totalLeadsResult[0]?.count || 0);
   const convertedLeads = Number(convertedLeadsResult[0]?.count || 0);
   const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
@@ -40,7 +52,7 @@ export async function getDashboardStats() {
     .select({ count: sql<number>`count(*)` })
     .from(tasks)
     .where(and(lt(tasks.dueDate, today), eq(tasks.status, "todo")));
-  
+
   const todayTasksResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(tasks)
@@ -60,23 +72,23 @@ export async function getDashboardStats() {
       return {
         name: stage.name,
         value: Number(countResult[0]?.count || 0),
-        color: stage.color || "#3b82f6"
+        color: stage.color || "#3b82f6",
       };
-    })
+    }),
   );
 
   // 6. Leads by Source
   const sourcesResult = await db
-    .select({ 
-      source: leads.source, 
-      count: sql<number>`count(*)` 
+    .select({
+      source: leads.source,
+      count: sql<number>`count(*)`,
     })
     .from(leads)
     .groupBy(leads.source);
-  
-  const leadsBySource = sourcesResult.map(r => ({
+
+  const leadsBySource = sourcesResult.map((r) => ({
     name: r.source || "Other",
-    value: Number(r.count)
+    value: Number(r.count),
   }));
 
   // 7. Quotes pipeline: total value of quotes awaiting response (sent + viewed)
@@ -118,4 +130,58 @@ export async function getDashboardStats() {
     openTicketsCount,
     urgentTicketsCount,
   };
+}
+
+export async function getTopDeals(limit = 5) {
+  const rows = await db
+    .select({
+      id: deals.id,
+      name: deals.name,
+      amount: deals.amount,
+      currency: deals.currency,
+      probability: deals.probability,
+      status: deals.status,
+      expectedCloseDate: deals.expectedCloseDate,
+      stageName: pipelineStages.name,
+      stageColor: pipelineStages.color,
+      companyName: companies.name,
+    })
+    .from(deals)
+    .leftJoin(pipelineStages, eq(deals.stageId, pipelineStages.id))
+    .leftJoin(companies, eq(deals.companyId, companies.id))
+    .where(eq(deals.status, "open"))
+    .orderBy(desc(sql`CAST(${deals.amount} AS NUMERIC)`))
+    .limit(limit);
+
+  return rows.map((r) => ({
+    ...r,
+    amount: Number(r.amount ?? 0),
+  }));
+}
+
+export async function getRecentActivities(limit = 10) {
+  const rows = await db
+    .select({
+      id: activities.id,
+      type: activities.type,
+      content: activities.content,
+      date: activities.date,
+      createdAt: activities.createdAt,
+      ownerName: users.name,
+      leadId: activities.leadId,
+      contactId: activities.contactId,
+      companyId: activities.companyId,
+      dealId: activities.dealId,
+      contactFirstName: contacts.firstName,
+      contactLastName: contacts.lastName,
+      companyName: companies.name,
+    })
+    .from(activities)
+    .leftJoin(users, eq(activities.ownerId, users.id))
+    .leftJoin(contacts, eq(activities.contactId, contacts.id))
+    .leftJoin(companies, eq(activities.companyId, companies.id))
+    .orderBy(desc(activities.createdAt))
+    .limit(limit);
+
+  return rows;
 }
