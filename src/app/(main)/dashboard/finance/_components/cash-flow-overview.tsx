@@ -1,112 +1,77 @@
 "use client";
 
-import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ReferenceLine, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
-import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/utils";
 
-const chartData = [
-  { month: "Jan", income: 5900, expenses: -4200 },
-  { month: "Feb", income: 3800, expenses: -6100 },
-  { month: "Mar", income: 5200, expenses: -5600 },
-  { month: "Apr", income: 7100, expenses: -3200 },
-  { month: "May", income: 4500, expenses: -4400 },
-  { month: "Jun", income: 6100, expenses: -3600 },
-  { month: "Jul", income: 3300, expenses: -5200 },
-  { month: "Aug", income: 4300, expenses: -4000 },
-  { month: "Sep", income: 7200, expenses: -5800 },
-  { month: "Oct", income: 5600, expenses: -4600 },
-  { month: "Nov", income: 3600, expenses: -6400 },
-  { month: "Dec", income: 4700, expenses: -3400 },
-];
+interface Props {
+  revenueTrend: { month: string; deals: number; orders: number }[];
+}
 
 const chartConfig = {
-  income: {
-    label: "Income",
+  deals: {
+    label: "Deals Won",
     color: "var(--chart-1)",
   },
-  expenses: {
-    label: "Expenses",
+  orders: {
+    label: "Orders",
     color: "var(--chart-2)",
   },
 } as ChartConfig;
 
-export function CashFlowOverview() {
-  const totalIncome = chartData.reduce((acc, item) => acc + item.income, 0);
-  const totalExpenses = chartData.reduce((acc, item) => acc + Math.abs(item.expenses), 0);
+export function CashFlowOverview({ revenueTrend }: Props) {
+  const totalDeals = revenueTrend.reduce((acc, item) => acc + item.deals, 0);
+  const totalOrders = revenueTrend.reduce((acc, item) => acc + item.orders, 0);
+
+  const chartData = revenueTrend.map((item) => {
+    const [year, month] = item.month.split("-");
+    const label = new Date(Number(year), Number(month) - 1, 1).toLocaleString("en-US", { month: "short" });
+    return { ...item, label };
+  });
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Cash Flow Overview</CardTitle>
-        <CardDescription>Monthly income and expenses with net cash impact.</CardDescription>
-        <CardAction>
-          <Select defaultValue="this-year">
-            <SelectTrigger size="sm" className="w-37">
-              <SelectValue placeholder="Select period" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="this-month">This Month</SelectItem>
-                <SelectItem value="last-6-months">Last 6 Months</SelectItem>
-                <SelectItem value="ytd">Year to Date</SelectItem>
-                <SelectItem value="this-year">This Year</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </CardAction>
-      </CardHeader>
-      <CardContent>
-        <Separator />
-        <div className="flex items-start justify-between gap-2 py-5 md:items-stretch md:gap-0">
-          <div className="flex flex-1 items-center justify-center gap-2">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-chart-1">
-              <ArrowDownLeft className="size-6 stroke-background" />
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs uppercase">Income</p>
-              <p className="font-medium tabular-nums">{formatCurrency(totalIncome, { noDecimals: true })}</p>
-            </div>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
+        <div>
+          <CardTitle className="text-base">Revenue Trend</CardTitle>
+          <CardDescription className="text-xs mt-0.5">
+            Won deals and completed orders — last 12 months
+          </CardDescription>
+        </div>
+        <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block size-2.5 rounded-sm" style={{ background: "var(--chart-1)" }} />
+            <span className="text-muted-foreground text-xs">Deals</span>
+            <span className="font-medium text-xs tabular-nums">
+              {formatCurrency(totalDeals, { noDecimals: true })}
+            </span>
           </div>
-          <Separator orientation="vertical" className="h-auto! self-stretch" />
-          <div className="flex flex-1 items-center justify-center gap-2">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-chart-2">
-              <ArrowUpRight className="size-6 stroke-background" />
-            </div>
-            <div>
-              <p className="text-muted-foreground text-xs uppercase">Expenses</p>
-              <p className="font-medium tabular-nums">{formatCurrency(totalExpenses, { noDecimals: true })}</p>
-            </div>
+          <div className="flex items-center gap-1.5">
+            <span className="inline-block size-2.5 rounded-sm" style={{ background: "var(--chart-2)" }} />
+            <span className="text-muted-foreground text-xs">Orders</span>
+            <span className="font-medium text-xs tabular-nums">
+              {formatCurrency(totalOrders, { noDecimals: true })}
+            </span>
           </div>
         </div>
-        <Separator />
-        <ChartContainer className="max-h-72 w-full" config={chartConfig}>
-          <BarChart
-            stackOffset="sign"
-            margin={{ left: -25, right: 0, top: 25, bottom: 0 }}
-            accessibilityLayer
-            data={chartData}
-          >
+      </CardHeader>
+      <CardContent className="pt-0">
+        <ChartContainer className="max-h-64 w-full" config={chartConfig}>
+          <BarChart margin={{ left: -25, right: 0, top: 10, bottom: 0 }} accessibilityLayer data={chartData}>
             <CartesianGrid vertical={false} />
-            <XAxis dataKey="month" tickLine={false} tickMargin={10} axisLine={false} />
+            <XAxis dataKey="label" tickLine={false} tickMargin={8} axisLine={false} className="text-xs" />
             <YAxis
               axisLine={false}
               tickLine={false}
               tickMargin={8}
-              tickFormatter={(value) => {
-                const abs = Math.abs(value);
-                const formatted = abs >= 1000 ? `${abs / 1000}k` : `${abs}`;
-                return value < 0 ? `-${formatted}` : formatted;
-              }}
-              ticks={[-8000, -4000, 0, 4000, 8000]}
+              tickFormatter={(value) => (value >= 1000 ? `${(value / 1000).toFixed(0)}k` : `${value}`)}
+              className="text-xs"
             />
-            <ChartTooltip content={<ChartTooltipContent hideLabel />} />
-            <ReferenceLine y={0} stroke="var(--border)" />
-            <Bar dataKey="income" stackId="a" fill={chartConfig.income.color} radius={[4, 4, 0, 0]} />
-            <Bar dataKey="expenses" stackId="a" fill={chartConfig.expenses.color} radius={[4, 4, 0, 0]} />
+            <ChartTooltip content={<ChartTooltipContent hideLabel={false} />} />
+            <Bar dataKey="deals" stackId="a" fill={chartConfig.deals.color} radius={[0, 0, 0, 0]} />
+            <Bar dataKey="orders" stackId="a" fill={chartConfig.orders.color} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ChartContainer>
       </CardContent>

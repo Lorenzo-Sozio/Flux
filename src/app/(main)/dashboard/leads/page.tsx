@@ -1,4 +1,6 @@
-import { getLeads } from "@/actions/crm";
+import Link from "next/link";
+
+import { getLeads, getAllUsers } from "@/actions/crm";
 import { getCustomFilters } from "@/actions/filters";
 import { getCustomFieldDefinitions } from "@/actions/custom-fields";
 import { toFieldMetaMap, LEAD_FIELDS, customFieldsToMetaMap } from "@/lib/filter-engine";
@@ -7,16 +9,9 @@ import { FilterBuilder } from "@/components/crm/filter-builder";
 import { ImportExportButtons } from "@/components/crm/import-export-buttons";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import Link from "next/link";
-import { LeadActions, LeadModal } from "./_components/lead-modal";
+import { LeadModal } from "./_components/lead-modal";
+import { LeadsTable } from "./_components/leads-table";
 import { auth } from "@/auth";
-
-const RATING_COLORS: Record<string, string> = {
-  hot:  "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-  warm: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
-  cold: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
-};
 
 export default async function LeadsPage({
   searchParams,
@@ -29,10 +24,11 @@ export default async function LeadsPage({
   const session = await auth();
   const canEdit = session?.user?.role !== "viewer";
 
-  const [allLeads, savedFilters, customDefs] = await Promise.all([
+  const [allLeads, savedFilters, customDefs, users] = await Promise.all([
     getLeads(encoded),
     getCustomFilters("leads").catch(() => []),
     getCustomFieldDefinitions("lead").catch(() => []),
+    getAllUsers(),
   ]);
 
   const tree = encoded ? decodeFilter(encoded) : null;
@@ -72,75 +68,12 @@ export default async function LeadsPage({
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Company</TableHead>
-            <TableHead>City</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Rating</TableHead>
-            <TableHead>Score</TableHead>
-            <TableHead>Assigned To</TableHead>
-            <TableHead className="w-[100px] text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {allLeads.map((lead) => (
-            <TableRow key={lead.id} className="hover:bg-muted/40">
-              <TableCell>
-                <Link
-                  href={`/dashboard/leads/${lead.id}`}
-                  className="font-medium hover:underline"
-                >
-                  {lead.firstName} {lead.lastName}
-                </Link>
-              </TableCell>
-              <TableCell>{lead.email}</TableCell>
-              <TableCell>{lead.companyName}</TableCell>
-              <TableCell>{lead.city}</TableCell>
-              <TableCell className="capitalize">{lead.status}</TableCell>
-              <TableCell>
-                {lead.rating && (
-                  <span
-                    className={`text-xs font-medium px-1.5 py-0.5 rounded capitalize ${
-                      RATING_COLORS[lead.rating] ?? ""
-                    }`}
-                  >
-                    {lead.rating}
-                  </span>
-                )}
-              </TableCell>
-              <TableCell>{lead.leadScore}</TableCell>
-              <TableCell>
-                {lead.ownerName ? (
-                  <div className="flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
-                      {lead.ownerName.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="text-sm">{lead.ownerName}</span>
-                  </div>
-                ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
-                )}
-              </TableCell>
-              <TableCell className="text-right">
-                {canEdit && <LeadActions lead={lead} />}
-              </TableCell>
-            </TableRow>
-          ))}
-          {allLeads.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
-                {activeCount > 0
-                  ? "No leads match the current filters."
-                  : "No leads yet."}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+      <LeadsTable
+        leads={allLeads}
+        users={users}
+        canEdit={canEdit}
+        activeCount={activeCount}
+      />
     </div>
   );
 }

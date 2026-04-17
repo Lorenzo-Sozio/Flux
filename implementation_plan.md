@@ -1,6 +1,6 @@
 # Flux CRM — Piano di Sviluppo Completo
 
-> **Ultimo aggiornamento:** 16 Aprile 2026
+> **Ultimo aggiornamento:** 17 Aprile 2026
 
 ---
 
@@ -12,7 +12,7 @@
 |---|---|---|
 | **Pipeline / Deals** | `/dashboard/pipeline` | ✅ Kanban drag-and-drop, detail view, stage management |
 | **Contacts** | `/dashboard/contacts` | ✅ Lista, detail `[id]`, filtri avanzati, custom fields |
-| **Companies** | `/dashboard/companies` | ✅ Lista, detail `[id]`, attività, task |
+| **Companies** | `/dashboard/companies` | ✅ Lista, detail `[id]`, attività, task, bulk actions |
 | **Leads** | `/dashboard/leads` | ✅ Lista, detail `[id]`, conversione in contact |
 | **Tasks** | `/dashboard/tasks` | ✅ Lista + **Kanban Board** (drag-and-drop, colonne Todo/In Progress/Done) |
 | **Quotes** | `/dashboard/quotes` | ✅ Lista, nuova (`/new`), detail `[id]`, email invio |
@@ -33,7 +33,7 @@
 | Modulo | Route | Stato attuale |
 |---|---|---|
 | **CRM Dashboard** | `/dashboard/crm` | ✅ KPI reali, pipeline funnel, top deals, recent activities feed |
-| **Finance Dashboard** | `/dashboard/finance` | ⚠️ Dati statici mock. Tab "Activity", "Insights", "Utilities" disabilitati |
+| **Finance Dashboard** | `/dashboard/finance` | ✅ Dati reali: revenue totale, pipeline weighted, monthly trend, win rate, revenue by source, pipeline by stage |
 | **Analytics Dashboard** | `/dashboard/analytics` | ⚠️ Componenti esistono, dati probabilmente mock |
 | **Support Dashboard** | `/dashboard/support` | ✅ `avgResolutionTime` calcolato da dati reali (resolvedAt - createdAt) |
 | **Chat Route dedicata** | `/dashboard/chat` | ✅ Pagina full-screen con lista conversazioni + thread, sidebar entry |
@@ -55,7 +55,7 @@
 | **Import/Export Globale** | 🟡 Media | Import CSV già esiste per alcune entità |
 | **Support Dashboard reale** | 🟡 Media | Sostituire avgResolutionTime e satisfaction con dati DB |
 | **Analytics Template** | 🟢 Bassa | Connettere ai dati reali del CRM |
-| **Roles CRUD** | 🟢 Bassa | Route `/dashboard/roles` per permessi granulari |
+| ~~**Roles CRUD**~~ | ✅ Completato | Route `/dashboard/roles`: matrice permessi + utenti per ruolo + reassign |
 | **Lead Scoring automatico** | 🟢 Bassa | Campo `leadScore` presente, logica da implementare |
 | **Email preview pubblico quote** | 🟢 Bassa | Link `/q/[token]` per customer acceptance senza login |
 | **Onboarding / Welcome flow** | 🟢 Bassa | Wizard setup iniziale |
@@ -119,9 +119,12 @@ Campo "Assegnato a" con selezione utenti e gruppi uniformata su tutte le entità
 - `src/actions/reports.ts` — aggiunto `getSalesReport()` (deals won + quotes accepted + orders completed, monthly trend, revenue by stage)
 - `src/app/(main)/dashboard/reports/_components/reports-client.tsx` — aggiunto tab "Sales" con KPI cards e grafici
 
-#### 3.3 · Finance Dashboard Reale
-- Collegare a `deals.amount` (won = revenue), `quotes` stats
-- Complessità: ⭐ (Bassa)
+#### ✅ 3.3 · Finance Dashboard Reale
+- `src/actions/finance.ts` — `getFinanceDashboard()`: revenue totale, pipeline weighted, monthly trend (12 mesi), win rate, revenue breakdown per fonte, pipeline by stage
+- KPI cards reali: Total Revenue, Pipeline Value (weighted), Monthly Revenue (MoM%), Win Rate (90 giorni)
+- Revenue Trend: grafico bar stacked deals won + orders (12 mesi)
+- Revenue Sources: breakdown deals/orders/quotes con progress bar
+- Pipeline Health: open deals per stage con valore e conteggio
 
 #### 3.4 · Support Dashboard Reale
 - Calcolare `avgResolutionTime` da `resolvedAt - createdAt`
@@ -142,6 +145,35 @@ Campo "Assegnato a" con selezione utenti e gruppi uniformata su tutte le entità
 - **Roles Management UI** — `/dashboard/roles`
 - **Onboarding Wizard** — setup iniziale workspace
 - **Mobile Responsive Polish** — audit UX mobile
+
+---
+
+---
+
+### ✅ FASE 5 — Fix UI / Architettura Layout
+
+#### 5.1 · Roles Management UI ✅
+Pagina `/dashboard/roles` (admin/owner only, già protetta in middleware):
+- Matrice permessi: 4 card (Owner / Admin / User / Viewer) con elenco capabilities
+- Sezione "Users by Role": utenti raggruppati per ruolo con dropdown inline per reassign
+- Regole: owner può assegnare qualsiasi ruolo; admin solo user/viewer su non-admin
+- Sidebar entry "Roles" con `ShieldCheck` icon nel gruppo Administration
+- `src/app/(main)/dashboard/roles/page.tsx` + `_components/roles-client.tsx`
+
+#### 5.2 · Fix layout dashboard (overflow/scrollbar) ✅
+Correzione architetturale al layout principale che impediva alle pagine kanban di usare `h-full` correttamente:
+- **Causa root**: `SidebarProvider` usa `min-h-svh` (non fissa), quindi `h-full` sui figli non era bounded
+- `SidebarInset` riceve `overflow-hidden` → bounded a viewport height
+- Content div: `h-full p-4 md:p-6` → `flex-1 min-h-0 overflow-y-auto p-4 md:p-6`
+- Le pagine con contenuto normale scrollano internamente; le pagine kanban con `h-full` riempiono esattamente il viewport
+- Modificato `src/app/(main)/dashboard/layout.tsx`
+
+#### 5.3 · Ticket Kanban — fix scroll verticale inutile ✅
+- Rimosso `h-[calc(100vh-220px)]` (offset errato) da `TicketKanbanBoard`
+- Board ora usa `h-full` + DragDropContext con `div.h-full.flex.gap-3.overflow-x-auto`
+- Tickets page in kanban mode: `h-full flex flex-col gap-6` con sezioni statiche `shrink-0` e content area `flex-1 min-h-0`
+- Paginazione nascosta in kanban mode
+- Modificati `src/components/crm/ticket-kanban-board.tsx` + `src/app/(main)/dashboard/support/tickets/page.tsx`
 
 ---
 
@@ -176,15 +208,15 @@ Campo "Assegnato a" con selezione utenti e gruppi uniformata su tutte le entità
 🟡 Media priorità:
   [x] Pipeline Forecast (già implementata in /pipeline/report)
   [x] Revenue Reports (tab Sales in reports con getSalesReport())
-  [ ] Finance Dashboard reale
+  [x] Finance Dashboard reale
   [x] Support Dashboard reale (avgResolutionTime calcolato)
   [x] Chat Route dedicata (/dashboard/chat)
 
 🟢 Bassa priorità:
-  [ ] Lead Scoring automatico
-  [ ] Global Search
-  [ ] Bulk Actions
-  [ ] Quote Public Preview
-  [ ] Roles Management UI
+  [x] Global Search (contacts, leads, companies, deals, tickets, quotes, orders)
+  [x] Lead Scoring automatico (computeLeadScore, badge Cold/Warm/Hot/Very Hot)
+  [x] Bulk Actions (leads + contacts: delete, set status, assign)
+  [x] Quote Public Preview (/q/[token], accept/decline, no auth)
+  [x] Roles Management UI (/dashboard/roles: permission matrix, users by role, role reassign)
   [ ] Onboarding Wizard
 ```

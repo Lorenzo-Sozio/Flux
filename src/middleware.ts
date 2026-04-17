@@ -49,6 +49,11 @@ export default auth((req) => {
     pathname.startsWith("/auth/v1/register") ||
     pathname.startsWith("/auth/v2/register");
 
+  // Public quote preview pages (no auth required)
+  if (pathname.startsWith("/q/") || pathname.startsWith("/api/quotes/public")) {
+    return; // allow unauthenticated
+  }
+
   if (isOnLogin || isOnPublicAuth) {
     if (isLoggedIn && isOnLogin) {
       return Response.redirect(new URL("/dashboard/crm", nextUrl));

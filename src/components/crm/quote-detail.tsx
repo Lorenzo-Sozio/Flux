@@ -16,7 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
-import { Mail, Printer, Eye, Check, X, Clock, Calendar, Building2, User } from "lucide-react";
+import { Mail, Printer, Eye, Check, X, Clock, Calendar, Building2, User, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { updateQuoteAction, getQuoteById } from "@/actions/quotes";
 import { SendQuoteEmailDialog } from "./send-quote-email-dialog";
@@ -132,6 +132,21 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange }: Quo
 
             {/* Actions */}
             <div className="flex items-center gap-2 shrink-0">
+              {quote.publicToken && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const url = `${window.location.origin}/q/${quote.publicToken}`;
+                    navigator.clipboard.writeText(url).then(() => {
+                      toast.success("Public link copied to clipboard");
+                    });
+                  }}
+                >
+                  <Link2 className="mr-2 h-4 w-4" />
+                  Copy Link
+                </Button>
+              )}
               {(quote.status === "draft" || quote.status === "sent" || quote.status === "viewed") && (
                 <Button
                   variant="outline"

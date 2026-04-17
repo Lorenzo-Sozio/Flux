@@ -124,9 +124,9 @@ export default function TicketsListPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={view === "kanban" ? "h-full flex flex-col gap-6" : "space-y-6"}>
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between shrink-0">
         <Link
           href="/dashboard/support"
           className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
@@ -138,7 +138,7 @@ export default function TicketsListPage() {
       </div>
 
       {/* Title + View Toggle */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Support Tickets</h1>
           <p className="text-muted-foreground mt-1">
@@ -169,7 +169,7 @@ export default function TicketsListPage() {
       </div>
 
       {/* Status tabs */}
-      <div className="flex gap-1 border-b overflow-x-auto pb-0 scrollbar-none">
+      <div className="flex gap-1 border-b overflow-x-auto pb-0 scrollbar-none shrink-0">
         {STATUS_TABS.map((tab) => {
           const count = statusCounts[tab.value as keyof typeof statusCounts];
           const active = statusFilter === tab.value;
@@ -197,7 +197,7 @@ export default function TicketsListPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-2">
+      <div className="flex flex-col sm:flex-row gap-2 shrink-0">
         <Input
           placeholder="Search by ticket #, subject, or customer..."
           value={search}
@@ -231,6 +231,7 @@ export default function TicketsListPage() {
       </div>
 
       {/* Content */}
+      <div className={view === "kanban" ? "flex-1 min-h-0" : undefined}>
       {loading ? (
         <div className="space-y-2">
           {[1, 2, 3, 4, 5].map((i) => (
@@ -354,10 +355,11 @@ export default function TicketsListPage() {
           </CardContent>
         </Card>
       )}
+      </div>
 
       {/* Pagination info */}
-      {!loading && filteredTickets.length > 0 && (
-        <p className="text-center text-xs text-muted-foreground">
+      {!loading && view === "list" && filteredTickets.length > 0 && (
+        <p className="text-center text-xs text-muted-foreground shrink-0">
           Showing {filteredTickets.length} of {statusCounts.all} tickets
         </p>
       )}

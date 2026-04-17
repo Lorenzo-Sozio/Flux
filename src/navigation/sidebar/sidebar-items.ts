@@ -20,6 +20,7 @@ import {
   Package,
   Settings,
   Settings2,
+  ShieldCheck,
   ShoppingCart,
   Target,
   TrendingUp,
@@ -106,6 +107,11 @@ export const sidebarItems: NavGroup[] = [
     label: "Sales",
     items: [
       {
+        title: "Finance",
+        url: "/dashboard/finance",
+        icon: Banknote,
+      },
+      {
         title: "Quotes",
         url: "/dashboard/quotes",
         icon: FileText,
@@ -182,6 +188,11 @@ export const sidebarItems: NavGroup[] = [
         isNew: true,
       },
       {
+        title: "Roles",
+        url: "/dashboard/roles",
+        icon: ShieldCheck,
+      },
+      {
         title: "Reports",
         url: "/dashboard/reports",
         icon: BarChart3,
@@ -215,11 +226,6 @@ export const sidebarItems: NavGroup[] = [
     id: 6,
     label: "Dashboard Templates",
     items: [
-      {
-        title: "Finance",
-        url: "/dashboard/finance",
-        icon: Banknote,
-      },
       {
         title: "Analytics",
         url: "/dashboard/analytics",

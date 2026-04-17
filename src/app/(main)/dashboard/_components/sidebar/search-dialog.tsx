@@ -1,17 +1,23 @@
 "use client";
 
 import * as React from "react";
+
 import { useRouter } from "next/navigation";
+
 import { Command as CommandPrimitive } from "cmdk";
 import {
+  ArrowRight,
   Building2,
   Contact,
+  FileText,
+  Headphones,
   Kanban,
   Loader2,
   Search,
+  ShoppingCart,
   Users,
-  ArrowRight,
 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   CommandDialog,
@@ -35,6 +41,9 @@ type SearchResults = {
   leads: SearchResult[];
   companies: SearchResult[];
   deals: SearchResult[];
+  tickets: SearchResult[];
+  quotes: SearchResult[];
+  orders: SearchResult[];
 };
 
 const ENTITY_CONFIG: Record<
@@ -50,23 +59,38 @@ const ENTITY_CONFIG: Record<
   lead: {
     icon: <Users className="h-4 w-4" />,
     badge: "Lead",
-    badgeClass:
-      "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
+    badgeClass: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
     href: "/dashboard/leads",
   },
   company: {
     icon: <Building2 className="h-4 w-4" />,
     badge: "Company",
-    badgeClass:
-      "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+    badgeClass: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
     href: "/dashboard/companies",
   },
   deal: {
     icon: <Kanban className="h-4 w-4" />,
     badge: "Deal",
-    badgeClass:
-      "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
     href: "/dashboard/pipeline",
+  },
+  ticket: {
+    icon: <Headphones className="h-4 w-4" />,
+    badge: "Ticket",
+    badgeClass: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+    href: "/dashboard/support/tickets",
+  },
+  quote: {
+    icon: <FileText className="h-4 w-4" />,
+    badge: "Quote",
+    badgeClass: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+    href: "/dashboard/quotes",
+  },
+  order: {
+    icon: <ShoppingCart className="h-4 w-4" />,
+    badge: "Order",
+    badgeClass: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+    href: "/dashboard/orders",
   },
 };
 
@@ -75,6 +99,9 @@ const QUICK_LINKS: { label: string; entity: string }[] = [
   { label: "Leads", entity: "lead" },
   { label: "Companies", entity: "company" },
   { label: "Deals", entity: "deal" },
+  { label: "Tickets", entity: "ticket" },
+  { label: "Quotes", entity: "quote" },
+  { label: "Orders", entity: "order" },
 ];
 
 export function SearchDialog() {
@@ -97,7 +124,6 @@ export function SearchDialog() {
     return () => document.removeEventListener("keydown", down);
   }, []);
 
-  // Auto-focus input when dialog opens
   React.useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -143,13 +169,13 @@ export function SearchDialog() {
     { key: "leads", label: "Leads" },
     { key: "companies", label: "Companies" },
     { key: "deals", label: "Deals" },
+    { key: "tickets", label: "Tickets" },
+    { key: "quotes", label: "Quotes" },
+    { key: "orders", label: "Orders" },
   ];
 
   const hasResults = results && groups.some((g) => results[g.key]?.length > 0);
-
-  const totalCount = results
-    ? groups.reduce((acc, g) => acc + (results[g.key]?.length ?? 0), 0)
-    : 0;
+  const totalCount = results ? groups.reduce((acc, g) => acc + (results[g.key]?.length ?? 0), 0) : 0;
 
   return (
     <>
@@ -174,18 +200,14 @@ export function SearchDialog() {
         className="sm:max-w-[620px]"
       >
         <CommandPrimitive shouldFilter={false}>
-          {/* ── Search input ─────────────────────────────────── */}
+          {/* Search input */}
           <div className="flex items-center gap-3 border-b px-4 py-3.5">
             <div className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
-              {loading ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Search className="h-5 w-5" />
-              )}
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
             </div>
             <CommandPrimitive.Input
               ref={inputRef}
-              placeholder="Search contacts, leads, companies, deals…"
+              placeholder="Search contacts, leads, deals, tickets, quotes…"
               value={query}
               onValueChange={handleValueChange}
               className="h-8 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground/60"
@@ -204,7 +226,7 @@ export function SearchDialog() {
             )}
           </div>
 
-          {/* ── Results list ─────────────────────────────────── */}
+          {/* Results list */}
           <CommandList className="max-h-[420px] overflow-y-auto">
             {/* Idle state */}
             {!query && (
@@ -212,7 +234,7 @@ export function SearchDialog() {
                 <p className="mb-3 px-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
                   Quick access
                 </p>
-                <div className="grid grid-cols-2 gap-1.5">
+                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                   {QUICK_LINKS.map(({ label, entity }) => {
                     const cfg = ENTITY_CONFIG[entity];
                     return (
@@ -221,9 +243,7 @@ export function SearchDialog() {
                         onClick={() => handleSelect(cfg.href)}
                         className="flex items-center gap-2.5 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted hover:border-border"
                       >
-                        <span className="text-muted-foreground">
-                          {cfg.icon}
-                        </span>
+                        <span className="text-muted-foreground">{cfg.icon}</span>
                         <span className="font-medium">{label}</span>
                         <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground/40" />
                       </button>
@@ -235,9 +255,7 @@ export function SearchDialog() {
 
             {/* Typing but < 2 chars */}
             {query.length === 1 && (
-              <div className="py-8 text-center text-sm text-muted-foreground">
-                Keep typing to search…
-              </div>
+              <div className="py-8 text-center text-sm text-muted-foreground">Keep typing to search…</div>
             )}
 
             {/* No results */}
@@ -246,12 +264,10 @@ export function SearchDialog() {
                 <div className="py-8">
                   <p className="text-sm text-muted-foreground">
                     No results for{" "}
-                    <span className="font-medium text-foreground">
-                      &ldquo;{query}&rdquo;
-                    </span>
+                    <span className="font-medium text-foreground">&ldquo;{query}&rdquo;</span>
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground/60">
-                    Try a different name, email, or company.
+                    Try a different name, number, email, or subject.
                   </p>
                 </div>
               </CommandEmpty>
@@ -261,12 +277,8 @@ export function SearchDialog() {
             {hasResults && (
               <>
                 <div className="flex items-center justify-between px-4 pt-3 pb-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Results
-                  </p>
-                  <span className="text-xs text-muted-foreground">
-                    {totalCount} found
-                  </span>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Results</p>
+                  <span className="text-xs text-muted-foreground">{totalCount} found</span>
                 </div>
                 {groups.map((group, idx) => {
                   const items = results![group.key];
@@ -290,9 +302,7 @@ export function SearchDialog() {
                                 {cfg?.icon}
                               </span>
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium leading-tight">
-                                  {item.label}
-                                </p>
+                                <p className="truncate text-sm font-medium leading-tight">{item.label}</p>
                                 {item.sub && (
                                   <p className="truncate text-xs text-muted-foreground leading-tight mt-0.5">
                                     {item.sub}
@@ -315,31 +325,19 @@ export function SearchDialog() {
             )}
           </CommandList>
 
-          {/* ── Footer hint ──────────────────────────────────── */}
+          {/* Footer */}
           <div className="flex items-center gap-4 border-t bg-muted/30 px-4 py-2.5 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1">
-              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">
-                ↑↓
-              </kbd>{" "}
-              navigate
+              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">↑↓</kbd> navigate
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">
-                ↵
-              </kbd>{" "}
-              open
+              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">↵</kbd> open
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">
-                esc
-              </kbd>{" "}
-              close
+              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">esc</kbd> close
             </span>
             <span className="ml-auto flex items-center gap-1">
-              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">
-                ⌘J
-              </kbd>{" "}
-              toggle
+              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">⌘J</kbd> toggle
             </span>
           </div>
         </CommandPrimitive>

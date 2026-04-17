@@ -85,6 +85,13 @@
       "when": 1776029515154,
       "tag": "0011_bored_slipstream",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1776414260636,
+      "tag": "0012_elite_giant_girl",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,7 @@ import { decodeFilter } from "@/lib/filter-types";
 import type { FilterTree } from "@/lib/filter-types";
 import { customFieldDefinitions } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
+import { computeLeadScore } from "@/lib/lead-score";
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export async function getAllUsers() {
@@ -56,6 +57,7 @@ export async function createLead(data: any) {
     marketingConsent: data.marketingConsent ?? false,
     consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
     tags: Array.isArray(data.tags) ? data.tags : typeof data.tags === 'string' ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null,
+    leadScore: computeLeadScore(data),
   };
   const [newLead] = await db.insert(leads).values(payload).returning();
   revalidatePath("/dashboard/leads");
@@ -77,6 +79,7 @@ export async function updateLead(id: string, data: any) {
     marketingConsent: data.marketingConsent ?? false,
     consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
     tags: Array.isArray(data.tags) ? data.tags : typeof data.tags === 'string' ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null,
+    leadScore: computeLeadScore(data),
   };
   const [updatedLead] = await db.update(leads).set(payload).where(eq(leads.id, id)).returning();
   revalidatePath("/dashboard/leads");
@@ -163,6 +166,7 @@ export async function createContact(data: any) {
     marketingConsent: data.marketingConsent ?? false,
     consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
     tags: Array.isArray(data.tags) ? data.tags : typeof data.tags === 'string' ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null,
+    leadScore: computeLeadScore(data),
   };
   const [newContact] = await db.insert(contacts).values(payload).returning();
   revalidatePath("/dashboard/contacts");
@@ -184,6 +188,7 @@ export async function updateContact(id: string, data: any) {
     marketingConsent: data.marketingConsent ?? false,
     consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
     tags: Array.isArray(data.tags) ? data.tags : typeof data.tags === 'string' ? data.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : null,
+    leadScore: computeLeadScore(data),
   };
   const [updatedContact] = await db.update(contacts).set(payload).where(eq(contacts.id, id)).returning();
   revalidatePath("/dashboard/contacts");

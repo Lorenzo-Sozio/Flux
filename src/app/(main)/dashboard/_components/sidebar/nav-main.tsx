@@ -3,7 +3,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { ChevronRight, MailIcon, PlusCircleIcon } from "lucide-react";
+import {
+  Building2,
+  CheckSquare,
+  ChevronRight,
+  Contact,
+  FileText,
+  Headphones,
+  Kanban,
+  MessageSquare,
+  PlusCircleIcon,
+  ShoppingCart,
+  Users,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -11,6 +23,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -172,18 +186,56 @@ export function NavMain({ items }: NavMainProps) {
                     <span>Quick Create</span>
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-48 space-y-1" side="right" align="start">
+                <DropdownMenuContent className="w-52" side="right" align="start">
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">CRM</DropdownMenuLabel>
                   <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/leads?new=true">New Lead</Link>
+                    <Link prefetch={false} href="/dashboard/leads?new=true" className="flex items-center gap-2">
+                      <Users className="h-3.5 w-3.5" /> New Lead
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/contacts?new=true">New Contact</Link>
+                    <Link prefetch={false} href="/dashboard/contacts?new=true" className="flex items-center gap-2">
+                      <Contact className="h-3.5 w-3.5" /> New Contact
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/companies?new=true">New Company</Link>
+                    <Link prefetch={false} href="/dashboard/companies?new=true" className="flex items-center gap-2">
+                      <Building2 className="h-3.5 w-3.5" /> New Company
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/pipeline?new=true">New Deal</Link>
+                    <Link prefetch={false} href="/dashboard/pipeline?new=true" className="flex items-center gap-2">
+                      <Kanban className="h-3.5 w-3.5" /> New Deal
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">Sales</DropdownMenuLabel>
+                  <DropdownMenuItem asChild>
+                    <Link prefetch={false} href="/dashboard/quotes/new" className="flex items-center gap-2">
+                      <FileText className="h-3.5 w-3.5" /> New Quote
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link prefetch={false} href="/dashboard/orders?new=true" className="flex items-center gap-2">
+                      <ShoppingCart className="h-3.5 w-3.5" /> New Order
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">Work</DropdownMenuLabel>
+                  <DropdownMenuItem asChild>
+                    <Link prefetch={false} href="/dashboard/tasks?new=true" className="flex items-center gap-2">
+                      <CheckSquare className="h-3.5 w-3.5" /> New Task
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link prefetch={false} href="/dashboard/support/tickets?new=true" className="flex items-center gap-2">
+                      <Headphones className="h-3.5 w-3.5" /> New Ticket
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link prefetch={false} href="/dashboard/marketing/campaigns?new=true" className="flex items-center gap-2">
+                      <MessageSquare className="h-3.5 w-3.5" /> New Campaign
+                    </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

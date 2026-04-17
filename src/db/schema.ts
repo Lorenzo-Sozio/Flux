@@ -588,6 +588,7 @@ export const quotes = pgTable("quote", {
   declineReason: text("decline_reason"),
   version: integer("version").default(1).notNull(),
   notes: text("notes"),
+  publicToken: text("public_token").unique().$defaultFn(() => crypto.randomUUID()),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

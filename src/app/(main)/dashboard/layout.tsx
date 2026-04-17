@@ -39,6 +39,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
       <AppSidebar user={user} variant={variant} collapsible={collapsible} />
       <SidebarInset
         className={cn(
+          "overflow-hidden",
           "[html[data-content-layout=centered]_&]:mx-auto! [html[data-content-layout=centered]_&]:max-w-screen-2xl!",
           // Adds right margin for inset sidebar in centered layout up to 113rem.
           // On wider screens with collapsed sidebar, removes margin and sets margin auto for alignment.
@@ -74,7 +75,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
             </div>
           </div>
         </header>
-        <div className="h-full p-4 md:p-6">{children}</div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">{children}</div>
       </SidebarInset>
       {session?.user?.id && <ChatWidget userId={session.user.id} />}
     </SidebarProvider>

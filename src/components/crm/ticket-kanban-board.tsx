@@ -157,9 +157,8 @@ export function TicketKanbanBoard({
   if (!isMounted) return null;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-220px)]">
-      <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex-1 flex gap-3 overflow-x-auto pb-4">
+    <DragDropContext onDragEnd={onDragEnd}>
+      <div className="h-full flex gap-3 overflow-x-auto pb-4">
           {COLUMNS.map((col) => {
             const colTickets = tickets.filter((t) => t.status === col.id);
 
@@ -236,8 +235,7 @@ export function TicketKanbanBoard({
               </div>
             );
           })}
-        </div>
-      </DragDropContext>
-    </div>
+      </div>
+    </DragDropContext>
   );
 }
