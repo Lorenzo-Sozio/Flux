@@ -21,14 +21,16 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-4">
-      <Link
-        href="/dashboard/quotes"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        Back to Quotes
-      </Link>
+    <div className="flex flex-col gap-6 p-6">
+      <div>
+        <Link
+          href="/dashboard/quotes"
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Back to Quotes
+        </Link>
+      </div>
       <QuoteDetail quote={quote} autoOpenSend={send === "1"} />
     </div>
   );

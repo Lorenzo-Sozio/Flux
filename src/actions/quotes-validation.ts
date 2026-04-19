@@ -26,4 +26,8 @@ export const UpdateQuoteSchema = z.object({
   items: z.array(QuoteItemSchema).optional(),
   discountPercent: z.coerce.number().min(0).max(100).optional(),
   taxPercent: z.coerce.number().min(0).max(100).optional(),
+  dealId: z.string().optional(),
+  companyId: z.string().optional(),
+  contactId: z.string().optional(),
+  expiresAt: z.string().optional(),
 });

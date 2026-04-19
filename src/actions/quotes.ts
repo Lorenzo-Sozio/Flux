@@ -241,6 +241,12 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
 
     if (validated.status) updateData.status = validated.status;
     if (validated.notes !== undefined) updateData.notes = validated.notes;
+    if (validated.dealId) updateData.dealId = validated.dealId;
+    if (validated.companyId) updateData.companyId = validated.companyId;
+    if (validated.contactId !== undefined) updateData.contactId = validated.contactId || null;
+    if (validated.expiresAt !== undefined) {
+      updateData.expiresAt = validated.expiresAt ? new Date(validated.expiresAt) : null;
+    }
 
     // If items are being updated, recalculate totals
     if (validated.items && validated.items.length > 0) {
@@ -308,6 +314,7 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
     }
 
     revalidatePath("/dashboard/quotes");
+    revalidatePath(`/dashboard/quotes/${quoteId}`);
     return { success: true, quote: updated };
   } catch (error) {
     console.error("[updateQuoteAction]", error);

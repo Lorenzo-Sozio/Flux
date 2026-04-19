@@ -24,18 +24,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
 import { Separator } from "@/components/ui/separator";
 import { ChevronLeft, Plus, Trash2, Loader2, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { createQuoteAction, getQuoteFormData } from "@/actions/quotes";
 import { CreateQuoteSchema } from "@/actions/quotes-validation";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 type FormValues = z.infer<typeof CreateQuoteSchema>;
 
@@ -74,7 +69,6 @@ export default function NewQuotePage() {
 
   const selectedDealId = form.watch("dealId");
 
-  // Auto-fill companyId when a deal is selected
   function handleDealChange(dealId: string) {
     form.setValue("dealId", dealId);
     const deal = formData?.deals.find((d) => d.id === dealId);
@@ -96,7 +90,6 @@ export default function NewQuotePage() {
     }
   }
 
-  // Live subtotal preview
   const items = form.watch("items");
   const discountPct = form.watch("discountPercent") ?? 0;
   const taxPct = form.watch("taxPercent") ?? 0;
@@ -107,17 +100,13 @@ export default function NewQuotePage() {
       const price = Number(item.unitPrice) || 0;
       const disc = Number(item.discountPercent) || 0;
       const tax = Number(item.taxPercent) || 0;
-      const lineSubtotal = qty * price;
-      const afterDisc = lineSubtotal * (1 - disc / 100);
+      const afterDisc = qty * price * (1 - disc / 100);
       return sum + afterDisc * (1 + tax / 100);
     }, 0);
-
     const discountAmount = subtotal * (Number(discountPct) / 100);
     const afterDiscount = subtotal - discountAmount;
     const taxAmount = afterDiscount * (Number(taxPct) / 100);
-    const total = afterDiscount + taxAmount;
-
-    return { subtotal, discountAmount, taxAmount, total };
+    return { subtotal, discountAmount, taxAmount, total: afterDiscount + taxAmount };
   }, [items, discountPct, taxPct]);
 
   async function onSubmit(data: FormValues) {
@@ -134,7 +123,7 @@ export default function NewQuotePage() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-5">
+    <div className="flex flex-col gap-6 p-6">
       {/* Header */}
       <div>
         <Link
@@ -156,402 +145,400 @@ export default function NewQuotePage() {
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
 
-          {/* Deal + Customer */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Deal & Customer
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="dealId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Deal <span className="text-destructive">*</span></FormLabel>
-                    <Select
-                      disabled={isFormDataLoading}
-                      onValueChange={(val) => {
-                        field.onChange(val);
-                        handleDealChange(val);
-                      }}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder={isFormDataLoading ? "Loading…" : "Select a deal"} />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {formData?.deals.map((deal) => (
-                          <SelectItem key={deal.id} value={deal.id}>
-                            {deal.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Left column: Deal, Adjustments, Notes */}
+            <div className="w-full lg:w-1/3 flex flex-col gap-6">
 
-              <FormField
-                control={form.control}
-                name="companyId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company <span className="text-destructive">*</span></FormLabel>
-                    <Select
-                      disabled={isFormDataLoading}
-                      onValueChange={field.onChange}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a company" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {formData?.companies.map((company) => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Line Items */}
-          <Card className="border-0 shadow-sm">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
-              <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Line Items
-              </CardTitle>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!selectedDealId}
-                onClick={() =>
-                  append({ productId: "", description: "", quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 0 })
-                }
-              >
-                <Plus className="mr-2 h-3.5 w-3.5" />
-                Add Item
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {fields.map((field, index) => (
-                <div key={field.id} className="rounded-lg border bg-muted/20 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground">Item {index + 1}</span>
-                    {fields.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => remove(index)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.productId`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Product</FormLabel>
-                          <Select
-                            onValueChange={(val) => {
-                              field.onChange(val === "_custom" ? "" : val);
-                              handleProductSelect(index, val);
-                            }}
-                            value={field.value || "_custom"}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="h-8 text-sm">
-                                <SelectValue placeholder="Select product" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="_custom">Custom item</SelectItem>
-                              {formData?.products.map((p) => (
-                                <SelectItem key={p.id} value={p.id}>
-                                  {p.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.quantity`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Qty</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              min="1"
-                              step="1"
-                              className="h-8 text-sm"
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
+              {/* Deal + Customer */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Deal & Customer
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <FormField
                     control={form.control}
-                    name={`items.${index}.description`}
+                    name="dealId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Description</FormLabel>
+                        <FormLabel>Deal <span className="text-destructive">*</span></FormLabel>
                         <FormControl>
-                          <Input className="h-8 text-sm" placeholder="Describe the item" {...field} />
+                          <SearchableSelect
+                            disabled={isFormDataLoading}
+                            options={(formData?.deals ?? []).map((d) => ({
+                              value: d.id,
+                              label: d.name,
+                            }))}
+                            value={field.value}
+                            onChange={(val) => {
+                              field.onChange(val);
+                              handleDealChange(val);
+                            }}
+                            placeholder={isFormDataLoading ? "Loading…" : "Search deal…"}
+                            searchPlaceholder="Type to search deals…"
+                            emptyText="No deals found."
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
 
-                  <div className="grid grid-cols-3 gap-3">
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.unitPrice`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Unit Price</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00"
-                              className="h-8 text-sm"
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.discountPercent`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Discount %</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              max="100"
-                              placeholder="0"
-                              className="h-8 text-sm"
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`items.${index}.taxPercent`}
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs">Tax %</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              step="0.1"
-                              min="0"
-                              max="100"
-                              placeholder="0"
-                              className="h-8 text-sm"
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+                  <FormField
+                    control={form.control}
+                    name="companyId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Company <span className="text-destructive">*</span></FormLabel>
+                        <FormControl>
+                          <SearchableSelect
+                            disabled={isFormDataLoading}
+                            options={(formData?.companies ?? []).map((c) => ({
+                              value: c.id,
+                              label: c.name,
+                            }))}
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Search company…"
+                            searchPlaceholder="Type to search companies…"
+                            emptyText="No companies found."
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
 
-          {/* Adjustments + Preview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {/* Quote adjustments */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Adjustments
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="discountPercent"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Quote Discount %</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          max="100"
-                          placeholder="0"
-                          className="h-8 text-sm"
-                          {...field}
-                          onChange={(e) => field.onChange(e.target.valueAsNumber)}
+              {/* Adjustments */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Adjustments
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="discountPercent"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Quote Discount %</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            placeholder="0"
+                            className="h-8 text-sm"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="taxPercent"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Quote Tax %</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            placeholder="0"
+                            className="h-8 text-sm"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="expiresAt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">Expires On</FormLabel>
+                        <FormControl>
+                          <Input type="date" className="h-8 text-sm" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Notes */}
+              <Card>
+                <CardContent className="pt-5">
+                  <FormField
+                    control={form.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Notes (optional)</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Add any notes or terms for the customer…"
+                            className="text-sm resize-none"
+                            rows={4}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right column: Line Items + Total Preview + Submit */}
+            <div className="w-full lg:w-2/3 flex flex-col gap-6">
+
+              {/* Line Items */}
+              <Card>
+                <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Line Items
+                  </CardTitle>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!selectedDealId}
+                    onClick={() =>
+                      append({ productId: "", description: "", quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 0 })
+                    }
+                  >
+                    <Plus className="mr-2 h-3.5 w-3.5" />
+                    Add Item
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {fields.map((field, index) => (
+                    <div key={field.id} className="rounded-lg border bg-muted/20 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-muted-foreground">Item {index + 1}</span>
+                        {fields.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => remove(index)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.productId`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Product</FormLabel>
+                              <FormControl>
+                                <SearchableSelect
+                                  options={[
+                                    { value: "_custom", label: "Custom item" },
+                                    ...(formData?.products ?? []).map((p) => ({
+                                      value: p.id,
+                                      label: p.name,
+                                    })),
+                                  ]}
+                                  value={field.value || "_custom"}
+                                  onChange={(val) => {
+                                    field.onChange(val === "_custom" ? "" : val);
+                                    handleProductSelect(index, val);
+                                  }}
+                                  placeholder="Select product"
+                                  searchPlaceholder="Search products…"
+                                  emptyText="No products found."
+                                  className="h-8 text-sm"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="taxPercent"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Quote Tax %</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          step="0.1"
-                          min="0"
-                          max="100"
-                          placeholder="0"
-                          className="h-8 text-sm"
-                          {...field}
-                          onChange={(e) => field.onChange(e.target.valueAsNumber)}
+
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.quantity`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Qty</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min="1"
+                                  step="1"
+                                  className="h-8 text-sm"
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="expiresAt"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-xs">Expires On</FormLabel>
-                      <FormControl>
-                        <Input type="date" className="h-8 text-sm" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </CardContent>
-            </Card>
+                      </div>
 
-            {/* Live total preview */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Total Preview
-                </CardTitle>
-                <CardDescription className="text-xs">Updates as you type</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span className="tabular-nums font-medium">
-                    ${totals.subtotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-                {totals.discountAmount > 0 && (
-                  <div className="flex justify-between text-sm text-amber-600">
-                    <span>Discount ({discountPct}%)</span>
-                    <span className="tabular-nums">
-                      −${totals.discountAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-                {totals.taxAmount > 0 && (
-                  <div className="flex justify-between text-sm text-slate-600">
-                    <span>Tax ({taxPct}%)</span>
-                    <span className="tabular-nums">
-                      +${totals.taxAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                )}
-                <Separator />
-                <div className="flex justify-between">
-                  <span className="font-semibold">Total</span>
-                  <span className="text-lg font-bold tabular-nums">
-                    ${totals.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Notes */}
-          <Card className="border-0 shadow-sm">
-            <CardContent className="pt-5">
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Notes (optional)</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Add any notes or terms for the customer…"
-                        className="text-sm resize-none"
-                        rows={3}
-                        {...field}
+                      <FormField
+                        control={form.control}
+                        name={`items.${index}.description`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs">Description</FormLabel>
+                            <FormControl>
+                              <Input className="h-8 text-sm" placeholder="Describe the item" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
 
-          {/* Submit */}
-          <div className="flex gap-3 justify-end">
-            <Button type="button" variant="outline" onClick={() => router.back()}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Create Quote
-            </Button>
+                      <div className="grid grid-cols-3 gap-3">
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.unitPrice`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Unit Price</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  placeholder="0.00"
+                                  className="h-8 text-sm"
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.discountPercent`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Discount %</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max="100"
+                                  placeholder="0"
+                                  className="h-8 text-sm"
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name={`items.${index}.taxPercent`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs">Tax %</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max="100"
+                                  placeholder="0"
+                                  className="h-8 text-sm"
+                                  {...field}
+                                  onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Total Preview */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                    Total Preview
+                  </CardTitle>
+                  <CardDescription className="text-xs">Updates as you type</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="tabular-nums font-medium">
+                      ${totals.subtotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  {totals.discountAmount > 0 && (
+                    <div className="flex justify-between text-sm text-amber-600">
+                      <span>Discount ({discountPct}%)</span>
+                      <span className="tabular-nums">
+                        −${totals.discountAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                  {totals.taxAmount > 0 && (
+                    <div className="flex justify-between text-sm text-slate-600">
+                      <span>Tax ({taxPct}%)</span>
+                      <span className="tabular-nums">
+                        +${totals.taxAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  )}
+                  <Separator />
+                  <div className="flex justify-between">
+                    <span className="font-semibold">Total</span>
+                    <span className="text-lg font-bold tabular-nums">
+                      ${totals.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Submit */}
+              <div className="flex gap-3 justify-end">
+                <Button type="button" variant="outline" onClick={() => router.back()}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Create Quote
+                </Button>
+              </div>
+            </div>
           </div>
         </form>
       </Form>

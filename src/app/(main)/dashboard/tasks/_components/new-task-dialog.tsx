@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { createTask } from "@/actions/tasks";
 
 const schema = z.object({
@@ -49,7 +50,7 @@ export function NewTaskDialog({ users, currentUserId, onCreated }: Props) {
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { title: "", description: "", priority: "normal", dueDate: "", assigneeId: "" },
+    defaultValues: { title: "", description: "", priority: "normal", dueDate: "", assigneeId: "_none" },
   });
 
   const onSubmit = (data: FormValues) => {
@@ -61,7 +62,7 @@ export function NewTaskDialog({ users, currentUserId, onCreated }: Props) {
           priority: data.priority,
           dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
           ownerId: currentUserId,
-          assigneeId: data.assigneeId || undefined,
+          assigneeId: data.assigneeId && data.assigneeId !== "_none" ? data.assigneeId : undefined,
         });
         toast.success("Task created.");
         setOpen(false);
@@ -126,17 +127,17 @@ export function NewTaskDialog({ users, currentUserId, onCreated }: Props) {
                   control={form.control}
                   name="assigneeId"
                   render={({ field }) => (
-                    <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="—" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Unassigned</SelectItem>
-                        {users.map((u) => (
-                          <SelectItem key={u.id} value={u.id}>{u.name ?? u.id}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      options={[
+                        { value: "_none", label: "Unassigned" },
+                        ...users.map((u) => ({ value: u.id, label: u.name ?? u.id })),
+                      ]}
+                      value={field.value ?? "_none"}
+                      onChange={field.onChange}
+                      placeholder="Unassigned"
+                      searchPlaceholder="Search users…"
+                      emptyText="No users found."
+                    />
                   )}
                 />
               </div>
