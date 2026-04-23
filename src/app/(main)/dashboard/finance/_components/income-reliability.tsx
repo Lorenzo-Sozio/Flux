@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,8 @@ interface Props {
   pipelineByStage: { name: string; color: string; value: number; count: number }[];
 }
 
-export function IncomeReliability({ pipelineByStage }: Props) {
+export async function IncomeReliability({ pipelineByStage }: Props) {
+  const t = await getTranslations("finance");
   const totalValue = pipelineByStage.reduce((sum, s) => sum + s.value, 0);
   const totalCount = pipelineByStage.reduce((sum, s) => sum + s.count, 0);
 
@@ -16,23 +18,21 @@ export function IncomeReliability({ pipelineByStage }: Props) {
     <Card className="h-full">
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
         <div>
-          <CardTitle className="text-base">Pipeline Health</CardTitle>
-          <CardDescription className="text-xs mt-0.5">Open deals by stage</CardDescription>
+          <CardTitle className="text-base">{t("pipelineHealth")}</CardTitle>
+          <CardDescription className="text-xs mt-0.5">{t("openDealsByStage")}</CardDescription>
         </div>
         <Button variant="ghost" size="sm" className="h-7 text-xs px-2" asChild>
-          <Link href="/dashboard/pipeline">View →</Link>
+          <Link href="/dashboard/pipeline">{t("viewArrow")}</Link>
         </Button>
       </CardHeader>
       <CardContent className="pt-0 space-y-4">
-        {/* Summary */}
         <div className="rounded-lg bg-muted/50 p-3 space-y-0.5">
           <p className="text-2xl font-bold tabular-nums">{formatCurrency(totalValue, { noDecimals: true })}</p>
-          <p className="text-xs text-muted-foreground">{totalCount} open deal{totalCount !== 1 ? "s" : ""} in pipeline</p>
+          <p className="text-xs text-muted-foreground">{t("openDealsInPipeline", { count: totalCount })}</p>
         </div>
 
-        {/* Stages */}
         {pipelineByStage.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-6">No open deals in pipeline.</p>
+          <p className="text-sm text-muted-foreground text-center py-6">{t("noOpenDeals")}</p>
         ) : (
           <div className="space-y-3">
             {pipelineByStage.map((stage) => {

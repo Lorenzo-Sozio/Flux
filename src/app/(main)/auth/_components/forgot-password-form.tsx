@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { useTranslations } from "next-intl";
 
 import { forgotPasswordAction } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -16,6 +17,7 @@ const formSchema = z.object({
 });
 
 export function ForgotPasswordForm() {
+  const t = useTranslations("auth.forgotPassword");
   const [sent, setSent] = useState(false);
   const [isPending, setIsPending] = useState(false);
 
@@ -30,7 +32,7 @@ export function ForgotPasswordForm() {
       await forgotPasswordAction(data.email);
       setSent(true);
     } catch {
-      toast.error("Something went wrong. Please try again.");
+      toast.error(t("error"));
     } finally {
       setIsPending(false);
     }
@@ -39,10 +41,8 @@ export function ForgotPasswordForm() {
   if (sent) {
     return (
       <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-center dark:border-green-800 dark:bg-green-950">
-        <p className="font-medium text-green-800 dark:text-green-200">Check your inbox</p>
-        <p className="mt-1 text-sm text-green-600 dark:text-green-400">
-          If an account exists for that email, we sent a password reset link. Check your spam folder too.
-        </p>
+        <p className="font-medium text-green-800 dark:text-green-200">{t("checkInbox")}</p>
+        <p className="mt-1 text-sm text-green-600 dark:text-green-400">{t("checkInboxDesc")}</p>
       </div>
     );
   }
@@ -55,12 +55,12 @@ export function ForgotPasswordForm() {
           name="email"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="forgot-email">Email Address</FieldLabel>
+              <FieldLabel htmlFor="forgot-email">{t("emailAddress")}</FieldLabel>
               <Input
                 {...field}
                 id="forgot-email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder={t("emailPlaceholder")}
                 autoComplete="email"
                 aria-invalid={fieldState.invalid}
               />
@@ -70,7 +70,7 @@ export function ForgotPasswordForm() {
         />
       </FieldGroup>
       <Button className="w-full" type="submit" disabled={isPending}>
-        {isPending ? "Sending…" : "Send Reset Link"}
+        {isPending ? t("sending") : t("sendResetLink")}
       </Button>
     </form>
   );

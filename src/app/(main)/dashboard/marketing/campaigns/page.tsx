@@ -1,9 +1,11 @@
 import { getCampaignsWithStats, getEmailTemplates } from "@/actions/marketing";
+import { getTranslations } from "next-intl/server";
 import { TargetIcon } from "lucide-react";
 import { CampaignsClient } from "./_components/campaigns-client";
 import { NewCampaignButton } from "./_components/new-campaign-button";
 
 export default async function CampaignsPage() {
+  const t = await getTranslations("marketing.campaigns");
   const [campaigns, templates] = await Promise.all([
     getCampaignsWithStats(),
     getEmailTemplates(),
@@ -15,10 +17,10 @@ export default async function CampaignsPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <TargetIcon className="w-6 h-6 text-primary" />
-            Marketing Campaigns
+            {t("title")}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Create, launch, and track your outbound email campaigns.
+            {t("subtitle")}
           </p>
         </div>
         <NewCampaignButton templates={templates} />

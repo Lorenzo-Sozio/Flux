@@ -18,6 +18,7 @@ import { getPreference } from "@/server/server-actions";
 import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
+import { LocaleSwitcher } from "@/components/ui/locale-switcher";
 import { RecentlyVisited } from "@/components/crm/recently-visited";
 import { ChatWidget } from "@/components/chat/chat-widget";
 
@@ -70,6 +71,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
                   userId={session.user.id}
                 />
               )}
+              <LocaleSwitcher />
               <LayoutControls />
               <ThemeSwitcher />
             </div>

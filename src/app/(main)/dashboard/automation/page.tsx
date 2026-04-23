@@ -18,7 +18,7 @@ export default async function AutomationPage() {
   ])
 
   return (
-    <div className="container mx-auto py-6 px-4 max-w-7xl space-y-8">
+    <div className="p-6 space-y-6">
       <AutomationOverview rules={rules} logs={logs} />
       <AutomationClient rules={rules} canEdit={canEdit} />
       <AutomationLogs logs={logs} rules={rules} limit={20} />

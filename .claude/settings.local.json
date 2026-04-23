@@ -22,7 +22,32 @@
       "Bash(echo \"exit: $?\")",
       "Bash(xargs grep:*)",
       "Bash(npm run *)",
-      "Bash(npx biome *)"
+      "Bash(npx biome *)",
+      "Bash(sed -n '130,133p' \"src/app/\\(main\\)/dashboard/tasks/_components/tasks-client.tsx\")",
+      "Bash(sed -n '136,139p' \"src/app/\\(main\\)/dashboard/products/_components/products-client.tsx\")",
+      "Bash(sed -n '161,165p' \"src/app/\\(main\\)/dashboard/orders/_components/orders-client.tsx\")",
+      "Bash(sed -n '202,206p' \"src/app/\\(main\\)/dashboard/roles/_components/roles-client.tsx\")",
+      "Bash(sed -n '315,320p' \"src/app/\\(main\\)/dashboard/tasks/_components/tasks-client.tsx\")",
+      "Bash(sed -n '203,207p' \"src/app/\\(main\\)/dashboard/users/_components/users-client.tsx\")",
+      "Bash(grep -v \"space-y-[0-9]$\\\\|space-y-1\\\\|space-y-2\\\\|space-y-3\\\\|space-y-4\")",
+      "Bash(sed -n '55,58p' \"src/app/\\(main\\)/dashboard/crm/page.tsx\")",
+      "Bash(sed -n '142,150p' \"src/app/\\(main\\)/dashboard/support/tickets/[id]/page.tsx\")",
+      "Bash(sed -n '41,46p' \"src/app/\\(main\\)/dashboard/marketing/templates/editor/page.tsx\")",
+      "Bash(grep -n \"^  return \\(\\\\|^  return$\" \"src/app/\\(main\\)/dashboard/support/tickets/[id]/page.tsx\")",
+      "Bash(awk '/^  return \\\\\\($/{found=1; line=NR} found && NR==line+1{print NR\": \"$0; found=0}' \"src/app/\\(main\\)/dashboard/support/tickets/[id]/page.tsx\")",
+      "Bash(sed -i 's/className=\"space-y-5\">/className=\"p-6 space-y-6\">/' 'src/app/\\(main\\)/dashboard/tasks/_components/tasks-client.tsx')",
+      "Bash(sed -i 's/className=\"space-y-5\">/className=\"p-6 space-y-6\">/' 'src/app/\\(main\\)/dashboard/orders/_components/orders-client.tsx')",
+      "Bash(sed -i 's/className=\"container mx-auto py-6 px-4 max-w-7xl space-y-8\"/className=\"p-6 space-y-6\"/' 'src/app/\\(main\\)/dashboard/automation/page.tsx')",
+      "Bash(sed -i 's/className=\"p-6 max-w-5xl mx-auto space-y-6\"/className=\"p-6 space-y-6\"/' 'src/app/\\(main\\)/dashboard/marketing/campaigns/[id]/page.tsx')",
+      "Bash(sed -i 's/className=\"flex flex-col gap-4 md:gap-6\"/className=\"p-6 flex flex-col gap-6\"/' 'src/app/\\(main\\)/dashboard/analytics/page.tsx')",
+      "Bash(sed -i 's/className=\"p-8 space-y-8 w-full\"/className=\"p-6 space-y-6\"/' 'src/app/\\(main\\)/dashboard/roles/_components/roles-client.tsx')",
+      "Bash(sed -n '247,252p' \"src/app/\\(main\\)/dashboard/orders/[id]/page.tsx\")",
+      "Bash(sed -n '353,360p' \"src/app/\\(main\\)/dashboard/support/tickets/[id]/page.tsx\")",
+      "Bash(sed -i '249s/className=\"space-y-5\"/className=\"p-6 space-y-5\"/' 'src/app/\\(main\\)/dashboard/orders/[id]/page.tsx')",
+      "Bash(sed -i '355s/className=\"space-y-5\"/className=\"p-6 space-y-5\"/' 'src/app/\\(main\\)/dashboard/support/tickets/[id]/page.tsx')",
+      "Bash(xargs ls *)",
+      "Bash(node -e \"const p = require\\('./node_modules/next-intl/package.json'\\); console.log\\(p.version\\)\")",
+      "Bash(node -e \"const fs = require\\('fs'\\); const exports = require\\('./node_modules/next-intl/package.json'\\).exports; console.log\\(JSON.stringify\\(Object.keys\\(exports\\).slice\\(0, 20\\), null, 2\\)\\)\")"
     ]
   }
 }

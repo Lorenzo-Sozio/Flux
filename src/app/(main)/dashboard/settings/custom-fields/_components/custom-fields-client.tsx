@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, GripVertical, Settings2 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { Plus, Trash2, Settings2 } from "lucide-react";
 import {
   createCustomFieldDefinition,
   deleteCustomFieldDefinition,
@@ -51,15 +52,7 @@ type Field = {
 };
 
 const ENTITY_TYPES: EntityType[] = ["contact", "lead", "company", "deal"];
-const FIELD_TYPES: { value: FieldType; label: string }[] = [
-  { value: "text", label: "Text" },
-  { value: "number", label: "Number" },
-  { value: "date", label: "Date" },
-  { value: "select", label: "Dropdown (single)" },
-  { value: "multiselect", label: "Dropdown (multi)" },
-  { value: "boolean", label: "Checkbox" },
-  { value: "url", label: "URL" },
-];
+const FIELD_TYPE_VALUES: FieldType[] = ["text", "number", "date", "select", "multiselect", "boolean", "url"];
 
 interface Props {
   fields: Field[];
@@ -67,6 +60,8 @@ interface Props {
 }
 
 export function CustomFieldsClient({ fields: initialFields, currentUserId }: Props) {
+  const t = useTranslations("settings.customFields");
+  const tc = useTranslations("common");
   const [fields, setFields] = useState(initialFields);
   const [addOpen, setAddOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
@@ -105,24 +100,24 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
       });
 
       setFields((prev) => [...prev, field as Field]);
-      toast.success("Custom field created.");
+      toast.success(t("createSuccess"));
       setAddOpen(false);
       setForm({ name: "", entityType: "contact", fieldType: "text", options: "", isRequired: false });
     } catch {
-      toast.error("Failed to create field.");
+      toast.error(t("createFailed"));
     } finally {
       setIsPending(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this field? All stored values will be permanently removed.")) return;
+    if (!confirm(t("deleteConfirm"))) return;
     try {
       await deleteCustomFieldDefinition(id);
       setFields((prev) => prev.filter((f) => f.id !== id));
-      toast.success("Field deleted.");
+      toast.success(t("deleteSuccess"));
     } catch {
-      toast.error("Failed to delete field.");
+      toast.error(t("deleteFailed"));
     }
   };
 
@@ -132,42 +127,42 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
   }, {} as Record<string, Field[]>);
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Custom Fields</h1>
-          <p className="text-muted-foreground">
-            Extend standard entities with additional data fields.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button onClick={() => setAddOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Field
+          {t("addField")}
         </Button>
       </div>
 
       {ENTITY_TYPES.map((et) => (
         <Card key={et}>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 capitalize">
+            <CardTitle className="flex items-center gap-2">
               <Settings2 className="h-4 w-4" />
-              {et} Fields
+              {t("entityTitle", { entity: t(`entityTypes.${et as "contact" | "lead" | "company" | "deal"}`) })}
             </CardTitle>
-            <CardDescription>{groupedByEntity[et]?.length ?? 0} custom fields</CardDescription>
+            <CardDescription>
+              {t("fieldCount", { count: groupedByEntity[et]?.length ?? 0 })}
+            </CardDescription>
           </CardHeader>
           <CardContent>
             {groupedByEntity[et]?.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No custom fields for {et}s yet.
+                {t("noFieldsForEntity", { entity: t(`entityTypes.${et as "contact" | "lead" | "company" | "deal"}`) })}
               </p>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Slug</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Required</TableHead>
+                    <TableHead>{t("columns.name")}</TableHead>
+                    <TableHead>{t("columns.slug")}</TableHead>
+                    <TableHead>{t("columns.type")}</TableHead>
+                    <TableHead>{t("required")}</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
@@ -185,9 +180,9 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
                       </TableCell>
                       <TableCell>
                         {field.isRequired ? (
-                          <Badge variant="destructive" className="text-[10px]">Required</Badge>
+                          <Badge variant="destructive" className="text-[10px]">{t("requiredBadge")}</Badge>
                         ) : (
-                          <span className="text-muted-foreground text-xs">Optional</span>
+                          <span className="text-muted-foreground text-xs">{t("optionalLabel")}</span>
                         )}
                       </TableCell>
                       <TableCell>
@@ -209,18 +204,15 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
         </Card>
       ))}
 
-      {/* Add Field Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add Custom Field</DialogTitle>
-            <DialogDescription>
-              Create a new field that will appear on all records of the selected type.
-            </DialogDescription>
+            <DialogTitle>{t("dialog.title")}</DialogTitle>
+            <DialogDescription>{t("dialog.description")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>Field Name</Label>
+              <Label>{t("dialog.fieldNameLabel")}</Label>
               <Input
                 placeholder="e.g. LinkedIn URL"
                 value={form.name}
@@ -229,7 +221,7 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Entity Type</Label>
+                <Label>{t("entityType")}</Label>
                 <Select
                   value={form.entityType}
                   onValueChange={(v) => setForm((f) => ({ ...f, entityType: v as EntityType }))}
@@ -239,15 +231,15 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
                   </SelectTrigger>
                   <SelectContent>
                     {ENTITY_TYPES.map((et) => (
-                      <SelectItem key={et} value={et} className="capitalize">
-                        {et}
+                      <SelectItem key={et} value={et}>
+                        {t(`entityTypes.${et as "contact" | "lead" | "company" | "deal"}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Field Type</Label>
+                <Label>{t("fieldType")}</Label>
                 <Select
                   value={form.fieldType}
                   onValueChange={(v) => setForm((f) => ({ ...f, fieldType: v as FieldType }))}
@@ -256,9 +248,9 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {FIELD_TYPES.map((ft) => (
-                      <SelectItem key={ft.value} value={ft.value}>
-                        {ft.label}
+                    {FIELD_TYPE_VALUES.map((ft) => (
+                      <SelectItem key={ft} value={ft}>
+                        {t(`fieldTypes.${ft as "text" | "number" | "date" | "select" | "multiselect" | "boolean" | "url"}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -267,7 +259,7 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
             </div>
             {["select", "multiselect"].includes(form.fieldType) && (
               <div className="space-y-1.5">
-                <Label>Options (comma-separated)</Label>
+                <Label>{t("dialog.optionsLabel")}</Label>
                 <Input
                   placeholder="Option A, Option B, Option C"
                   value={form.options}
@@ -277,7 +269,7 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
             )}
             <div className="flex items-center justify-between rounded-lg border p-3">
               <Label htmlFor="field-required" className="cursor-pointer">
-                Required field
+                {t("dialog.requiredField")}
               </Label>
               <Switch
                 id="field-required"
@@ -287,9 +279,9 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>{tc("cancel")}</Button>
             <Button onClick={handleAdd} disabled={isPending || !form.name}>
-              {isPending ? "Creating…" : "Create Field"}
+              {isPending ? t("dialog.creating") : t("dialog.createField")}
             </Button>
           </DialogFooter>
         </DialogContent>

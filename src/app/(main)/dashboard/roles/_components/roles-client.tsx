@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { Shield, Crown, Pencil, Eye } from "lucide-react";
 
@@ -30,76 +31,45 @@ interface Props {
   currentUserRole: string;
 }
 
-const ROLES = [
+type RoleId = "owner" | "admin" | "user" | "viewer";
+
+const ROLES: { id: RoleId; icon: React.ElementType; color: string }[] = [
   {
     id: "owner",
-    label: "Owner",
     icon: Crown,
     color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-    description: "Full control over the workspace. Can manage all settings, users, and data.",
-    permissions: [
-      "All admin permissions",
-      "Transfer workspace ownership",
-      "Delete workspace",
-      "Manage billing",
-    ],
   },
   {
     id: "admin",
-    label: "Admin",
     icon: Shield,
     color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-    description: "Can manage users, roles, settings, and all CRM data.",
-    permissions: [
-      "All user permissions",
-      "Invite and manage users",
-      "Assign roles",
-      "Configure settings & custom fields",
-      "Manage webhooks and automation",
-    ],
   },
   {
     id: "user",
-    label: "User",
     icon: Pencil,
     color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-    description: "Can create, edit and delete CRM records. Cannot manage users or settings.",
-    permissions: [
-      "All viewer permissions",
-      "Create and edit records",
-      "Delete records",
-      "Send emails and quotes",
-      "Manage tasks and pipeline",
-    ],
   },
   {
     id: "viewer",
-    label: "Viewer",
     icon: Eye,
     color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-    description: "Read-only access. Cannot create, edit or delete any records.",
-    permissions: [
-      "View contacts, companies, leads",
-      "View pipeline and deals",
-      "View quotes and orders",
-      "View reports and analytics",
-    ],
   },
 ];
 
-const ASSIGNABLE_ROLES = ["admin", "user", "viewer"];
+const ASSIGNABLE_ROLES: RoleId[] = ["admin", "user", "viewer"];
 
 function getRoleConfig(roleId: string) {
   return ROLES.find((r) => r.id === roleId) ?? ROLES[3];
 }
 
 function RoleBadge({ role }: { role: string }) {
+  const t = useTranslations("roles");
   const cfg = getRoleConfig(role);
   const Icon = cfg.icon;
   return (
     <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${cfg.color}`}>
       <Icon className="h-3 w-3" />
-      {cfg.label}
+      {t(`roleLabel.${role as RoleId}`)}
     </span>
   );
 }
@@ -153,7 +123,7 @@ function UserCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {(currentUserRole === "owner" ? ["owner", ...ASSIGNABLE_ROLES] : ASSIGNABLE_ROLES).map((r) => (
+              {(currentUserRole === "owner" ? (["owner", ...ASSIGNABLE_ROLES] as RoleId[]) : ASSIGNABLE_ROLES).map((r) => (
                 <DropdownMenuItem
                   key={r}
                   onSelect={() => onRoleChange(user.id, r)}
@@ -173,6 +143,7 @@ function UserCard({
 }
 
 export function RolesClient({ users: initialUsers, currentUserId, currentUserRole }: Props) {
+  const t = useTranslations("roles");
   const [users, setUsers] = useState(initialUsers);
   const [, startTransition] = useTransition();
   const [pending, setPending] = useState(false);
@@ -185,9 +156,9 @@ export function RolesClient({ users: initialUsers, currentUserId, currentUserRol
         setUsers((prev) =>
           prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
         );
-        toast.success("Role updated");
+        toast.success(t("roleUpdated"));
       } catch {
-        toast.error("Failed to update role");
+        toast.error(t("roleUpdateFailed"));
       } finally {
         setPending(false);
       }
@@ -200,34 +171,33 @@ export function RolesClient({ users: initialUsers, currentUserId, currentUserRol
   }));
 
   return (
-    <div className="p-8 space-y-8 w-full">
+    <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Roles & Permissions</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage user roles and understand what each role can do.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>
+        <p className="text-muted-foreground mt-1">{t("subtitle")}</p>
       </div>
 
       {/* Permission Matrix */}
       <section>
-        <h2 className="text-lg font-semibold mb-4">Permission Overview</h2>
+        <h2 className="text-lg font-semibold mb-4">{t("permissionOverview")}</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {ROLES.map((role) => {
             const Icon = role.icon;
+            const perms = t.raw(`rolePerms.${role.id}`) as string[];
             return (
               <Card key={role.id} className="border">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
                     <span className={`inline-flex items-center gap-1.5 text-sm font-semibold px-2.5 py-1 rounded-full ${role.color}`}>
                       <Icon className="h-3.5 w-3.5" />
-                      {role.label}
+                      {t(`roleLabel.${role.id}`)}
                     </span>
                   </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-1">{role.description}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{t(`roleDesc.${role.id}`)}</p>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-1.5">
-                    {role.permissions.map((perm) => (
+                    {perms.map((perm) => (
                       <li key={perm} className="flex items-start gap-1.5 text-xs text-muted-foreground">
                         <span className="mt-0.5 text-green-500">✓</span>
                         {perm}
@@ -245,7 +215,7 @@ export function RolesClient({ users: initialUsers, currentUserId, currentUserRol
 
       {/* Users by Role */}
       <section>
-        <h2 className="text-lg font-semibold mb-4">Users by Role</h2>
+        <h2 className="text-lg font-semibold mb-4">{t("usersByRole")}</h2>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {usersByRole.map((role) => {
             const Icon = role.icon;
@@ -254,15 +224,15 @@ export function RolesClient({ users: initialUsers, currentUserId, currentUserRol
                 <div className="flex items-center gap-2 mb-3">
                   <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${role.color}`}>
                     <Icon className="h-3 w-3" />
-                    {role.label}
+                    {t(`roleLabel.${role.id}`)}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {role.members.length} user{role.members.length !== 1 ? "s" : ""}
+                    {t("userCount", { count: role.members.length })}
                   </span>
                 </div>
                 <div className="rounded-lg border divide-y">
                   {role.members.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4">No users</p>
+                    <p className="text-xs text-muted-foreground text-center py-4">{t("noUsers")}</p>
                   ) : (
                     role.members.map((user) => (
                       <div key={user.id} className="px-3">

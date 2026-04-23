@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 import {
   createProduct,
@@ -87,6 +88,7 @@ function ProductDialog({
   product?: Product;
   onSaved: (p: Product) => void;
 }) {
+  const t = useTranslations("products");
   const [submitting, setSubmitting] = useState(false);
   const isEdit = !!product;
 
@@ -118,16 +120,16 @@ function ProductDialog({
       if (isEdit) {
         const updated = await updateProduct(product.id, data);
         onSaved(updated as Product);
-        toast.success("Product updated.");
+        toast.success(t("updateSuccess"));
       } else {
         const created = await createProduct(data);
         onSaved(created as Product);
-        toast.success("Product created.");
+        toast.success(t("createSuccess"));
       }
       onOpenChange(false);
       form.reset();
     } catch {
-      toast.error(isEdit ? "Failed to update product." : "Failed to create product.");
+      toast.error(isEdit ? t("updateFailed") : t("createFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -139,7 +141,7 @@ function ProductDialog({
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-4.5 w-4.5 text-primary" />
-            {isEdit ? "Edit Product" : "New Product"}
+            {isEdit ? t("dialog.editTitle") : t("dialog.newTitle")}
           </DialogTitle>
         </DialogHeader>
 
@@ -147,8 +149,8 @@ function ProductDialog({
           <div className="px-6 py-5 space-y-4">
             {/* Name */}
             <div className="space-y-1.5">
-              <Label>Name <span className="text-destructive">*</span></Label>
-              <Input {...form.register("name")} placeholder="Product name…" />
+              <Label>{t("dialog.nameLabel")} <span className="text-destructive">*</span></Label>
+              <Input {...form.register("name")} placeholder={t("form.namePlaceholder")} />
               {form.formState.errors.name && (
                 <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
               )}
@@ -181,10 +183,10 @@ function ProductDialog({
 
             {/* Description */}
             <div className="space-y-1.5">
-              <Label>Description <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Label>{t("dialog.descriptionLabel")} <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span></Label>
               <Textarea
                 {...form.register("description")}
-                placeholder="Describe the product…"
+                placeholder={t("form.descriptionPlaceholder")}
                 className="resize-none min-h-[72px]"
               />
             </div>
@@ -192,8 +194,8 @@ function ProductDialog({
             {/* Active toggle */}
             <div className="flex items-center justify-between rounded-lg border px-4 py-3">
               <div>
-                <p className="text-sm font-medium">Active</p>
-                <p className="text-xs text-muted-foreground">Inactive products won't appear in quote line items</p>
+                <p className="text-sm font-medium">{t("dialog.activeLabel")}</p>
+                <p className="text-xs text-muted-foreground">{t("dialog.activeDesc")}</p>
               </div>
               <Switch
                 checked={form.watch("isActive")}
@@ -208,7 +210,7 @@ function ProductDialog({
             </Button>
             <Button type="submit" disabled={submitting} className="gap-2">
               {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {isEdit ? "Save Changes" : "Create Product"}
+              {isEdit ? t("dialog.saveChanges") : t("dialog.createProduct")}
             </Button>
           </DialogFooter>
         </form>
@@ -224,6 +226,7 @@ interface Props {
 }
 
 export function ProductsClient({ products: initial }: Props) {
+  const t = useTranslations("products");
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [products, setProducts] = useState(initial);
@@ -283,9 +286,9 @@ export function ProductsClient({ products: initial }: Props) {
     try {
       await deleteProduct(deleteTarget.id);
       setProducts((prev) => prev.filter((p) => p.id !== deleteTarget.id));
-      toast.success("Product deleted.");
+      toast.success(t("deleteSuccess"));
     } catch {
-      toast.error("Failed to delete product.");
+      toast.error(t("deleteFailed"));
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
@@ -293,28 +296,28 @@ export function ProductsClient({ products: initial }: Props) {
   };
 
   const formatPrice = (price: string) =>
-    new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(price));
+    new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(Number(price));
 
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Products</h1>
-          <p className="text-muted-foreground text-sm">Manage your product catalog used in quotes and orders.</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
         <Button onClick={handleOpenCreate} className="gap-1.5">
           <Plus className="h-4 w-4" />
-          New Product
+          {t("newProduct")}
         </Button>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Total",    value: products.length, active: filter === "all",      onClick: () => setFilter("all") },
-          { label: "Active",   value: activeCount,     active: filter === "active",   onClick: () => setFilter("active") },
-          { label: "Inactive", value: inactiveCount,   active: filter === "inactive", onClick: () => setFilter("inactive") },
+          { label: t("total"),    value: products.length, active: filter === "all",      onClick: () => setFilter("all") },
+          { label: t("active"),   value: activeCount,     active: filter === "active",   onClick: () => setFilter("active") },
+          { label: t("inactive"), value: inactiveCount,   active: filter === "inactive", onClick: () => setFilter("inactive") },
         ].map(({ label, value, active, onClick }) => (
           <button
             key={label}
@@ -336,7 +339,7 @@ export function ProductsClient({ products: initial }: Props) {
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder="Search by name or SKU…"
+            placeholder={t("searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-8 pl-8 text-sm"
@@ -349,11 +352,11 @@ export function ProductsClient({ products: initial }: Props) {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-              <th className="px-4 py-2.5 text-left font-medium">Name</th>
-              <th className="px-4 py-2.5 text-left font-medium hidden sm:table-cell">SKU</th>
-              <th className="px-4 py-2.5 text-left font-medium">Price</th>
-              <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">Description</th>
-              <th className="px-4 py-2.5 text-center font-medium">Active</th>
+              <th className="px-4 py-2.5 text-left font-medium">{t("columns.name")}</th>
+              <th className="px-4 py-2.5 text-left font-medium hidden sm:table-cell">{t("columns.sku")}</th>
+              <th className="px-4 py-2.5 text-left font-medium">{t("columns.price")}</th>
+              <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">{t("columns.description")}</th>
+              <th className="px-4 py-2.5 text-center font-medium">{t("columns.active")}</th>
               <th className="w-20 px-4 py-2.5" />
             </tr>
           </thead>
@@ -363,7 +366,7 @@ export function ProductsClient({ products: initial }: Props) {
                 <td colSpan={6} className="py-14 text-center">
                   <Package className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-muted-foreground text-sm">
-                    {search || filter !== "all" ? "No products match your search." : "No products yet. Create the first one."}
+                    {search || filter !== "all" ? t("noMatchSearch") : t("noProductsYet")}
                   </p>
                 </td>
               </tr>
@@ -395,7 +398,7 @@ export function ProductsClient({ products: initial }: Props) {
                       type="button"
                       onClick={() => handleToggleActive(product)}
                       className="inline-flex items-center justify-center"
-                      title={product.isActive ? "Deactivate" : "Activate"}
+                      title={product.isActive ? t("deactivate") : t("activate")}
                     >
                       {product.isActive ? (
                         <ToggleRight className="h-5 w-5 text-emerald-500" />
@@ -433,7 +436,7 @@ export function ProductsClient({ products: initial }: Props) {
 
       {filtered.length > 0 && (
         <p className="text-xs text-muted-foreground text-right">
-          Showing {filtered.length} of {products.length} products
+          {t("showingOf", { shown: filtered.length, total: products.length })}
         </p>
       )}
 
@@ -449,10 +452,9 @@ export function ProductsClient({ products: initial }: Props) {
       <AlertDialog open={!!deleteTarget} onOpenChange={(v) => { if (!v) setDeleteTarget(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete product?</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{deleteTarget?.name}</strong> will be permanently deleted. This cannot be undone.
-              Products linked to existing quotes will not be affected.
+              <strong>{deleteTarget?.name}</strong> {t("deleteDesc")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -463,7 +465,7 @@ export function ProductsClient({ products: initial }: Props) {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Delete
+              {t("deleteProduct")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Loader2, Send, Save, Eye, EyeOff, Server, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ const DEFAULT: Settings = {
 };
 
 export default function EmailSettingsPage() {
+  const t = useTranslations("settings.email");
   const [settings, setSettings] = useState<Settings>(DEFAULT);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -62,23 +64,23 @@ export default function EmailSettingsPage() {
     try {
       const result = await saveEmailSettings(settings);
       if ("error" in result) toast.error(result.error);
-      else toast.success("Email settings saved.");
+      else toast.success(t("savedSuccess"));
     } finally {
       setSaving(false);
     }
   };
 
   const handleTest = async () => {
-    if (!testTo) { toast.error("Enter a recipient email address."); return; }
+    if (!testTo) { toast.error(t("enterRecipient")); return; }
     setTesting(true);
     try {
       const result = await testEmailConnection({ ...settings, testTo });
       if ("error" in result) {
-        toast.error(`Test failed: ${result.error}`);
+        toast.error(t("testFailed", { error: result.error ?? "" }));
       } else if (result.success) {
-        toast.success(`Test email sent to ${testTo}. Check your inbox!`);
+        toast.success(t("testSent", { email: testTo }));
       } else {
-        toast.error("Test failed — check your configuration.");
+        toast.error(t("testFailedConfig"));
       }
     } finally {
       setTesting(false);
@@ -94,17 +96,15 @@ export default function EmailSettingsPage() {
   }
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="p-6 max-w-2xl space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Email Settings</h1>
-        <p className="text-muted-foreground mt-1">
-          Configure how the CRM sends marketing and system emails.
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+        <p className="text-muted-foreground mt-1">{t("subtitle")}</p>
       </div>
 
       {/* Provider selection */}
       <div className="space-y-3">
-        <Label className="text-sm font-semibold">Email Provider</Label>
+        <Label className="text-sm font-semibold">{t("providerLabel")}</Label>
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => set("provider", "resend")}
@@ -117,7 +117,7 @@ export default function EmailSettingsPage() {
             <Zap className={`h-5 w-5 shrink-0 ${settings.provider === "resend" ? "text-primary" : "text-muted-foreground"}`} />
             <div>
               <p className="font-medium text-sm">Resend</p>
-              <p className="text-xs text-muted-foreground">API-based, free tier 100/day</p>
+              <p className="text-xs text-muted-foreground">{t("resendDesc")}</p>
             </div>
           </button>
           <button
@@ -131,7 +131,7 @@ export default function EmailSettingsPage() {
             <Server className={`h-5 w-5 shrink-0 ${settings.provider === "smtp" ? "text-primary" : "text-muted-foreground"}`} />
             <div>
               <p className="font-medium text-sm">SMTP</p>
-              <p className="text-xs text-muted-foreground">Any mail server or relay</p>
+              <p className="text-xs text-muted-foreground">{t("smtpDesc")}</p>
             </div>
           </button>
         </div>
@@ -143,11 +143,11 @@ export default function EmailSettingsPage() {
       {settings.provider === "resend" && (
         <div className="space-y-4">
           <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-sm">Resend Configuration</h2>
+            <h2 className="font-semibold text-sm">{t("resendConfig")}</h2>
             <Badge variant="secondary" className="text-xs">resend.com</Badge>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="resend-key">API Key</Label>
+            <Label htmlFor="resend-key">{t("apiKey")}</Label>
             <div className="relative">
               <Input
                 id="resend-key"
@@ -165,11 +165,7 @@ export default function EmailSettingsPage() {
                 {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Get your API key from{" "}
-              <span className="font-medium">resend.com → API Keys</span>.
-              Your sender domain must be verified.
-            </p>
+            <p className="text-xs text-muted-foreground">{t("apiKeyHint")}</p>
           </div>
         </div>
       )}
@@ -177,11 +173,11 @@ export default function EmailSettingsPage() {
       {/* SMTP settings */}
       {settings.provider === "smtp" && (
         <div className="space-y-4">
-          <h2 className="font-semibold text-sm">SMTP Configuration</h2>
+          <h2 className="font-semibold text-sm">{t("smtpConfig")}</h2>
 
           <div className="grid grid-cols-3 gap-3">
             <div className="col-span-2 space-y-2">
-              <Label htmlFor="smtp-host">Server / Host</Label>
+              <Label htmlFor="smtp-host">{t("serverHost")}</Label>
               <Input
                 id="smtp-host"
                 value={settings.smtpHost}
@@ -190,7 +186,7 @@ export default function EmailSettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="smtp-port">Port</Label>
+              <Label htmlFor="smtp-port">{t("port")}</Label>
               <Input
                 id="smtp-port"
                 type="number"
@@ -210,13 +206,13 @@ export default function EmailSettingsPage() {
               className="h-4 w-4 rounded border-input"
             />
             <Label htmlFor="smtp-secure" className="font-normal cursor-pointer">
-              Use SSL/TLS (port 465)
+              {t("useSsl")}
             </Label>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="smtp-user">Username</Label>
+              <Label htmlFor="smtp-user">{t("username")}</Label>
               <Input
                 id="smtp-user"
                 value={settings.smtpUser}
@@ -226,7 +222,7 @@ export default function EmailSettingsPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="smtp-password">Password</Label>
+              <Label htmlFor="smtp-password">{t("password")}</Label>
               <div className="relative">
                 <Input
                   id="smtp-password"
@@ -249,7 +245,7 @@ export default function EmailSettingsPage() {
           </div>
 
           <div className="rounded-md bg-muted/50 border p-3 text-xs text-muted-foreground space-y-1">
-            <p className="font-medium text-foreground">Common SMTP configurations</p>
+            <p className="font-medium text-foreground">{t("commonConfigs")}</p>
             <p><span className="font-medium">Gmail:</span> smtp.gmail.com : 587 (STARTTLS) — requires App Password</p>
             <p><span className="font-medium">Outlook/365:</span> smtp.office365.com : 587 (STARTTLS)</p>
             <p><span className="font-medium">SendGrid:</span> smtp.sendgrid.net : 587 — user: apikey, pass: SG.xxxx</p>
@@ -260,12 +256,12 @@ export default function EmailSettingsPage() {
 
       <Separator />
 
-      {/* Sender identity (common to both providers) */}
+      {/* Sender identity */}
       <div className="space-y-4">
-        <h2 className="font-semibold text-sm">Sender Identity</h2>
+        <h2 className="font-semibold text-sm">{t("senderIdentity")}</h2>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label htmlFor="from-name">Display Name</Label>
+            <Label htmlFor="from-name">{t("displayName")}</Label>
             <Input
               id="from-name"
               value={settings.fromName}
@@ -274,7 +270,7 @@ export default function EmailSettingsPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="from-email">From Address</Label>
+            <Label htmlFor="from-email">{t("fromAddress")}</Label>
             <Input
               id="from-email"
               type="email"
@@ -285,7 +281,9 @@ export default function EmailSettingsPage() {
           </div>
         </div>
         <p className="text-xs text-muted-foreground">
-          Recipients will see: <span className="font-medium text-foreground">{settings.fromName || "CRM"} &lt;{settings.fromEmail || "noreply@yourdomain.com"}&gt;</span>
+          {t("recipientsWillSee", {
+            identity: `${settings.fromName || "CRM"} <${settings.fromEmail || "noreply@yourdomain.com"}>`,
+          })}
         </p>
       </div>
 
@@ -293,7 +291,7 @@ export default function EmailSettingsPage() {
 
       {/* Test connection */}
       <div className="space-y-3">
-        <h2 className="font-semibold text-sm">Test Connection</h2>
+        <h2 className="font-semibold text-sm">{t("testConnection")}</h2>
         <div className="flex gap-2">
           <Input
             type="email"
@@ -304,19 +302,17 @@ export default function EmailSettingsPage() {
           />
           <Button variant="outline" onClick={handleTest} disabled={testing} className="gap-2 shrink-0">
             {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-            Send Test Email
+            {t("sendTest")}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Sends a test email using the current (unsaved) configuration.
-        </p>
+        <p className="text-xs text-muted-foreground">{t("testHint")}</p>
       </div>
 
       {/* Save */}
       <div className="flex justify-end pt-2">
         <Button onClick={handleSave} disabled={saving} className="gap-2 min-w-[120px]">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save Settings
+          {t("saveSettings")}
         </Button>
       </div>
     </div>

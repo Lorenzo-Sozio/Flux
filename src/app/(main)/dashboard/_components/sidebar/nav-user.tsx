@@ -1,6 +1,7 @@
 "use client";
 
-import { CircleUser, CreditCard, EllipsisVertical, LogOut, MessageSquareDot } from "lucide-react";
+import { EllipsisVertical, LogOut } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { logoutAction } from "@/actions/auth";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -26,7 +27,8 @@ export function NavUser({
   };
 }) {
   const { isMobile } = useSidebar();
-  const userName = user?.name || "Utente Sconosciuto";
+  const t = useTranslations("nav.user");
+  const userName = user?.name || t("unknownUser");
   const userEmail = user?.email || "";
   const userImage = user?.image || undefined;
 
@@ -73,7 +75,7 @@ export function NavUser({
               <form action={logoutAction} className="w-full">
                 <button type="submit" className="flex w-full items-center gap-2">
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
+                  <span>{t("logout")}</span>
                 </button>
               </form>
             </DropdownMenuItem>

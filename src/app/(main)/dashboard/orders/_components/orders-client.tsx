@@ -7,18 +7,17 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import {
   ShoppingCart,
   Plus,
   Trash2,
   Search,
-  Package,
   Loader2,
   ExternalLink,
   TrendingUp,
   Clock,
   CheckCircle2,
-  XCircle,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -78,13 +77,13 @@ type Product = {
   isActive: boolean;
 };
 
-// ── Status config ─────────────────────────────────────────────────────────────
+// ── Status CSS classes (no labels — translated in render) ─────────────────────
 
-const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
-  draft:      { label: "Draft",      class: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  processing: { label: "Processing", class: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
-  completed:  { label: "Completed",  class: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
-  cancelled:  { label: "Cancelled",  class: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
+const STATUS_CLASS: Record<string, string> = {
+  draft:      "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  processing: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  completed:  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  cancelled:  "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
 };
 
 // ── New order form schema ─────────────────────────────────────────────────────
@@ -117,7 +116,9 @@ function NewOrderDialog({
   products: Product[];
   onCreated: (order: Order) => void;
 }) {
-  const [open, setOpen]           = useState(false);
+  const t = useTranslations("orders");
+  const tc = useTranslations("common");
+  const [open, setOpen]             = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const activeProducts = products.filter((p) => p.isActive);
 
@@ -148,20 +149,22 @@ function NewOrderDialog({
     try {
       const created = await createOrder(data);
       onCreated(created as unknown as Order);
-      toast.success(`Order ${created.orderNumber} created.`);
+      toast.success(`${t("newOrder")} ${created.orderNumber} ${tc("createSuccess").toLowerCase()}`);
       setOpen(false);
       form.reset();
     } catch (e: any) {
-      toast.error(e.message ?? "Failed to create order.");
+      toast.error(e.message ?? tc("createError"));
     } finally {
       setSubmitting(false);
     }
   };
 
+  const STATUS_KEYS = ["draft", "processing", "completed", "cancelled"] as const;
+
   return (
     <>
       <Button onClick={() => setOpen(true)} className="gap-1.5">
-        <Plus className="h-4 w-4" /> New Order
+        <Plus className="h-4 w-4" /> {t("newOrder")}
       </Button>
 
       <Dialog open={open} onOpenChange={(v) => { if (!submitting) { setOpen(v); if (!v) form.reset(); } }}>
@@ -169,16 +172,15 @@ function NewOrderDialog({
           <DialogHeader className="px-6 pt-6 pb-4 border-b">
             <DialogTitle className="flex items-center gap-2">
               <ShoppingCart className="h-4 w-4 text-primary" />
-              New Order
+              {t("dialog.title")}
             </DialogTitle>
           </DialogHeader>
 
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="px-6 py-5 space-y-4 max-h-[60vh] overflow-y-auto">
-              {/* Status + Date */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Status</Label>
+                  <Label>{t("dialog.status")}</Label>
                   <Select
                     value={form.watch("status")}
                     onValueChange={(v) => form.setValue("status", v as any)}
@@ -187,21 +189,20 @@ function NewOrderDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(STATUS_CONFIG).map(([v, cfg]) => (
-                        <SelectItem key={v} value={v}>{cfg.label}</SelectItem>
+                      {STATUS_KEYS.map((v) => (
+                        <SelectItem key={v} value={v}>{t(`statuses.${v}` as any)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Order Date</Label>
+                  <Label>{t("dialog.orderDate")}</Label>
                   <Input type="date" {...form.register("orderDate")} className="h-9" />
                 </div>
               </div>
 
-              {/* Line items */}
               <div className="space-y-2">
-                <Label>Line Items <span className="text-destructive">*</span></Label>
+                <Label>{t("dialog.lineItems")} <span className="text-destructive">*</span></Label>
                 <div className="space-y-2">
                   {fields.map((field, idx) => (
                     <div key={field.id} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-start">
@@ -211,7 +212,7 @@ function NewOrderDialog({
                           onValueChange={(v) => handleProductChange(idx, v)}
                         >
                           <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Select product…" />
+                            <SelectValue placeholder={t("dialog.selectProduct")} />
                           </SelectTrigger>
                           <SelectContent>
                             {activeProducts.map((p) => (
@@ -231,7 +232,7 @@ function NewOrderDialog({
                         type="number"
                         min="1"
                         {...form.register(`items.${idx}.quantity`)}
-                        placeholder="Qty"
+                        placeholder={t("dialog.qty")}
                         className="h-8 text-xs"
                       />
                       <Input
@@ -239,7 +240,7 @@ function NewOrderDialog({
                         step="0.01"
                         min="0"
                         {...form.register(`items.${idx}.unitPrice`)}
-                        placeholder="Price"
+                        placeholder={t("dialog.price")}
                         className="h-8 text-xs font-mono"
                       />
                       <Button
@@ -262,27 +263,26 @@ function NewOrderDialog({
                   className="h-7 gap-1.5 text-xs"
                   onClick={() => append({ productId: "", quantity: 1, unitPrice: 0 })}
                 >
-                  <Plus className="h-3 w-3" /> Add Item
+                  <Plus className="h-3 w-3" /> {t("dialog.addItem")}
                 </Button>
                 {form.formState.errors.items?.root && (
                   <p className="text-xs text-destructive">{form.formState.errors.items.root.message}</p>
                 )}
               </div>
 
-              {/* Total */}
               <div className="flex items-center justify-end border-t pt-3">
-                <span className="text-sm text-muted-foreground mr-3">Total</span>
+                <span className="text-sm text-muted-foreground mr-3">{t("dialog.total")}</span>
                 <span className="text-lg font-bold tabular-nums">{formatCurrency(total)}</span>
               </div>
             </div>
 
             <DialogFooter className="px-6 py-4 border-t bg-muted/10">
               <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={submitting}>
-                Cancel
+                {tc("cancel")}
               </Button>
               <Button type="submit" disabled={submitting} className="gap-2">
                 {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Create Order
+                {t("dialog.createOrder")}
               </Button>
             </DialogFooter>
           </form>
@@ -303,6 +303,8 @@ export function OrdersClient({
   stats: Stats;
   products: Product[];
 }) {
+  const t = useTranslations("orders");
+  const tc = useTranslations("common");
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [orders, setOrders]   = useState(initial);
@@ -325,42 +327,44 @@ export function OrdersClient({
     startTransition(async () => {
       await updateOrderStatus(id, status);
       setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status } : o));
-      toast.success("Status updated.");
+      toast.success(tc("updateSuccess"));
     });
   };
 
   const handleDelete = (id: string) => {
-    if (!confirm("Delete this order? This cannot be undone.")) return;
+    if (!confirm(tc("confirmDelete"))) return;
     startTransition(async () => {
       await deleteOrder(id);
       setOrders((prev) => prev.filter((o) => o.id !== id));
-      toast.success("Order deleted.");
+      toast.success(t("deleteSuccess"));
     });
   };
 
   const STAT_CARDS = [
-    { label: "Total Orders",   value: stats.total,     filter: "all",        icon: ShoppingCart, color: "text-primary" },
-    { label: "Processing",     value: stats.processing, filter: "processing", icon: Clock,        color: "text-blue-500" },
-    { label: "Completed",      value: stats.completed,  filter: "completed",  icon: CheckCircle2, color: "text-emerald-500" },
-    { label: "Revenue",        value: formatCurrency(stats.revenue ?? 0), filter: null, icon: TrendingUp, color: "text-violet-500" },
-  ];
+    { labelKey: "stats.totalOrders", value: stats.total,     filter: "all",        icon: ShoppingCart, color: "text-primary" },
+    { labelKey: "stats.processing",  value: stats.processing, filter: "processing", icon: Clock,        color: "text-blue-500" },
+    { labelKey: "stats.completed",   value: stats.completed,  filter: "completed",  icon: CheckCircle2, color: "text-emerald-500" },
+    { labelKey: "stats.revenue",     value: formatCurrency(stats.revenue ?? 0), filter: null, icon: TrendingUp, color: "text-violet-500" },
+  ] as const;
+
+  const STATUS_KEYS = ["draft", "processing", "completed", "cancelled"] as const;
 
   return (
-    <div className="space-y-5">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Orders</h1>
-          <p className="text-muted-foreground text-sm">Manage customer orders and track fulfilment.</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
         <NewOrderDialog products={products} onCreated={(o) => setOrders((prev) => [o, ...prev])} />
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {STAT_CARDS.map(({ label, value, filter, icon: Icon, color }) => (
+        {STAT_CARDS.map(({ labelKey, value, filter, icon: Icon, color }) => (
           <button
-            key={label}
+            key={labelKey}
             type="button"
             onClick={() => filter && setFilterStatus(filter)}
             className={cn(
@@ -372,7 +376,7 @@ export function OrdersClient({
             <Icon className={cn("h-5 w-5 shrink-0", color)} />
             <div>
               <p className="text-xl font-bold leading-none">{value}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t(labelKey)}</p>
             </div>
           </button>
         ))}
@@ -383,7 +387,7 @@ export function OrdersClient({
         <div className="relative flex-1 max-w-xs">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
           <Input
-            placeholder="Search by number or company…"
+            placeholder={t("searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="h-8 pl-8 text-sm"
@@ -394,9 +398,9 @@ export function OrdersClient({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
-            {Object.entries(STATUS_CONFIG).map(([v, cfg]) => (
-              <SelectItem key={v} value={v}>{cfg.label}</SelectItem>
+            <SelectItem value="all">{t("allStatuses")}</SelectItem>
+            {STATUS_KEYS.map((v) => (
+              <SelectItem key={v} value={v}>{t(`statuses.${v}` as any)}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -407,11 +411,11 @@ export function OrdersClient({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
-              <th className="px-4 py-2.5 text-left font-medium">Order</th>
-              <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">Customer</th>
-              <th className="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Date</th>
-              <th className="px-4 py-2.5 text-left font-medium">Status</th>
-              <th className="px-4 py-2.5 text-right font-medium">Amount</th>
+              <th className="px-4 py-2.5 text-left font-medium">{t("columns.number")}</th>
+              <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">{t("columns.customer")}</th>
+              <th className="px-4 py-2.5 text-left font-medium hidden sm:table-cell">{t("columns.date")}</th>
+              <th className="px-4 py-2.5 text-left font-medium">{t("columns.status")}</th>
+              <th className="px-4 py-2.5 text-right font-medium">{tc("amount")}</th>
               <th className="w-20 px-4 py-2.5" />
             </tr>
           </thead>
@@ -422,14 +426,15 @@ export function OrdersClient({
                   <ShoppingCart className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-muted-foreground text-sm">
                     {search || filterStatus !== "all"
-                      ? "No orders match your search."
-                      : "No orders yet. Create the first one."}
+                      ? t("noOrdersSearch")
+                      : t("noOrdersYet")}
                   </p>
                 </td>
               </tr>
             ) : (
               filtered.map((order) => {
-                const status = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.draft;
+                const statusClass = STATUS_CLASS[order.status] ?? STATUS_CLASS.draft;
+                const statusLabel = t(`statuses.${order.status as "draft" | "processing" | "completed" | "cancelled"}`);
                 const customer =
                   order.contactFirstName
                     ? `${order.contactFirstName} ${order.contactLastName ?? ""}`.trim()
@@ -457,13 +462,13 @@ export function OrdersClient({
                         onValueChange={(v) => handleStatusChange(order.id, v as OrderStatus)}
                       >
                         <SelectTrigger className="h-7 w-32 border-0 px-2 text-xs">
-                          <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5", status.class)}>
-                            {status.label}
+                          <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-5", statusClass)}>
+                            {statusLabel}
                           </Badge>
                         </SelectTrigger>
                         <SelectContent>
-                          {Object.entries(STATUS_CONFIG).map(([v, cfg]) => (
-                            <SelectItem key={v} value={v} className="text-xs">{cfg.label}</SelectItem>
+                          {STATUS_KEYS.map((v) => (
+                            <SelectItem key={v} value={v} className="text-xs">{t(`statuses.${v}` as any)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -498,7 +503,7 @@ export function OrdersClient({
 
       {filtered.length > 0 && (
         <p className="text-xs text-muted-foreground text-right">
-          {filtered.length} of {orders.length} orders
+          {t("countOrders", { count: filtered.length, total: orders.length })}
         </p>
       )}
     </div>

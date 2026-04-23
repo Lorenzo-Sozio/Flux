@@ -36,6 +36,7 @@ import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
 import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
 import { TicketKanbanBoard } from "@/components/crm/ticket-kanban-board";
 import { getTickets } from "@/actions/support";
+import { useTranslations } from "next-intl";
 import { CreateTicketButton } from "@/components/crm/create-ticket-button";
 
 type SortField = "createdAt" | "subject" | "status" | "priority";
@@ -49,16 +50,11 @@ const CHANNEL_ICONS: Record<string, React.ReactNode> = {
   social: <Users className="h-3.5 w-3.5" />,
 };
 
-const STATUS_TABS = [
-  { value: "all",         label: "All" },
-  { value: "open",        label: "Open" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "waiting",     label: "Waiting" },
-  { value: "resolved",    label: "Resolved" },
-  { value: "closed",      label: "Closed" },
-] as const;
+const STATUS_TAB_VALUES = ["all", "open", "in_progress", "waiting", "resolved", "closed"] as const;
+type StatusTabValue = typeof STATUS_TAB_VALUES[number];
 
 export default function TicketsListPage() {
+  const t = useTranslations("support.tickets");
   const router = useRouter();
   const [tickets, setTickets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,7 +120,7 @@ export default function TicketsListPage() {
   };
 
   return (
-    <div className={view === "kanban" ? "h-full flex flex-col gap-6" : "space-y-6"}>
+    <div className={view === "kanban" ? "p-6 h-full flex flex-col gap-6" : "p-6 space-y-6"}>
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <Link
@@ -132,7 +128,7 @@ export default function TicketsListPage() {
           className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />
-          Support Center
+          {t("supportCenter")}
         </Link>
         <CreateTicketButton />
       </div>
@@ -140,10 +136,9 @@ export default function TicketsListPage() {
       {/* Title + View Toggle */}
       <div className="flex items-start justify-between gap-4 shrink-0">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Support Tickets</h1>
+          <h1 className="text-3xl font-bold tracking-tight">{t("supportTickets")}</h1>
           <p className="text-muted-foreground mt-1">
-            {statusCounts.all} total &middot;{" "}
-            <span className="text-blue-600 dark:text-blue-400 font-medium">{statusCounts.open} open</span>
+            {t("totalOpen", { total: statusCounts.all, open: statusCounts.open })}
           </p>
         </div>
         <div className="flex items-center rounded-lg border p-0.5 bg-muted/50 gap-0.5 shrink-0">
@@ -154,7 +149,7 @@ export default function TicketsListPage() {
             onClick={() => setView("list")}
           >
             <LayoutList className="h-3.5 w-3.5" />
-            <span className="text-xs">List</span>
+            <span className="text-xs">{t("listView")}</span>
           </Button>
           <Button
             variant={view === "kanban" ? "default" : "ghost"}
@@ -163,27 +158,35 @@ export default function TicketsListPage() {
             onClick={() => setView("kanban")}
           >
             <Kanban className="h-3.5 w-3.5" />
-            <span className="text-xs">Kanban</span>
+            <span className="text-xs">{t("kanbanView")}</span>
           </Button>
         </div>
       </div>
 
       {/* Status tabs */}
       <div className="flex gap-1 border-b overflow-x-auto pb-0 scrollbar-none shrink-0">
-        {STATUS_TABS.map((tab) => {
-          const count = statusCounts[tab.value as keyof typeof statusCounts];
-          const active = statusFilter === tab.value;
+        {STATUS_TAB_VALUES.map((value) => {
+          const count = statusCounts[value as keyof typeof statusCounts];
+          const active = statusFilter === value;
+          const statusLabels: Record<StatusTabValue, string> = {
+            all: t("statusAll"),
+            open: t("statuses.open"),
+            in_progress: t("statusInProgress"),
+            waiting: t("statusWaiting"),
+            resolved: t("statuses.resolved"),
+            closed: t("statuses.closed"),
+          };
           return (
             <button
-              key={tab.value}
-              onClick={() => setStatusFilter(tab.value)}
+              key={value}
+              onClick={() => setStatusFilter(value)}
               className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                 active
                   ? "border-primary text-foreground"
                   : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/30"
               }`}
             >
-              {tab.label}
+              {statusLabels[value]}
               <span
                 className={`rounded-full text-[10px] px-1.5 py-0.5 font-semibold ${
                   active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
@@ -199,33 +202,33 @@ export default function TicketsListPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-2 shrink-0">
         <Input
-          placeholder="Search by ticket #, subject, or customer..."
+          placeholder={t("searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="flex-1 h-9"
         />
         <Select value={priorityFilter} onValueChange={setPriorityFilter}>
           <SelectTrigger className="w-full sm:w-36 h-9">
-            <SelectValue placeholder="Priority" />
+            <SelectValue placeholder={t("priority")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Priority</SelectItem>
-            <SelectItem value="urgent">Urgent</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="normal">Normal</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="all">{t("allPriority")}</SelectItem>
+            <SelectItem value="urgent">{t("priorities.urgent")}</SelectItem>
+            <SelectItem value="high">{t("priorities.high")}</SelectItem>
+            <SelectItem value="normal">{t("priorities.normal")}</SelectItem>
+            <SelectItem value="low">{t("priorities.low")}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={channelFilter} onValueChange={setChannelFilter}>
           <SelectTrigger className="w-full sm:w-36 h-9">
-            <SelectValue placeholder="Channel" />
+            <SelectValue placeholder={t("channel")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Channels</SelectItem>
-            <SelectItem value="email">Email</SelectItem>
-            <SelectItem value="chat">Chat</SelectItem>
-            <SelectItem value="phone">Phone</SelectItem>
-            <SelectItem value="social">Social</SelectItem>
+            <SelectItem value="all">{t("allChannels")}</SelectItem>
+            <SelectItem value="email">{t("channels.email")}</SelectItem>
+            <SelectItem value="chat">{t("channels.chat")}</SelectItem>
+            <SelectItem value="phone">{t("channels.phone")}</SelectItem>
+            <SelectItem value="social">{t("channels.social")}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -246,7 +249,7 @@ export default function TicketsListPage() {
             {filteredTickets.length === 0 ? (
               <div className="text-center py-16">
                 <MessageSquare className="h-10 w-10 text-muted-foreground/40 mx-auto mb-3" />
-                <p className="text-muted-foreground">No tickets match your filters.</p>
+                <p className="text-muted-foreground">{t("noTicketsFilter")}</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -258,7 +261,7 @@ export default function TicketsListPage() {
                         onClick={() => toggleSort("createdAt")}
                       >
                         <div className="flex items-center gap-1.5">
-                          Ticket #
+                          {t("colTicketNum")}
                           <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
                         </div>
                       </TableHead>
@@ -267,17 +270,17 @@ export default function TicketsListPage() {
                         onClick={() => toggleSort("subject")}
                       >
                         <div className="flex items-center gap-1.5">
-                          Subject
+                          {t("subject")}
                           <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
                         </div>
                       </TableHead>
-                      <TableHead>Customer</TableHead>
+                      <TableHead>{t("colCustomer")}</TableHead>
                       <TableHead
                         className="cursor-pointer select-none w-32"
                         onClick={() => toggleSort("status")}
                       >
                         <div className="flex items-center gap-1.5">
-                          Status
+                          {t("columns.status")}
                           <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
                         </div>
                       </TableHead>
@@ -286,13 +289,13 @@ export default function TicketsListPage() {
                         onClick={() => toggleSort("priority")}
                       >
                         <div className="flex items-center gap-1.5">
-                          Priority
+                          {t("priority")}
                           <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
                         </div>
                       </TableHead>
-                      <TableHead className="w-20">Channel</TableHead>
-                      <TableHead className="w-20">Msgs</TableHead>
-                      <TableHead className="w-28">Created</TableHead>
+                      <TableHead className="w-20">{t("colChannel")}</TableHead>
+                      <TableHead className="w-20">{t("colMsgs")}</TableHead>
+                      <TableHead className="w-28">{t("columns.created")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -302,7 +305,7 @@ export default function TicketsListPage() {
                       const daysAgo = Math.floor(
                         (Date.now() - createdDate.getTime()) / 86_400_000
                       );
-                      const dateLabel = isToday ? "Today" : `${daysAgo}d ago`;
+                      const dateLabel = isToday ? t("dateToday") : t("daysAgo", { count: daysAgo });
                       const msgCount = ticket.messages?.length ?? 0;
 
                       return (
@@ -360,7 +363,7 @@ export default function TicketsListPage() {
       {/* Pagination info */}
       {!loading && view === "list" && filteredTickets.length > 0 && (
         <p className="text-center text-xs text-muted-foreground shrink-0">
-          Showing {filteredTickets.length} of {statusCounts.all} tickets
+          {t("showingTickets", { shown: filteredTickets.length, total: statusCounts.all })}
         </p>
       )}
     </div>

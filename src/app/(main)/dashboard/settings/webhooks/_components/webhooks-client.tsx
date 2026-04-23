@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Plus, Trash2, Webhook, Copy, CheckCircle, XCircle } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { Plus, Trash2, Webhook, Copy, CheckCircle } from "lucide-react";
 import { createWebhook, deleteWebhook, updateWebhook } from "@/actions/webhooks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,20 +22,26 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-const AVAILABLE_EVENTS = [
-  { value: "contact.created", label: "Contact Created" },
-  { value: "contact.updated", label: "Contact Updated" },
-  { value: "contact.deleted", label: "Contact Deleted" },
-  { value: "lead.created", label: "Lead Created" },
-  { value: "lead.converted", label: "Lead Converted" },
-  { value: "deal.created", label: "Deal Created" },
-  { value: "deal.stage_changed", label: "Deal Stage Changed" },
-  { value: "deal.won", label: "Deal Won" },
-  { value: "deal.lost", label: "Deal Lost" },
-  { value: "task.completed", label: "Task Completed" },
+type WebhookEventKey =
+  | "contactCreated" | "contactUpdated" | "contactDeleted"
+  | "leadCreated" | "leadConverted"
+  | "dealCreated" | "dealStageChanged" | "dealWon" | "dealLost"
+  | "taskCompleted";
+
+const AVAILABLE_EVENTS: { value: string; key: WebhookEventKey }[] = [
+  { value: "contact.created",   key: "contactCreated" },
+  { value: "contact.updated",   key: "contactUpdated" },
+  { value: "contact.deleted",   key: "contactDeleted" },
+  { value: "lead.created",      key: "leadCreated" },
+  { value: "lead.converted",    key: "leadConverted" },
+  { value: "deal.created",      key: "dealCreated" },
+  { value: "deal.stage_changed",key: "dealStageChanged" },
+  { value: "deal.won",          key: "dealWon" },
+  { value: "deal.lost",         key: "dealLost" },
+  { value: "task.completed",    key: "taskCompleted" },
 ];
 
-type Webhook = {
+type WebhookType = {
   id: string;
   name: string;
   url: string;
@@ -45,11 +52,13 @@ type Webhook = {
 };
 
 interface Props {
-  webhooks: Webhook[];
+  webhooks: WebhookType[];
   currentUserId: string;
 }
 
 export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
+  const t = useTranslations("settings.webhooks");
+  const tc = useTranslations("common");
   const [webhooks, setWebhooks] = useState(initial);
   const [addOpen, setAddOpen] = useState(false);
   const [isPending, setIsPending] = useState(false);
@@ -58,40 +67,40 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
 
   const handleAdd = async () => {
     if (!form.name || !form.url || form.events.length === 0) {
-      toast.error("Please fill all fields and select at least one event.");
+      toast.error(t("fillAllFields"));
       return;
     }
     setIsPending(true);
     try {
       const wh = await createWebhook({ ...form, ownerId: currentUserId });
-      setWebhooks((prev) => [...prev, wh as Webhook]);
-      toast.success("Webhook created.");
+      setWebhooks((prev) => [...prev, wh as WebhookType]);
+      toast.success(t("createSuccess"));
       setAddOpen(false);
       setForm({ name: "", url: "", events: [] });
     } catch {
-      toast.error("Failed to create webhook.");
+      toast.error(t("deleteFailed"));
     } finally {
       setIsPending(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this webhook?")) return;
+    if (!confirm(t("deleteWebhook"))) return;
     try {
       await deleteWebhook(id);
       setWebhooks((prev) => prev.filter((w) => w.id !== id));
-      toast.success("Webhook deleted.");
+      toast.success(t("deleteSuccess"));
     } catch {
-      toast.error("Failed to delete webhook.");
+      toast.error(t("deleteFailed"));
     }
   };
 
-  const handleToggleActive = async (wh: Webhook) => {
+  const handleToggleActive = async (wh: WebhookType) => {
     try {
       await updateWebhook(wh.id, { isActive: !wh.isActive });
       setWebhooks((prev) => prev.map((w) => w.id === wh.id ? { ...w, isActive: !wh.isActive } : w));
     } catch {
-      toast.error("Failed to update webhook.");
+      toast.error(t("updateFailed"));
     }
   };
 
@@ -99,7 +108,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
     navigator.clipboard.writeText(secret);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-    toast.success("Secret copied to clipboard.");
+    toast.success(t("secretCopied"));
   };
 
   const toggleEvent = (ev: string) => {
@@ -110,17 +119,15 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Webhooks</h1>
-          <p className="text-muted-foreground">
-            Send automated HTTP POST requests to external services when events occur.
-          </p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button onClick={() => setAddOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Add Webhook
+          {t("addWebhook")}
         </Button>
       </div>
 
@@ -128,24 +135,24 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Webhook className="h-5 w-5" />
-            Active Webhooks ({webhooks.length})
+            {t("activeTitle", { count: webhooks.length })}
           </CardTitle>
           <CardDescription>
-            Each request includes an <code>X-Webhook-Signature</code> header (HMAC-SHA256) for verification.
+            {t("activeDescription")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {webhooks.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground text-sm">No webhooks configured yet.</p>
+            <p className="text-center py-8 text-muted-foreground text-sm">{t("noWebhooksYet")}</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>URL</TableHead>
-                  <TableHead>Events</TableHead>
-                  <TableHead>Secret</TableHead>
-                  <TableHead>Active</TableHead>
+                  <TableHead>{t("columns.name")}</TableHead>
+                  <TableHead>{t("columns.url")}</TableHead>
+                  <TableHead>{t("columns.events")}</TableHead>
+                  <TableHead>{t("columns.secret")}</TableHead>
+                  <TableHead>{t("columns.active")}</TableHead>
                   <TableHead className="w-10" />
                 </TableRow>
               </TableHeader>
@@ -167,7 +174,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
                         ))}
                         {wh.events.length > 3 && (
                           <Badge variant="secondary" className="text-[10px]">
-                            +{wh.events.length - 3} more
+                            {t("moreEvents", { count: wh.events.length - 3 })}
                           </Badge>
                         )}
                       </div>
@@ -185,7 +192,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
                           ) : (
                             <Copy className="h-3 w-3" />
                           )}
-                          Copy
+                          {t("copy")}
                         </Button>
                       )}
                     </TableCell>
@@ -213,18 +220,15 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
         </CardContent>
       </Card>
 
-      {/* Add Dialog */}
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Add Webhook</DialogTitle>
-            <DialogDescription>
-              We'll POST a JSON payload to your URL whenever the selected events occur.
-            </DialogDescription>
+            <DialogTitle>{t("dialog.title")}</DialogTitle>
+            <DialogDescription>{t("dialog.description")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>Name</Label>
+              <Label>{t("dialog.nameLabel")}</Label>
               <Input
                 placeholder="e.g. Slack notifications"
                 value={form.name}
@@ -232,7 +236,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Endpoint URL</Label>
+              <Label>{t("dialog.endpointUrl")}</Label>
               <Input
                 placeholder="https://hooks.slack.com/services/..."
                 value={form.url}
@@ -240,7 +244,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
               />
             </div>
             <div className="space-y-2">
-              <Label>Events to subscribe</Label>
+              <Label>{t("dialog.eventsLabel")}</Label>
               <div className="grid grid-cols-2 gap-2 rounded-lg border p-3">
                 {AVAILABLE_EVENTS.map((ev) => (
                   <label key={ev.value} className="flex items-center gap-2 cursor-pointer text-sm">
@@ -248,16 +252,16 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
                       checked={form.events.includes(ev.value)}
                       onCheckedChange={() => toggleEvent(ev.value)}
                     />
-                    {ev.label}
+                    {t(`webhookEvents.${ev.key}`)}
                   </label>
                 ))}
               </div>
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>{tc("cancel")}</Button>
             <Button onClick={handleAdd} disabled={isPending}>
-              {isPending ? "Creating…" : "Create Webhook"}
+              {isPending ? t("dialog.creating") : t("dialog.createWebhook")}
             </Button>
           </DialogFooter>
         </DialogContent>

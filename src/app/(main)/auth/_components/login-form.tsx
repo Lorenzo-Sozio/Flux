@@ -9,6 +9,8 @@ import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { useTranslations } from "next-intl";
+
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -22,6 +24,7 @@ const formSchema = z.object({
 
 export function LoginForm() {
   const router = useRouter();
+  const t = useTranslations("auth.login");
   const [isPending, setIsPending] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
@@ -39,14 +42,14 @@ export function LoginForm() {
       });
 
       if (result?.error) {
-        toast.error("Invalid email or password.");
+        toast.error(t("invalidCredentials"));
         return;
       }
 
       router.push("/dashboard/crm");
       router.refresh();
     } catch {
-      toast.error("Something went wrong. Please try again.");
+      toast.error(t("error"));
     } finally {
       setIsPending(false);
     }
@@ -60,12 +63,12 @@ export function LoginForm() {
           name="email"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="login-email">Email Address</FieldLabel>
+              <FieldLabel htmlFor="login-email">{t("email")}</FieldLabel>
               <Input
                 {...field}
                 id="login-email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder={t("emailPlaceholder")}
                 autoComplete="email"
                 aria-invalid={fieldState.invalid}
               />
@@ -79,13 +82,13 @@ export function LoginForm() {
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
               <div className="flex items-center justify-between">
-                <FieldLabel htmlFor="login-password">Password</FieldLabel>
+                <FieldLabel htmlFor="login-password">{t("password")}</FieldLabel>
                 <Link
                   href="/auth/v1/forgot-password"
                   className="text-xs text-primary hover:underline"
                   prefetch={false}
                 >
-                  Forgot password?
+                  {t("forgotPassword")}
                 </Link>
               </div>
               <Input
@@ -114,7 +117,7 @@ export function LoginForm() {
               />
               <FieldContent>
                 <FieldLabel htmlFor="login-remember" className="font-normal">
-                  Remember me for 30 days
+                  {t("rememberMe")}
                 </FieldLabel>
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </FieldContent>
@@ -123,7 +126,7 @@ export function LoginForm() {
         />
       </FieldGroup>
       <Button className="w-full" type="submit" disabled={isPending}>
-        {isPending ? "Signing in…" : "Login"}
+        {isPending ? t("signingIn") : t("signIn")}
       </Button>
     </form>
   );

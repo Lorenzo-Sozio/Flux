@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -20,7 +21,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 
-// ── Schema ────────────────────────────────────────────────────────────────────
 const contactSchema = z.object({
   firstName:        z.string().min(1, "Required"),
   lastName:         z.string().min(1, "Required"),
@@ -48,18 +48,6 @@ const contactSchema = z.object({
 });
 type ContactFormValues = z.infer<typeof contactSchema>;
 
-const SOURCE_OPTIONS = [
-  { value: "website",        label: "Website" },
-  { value: "referral",       label: "Referral" },
-  { value: "linkedin",       label: "LinkedIn" },
-  { value: "cold_outreach",  label: "Cold Outreach" },
-  { value: "trade_show",     label: "Trade Show" },
-  { value: "advertisement",  label: "Advertisement" },
-  { value: "email_campaign", label: "Email Campaign" },
-  { value: "other",          label: "Other" },
-];
-
-// ── Field helper ──────────────────────────────────────────────────────────────
 function F({
   label, error, required, children,
 }: {
@@ -76,7 +64,6 @@ function F({
   );
 }
 
-// ── Section header ────────────────────────────────────────────────────────────
 function Section({ title }: { title: string }) {
   return (
     <p className="col-span-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 mt-2 mb-0.5 border-b pb-1">
@@ -85,8 +72,9 @@ function Section({ title }: { title: string }) {
   );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
 export function ContactModal({ contact, children }: { contact?: any; children: React.ReactNode }) {
+  const t = useTranslations("contacts");
+  const tc = useTranslations("common");
   const [open, setOpen]           = useState(false);
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const isEditing = !!contact;
@@ -101,6 +89,17 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
       getCompanies().then((rows) => setCompanies(rows.map((c) => ({ id: c.id, name: c.name }))));
     }
   }, [open]);
+
+  const sourceOptions = [
+    { value: "website",        label: tc("sources.website") },
+    { value: "referral",       label: tc("sources.referral") },
+    { value: "linkedin",       label: tc("sources.linkedin") },
+    { value: "cold_outreach",  label: tc("sources.cold_outreach") },
+    { value: "trade_show",     label: tc("sources.trade_show") },
+    { value: "advertisement",  label: tc("sources.advertisement") },
+    { value: "email_campaign", label: tc("sources.email_campaign") },
+    { value: "other",          label: tc("sources.other") },
+  ];
 
   const form = useForm<ContactFormValues>({
     resolver: zodResolver(contactSchema),
@@ -133,7 +132,6 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
 
   const { register, control, handleSubmit, formState: { errors, isSubmitting } } = form;
 
-  // Tab error indicators
   const e = errors;
   const tabErrors = {
     info:    !!(e.firstName || e.lastName || e.email || e.phone || e.mobile || e.jobTitle || e.department || e.linkedinUrl),
@@ -148,15 +146,15 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
       const payload = { ...data, ownerId, groupId, assigneeValue: undefined };
       if (isEditing) {
         await updateContact(contact.id, payload);
-        toast.success("Contact updated.");
+        toast.success(t("updateSuccess"));
       } else {
         await createContact(payload);
-        toast.success("Contact created.");
+        toast.success(t("createSuccess"));
       }
       setOpen(false);
       form.reset();
     } catch {
-      toast.error("Failed to save contact.");
+      toast.error(t("form.saveFailed"));
     }
   };
 
@@ -169,7 +167,9 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="text-lg">
-            {isEditing ? `Edit Contact — ${contact.firstName} ${contact.lastName}` : "New Contact"}
+            {isEditing
+              ? t("form.editTitle", { name: `${contact.firstName} ${contact.lastName}` })
+              : t("form.newTitle")}
           </DialogTitle>
         </DialogHeader>
 
@@ -178,51 +178,51 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
             <Tabs defaultValue="info">
               <TabsList className="w-full mb-5">
                 <TabsTrigger value="info" className="relative flex-1 gap-1.5">
-                  <UserIcon className="h-3.5 w-3.5" />Info
+                  <UserIcon className="h-3.5 w-3.5" />{t("form.tabs.info")}
                   <TabDot has={tabErrors.info} />
                 </TabsTrigger>
                 <TabsTrigger value="crm" className="relative flex-1 gap-1.5">
-                  <TagIcon className="h-3.5 w-3.5" />CRM
+                  <TagIcon className="h-3.5 w-3.5" />{t("form.tabs.crm")}
                   <TabDot has={tabErrors.crm} />
                 </TabsTrigger>
                 <TabsTrigger value="address" className="relative flex-1 gap-1.5">
-                  <MapPinIcon className="h-3.5 w-3.5" />Address
+                  <MapPinIcon className="h-3.5 w-3.5" />{t("form.tabs.address")}
                   <TabDot has={tabErrors.address} />
                 </TabsTrigger>
                 <TabsTrigger value="notes" className="relative flex-1 gap-1.5">
-                  <FileTextIcon className="h-3.5 w-3.5" />Notes
+                  <FileTextIcon className="h-3.5 w-3.5" />{t("form.tabs.notes")}
                   <TabDot has={tabErrors.notes} />
                 </TabsTrigger>
               </TabsList>
 
               {/* ── Info Tab ─────────────────────────────────────────────── */}
               <TabsContent value="info" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
-                <F label="First Name" required error={e.firstName?.message}>
-                  <Input {...register("firstName")} placeholder="Jane" />
+                <F label={t("firstName")} required error={e.firstName?.message}>
+                  <Input {...register("firstName")} placeholder="Mario" />
                 </F>
-                <F label="Last Name" required error={e.lastName?.message}>
-                  <Input {...register("lastName")} placeholder="Doe" />
+                <F label={t("lastName")} required error={e.lastName?.message}>
+                  <Input {...register("lastName")} placeholder="Rossi" />
                 </F>
-                <F label="Email" error={e.email?.message} >
-                  <Input {...register("email")} type="email" placeholder="jane@example.com" />
+                <F label={tc("email")} error={e.email?.message}>
+                  <Input {...register("email")} type="email" placeholder="mario@example.com" />
                 </F>
-                <F label="Job Title" error={e.jobTitle?.message}>
+                <F label={t("jobTitle")} error={e.jobTitle?.message}>
                   <Input {...register("jobTitle")} placeholder="Sales Manager" />
                 </F>
-                <F label="Phone" error={e.phone?.message}>
-                  <Input {...register("phone")} type="tel" placeholder="+39 02 1234567" />
+                <F label={tc("phone")} error={e.phone?.message}>
+                  <Input {...register("phone")} type="tel" placeholder="+39 0464 1234567" />
                 </F>
-                <F label="Mobile" error={e.mobile?.message}>
-                  <Input {...register("mobile")} type="tel" placeholder="+39 340 1234567" />
+                <F label={t("mobile")} error={e.mobile?.message}>
+                  <Input {...register("mobile")} type="tel" placeholder="+39 345 1234567" />
                 </F>
-                <F label="Department" error={e.department?.message}>
+                <F label={t("department")} error={e.department?.message}>
                   <Input {...register("department")} placeholder="Sales, Marketing…" />
                 </F>
-                <F label="LinkedIn URL" error={e.linkedinUrl?.message}>
+                <F label={t("linkedIn")} error={e.linkedinUrl?.message}>
                   <Input {...register("linkedinUrl")} placeholder="https://linkedin.com/in/…" />
                 </F>
                 <div className="col-span-2">
-                  <F label="Company" error={e.companyId?.message}>
+                  <F label={tc("company")} error={e.companyId?.message}>
                     <Controller
                       control={control}
                       name="companyId"
@@ -232,10 +232,10 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                           value={field.value ?? "__none__"}
                         >
                           <SelectTrigger>
-                            <SelectValue placeholder="— No company —" />
+                            <SelectValue placeholder={t("form.noCompany")} />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="__none__">— No company —</SelectItem>
+                            <SelectItem value="__none__">{t("form.noCompany")}</SelectItem>
                             {companies.map((c) => (
                               <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                             ))}
@@ -250,47 +250,47 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
               {/* ── CRM Tab ──────────────────────────────────────────────── */}
               <TabsContent value="crm" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
                 <div className="col-span-2">
-                  <F label="Assigned To">
+                  <F label={t("form.assignedTo")}>
                     <Controller control={control} name="assigneeValue" render={({ field }) => (
                       <AssigneeSelect value={field.value ?? null} onChange={field.onChange} />
                     )} />
                   </F>
                 </div>
-                <F label="Status" error={e.status?.message}>
+                <F label={t("form.status")} error={e.status?.message}>
                   <Controller control={control} name="status" render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="active">{t("statuses.active")}</SelectItem>
+                        <SelectItem value="inactive">{t("statuses.inactive")}</SelectItem>
                       </SelectContent>
                     </Select>
                   )} />
                 </F>
-                <F label="Source" error={e.source?.message}>
+                <F label={t("form.source")} error={e.source?.message}>
                   <Controller control={control} name="source" render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                      <SelectTrigger><SelectValue placeholder="— Select source —" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("form.selectSource")} /></SelectTrigger>
                       <SelectContent>
-                        {SOURCE_OPTIONS.map((o) => (
+                        {sourceOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   )} />
                 </F>
-                <F label="Lead Score (0–100)" error={e.leadScore?.message}>
+                <F label={t("leadScore")} error={e.leadScore?.message}>
                   <Input {...register("leadScore")} type="number" min={0} max={100} placeholder="0" />
                 </F>
-                <F label="Tags (comma-separated)" error={e.tags?.message}>
+                <F label={t("form.tags")} error={e.tags?.message}>
                   <Input {...register("tags")} placeholder="tech, startup, b2b" />
                 </F>
                 <div className="col-span-2">
                   <Controller control={control} name="marketingConsent" render={({ field }) => (
                     <div className="flex items-center justify-between rounded-lg border px-4 py-3">
                       <div>
-                        <p className="text-sm font-medium">Marketing Consent</p>
-                        <p className="text-xs text-muted-foreground">User agreed to receive marketing communications</p>
+                        <p className="text-sm font-medium">{t("form.marketingConsent")}</p>
+                        <p className="text-xs text-muted-foreground">{t("form.marketingConsentDesc")}</p>
                       </div>
                       <Switch checked={field.value} onCheckedChange={field.onChange} />
                     </div>
@@ -301,30 +301,30 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
               {/* ── Address Tab ──────────────────────────────────────────── */}
               <TabsContent value="address" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
                 <div className="col-span-2">
-                  <F label="Street" error={e.street?.message}>
+                  <F label={tc("street")} error={e.street?.message}>
                     <Input {...register("street")} placeholder="Via Roma 1" />
                   </F>
                 </div>
-                <F label="City" error={e.city?.message}>
+                <F label={tc("city")} error={e.city?.message}>
                   <Input {...register("city")} placeholder="Milan" />
                 </F>
-                <F label="State / Province" error={e.state?.message}>
+                <F label={tc("state")} error={e.state?.message}>
                   <Input {...register("state")} placeholder="MI" />
                 </F>
-                <F label="ZIP / Postal Code" error={e.zipCode?.message}>
+                <F label={tc("zipCode")} error={e.zipCode?.message}>
                   <Input {...register("zipCode")} placeholder="20100" />
                 </F>
-                <F label="Country" error={e.country?.message}>
+                <F label={tc("country")} error={e.country?.message}>
                   <Input {...register("country")} placeholder="Italy" />
                 </F>
               </TabsContent>
 
               {/* ── Notes Tab ────────────────────────────────────────────── */}
               <TabsContent value="notes" className="mt-0">
-                <F label="Notes" error={e.notes?.message}>
+                <F label={tc("notes")} error={e.notes?.message}>
                   <Textarea
                     {...register("notes")}
-                    placeholder="Internal notes about this contact…"
+                    placeholder={t("form.notesPlaceholder")}
                     className="min-h-[180px] resize-y"
                   />
                 </F>
@@ -333,10 +333,10 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
           </div>
 
           <DialogFooter className="px-6 py-4 border-t bg-muted/30">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>{tc("cancel")}</Button>
             <Button type="submit" disabled={isSubmitting} className="min-w-[100px]">
               {isSubmitting && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? "Save Changes" : "Create Contact"}
+              {isEditing ? t("form.saveChanges") : t("form.createContact")}
             </Button>
           </DialogFooter>
         </form>
@@ -345,17 +345,17 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
   );
 }
 
-// ── Delete ────────────────────────────────────────────────────────────────────
 export function DeleteContactButton({ id }: { id: string }) {
+  const t = useTranslations("contacts");
   const [isDeleting, setIsDeleting] = useState(false);
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this contact?")) return;
+    if (!confirm(t("deleteConfirm"))) return;
     try {
       setIsDeleting(true);
       await deleteContact(id);
-      toast.success("Contact deleted.");
+      toast.success(t("deleteSuccess"));
     } catch {
-      toast.error("Failed to delete contact.");
+      toast.error(t("deleteFailed"));
     } finally {
       setIsDeleting(false);
     }

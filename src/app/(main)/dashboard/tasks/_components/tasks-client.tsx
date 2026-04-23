@@ -4,6 +4,7 @@ import { useState, useMemo, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import {
   CheckCircle2,
@@ -74,10 +75,19 @@ type User = { id: string; name: string | null };
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-const PRIORITY_CONFIG = {
-  high:   { label: "High",   class: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" },
-  normal: { label: "Normal", class: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400" },
-  low:    { label: "Low",    class: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400" },
+const PRIORITY_CLASS: Record<string, string> = {
+  high:   "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+  normal: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
+  low:    "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+};
+
+const BOARD_COLUMN_IDS = ["todo", "in_progress", "done"] as const;
+type BoardColId = (typeof BOARD_COLUMN_IDS)[number];
+
+const BOARD_COLUMN_COLORS: Record<BoardColId, string> = {
+  todo:        "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  in_progress: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  done:        "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
 };
 
 function entityLink(task: Task): { label: string; href: string; icon: React.ElementType } | null {
@@ -105,14 +115,6 @@ function isDueToday(task: Task) {
     d.getDate() === today.getDate();
 }
 
-// ─── Board column config ────────────────────────────────────────────────────────
-
-const BOARD_COLUMNS = [
-  { id: "todo",        label: "To Do",       color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  { id: "in_progress", label: "In Progress", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
-  { id: "done",        label: "Done",        color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
-] as const;
-
 // ─── Task card (for board view) ─────────────────────────────────────────────────
 
 function TaskCard({ task, index, onToggle, onDelete }: {
@@ -121,11 +123,13 @@ function TaskCard({ task, index, onToggle, onDelete }: {
   onToggle: (task: Task) => void;
   onDelete: (id: string) => void;
 }) {
+  const t = useTranslations("tasks");
   const overdue = isOverdue(task);
   const today   = isDueToday(task);
   const done    = task.status === "done";
   const entity  = entityLink(task);
-  const priority = PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG] ?? PRIORITY_CONFIG.normal;
+  const priorityClass = PRIORITY_CLASS[task.priority] ?? PRIORITY_CLASS.normal;
+  const priorityLabel = t(`priorities.${task.priority as "low" | "normal" | "high"}`);
 
   return (
     <Draggable draggableId={task.id} index={index}>
@@ -140,7 +144,6 @@ function TaskCard({ task, index, onToggle, onDelete }: {
             done && "opacity-60",
           )}
         >
-          {/* Title row */}
           <div className="flex items-start gap-2">
             <button
               type="button"
@@ -156,15 +159,13 @@ function TaskCard({ task, index, onToggle, onDelete }: {
             </p>
           </div>
 
-          {/* Description */}
           {task.description && (
             <p className="text-xs text-muted-foreground line-clamp-2 pl-5">{task.description}</p>
           )}
 
-          {/* Meta row */}
           <div className="flex items-center gap-1.5 flex-wrap pl-5">
-            <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-4", priority.class)}>
-              {priority.label}
+            <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0 h-4", priorityClass)}>
+              {priorityLabel}
             </Badge>
             {task.dueDate && (
               <span className={cn(
@@ -185,7 +186,6 @@ function TaskCard({ task, index, onToggle, onDelete }: {
             )}
           </div>
 
-          {/* Assignee + delete */}
           <div className="flex items-center justify-between pl-5">
             <span className="text-[10px] text-muted-foreground">
               {task.assigneeName ?? task.ownerName ?? ""}
@@ -213,86 +213,82 @@ interface Props {
 }
 
 export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props) {
+  const t = useTranslations("tasks");
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [tasks, setTasks] = useState(initialTasks);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<"list" | "board">("list");
 
-  // ── Filters
   const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterAssignee, setFilterAssignee] = useState("all");
 
-  // ── Stats
   const stats = useMemo(() => ({
     total:    tasks.length,
     overdue:  tasks.filter(isOverdue).length,
     dueToday: tasks.filter(isDueToday).length,
-    done:     tasks.filter((t) => t.status === "done").length,
+    done:     tasks.filter((tk) => tk.status === "done").length,
   }), [tasks]);
 
-  // ── Filtered list
   const filtered = useMemo(() => {
-    return tasks.filter((t) => {
-      if (search && !t.title.toLowerCase().includes(search.toLowerCase())) return false;
+    return tasks.filter((tk) => {
+      if (search && !tk.title.toLowerCase().includes(search.toLowerCase())) return false;
       if (filterStatus !== "all") {
-        if (filterStatus === "overdue" && !isOverdue(t)) return false;
-        if (filterStatus === "done" && t.status !== "done") return false;
-        if (filterStatus === "todo" && (t.status === "done" || isOverdue(t))) return false;
+        if (filterStatus === "overdue" && !isOverdue(tk)) return false;
+        if (filterStatus === "done" && tk.status !== "done") return false;
+        if (filterStatus === "todo" && (tk.status === "done" || isOverdue(tk))) return false;
       }
-      if (filterPriority !== "all" && t.priority !== filterPriority) return false;
+      if (filterPriority !== "all" && tk.priority !== filterPriority) return false;
       if (filterAssignee !== "all") {
-        if (filterAssignee === "me" && t.assigneeId !== currentUserId && t.ownerId !== currentUserId) return false;
-        if (filterAssignee !== "me" && t.assigneeId !== filterAssignee) return false;
+        if (filterAssignee === "me" && tk.assigneeId !== currentUserId && tk.ownerId !== currentUserId) return false;
+        if (filterAssignee !== "me" && tk.assigneeId !== filterAssignee) return false;
       }
       return true;
     });
   }, [tasks, search, filterStatus, filterPriority, filterAssignee, currentUserId]);
 
-  // ── Selection
-  const allSelected = filtered.length > 0 && filtered.every((t) => selected.has(t.id));
+  const allSelected = filtered.length > 0 && filtered.every((tk) => selected.has(tk.id));
   const toggleAll = () => {
     if (allSelected) setSelected(new Set());
-    else setSelected(new Set(filtered.map((t) => t.id)));
+    else setSelected(new Set(filtered.map((tk) => tk.id)));
   };
   const toggleOne = (id: string) =>
     setSelected((prev) => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
 
-  // ── Actions
   const handleToggleStatus = (task: Task) => {
     const newStatus = task.status === "done" ? "todo" : "done";
     startTransition(async () => {
       await updateTaskStatus(task.id, newStatus);
-      setTasks((prev) => prev.map((t) => t.id === task.id ? { ...t, status: newStatus } : t));
+      setTasks((prev) => prev.map((tk) => tk.id === task.id ? { ...tk, status: newStatus } : tk));
     });
   };
 
   const handleBulkComplete = () => {
     startTransition(async () => {
       await Promise.all([...selected].map((id) => updateTaskStatus(id, "done")));
-      setTasks((prev) => prev.map((t) => selected.has(t.id) ? { ...t, status: "done" } : t));
+      setTasks((prev) => prev.map((tk) => selected.has(tk.id) ? { ...tk, status: "done" } : tk));
       setSelected(new Set());
-      toast.success(`${selected.size} task${selected.size > 1 ? "s" : ""} completed.`);
+      toast.success(t("createSuccess"));
     });
   };
 
   const handleBulkDelete = async () => {
-    if (!confirm(`Delete ${selected.size} task${selected.size > 1 ? "s" : ""}?`)) return;
+    if (!confirm(`Delete ${selected.size} tasks?`)) return;
     startTransition(async () => {
       await Promise.all([...selected].map((id) => deleteTask(id)));
-      setTasks((prev) => prev.filter((t) => !selected.has(t.id)));
+      setTasks((prev) => prev.filter((tk) => !selected.has(tk.id)));
       setSelected(new Set());
-      toast.success("Tasks deleted.");
+      toast.success(t("deleteSuccess"));
     });
   };
 
   const handleDelete = async (id: string) => {
     startTransition(async () => {
       await deleteTask(id);
-      setTasks((prev) => prev.filter((t) => t.id !== id));
-      toast.success("Task deleted.");
+      setTasks((prev) => prev.filter((tk) => tk.id !== id));
+      toast.success(t("deleteSuccess"));
     });
   };
 
@@ -308,20 +304,26 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
     const newStatus = destination.droppableId as Task["status"];
     startTransition(async () => {
       await updateTaskStatus(draggableId, newStatus);
-      setTasks((prev) => prev.map((t) => t.id === draggableId ? { ...t, status: newStatus } : t));
+      setTasks((prev) => prev.map((tk) => tk.id === draggableId ? { ...tk, status: newStatus } : tk));
     });
   };
 
+  const STAT_CARDS = [
+    { labelKey: "stats.total",    value: stats.total,    icon: Circle,        color: "text-muted-foreground" },
+    { labelKey: "stats.overdue",  value: stats.overdue,  icon: AlertCircle,   color: "text-destructive" },
+    { labelKey: "stats.dueToday", value: stats.dueToday, icon: Clock,         color: "text-orange-500" },
+    { labelKey: "stats.completed",value: stats.done,     icon: CheckCircle2,  color: "text-emerald-500" },
+  ] as const;
+
   return (
-    <div className="space-y-5">
+    <div className="p-6 space-y-6">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Tasks</h1>
-          <p className="text-muted-foreground text-sm">All tasks across leads, contacts and deals.</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
         <div className="flex items-center gap-2">
-          {/* View toggle */}
           <div className="flex items-center rounded-md border bg-muted/30 p-0.5 gap-0.5">
             <button
               type="button"
@@ -333,7 +335,7 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <List className="h-3.5 w-3.5" /> List
+              <List className="h-3.5 w-3.5" /> {t("list")}
             </button>
             <button
               type="button"
@@ -345,7 +347,7 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <Kanban className="h-3.5 w-3.5" /> Board
+              <Kanban className="h-3.5 w-3.5" /> {t("board")}
             </button>
           </div>
           <NewTaskDialog users={users} currentUserId={currentUserId} onCreated={handleCreated} />
@@ -354,17 +356,12 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
 
       {/* ── Stats cards ─────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: "Total",     value: stats.total,    icon: Circle,        color: "text-muted-foreground" },
-          { label: "Overdue",   value: stats.overdue,  icon: AlertCircle,   color: "text-destructive" },
-          { label: "Due Today", value: stats.dueToday, icon: Clock,         color: "text-orange-500" },
-          { label: "Completed", value: stats.done,     icon: CheckCircle2,  color: "text-emerald-500" },
-        ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="rounded-lg border bg-card px-4 py-3 flex items-center gap-3">
+        {STAT_CARDS.map(({ labelKey, value, icon: Icon, color }) => (
+          <div key={labelKey} className="rounded-lg border bg-card px-4 py-3 flex items-center gap-3">
             <Icon className={cn("h-5 w-5 shrink-0", color)} />
             <div>
               <p className="text-xl font-bold leading-none">{value}</p>
-              <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t(labelKey)}</p>
             </div>
           </div>
         ))}
@@ -373,7 +370,7 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
       {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-2">
         <Input
-          placeholder="Search tasks…"
+          placeholder={t("searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="h-8 w-48"
@@ -385,49 +382,48 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All status</SelectItem>
-            <SelectItem value="todo">To do</SelectItem>
-            <SelectItem value="overdue">Overdue</SelectItem>
-            <SelectItem value="done">Done</SelectItem>
+            <SelectItem value="all">{t("allStatus")}</SelectItem>
+            <SelectItem value="todo">{t("todoFilter")}</SelectItem>
+            <SelectItem value="overdue">{t("overdue")}</SelectItem>
+            <SelectItem value="done">{t("statuses.done")}</SelectItem>
           </SelectContent>
         </Select>
 
         <Select value={filterPriority} onValueChange={setFilterPriority}>
           <SelectTrigger className="h-8 w-32 text-xs">
-            <SelectValue placeholder="Priority" />
+            <SelectValue placeholder={t("allPriorities")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All priorities</SelectItem>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="normal">Normal</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="all">{t("allPriorities")}</SelectItem>
+            <SelectItem value="high">{t("priorities.high")}</SelectItem>
+            <SelectItem value="normal">{t("priorities.normal")}</SelectItem>
+            <SelectItem value="low">{t("priorities.low")}</SelectItem>
           </SelectContent>
         </Select>
 
         <Select value={filterAssignee} onValueChange={setFilterAssignee}>
           <SelectTrigger className="h-8 w-36 text-xs">
-            <SelectValue placeholder="Assignee" />
+            <SelectValue placeholder={t("allAssignees")} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All assignees</SelectItem>
-            <SelectItem value="me">My tasks</SelectItem>
+            <SelectItem value="all">{t("allAssignees")}</SelectItem>
+            <SelectItem value="me">{t("myTasks")}</SelectItem>
             {users.map((u) => (
               <SelectItem key={u.id} value={u.id}>{u.name ?? u.id}</SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        {/* Bulk actions — appear when rows are selected */}
         {selected.size > 0 && (
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">{selected.size} selected</span>
+            <span className="text-xs text-muted-foreground">{t("selectedCount", { count: selected.size })}</span>
             <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={handleBulkComplete}>
               <CheckCircle2 className="h-3.5 w-3.5" />
-              Mark done
+              {t("markDone")}
             </Button>
             <Button size="sm" variant="outline" className="h-8 gap-1.5 text-destructive hover:text-destructive" onClick={handleBulkDelete}>
               <Trash2 className="h-3.5 w-3.5" />
-              Delete
+              {t("deleteTask")}
             </Button>
           </div>
         )}
@@ -437,26 +433,26 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
       {viewMode === "board" && (
         <DragDropContext onDragEnd={handleDragEnd}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {BOARD_COLUMNS.map((col) => {
-              const colTasks = filtered.filter((t) => {
-                if (col.id === "todo")        return t.status !== "done" && t.status !== "in_progress";
-                if (col.id === "in_progress") return t.status === "in_progress";
-                return t.status === "done";
+            {BOARD_COLUMN_IDS.map((colId) => {
+              const colLabel = t(`statuses.${colId === "in_progress" ? "inProgress" : colId === "todo" ? "todo" : "done"}`);
+              const colColor = BOARD_COLUMN_COLORS[colId];
+              const colTasks = filtered.filter((tk) => {
+                if (colId === "todo")        return tk.status !== "done" && tk.status !== "in_progress";
+                if (colId === "in_progress") return tk.status === "in_progress";
+                return tk.status === "done";
               });
               return (
-                <div key={col.id} className="flex flex-col gap-2">
-                  {/* Column header */}
+                <div key={colId} className="flex flex-col gap-2">
                   <div className="flex items-center justify-between px-1">
                     <div className="flex items-center gap-2">
-                      <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold", col.color)}>
-                        {col.label}
+                      <span className={cn("px-2 py-0.5 rounded-full text-xs font-semibold", colColor)}>
+                        {colLabel}
                       </span>
                     </div>
                     <span className="text-xs text-muted-foreground tabular-nums">{colTasks.length}</span>
                   </div>
 
-                  {/* Drop zone */}
-                  <Droppable droppableId={col.id}>
+                  <Droppable droppableId={colId}>
                     {(provided, snapshot) => (
                       <div
                         ref={provided.innerRef}
@@ -480,7 +476,7 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
                         {provided.placeholder}
                         {colTasks.length === 0 && !snapshot.isDraggingOver && (
                           <p className="text-xs text-muted-foreground/40 text-center py-6">
-                            Drop tasks here
+                            {t("dropTasksHere")}
                           </p>
                         )}
                       </div>
@@ -502,11 +498,11 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
               <th className="w-10 px-3 py-2.5 text-left">
                 <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
               </th>
-              <th className="px-3 py-2.5 text-left font-medium">Task</th>
-              <th className="px-3 py-2.5 text-left font-medium hidden md:table-cell">Linked to</th>
-              <th className="px-3 py-2.5 text-left font-medium hidden sm:table-cell">Due</th>
-              <th className="px-3 py-2.5 text-left font-medium hidden lg:table-cell">Priority</th>
-              <th className="px-3 py-2.5 text-left font-medium hidden lg:table-cell">Assignee</th>
+              <th className="px-3 py-2.5 text-left font-medium">{t("columns.task")}</th>
+              <th className="px-3 py-2.5 text-left font-medium hidden md:table-cell">{t("columns.linkedTo")}</th>
+              <th className="px-3 py-2.5 text-left font-medium hidden sm:table-cell">{t("columns.due")}</th>
+              <th className="px-3 py-2.5 text-left font-medium hidden lg:table-cell">{t("columns.priority")}</th>
+              <th className="px-3 py-2.5 text-left font-medium hidden lg:table-cell">{t("columns.assignee")}</th>
               <th className="w-10 px-3 py-2.5" />
             </tr>
           </thead>
@@ -515,8 +511,8 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
               <tr>
                 <td colSpan={7} className="py-12 text-center text-muted-foreground text-sm">
                   {search || filterStatus !== "all" || filterPriority !== "all" || filterAssignee !== "all"
-                    ? "No tasks match the current filters."
-                    : "No tasks yet. Create one to get started."}
+                    ? t("noTasksMatch")
+                    : t("noTasksYet")}
                 </td>
               </tr>
             ) : (
@@ -525,7 +521,8 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
                 const today = isDueToday(task);
                 const done = task.status === "done";
                 const entity = entityLink(task);
-                const priority = PRIORITY_CONFIG[task.priority as keyof typeof PRIORITY_CONFIG] ?? PRIORITY_CONFIG.normal;
+                const priorityClass = PRIORITY_CLASS[task.priority] ?? PRIORITY_CLASS.normal;
+                const priorityLabel = t(`priorities.${task.priority as "low" | "normal" | "high"}`);
 
                 return (
                   <tr
@@ -535,19 +532,17 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
                       done && "opacity-60",
                     )}
                   >
-                    {/* Checkbox */}
                     <td className="px-3 py-2.5">
                       <Checkbox checked={selected.has(task.id)} onCheckedChange={() => toggleOne(task.id)} />
                     </td>
 
-                    {/* Title + status toggle */}
                     <td className="px-3 py-2.5">
                       <div className="flex items-start gap-2.5">
                         <button
                           type="button"
                           onClick={() => handleToggleStatus(task)}
                           className="mt-0.5 shrink-0 text-muted-foreground hover:text-primary transition-colors"
-                          title={done ? "Mark as todo" : "Mark as done"}
+                          title={done ? t("markAsTodo") : t("markAsDone")}
                         >
                           {done
                             ? <CheckCircle2 className="h-4 w-4 text-emerald-500" />
@@ -564,7 +559,6 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
                       </div>
                     </td>
 
-                    {/* Linked entity */}
                     <td className="px-3 py-2.5 hidden md:table-cell">
                       {entity ? (
                         <Link
@@ -579,7 +573,6 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
                       )}
                     </td>
 
-                    {/* Due date */}
                     <td className="px-3 py-2.5 hidden sm:table-cell">
                       {task.dueDate ? (
                         <span className={cn(
@@ -596,14 +589,12 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
                       )}
                     </td>
 
-                    {/* Priority */}
                     <td className="px-3 py-2.5 hidden lg:table-cell">
-                      <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", priority.class)}>
-                        {priority.label}
+                      <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", priorityClass)}>
+                        {priorityLabel}
                       </Badge>
                     </td>
 
-                    {/* Assignee */}
                     <td className="px-3 py-2.5 hidden lg:table-cell">
                       {task.assigneeName ? (
                         <span className="text-xs text-muted-foreground">{task.assigneeName}</span>
@@ -614,7 +605,6 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
                       )}
                     </td>
 
-                    {/* Row actions */}
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-1">
                         <TaskModal
@@ -622,7 +612,7 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
                           users={users}
                           revalidatePathStr="/dashboard/tasks"
                           onUpdated={(updated) =>
-                            setTasks((prev) => prev.map((t) => t.id === updated.id ? { ...t, ...updated } : t))
+                            setTasks((prev) => prev.map((tk) => tk.id === updated.id ? { ...tk, ...updated } : tk))
                           }
                         />
                         <DropdownMenu>
@@ -633,14 +623,14 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-44">
                             <DropdownMenuItem onClick={() => handleToggleStatus(task)}>
-                              {done ? "Mark as to-do" : "Mark as done"}
+                              {done ? t("markAsTodo") : t("markAsDone")}
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => handleDelete(task.id)}
                             >
-                              Delete
+                              {t("deleteTask")}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -655,7 +645,7 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId }: Props
       </div>
 
       <p className="text-xs text-muted-foreground text-right">
-        Showing {filtered.length} of {tasks.length} tasks
+        {t("showingCount", { filtered: filtered.length, total: tasks.length })}
       </p>
       </>}
     </div>

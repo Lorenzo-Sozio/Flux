@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { ContactModal } from "./_components/contact-modal";
 import { ContactsTable } from "./_components/contacts-table";
 import { auth } from "@/auth";
+import { getTranslations } from "next-intl/server";
 
 export default async function ContactsPage({
   searchParams,
@@ -31,19 +32,21 @@ export default async function ContactsPage({
     getAllUsers(),
   ]);
 
+  const t = await getTranslations("contacts");
+  const tc = await getTranslations("common");
   const tree = encoded ? decodeFilter(encoded) : null;
   const activeCount = tree ? countActive(tree.conditions) : 0;
   const fields = { ...toFieldMetaMap(CONTACT_FIELDS), ...customFieldsToMetaMap(customDefs) };
 
   return (
-    <div className="p-8">
+    <div className="p-6">
       <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <h1 className="font-bold text-2xl">Contacts</h1>
+          <h1 className="font-bold text-2xl">{t("title")}</h1>
           <Badge variant="secondary">{allContacts.length}</Badge>
           {activeCount > 0 && (
             <Badge variant="outline" className="text-xs gap-1">
-              {activeCount} filter{activeCount !== 1 ? "s" : ""} active
+              {tc("filtersActive", { count: activeCount })}
               <Link href="/dashboard/contacts" className="ml-1 hover:text-destructive">✕</Link>
             </Badge>
           )}
@@ -62,7 +65,7 @@ export default async function ContactsPage({
           <ImportExportButtons entityType="contacts" />
           {canEdit && (
             <ContactModal>
-              <Button>Add Contact</Button>
+              <Button>{t("newContact")}</Button>
             </ContactModal>
           )}
         </div>

@@ -1,4 +1,5 @@
 import { getEmailTemplates } from "@/actions/marketing";
+import { getTranslations } from "next-intl/server";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,8 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default async function TemplatesPage() {
+  const t = await getTranslations("marketing.templates");
+  const tc = await getTranslations("common");
   let templates: any[] = [];
   try {
     templates = await getEmailTemplates();
@@ -28,16 +31,16 @@ export default async function TemplatesPage() {
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <MailIcon className="w-6 h-6 text-primary" />
-            Email Templates
+            {t("title")}
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            Build responsive email templates with the visual drag-and-drop editor.
+            {t("subtitle")}
           </p>
         </div>
         <Button asChild>
           <Link href="/dashboard/marketing/templates/editor">
             <Plus className="h-4 w-4 mr-1" />
-            New Template
+            {t("newTemplate")}
           </Link>
         </Button>
       </div>
@@ -46,36 +49,36 @@ export default async function TemplatesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Subject Line</TableHead>
-              <TableHead>Category</TableHead>
+              <TableHead>{tc("name")}</TableHead>
+              <TableHead>{t("subject")}</TableHead>
+              <TableHead>{tc("category")}</TableHead>
               <TableHead>Size</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{tc("createdAt")}</TableHead>
+              <TableHead className="text-right">{tc("actions")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {templates.length > 0 ? (
-              templates.map((t) => {
-                const bodyKb = t.body
-                  ? Math.round(new TextEncoder().encode(t.body).length / 102.4) / 10
+              templates.map((tmpl) => {
+                const bodyKb = tmpl.body
+                  ? Math.round(new TextEncoder().encode(tmpl.body).length / 102.4) / 10
                   : 0;
                 return (
-                  <TableRow key={t.id}>
+                  <TableRow key={tmpl.id}>
                     <TableCell>
                       <div>
-                        <p className="font-semibold">{t.name}</p>
-                        {t.description && (
-                          <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>
+                        <p className="font-semibold">{tmpl.name}</p>
+                        {tmpl.description && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{tmpl.description}</p>
                         )}
                       </div>
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                      {t.subject}
+                      {tmpl.subject}
                     </TableCell>
                     <TableCell>
-                      <span className={`text-xs px-2 py-1 rounded capitalize font-medium ${CATEGORY_COLORS[t.category] ?? CATEGORY_COLORS.general}`}>
-                        {t.category ?? "general"}
+                      <span className={`text-xs px-2 py-1 rounded capitalize font-medium ${CATEGORY_COLORS[tmpl.category] ?? CATEGORY_COLORS.general}`}>
+                        {tmpl.category ?? "general"}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -86,17 +89,17 @@ export default async function TemplatesPage() {
                       )}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {new Date(t.createdAt).toLocaleDateString()}
+                      {new Date(tmpl.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end items-center gap-2">
                         <Button variant="outline" size="sm" asChild className="h-7 gap-1 text-xs">
-                          <Link href={`/dashboard/marketing/templates/editor?id=${t.id}`}>
+                          <Link href={`/dashboard/marketing/templates/editor?id=${tmpl.id}`}>
                             <PenSquare className="h-3 w-3" />
-                            Edit
+                            {tc("edit")}
                           </Link>
                         </Button>
-                        <TemplateDeleteButton templateId={t.id} />
+                        <TemplateDeleteButton templateId={tmpl.id} />
                       </div>
                     </TableCell>
                   </TableRow>
@@ -106,11 +109,11 @@ export default async function TemplatesPage() {
               <TableRow>
                 <TableCell colSpan={6} className="text-center py-16 text-muted-foreground">
                   <MailIcon className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                  <p className="font-medium">No templates yet</p>
-                  <p className="text-sm mt-1">Create your first email template to get started</p>
+                  <p className="font-medium">{t("noTemplates")}</p>
+                  <p className="text-sm mt-1">{t("noTemplatesDescription")}</p>
                   <Button asChild className="mt-4" size="sm">
                     <Link href="/dashboard/marketing/templates/editor">
-                      <Plus className="h-4 w-4 mr-1" /> New Template
+                      <Plus className="h-4 w-4 mr-1" /> {t("newTemplate")}
                     </Link>
                   </Button>
                 </TableCell>

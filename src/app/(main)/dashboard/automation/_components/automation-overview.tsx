@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { Zap, TrendingUp, AlertTriangle, Clock } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,7 @@ interface AutomationOverviewProps {
 }
 
 export function AutomationOverview({ rules, logs }: AutomationOverviewProps) {
+  const t = useTranslations("automation");
   const stats = useMemo(() => {
     const now = new Date();
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
@@ -50,10 +52,10 @@ export function AutomationOverview({ rules, logs }: AutomationOverviewProps) {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-medium">Total Rules</p>
+              <p className="text-xs text-muted-foreground font-medium">{t("stats.totalRules")}</p>
               <p className="text-2xl font-bold mt-1">{stats.total}</p>
               <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                {stats.active} active
+                {t("stats.active", { count: stats.active })}
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100/50 dark:bg-blue-900/30">
@@ -68,10 +70,10 @@ export function AutomationOverview({ rules, logs }: AutomationOverviewProps) {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-medium">Last 24h</p>
+              <p className="text-xs text-muted-foreground font-medium">{t("stats.last24h")}</p>
               <p className="text-2xl font-bold mt-1">{stats.last24hExecutions}</p>
               <p className="text-xs text-muted-foreground mt-2">
-                runs total
+                {t("stats.runsTotal")}
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-purple-100/50 dark:bg-purple-900/30">
@@ -86,10 +88,10 @@ export function AutomationOverview({ rules, logs }: AutomationOverviewProps) {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-medium">Success Rate</p>
+              <p className="text-xs text-muted-foreground font-medium">{t("stats.successRate")}</p>
               <p className="text-2xl font-bold mt-1">{stats.successRate}%</p>
               <p className="text-xs text-green-600 dark:text-green-400 mt-2">
-                {stats.last24hSuccess}/{stats.last24hExecutions} successful
+                {t("stats.successCount", { success: stats.last24hSuccess, total: stats.last24hExecutions })}
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100/50 dark:bg-green-900/30">
@@ -111,10 +113,10 @@ export function AutomationOverview({ rules, logs }: AutomationOverviewProps) {
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-muted-foreground font-medium">Failed Runs</p>
+              <p className="text-xs text-muted-foreground font-medium">{t("stats.failedRuns")}</p>
               <p className="text-2xl font-bold mt-1">{stats.last24hFailed}</p>
               <p className="text-xs text-muted-foreground mt-2">
-                in last 24h
+                {t("stats.inLast24h")}
               </p>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-yellow-100/50 dark:bg-yellow-900/30">

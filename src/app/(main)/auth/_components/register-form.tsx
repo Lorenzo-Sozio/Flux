@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+import { useTranslations } from "next-intl";
 
 import { registerAction } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ const formSchema = z
   });
 
 export function RegisterForm() {
+  const t = useTranslations("auth.register");
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
 
@@ -48,18 +50,17 @@ export function RegisterForm() {
         return;
       }
 
-      // Sign in after successful registration
       await signIn("credentials", {
         email: data.email,
         password: data.password,
         redirect: false,
       });
 
-      toast.success("Account created successfully!");
+      toast.success(t("success"));
       router.push("/dashboard/crm");
       router.refresh();
     } catch {
-      toast.error("Something went wrong. Please try again.");
+      toast.error(t("error"));
     } finally {
       setIsPending(false);
     }
@@ -73,7 +74,7 @@ export function RegisterForm() {
           name="name"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="register-name">Full Name</FieldLabel>
+              <FieldLabel htmlFor="register-name">{t("fullName")}</FieldLabel>
               <Input
                 {...field}
                 id="register-name"
@@ -91,12 +92,12 @@ export function RegisterForm() {
           name="email"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="register-email">Email Address</FieldLabel>
+              <FieldLabel htmlFor="register-email">{t("email")}</FieldLabel>
               <Input
                 {...field}
                 id="register-email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder={t("emailPlaceholder")}
                 autoComplete="email"
                 aria-invalid={fieldState.invalid}
               />
@@ -109,7 +110,7 @@ export function RegisterForm() {
           name="password"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="register-password">Password</FieldLabel>
+              <FieldLabel htmlFor="register-password">{t("password")}</FieldLabel>
               <Input
                 {...field}
                 id="register-password"
@@ -127,7 +128,7 @@ export function RegisterForm() {
           name="confirmPassword"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="register-confirm-password">Confirm Password</FieldLabel>
+              <FieldLabel htmlFor="register-confirm-password">{t("confirmPassword")}</FieldLabel>
               <Input
                 {...field}
                 id="register-confirm-password"
@@ -142,7 +143,7 @@ export function RegisterForm() {
         />
       </FieldGroup>
       <Button className="w-full" type="submit" disabled={isPending}>
-        {isPending ? "Creating account…" : "Create Account"}
+        {isPending ? t("creatingAccount") : t("createAccount")}
       </Button>
     </form>
   );

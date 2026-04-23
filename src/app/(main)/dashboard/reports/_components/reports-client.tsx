@@ -35,6 +35,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import {
@@ -89,36 +90,6 @@ interface Props {
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const CHART_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899"];
 
-const ACTION_LABELS: Record<string, string> = {
-  login: "Login",
-  create_deal: "Create Deal",
-  update_deal: "Update Deal",
-  win_deal: "Win Deal",
-  lose_deal: "Lose Deal",
-  delete_deal: "Delete Deal",
-  create_lead: "Create Lead",
-  update_lead: "Update Lead",
-  convert_lead: "Convert Lead",
-  delete_lead: "Delete Lead",
-  create_contact: "Create Contact",
-  update_contact: "Update Contact",
-  delete_contact: "Delete Contact",
-  create_company: "Create Company",
-  create_task: "Create Task",
-  complete_task: "Complete Task",
-  delete_task: "Delete Task",
-  create_quote: "Create Quote",
-  send_quote: "Send Quote",
-  accept_quote: "Accept Quote",
-  delete_quote: "Delete Quote",
-  create_ticket: "Create Ticket",
-  resolve_ticket: "Resolve Ticket",
-  close_ticket: "Close Ticket",
-  launch_campaign: "Launch Campaign",
-  create_automation: "Create Automation",
-  trigger_automation: "Trigger Automation",
-};
-
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 function StatCard({
   title,
@@ -156,6 +127,8 @@ function StatCard({
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export function ReportsClient({ users, initial }: Props) {
+  const t = useTranslations("reports");
+  const actionLabels = t.raw("actionLabels") as Record<string, string>;
   const defaultFrom = format(subDays(new Date(), 29), "yyyy-MM-dd");
   const defaultTo = format(new Date(), "yyyy-MM-dd");
 
@@ -186,7 +159,7 @@ export function ReportsClient({ users, initial }: Props) {
           ]);
         setData({ kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf, salesReport });
       } catch {
-        toast.error("Failed to refresh report data");
+        toast.error(t("refreshFailed"));
       }
     });
   }, [from, to, userId]);
@@ -208,21 +181,21 @@ export function ReportsClient({ users, initial }: Props) {
         <CardContent className="pt-4 pb-4">
           <div className="flex flex-wrap gap-4 items-end">
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">From</Label>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">{t("from")}</Label>
               <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="h-8 text-sm w-36" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">To</Label>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">{t("to")}</Label>
               <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="h-8 text-sm w-36" />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">User</Label>
+              <Label className="text-xs uppercase tracking-wide text-muted-foreground">{t("user")}</Label>
               <Select value={userId} onValueChange={setUserId}>
                 <SelectTrigger className="h-8 text-sm w-44">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="all">{t("allUsers")}</SelectItem>
                   {users.map((u) => (
                     <SelectItem key={u.id} value={u.id}>
                       {u.name ?? u.email ?? u.id}
@@ -234,11 +207,11 @@ export function ReportsClient({ users, initial }: Props) {
             <div className="flex gap-2 ml-auto">
               <Button size="sm" variant="outline" onClick={handleExport}>
                 <Download className="mr-2 h-3.5 w-3.5" />
-                Export CSV
+                {t("exportCsv")}
               </Button>
               <Button size="sm" onClick={refresh} disabled={isPending}>
                 <RefreshCw className={`mr-2 h-3.5 w-3.5 ${isPending ? "animate-spin" : ""}`} />
-                Apply
+                {t("apply")}
               </Button>
             </div>
           </div>
@@ -248,60 +221,60 @@ export function ReportsClient({ users, initial }: Props) {
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Tracked Actions"
+          title={t("kpi.trackedActions")}
           value={kpis.activityCount}
           icon={Activity}
           color="border-l-blue-500"
-          sub="Total audit events in period"
+          sub={t("kpi.trackedActionsSub")}
         />
         <StatCard
-          title="Tasks Completed"
+          title={t("kpi.tasksCompleted")}
           value={`${kpis.tasksCompleted} / ${kpis.tasksTotal}`}
           icon={CheckCircle2}
           color="border-l-green-500"
-          sub={`${kpis.taskCompletionRate}% completion rate`}
+          sub={t("kpi.tasksCompletedSub", { rate: kpis.taskCompletionRate })}
         />
         <StatCard
-          title="Deals Won"
+          title={t("kpi.dealsWon")}
           value={`${kpis.dealsWon} / ${kpis.dealsCreated}`}
           icon={TrendingUp}
           color="border-l-violet-500"
-          sub={`${kpis.dealWinRate}% win rate`}
+          sub={t("kpi.dealsWonSub", { rate: kpis.dealWinRate })}
         />
         <StatCard
-          title="New Leads"
+          title={t("kpi.newLeads")}
           value={kpis.leadsCreated}
           icon={Users}
           color="border-l-orange-500"
-          sub="Leads added in period"
+          sub={t("kpi.newLeadsSub")}
         />
         <StatCard
-          title="Quotes Created"
+          title={t("kpi.quotesCreated")}
           value={kpis.quotesCreated}
           icon={FileText}
           color="border-l-cyan-500"
-          sub="All statuses"
+          sub={t("kpi.quotesCreatedSub")}
         />
         <StatCard
-          title="Open Tickets"
+          title={t("kpi.openTickets")}
           value={kpis.openTickets}
           icon={Ticket}
           color="border-l-amber-500"
-          sub="Open + in progress + waiting"
+          sub={t("kpi.openTicketsSub")}
         />
         <StatCard
-          title="Win Rate"
+          title={t("kpi.winRate")}
           value={`${kpis.dealWinRate}%`}
           icon={Target}
           color="border-l-emerald-500"
-          sub="Deals won vs. created"
+          sub={t("kpi.winRateSub")}
         />
         <StatCard
-          title="Task Rate"
+          title={t("kpi.taskRate")}
           value={`${kpis.taskCompletionRate}%`}
           icon={CheckCircle2}
           color="border-l-pink-500"
-          sub="Tasks done vs. total"
+          sub={t("kpi.taskRateSub")}
         />
       </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { useTranslations } from "next-intl";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -10,24 +11,26 @@ interface Props {
   revenueTrend: { month: string; deals: number; orders: number }[];
 }
 
-const chartConfig = {
-  deals: {
-    label: "Deals Won",
-    color: "var(--chart-1)",
-  },
-  orders: {
-    label: "Orders",
-    color: "var(--chart-2)",
-  },
-} as ChartConfig;
-
 export function CashFlowOverview({ revenueTrend }: Props) {
+  const t = useTranslations("finance");
+
+  const chartConfig = {
+    deals: {
+      label: t("dealsWonLabel"),
+      color: "var(--chart-1)",
+    },
+    orders: {
+      label: t("ordersLabel"),
+      color: "var(--chart-2)",
+    },
+  } as ChartConfig;
+
   const totalDeals = revenueTrend.reduce((acc, item) => acc + item.deals, 0);
   const totalOrders = revenueTrend.reduce((acc, item) => acc + item.orders, 0);
 
   const chartData = revenueTrend.map((item) => {
     const [year, month] = item.month.split("-");
-    const label = new Date(Number(year), Number(month) - 1, 1).toLocaleString("en-US", { month: "short" });
+    const label = new Date(Number(year), Number(month) - 1, 1).toLocaleString(undefined, { month: "short" });
     return { ...item, label };
   });
 
@@ -35,22 +38,20 @@ export function CashFlowOverview({ revenueTrend }: Props) {
     <Card>
       <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
         <div>
-          <CardTitle className="text-base">Revenue Trend</CardTitle>
-          <CardDescription className="text-xs mt-0.5">
-            Won deals and completed orders — last 12 months
-          </CardDescription>
+          <CardTitle className="text-base">{t("revenueTrend")}</CardTitle>
+          <CardDescription className="text-xs mt-0.5">{t("revenueTrendDesc")}</CardDescription>
         </div>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-1.5">
             <span className="inline-block size-2.5 rounded-sm" style={{ background: "var(--chart-1)" }} />
-            <span className="text-muted-foreground text-xs">Deals</span>
+            <span className="text-muted-foreground text-xs">{t("dealsLabel")}</span>
             <span className="font-medium text-xs tabular-nums">
               {formatCurrency(totalDeals, { noDecimals: true })}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block size-2.5 rounded-sm" style={{ background: "var(--chart-2)" }} />
-            <span className="text-muted-foreground text-xs">Orders</span>
+            <span className="text-muted-foreground text-xs">{t("ordersLabel")}</span>
             <span className="font-medium text-xs tabular-nums">
               {formatCurrency(totalOrders, { noDecimals: true })}
             </span>
@@ -70,8 +71,8 @@ export function CashFlowOverview({ revenueTrend }: Props) {
               className="text-xs"
             />
             <ChartTooltip content={<ChartTooltipContent hideLabel={false} />} />
-            <Bar dataKey="deals" stackId="a" fill={chartConfig.deals.color} radius={[0, 0, 0, 0]} />
-            <Bar dataKey="orders" stackId="a" fill={chartConfig.orders.color} radius={[4, 4, 0, 0]} />
+            <Bar dataKey="deals" stackId="a" fill={chartConfig.deals.color as string} radius={[0, 0, 0, 0]} />
+            <Bar dataKey="orders" stackId="a" fill={chartConfig.orders.color as string} radius={[4, 4, 0, 0]} />
           </BarChart>
         </ChartContainer>
       </CardContent>

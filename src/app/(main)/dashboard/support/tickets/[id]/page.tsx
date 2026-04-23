@@ -352,7 +352,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
   return (
     <>
-      <div className="space-y-5">
+      <div className="p-6 space-y-5">
         {/* Back nav */}
         <Link
           href="/dashboard/support/tickets"

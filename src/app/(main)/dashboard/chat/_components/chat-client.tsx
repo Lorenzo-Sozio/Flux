@@ -44,6 +44,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -95,29 +96,30 @@ function convName(conv: Conversation, myId: string) {
   return other?.user?.name ?? other?.user?.email ?? "Unknown";
 }
 
-function formatTime(date: Date | string) {
+function formatTime(date: Date | string, yesterday: string) {
   const d = new Date(date);
   const diffMs = Date.now() - d.getTime();
   const diffDays = Math.floor(diffMs / 86_400_000);
   if (diffDays === 0) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  if (diffDays === 1) return "Yesterday";
+  if (diffDays === 1) return yesterday;
   if (diffDays < 7) return d.toLocaleDateString([], { weekday: "short" });
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
-}
-
-function muteLabel(mutedUntil: Date | null) {
-  if (!mutedUntil) return null;
-  const diff = mutedUntil.getTime() - Date.now();
-  if (diff > 365 * 24 * 60 * 60_000) return "Muted forever";
-  const h = Math.round(diff / 3_600_000);
-  if (h >= 24) return `Muted ${Math.round(h / 24)}d`;
-  return `Muted ${h}h`;
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export function ChatClient({ userId }: { userId: string }) {
+  const t = useTranslations("chat");
   const myId = userId;
+
+  const muteLabel = (mutedUntil: Date | null) => {
+    if (!mutedUntil) return null;
+    const diff = mutedUntil.getTime() - Date.now();
+    if (diff > 365 * 24 * 60 * 60_000) return t("mutedForever");
+    const h = Math.round(diff / 3_600_000);
+    if (h >= 24) return t("mutedDays", { count: Math.round(h / 24) });
+    return t("mutedHours", { count: h });
+  };
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConv, setActiveConv] = useState<Conversation | null>(null);
@@ -226,14 +228,14 @@ export function ChatClient({ userId }: { userId: string }) {
   };
 
   const handleLeave = async (convId: string) => {
-    if (!confirm("Leave this group?")) return;
+    if (!confirm(t("leaveGroupConfirm"))) return;
     await leaveConversation(convId);
     if (activeConv?.id === convId) setActiveConv(null);
     await loadConversations();
   };
 
   const handleDelete = async (convId: string) => {
-    if (!confirm("Delete this conversation? This cannot be undone.")) return;
+    if (!confirm(t("deleteConvConfirm"))) return;
     await deleteConversation(convId);
     if (activeConv?.id === convId) {
       setActiveConv(null);
@@ -254,12 +256,12 @@ export function ChatClient({ userId }: { userId: string }) {
       {/* ── Left panel ───────────────────────────────────────────── */}
       <div className="w-72 shrink-0 flex flex-col border-r">
         <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h2 className="font-semibold text-base">Messages</h2>
+          <h2 className="font-semibold text-base">{t("messages")}</h2>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openNewDm} title="New direct message">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openNewDm} title={t("newDmTitle")}>
               <Edit className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openNewGroup} title="New group">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={openNewGroup} title={t("newGroupTitle")}>
               <Plus className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -269,7 +271,7 @@ export function ChatClient({ userId }: { userId: string }) {
           <div className="relative">
             <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
-              placeholder="Search…"
+              placeholder={t("searchPlaceholder")}
               className="pl-8 h-7 text-sm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -281,13 +283,13 @@ export function ChatClient({ userId }: { userId: string }) {
           <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
             <TabsList className="w-full h-7">
               <TabsTrigger value="all" className="flex-1 text-xs">
-                All
+                {t("allTab")}
               </TabsTrigger>
               <TabsTrigger value="direct" className="flex-1 text-xs">
-                DM
+                {t("dmTab")}
               </TabsTrigger>
               <TabsTrigger value="groups" className="flex-1 text-xs">
-                Groups
+                {t("groupsTab")}
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -297,7 +299,7 @@ export function ChatClient({ userId }: { userId: string }) {
           {filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 gap-2 text-sm text-muted-foreground">
               <MessageCircle className="h-8 w-8 opacity-30" />
-              <p>No conversations</p>
+              <p>{t("noConversationsPanel")}</p>
             </div>
           ) : (
             filtered.map((conv) => {
@@ -340,7 +342,7 @@ export function ChatClient({ userId }: { userId: string }) {
                         {name}
                       </span>
                       <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
-                        {last ? formatTime(last.createdAt) : ""}
+                        {last ? formatTime(last.createdAt, t("yesterday")) : ""}
                       </span>
                     </div>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
@@ -356,7 +358,7 @@ export function ChatClient({ userId }: { userId: string }) {
                             {muteText}
                           </span>
                         ) : (
-                          (last?.content ?? "No messages yet")
+                          (last?.content ?? t("noMessagesConv"))
                         )}
                       </span>
                       {conv.unread > 0 && (
@@ -381,23 +383,23 @@ export function ChatClient({ userId }: { userId: string }) {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground py-1">
-                          {isGroup ? "Group" : "Direct message"}
+                          {isGroup ? t("groupLabel") : t("directMessageLabel")}
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         {conv.muted ? (
                           <DropdownMenuItem onClick={() => handleMute(conv.id, null)}>
-                            <Volume2 className="h-3.5 w-3.5 mr-2" /> Unmute
+                            <Volume2 className="h-3.5 w-3.5 mr-2" /> {t("unmute")}
                           </DropdownMenuItem>
                         ) : (
                           <>
                             <DropdownMenuLabel className="text-[11px] text-muted-foreground px-2 pt-1 pb-0">
-                              Mute for…
+                              {t("muteFor")}
                             </DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => handleMute(conv.id, 60)}>1 hour</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleMute(conv.id, 8 * 60)}>8 hours</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleMute(conv.id, 24 * 60)}>24 hours</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleMute(conv.id, 60)}>{t("mute1h")}</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleMute(conv.id, 8 * 60)}>{t("mute8h")}</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleMute(conv.id, 24 * 60)}>{t("mute24h")}</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleMute(conv.id, 999_999_999)}>
-                              Forever
+                              {t("muteForever")}
                             </DropdownMenuItem>
                           </>
                         )}
@@ -408,7 +410,7 @@ export function ChatClient({ userId }: { userId: string }) {
                               onClick={() => handleLeave(conv.id)}
                               className="text-destructive focus:text-destructive"
                             >
-                              <LogOut className="h-3.5 w-3.5 mr-2" /> Leave group
+                              <LogOut className="h-3.5 w-3.5 mr-2" /> {t("leaveGroup")}
                             </DropdownMenuItem>
                           </>
                         )}
@@ -417,7 +419,7 @@ export function ChatClient({ userId }: { userId: string }) {
                           onClick={() => handleDelete(conv.id)}
                           className="text-destructive focus:text-destructive"
                         >
-                          <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                          <Trash2 className="h-3.5 w-3.5 mr-2" /> {t("delete")}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -434,13 +436,13 @@ export function ChatClient({ userId }: { userId: string }) {
         {!activeConv ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
             <MessageCircle className="h-12 w-12 opacity-20" />
-            <p className="text-sm font-medium">Select a conversation to start chatting</p>
+            <p className="text-sm font-medium">{t("selectConversation")}</p>
             <div className="flex gap-2 mt-1">
               <Button size="sm" variant="outline" onClick={openNewDm}>
-                <Edit className="h-3.5 w-3.5 mr-1.5" /> New Message
+                <Edit className="h-3.5 w-3.5 mr-1.5" /> {t("newMessageBtn")}
               </Button>
               <Button size="sm" variant="outline" onClick={openNewGroup}>
-                <Users className="h-3.5 w-3.5 mr-1.5" /> New Group
+                <Users className="h-3.5 w-3.5 mr-1.5" /> {t("newGroupBtn")}
               </Button>
             </div>
           </div>
@@ -467,7 +469,7 @@ export function ChatClient({ userId }: { userId: string }) {
               <div className="min-w-0">
                 <p className="font-semibold text-sm leading-tight">{convName(activeConv, myId)}</p>
                 {activeConv.type === "group" && (
-                  <p className="text-xs text-muted-foreground">{activeConv.members.length} members</p>
+                  <p className="text-xs text-muted-foreground">{t("membersCount", { count: activeConv.members.length })}</p>
                 )}
               </div>
             </div>
@@ -475,7 +477,7 @@ export function ChatClient({ userId }: { userId: string }) {
             <ScrollArea className="flex-1 px-4 py-4">
               <div className="space-y-3">
                 {messages.length === 0 && (
-                  <p className="text-center text-sm text-muted-foreground py-8">No messages yet. Say hello!</p>
+                  <p className="text-center text-sm text-muted-foreground py-8">{t("noMessagesYet")}</p>
                 )}
                 {[...messages].reverse().map((msg) => {
                   const isMe = msg.senderId === myId;
@@ -504,7 +506,7 @@ export function ChatClient({ userId }: { userId: string }) {
                         >
                           {msg.content}
                         </div>
-                        <p className="text-[10px] text-muted-foreground mt-0.5 px-0.5">{formatTime(msg.createdAt)}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 px-0.5">{formatTime(msg.createdAt, t("yesterday"))}</p>
                       </div>
                     </div>
                   );
@@ -515,7 +517,7 @@ export function ChatClient({ userId }: { userId: string }) {
 
             <div className="flex items-center gap-2 px-4 py-3 border-t bg-background">
               <Input
-                placeholder="Type a message…"
+                placeholder={t("typeMessage")}
                 value={messageInput}
                 onChange={(e) => setMessageInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -539,7 +541,7 @@ export function ChatClient({ userId }: { userId: string }) {
       <Dialog open={showNewDm} onOpenChange={setShowNewDm}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>New Direct Message</DialogTitle>
+            <DialogTitle>{t("newDmTitle")}</DialogTitle>
           </DialogHeader>
           <ScrollArea className="max-h-72">
             <div className="space-y-1">
@@ -572,11 +574,11 @@ export function ChatClient({ userId }: { userId: string }) {
       <Dialog open={showNewGroup} onOpenChange={setShowNewGroup}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>New Group</DialogTitle>
+            <DialogTitle>{t("newGroupTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Input placeholder="Group name…" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
-            <p className="text-xs font-medium text-muted-foreground uppercase">Select members</p>
+            <Input placeholder={t("groupNamePlaceholder")} value={groupName} onChange={(e) => setGroupName(e.target.value)} />
+            <p className="text-xs font-medium text-muted-foreground uppercase">{t("selectMembers")}</p>
             <ScrollArea className="max-h-56">
               <div className="space-y-1">
                 {chatUsers
@@ -607,7 +609,7 @@ export function ChatClient({ userId }: { userId: string }) {
               onClick={createGroup}
               disabled={!groupName.trim() || selectedMembers.length === 0}
             >
-              Create Group
+              {t("createGroup")}
             </Button>
           </div>
         </DialogContent>

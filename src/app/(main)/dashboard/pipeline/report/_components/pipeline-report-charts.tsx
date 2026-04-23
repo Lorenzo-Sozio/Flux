@@ -11,6 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type StageReport = {
@@ -24,20 +25,22 @@ type StageReport = {
 };
 
 const fmt = (v: number) =>
-  new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
+  new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
 
 export function PipelineReportCharts({ stageReport }: { stageReport: StageReport[] }) {
+  const t = useTranslations("pipeline");
+
   const valueData = stageReport.map((s) => ({
     name: s.name,
-    "Total Value": Math.round(s.totalValue),
-    "Weighted Forecast": Math.round(s.weightedValue),
+    totalValue: Math.round(s.totalValue),
+    weightedForecast: Math.round(s.weightedValue),
     fill: s.color ?? "#94a3b8",
   }));
 
   const velocityData = stageReport.map((s) => ({
     name: s.name,
-    "Avg Days": s.avgDaysInStage,
-    "Deals": s.dealCount,
+    avgDays: s.avgDaysInStage,
+    deals: s.dealCount,
     fill: s.color ?? "#94a3b8",
   }));
 
@@ -45,7 +48,7 @@ export function PipelineReportCharts({ stageReport }: { stageReport: StageReport
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Value by Stage</CardTitle>
+          <CardTitle className="text-sm">{t("charts.valueByStage")}</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={260}>
@@ -55,12 +58,12 @@ export function PipelineReportCharts({ stageReport }: { stageReport: StageReport
               <YAxis tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} tick={{ fontSize: 10 }} />
               <Tooltip formatter={(v: number) => fmt(v)} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="Total Value" radius={[4, 4, 0, 0]}>
+              <Bar dataKey="totalValue" name={t("charts.totalValue")} radius={[4, 4, 0, 0]}>
                 {valueData.map((entry, i) => (
                   <Cell key={i} fill={entry.fill} fillOpacity={0.85} />
                 ))}
               </Bar>
-              <Bar dataKey="Weighted Forecast" fill="hsl(var(--primary))" fillOpacity={0.4} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="weightedForecast" name={t("charts.weightedForecast")} fill="hsl(var(--primary))" fillOpacity={0.4} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -68,7 +71,7 @@ export function PipelineReportCharts({ stageReport }: { stageReport: StageReport
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Deal Velocity (avg days in stage)</CardTitle>
+          <CardTitle className="text-sm">{t("charts.dealVelocity")}</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={260}>
@@ -78,12 +81,12 @@ export function PipelineReportCharts({ stageReport }: { stageReport: StageReport
               <YAxis tick={{ fontSize: 10 }} />
               <Tooltip />
               <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar dataKey="Avg Days" radius={[4, 4, 0, 0]}>
+              <Bar dataKey="avgDays" name={t("charts.avgDays")} radius={[4, 4, 0, 0]}>
                 {velocityData.map((entry, i) => (
                   <Cell key={i} fill={entry.fill} fillOpacity={0.8} />
                 ))}
               </Bar>
-              <Bar dataKey="Deals" fill="#6366f1" fillOpacity={0.6} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="deals" name={t("charts.deals")} fill="#6366f1" fillOpacity={0.6} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

@@ -246,7 +246,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     : order.companyName ?? null;
 
   return (
-    <div className="space-y-5">
+    <div className="p-6 space-y-5">
       {/* Back nav */}
       <Link href="/dashboard/orders" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="h-4 w-4" /> All Orders

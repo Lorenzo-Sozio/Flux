@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -20,7 +21,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 
-// ── Schema ────────────────────────────────────────────────────────────────────
 const leadSchema = z.object({
   firstName:        z.string().min(1, "Required"),
   lastName:         z.string().min(1, "Required"),
@@ -49,33 +49,6 @@ const leadSchema = z.object({
 });
 type LeadFormValues = z.infer<typeof leadSchema>;
 
-const SOURCE_OPTIONS = [
-  { value: "website",        label: "Website" },
-  { value: "referral",       label: "Referral" },
-  { value: "linkedin",       label: "LinkedIn" },
-  { value: "cold_outreach",  label: "Cold Outreach" },
-  { value: "trade_show",     label: "Trade Show" },
-  { value: "advertisement",  label: "Advertisement" },
-  { value: "email_campaign", label: "Email Campaign" },
-  { value: "other",          label: "Other" },
-];
-
-const LEAD_STATUSES = [
-  { value: "new",         label: "New" },
-  { value: "contacting",  label: "Contacting" },
-  { value: "engaged",     label: "Engaged" },
-  { value: "qualified",   label: "Qualified" },
-  { value: "unqualified", label: "Unqualified" },
-  { value: "converted",   label: "Converted" },
-];
-
-const RATING_OPTIONS = [
-  { value: "hot",  label: "🔥 Hot" },
-  { value: "warm", label: "☀️ Warm" },
-  { value: "cold", label: "❄️ Cold" },
-];
-
-// ── Field helper ──────────────────────────────────────────────────────────────
 function F({
   label, error, required, children,
 }: {
@@ -92,8 +65,9 @@ function F({
   );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
 export function LeadModal({ lead, children }: { lead?: any; children: React.ReactNode }) {
+  const t = useTranslations("leads");
+  const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   const isEditing = !!lead;
   const searchParams = useSearchParams();
@@ -101,6 +75,17 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
   useEffect(() => {
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
   }, [isEditing, searchParams]);
+
+  const sourceOptions = [
+    { value: "website",        label: tc("sources.website") },
+    { value: "referral",       label: tc("sources.referral") },
+    { value: "linkedin",       label: tc("sources.linkedin") },
+    { value: "cold_outreach",  label: tc("sources.cold_outreach") },
+    { value: "trade_show",     label: tc("sources.trade_show") },
+    { value: "advertisement",  label: tc("sources.advertisement") },
+    { value: "email_campaign", label: tc("sources.email_campaign") },
+    { value: "other",          label: tc("sources.other") },
+  ];
 
   const form = useForm<LeadFormValues>({
     resolver: zodResolver(leadSchema),
@@ -148,15 +133,15 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
       const payload = { ...data, ownerId, groupId, assigneeValue: undefined };
       if (isEditing) {
         await updateLead(lead.id, payload);
-        toast.success("Lead updated.");
+        toast.success(t("updateSuccess"));
       } else {
         await createLead(payload);
-        toast.success("Lead created.");
+        toast.success(t("createSuccess"));
       }
       setOpen(false);
       form.reset();
     } catch {
-      toast.error("Failed to save lead.");
+      toast.error(t("form.saveFailed"));
     }
   };
 
@@ -169,7 +154,9 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="text-lg">
-            {isEditing ? `Edit Lead — ${lead.firstName} ${lead.lastName}` : "New Lead"}
+            {isEditing
+              ? t("form.editTitle", { name: `${lead.firstName} ${lead.lastName}` })
+              : t("form.newTitle")}
           </DialogTitle>
         </DialogHeader>
 
@@ -178,51 +165,51 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
             <Tabs defaultValue="info">
               <TabsList className="w-full mb-5">
                 <TabsTrigger value="info" className="relative flex-1 gap-1.5">
-                  <UserIcon className="h-3.5 w-3.5" />Info
+                  <UserIcon className="h-3.5 w-3.5" />{t("form.tabs.info")}
                   <TabDot has={tabErrors.info} />
                 </TabsTrigger>
                 <TabsTrigger value="crm" className="relative flex-1 gap-1.5">
-                  <TagIcon className="h-3.5 w-3.5" />CRM
+                  <TagIcon className="h-3.5 w-3.5" />{t("form.tabs.crm")}
                   <TabDot has={tabErrors.crm} />
                 </TabsTrigger>
                 <TabsTrigger value="address" className="relative flex-1 gap-1.5">
-                  <MapPinIcon className="h-3.5 w-3.5" />Address
+                  <MapPinIcon className="h-3.5 w-3.5" />{t("form.tabs.address")}
                   <TabDot has={tabErrors.address} />
                 </TabsTrigger>
                 <TabsTrigger value="notes" className="relative flex-1 gap-1.5">
-                  <FileTextIcon className="h-3.5 w-3.5" />Notes
+                  <FileTextIcon className="h-3.5 w-3.5" />{t("form.tabs.notes")}
                   <TabDot has={tabErrors.notes} />
                 </TabsTrigger>
               </TabsList>
 
               {/* ── Info Tab ─────────────────────────────────────────────── */}
               <TabsContent value="info" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
-                <F label="First Name" required error={e.firstName?.message}>
-                  <Input {...register("firstName")} placeholder="Jane" />
+                <F label={tc("firstName")} required error={e.firstName?.message}>
+                  <Input {...register("firstName")} placeholder="Mario" />
                 </F>
-                <F label="Last Name" required error={e.lastName?.message}>
-                  <Input {...register("lastName")} placeholder="Doe" />
+                <F label={tc("lastName")} required error={e.lastName?.message}>
+                  <Input {...register("lastName")} placeholder="Rossi" />
                 </F>
-                <F label="Email" error={e.email?.message}>
-                  <Input {...register("email")} type="email" placeholder="jane@example.com" />
+                <F label={tc("email")} error={e.email?.message}>
+                  <Input {...register("email")} type="email" placeholder="mario@example.com" />
                 </F>
-                <F label="Job Title" error={e.jobTitle?.message}>
+                <F label={tc("jobTitle")} error={e.jobTitle?.message}>
                   <Input {...register("jobTitle")} placeholder="Sales Manager" />
                 </F>
-                <F label="Phone" error={e.phone?.message}>
-                  <Input {...register("phone")} type="tel" placeholder="+39 02 1234567" />
+                <F label={tc("phone")} error={e.phone?.message}>
+                  <Input {...register("phone")} type="tel" placeholder="+39 0464 1234567" />
                 </F>
-                <F label="Mobile" error={e.mobile?.message}>
-                  <Input {...register("mobile")} type="tel" placeholder="+39 340 1234567" />
+                <F label={tc("mobile")} error={e.mobile?.message}>
+                  <Input {...register("mobile")} type="tel" placeholder="+39 345 1234567" />
                 </F>
-                <F label="Company Name" error={e.companyName?.message}>
+                <F label={t("form.companyName")} error={e.companyName?.message}>
                   <Input {...register("companyName")} placeholder="Acme Corp" />
                 </F>
-                <F label="Industry" error={e.industry?.message}>
+                <F label={tc("industry")} error={e.industry?.message}>
                   <Input {...register("industry")} placeholder="Technology, Finance…" />
                 </F>
                 <div className="col-span-2">
-                  <F label="Website" error={e.website?.message}>
+                  <F label={tc("website")} error={e.website?.message}>
                     <Input {...register("website")} placeholder="https://acme.com" />
                   </F>
                 </div>
@@ -231,53 +218,56 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
               {/* ── CRM Tab ──────────────────────────────────────────────── */}
               <TabsContent value="crm" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
                 <div className="col-span-2">
-                  <F label="Assigned To">
+                  <F label={t("form.assignedTo")}>
                     <Controller control={control} name="assigneeValue" render={({ field }) => (
                       <AssigneeSelect value={field.value ?? null} onChange={field.onChange} />
                     )} />
                   </F>
                 </div>
-                <F label="Status" error={e.status?.message}>
+                <F label={t("form.status")} error={e.status?.message}>
                   <Controller control={control} name="status" render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {LEAD_STATUSES.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                        ))}
+                        <SelectItem value="new">{t("statuses.new")}</SelectItem>
+                        <SelectItem value="contacting">{t("statuses.contacting")}</SelectItem>
+                        <SelectItem value="engaged">{t("statuses.engaged")}</SelectItem>
+                        <SelectItem value="qualified">{t("statuses.qualified")}</SelectItem>
+                        <SelectItem value="unqualified">{t("statuses.unqualified")}</SelectItem>
+                        <SelectItem value="converted">{t("converted")}</SelectItem>
                       </SelectContent>
                     </Select>
                   )} />
                 </F>
-                <F label="Source" error={e.source?.message}>
+                <F label={t("form.source")} error={e.source?.message}>
                   <Controller control={control} name="source" render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                      <SelectTrigger><SelectValue placeholder="— Select source —" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("form.selectSource")} /></SelectTrigger>
                       <SelectContent>
-                        {SOURCE_OPTIONS.map((o) => (
+                        {sourceOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   )} />
                 </F>
-                <F label="Rating" error={e.rating?.message}>
+                <F label={t("form.rating")} error={e.rating?.message}>
                   <Controller control={control} name="rating" render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                      <SelectTrigger><SelectValue placeholder="— Select rating —" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                       <SelectContent>
-                        {RATING_OPTIONS.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                        ))}
+                        <SelectItem value="hot">🔥 {t("ratings.hot")}</SelectItem>
+                        <SelectItem value="warm">☀️ {t("ratings.warm")}</SelectItem>
+                        <SelectItem value="cold">❄️ {t("ratings.cold")}</SelectItem>
                       </SelectContent>
                     </Select>
                   )} />
                 </F>
-                <F label="Lead Score (0–100)" error={e.leadScore?.message}>
+                <F label={t("form.leadScore")} error={e.leadScore?.message}>
                   <Input {...register("leadScore")} type="number" min={0} max={100} placeholder="0" />
                 </F>
                 <div className="col-span-2">
-                  <F label="Tags (comma-separated)" error={e.tags?.message}>
+                  <F label={t("form.tags")} error={e.tags?.message}>
                     <Input {...register("tags")} placeholder="tech, startup, b2b" />
                   </F>
                 </div>
@@ -285,8 +275,8 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
                   <Controller control={control} name="marketingConsent" render={({ field }) => (
                     <div className="flex items-center justify-between rounded-lg border px-4 py-3">
                       <div>
-                        <p className="text-sm font-medium">Marketing Consent</p>
-                        <p className="text-xs text-muted-foreground">User agreed to receive marketing communications</p>
+                        <p className="text-sm font-medium">{tc("marketingConsent")}</p>
+                        <p className="text-xs text-muted-foreground">{tc("marketingConsentDesc")}</p>
                       </div>
                       <Switch checked={field.value} onCheckedChange={field.onChange} />
                     </div>
@@ -297,30 +287,30 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
               {/* ── Address Tab ──────────────────────────────────────────── */}
               <TabsContent value="address" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
                 <div className="col-span-2">
-                  <F label="Street" error={e.street?.message}>
+                  <F label={tc("street")} error={e.street?.message}>
                     <Input {...register("street")} placeholder="Via Roma 1" />
                   </F>
                 </div>
-                <F label="City" error={e.city?.message}>
+                <F label={tc("city")} error={e.city?.message}>
                   <Input {...register("city")} placeholder="Milan" />
                 </F>
-                <F label="State / Province" error={e.state?.message}>
+                <F label={tc("state")} error={e.state?.message}>
                   <Input {...register("state")} placeholder="MI" />
                 </F>
-                <F label="ZIP / Postal Code" error={e.zipCode?.message}>
+                <F label={tc("zipCode")} error={e.zipCode?.message}>
                   <Input {...register("zipCode")} placeholder="20100" />
                 </F>
-                <F label="Country" error={e.country?.message}>
+                <F label={tc("country")} error={e.country?.message}>
                   <Input {...register("country")} placeholder="Italy" />
                 </F>
               </TabsContent>
 
               {/* ── Notes Tab ────────────────────────────────────────────── */}
               <TabsContent value="notes" className="mt-0">
-                <F label="Notes" error={e.notes?.message}>
+                <F label={tc("notes")} error={e.notes?.message}>
                   <Textarea
                     {...register("notes")}
-                    placeholder="Internal notes about this lead…"
+                    placeholder={t("form.notesPlaceholder")}
                     className="min-h-[180px] resize-y"
                   />
                 </F>
@@ -329,10 +319,10 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
           </div>
 
           <DialogFooter className="px-6 py-4 border-t bg-muted/30">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>{tc("cancel")}</Button>
             <Button type="submit" disabled={isSubmitting} className="min-w-[100px]">
               {isSubmitting && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? "Save Changes" : "Create Lead"}
+              {isEditing ? t("form.saveChanges") : t("form.createLead")}
             </Button>
           </DialogFooter>
         </form>
@@ -341,17 +331,17 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
   );
 }
 
-// ── Delete ────────────────────────────────────────────────────────────────────
 export function DeleteLeadButton({ id }: { id: string }) {
+  const t = useTranslations("leads");
   const [isDeleting, setIsDeleting] = useState(false);
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this lead?")) return;
+    if (!confirm(t("deleteConfirm"))) return;
     try {
       setIsDeleting(true);
       await deleteLead(id);
-      toast.success("Lead deleted.");
+      toast.success(t("deleteSuccess"));
     } catch {
-      toast.error("Failed to delete lead.");
+      toast.error(t("deleteFailed"));
     } finally {
       setIsDeleting(false);
     }

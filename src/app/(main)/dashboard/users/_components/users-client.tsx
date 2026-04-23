@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/table";
 import { getInitials } from "@/lib/utils";
 import { Copy, Info, KeyRound, Mail, Pencil, Plus, RotateCcw, Shield, Trash2, UserCog, Users } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { GroupModal } from "./group-modal";
 import { getUserGroups } from "@/actions/user-groups";
 
@@ -78,6 +79,8 @@ interface Props {
 type Group = Awaited<ReturnType<typeof getUserGroups>>[number];
 
 export function UsersClient({ users: initialUsers, pendingInvitations: initialInvitations, currentUserId, currentUserRole }: Props) {
+  const t = useTranslations("users");
+  const tc = useTranslations("common");
   const [users, setUsers] = useState(initialUsers);
   const [invitations] = useState(initialInvitations);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -115,26 +118,24 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
         invitedByName: me?.name ?? "Admin",
       });
 
-      // DB-level error (e.g. email already exists)
       if ("error" in result && result.error) {
         toast.error(result.error);
         return;
       }
 
-      // Email delivery failed — invitation is saved, show manual link
       if (!result.success && "inviteUrl" in result && result.inviteUrl) {
         setFallbackInviteUrl(result.inviteUrl);
-        toast.warning("Invitation saved but email could not be delivered. Copy the link below.");
+        toast.warning(t("inviteDialog.deliveryFailed"));
         return;
       }
 
-      toast.success(`Invitation sent to ${inviteEmail}`);
+      toast.success(`${t("inviteDialog.send")} → ${inviteEmail}`);
       setInviteOpen(false);
       setInviteEmail("");
       setInviteRole("user");
       setFallbackInviteUrl(null);
     } catch (err: any) {
-      toast.error(err?.message ?? "Failed to send invitation.");
+      toast.error(err?.message ?? tc("errorOccurred"));
     } finally {
       setIsInviting(false);
     }
@@ -144,20 +145,20 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
     try {
       await updateUserRoleAction(userId, newRole);
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
-      toast.success("Role updated.");
+      toast.success(t("updateSuccess"));
     } catch {
-      toast.error("Failed to update role.");
+      toast.error(tc("updateError"));
     }
   };
 
   const handleDelete = async (userId: string) => {
-    if (!confirm("Are you sure you want to delete this user? This cannot be undone.")) return;
+    if (!confirm(tc("confirmDelete"))) return;
     try {
       await deleteUserAction(userId);
       setUsers((prev) => prev.filter((u) => u.id !== userId));
-      toast.success("User deleted.");
+      toast.success(t("deleteSuccess"));
     } catch {
-      toast.error("Failed to delete user.");
+      toast.error(tc("deleteError"));
     }
   };
 
@@ -171,7 +172,7 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
       toast.success("Password changed successfully.");
       setChangePwOpen(false);
       setCurrentPw(""); setNewPw(""); setConfirmPw("");
-    } catch { toast.error("Failed to change password."); }
+    } catch { toast.error(tc("errorOccurred")); }
     finally { setIsChangingPw(false); }
   };
 
@@ -182,7 +183,7 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
     try {
       const result = await adminSendPasswordResetAction(user.id);
       if (result.success) {
-        toast.success(`Reset link sent to ${user.email}`);
+        toast.success(`${t("resetFallback.title")} → ${user.email}`);
         setResetTarget(null);
       } else if ("resetUrl" in result && result.resetUrl) {
         setResetFallbackUrl(result.resetUrl as string);
@@ -191,7 +192,7 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
         toast.error(result.error as string);
         setResetTarget(null);
       }
-    } catch { toast.error("Failed to send reset link."); setResetTarget(null); }
+    } catch { toast.error(tc("errorOccurred")); setResetTarget(null); }
     finally { setIsSendingReset(false); }
   };
 
@@ -200,15 +201,15 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
     : ["user", "viewer"];
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Team Members</h1>
-          <p className="text-muted-foreground">Manage users, roles, and invitations.</p>
+          <h1 className="text-2xl font-bold tracking-tight">{t("teamMembers")}</h1>
+          <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button onClick={() => setInviteOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
-          Invite User
+          {t("newUser")}
         </Button>
       </div>
 
@@ -216,7 +217,7 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
       {currentUserRole === "user" || currentUserRole === "viewer" ? (
         <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
           <Info className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>Role management is available to <strong>admin</strong> and <strong>owner</strong> users only. Contact your workspace administrator to change roles.</span>
+          <span>{t("roleManagementNotice")}</span>
         </div>
       ) : null}
 
@@ -225,17 +226,17 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <UserCog className="h-5 w-5" />
-            Active Users ({users.length})
+            {t("activeUsersCard", { count: users.length })}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>User</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                {currentUserRole !== "viewer" && <TableHead className="text-right">Actions</TableHead>}
+                <TableHead>{t("columns.user")}</TableHead>
+                <TableHead>{t("columns.role")}</TableHead>
+                <TableHead>{t("columns.status")}</TableHead>
+                {currentUserRole !== "viewer" && <TableHead className="text-right">{t("columns.actions")}</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -283,7 +284,7 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                   </TableCell>
                   <TableCell>
                     <Badge variant={user.emailVerified ? "default" : "secondary"}>
-                      {user.emailVerified ? "Verified" : "Unverified"}
+                      {user.emailVerified ? t("verified") : t("unverified")}
                     </Badge>
                   </TableCell>
                   {currentUserRole !== "viewer" && (
@@ -342,17 +343,17 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
-              Pending Invitations ({invitations.length})
+              {t("pendingInvitationsCard", { count: invitations.length })}
             </CardTitle>
-            <CardDescription>These users have been invited but haven't joined yet.</CardDescription>
+            <CardDescription>{t("pendingInvitationsDesc")}</CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Expires</TableHead>
+                  <TableHead>{t("columns.email")}</TableHead>
+                  <TableHead>{t("columns.role")}</TableHead>
+                  <TableHead>{t("columns.expires")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -376,16 +377,14 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
       {/* Role Legend */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">Role Permissions</CardTitle>
+          <CardTitle className="text-sm">{t("rolePermissions")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              { role: "owner", desc: "Full control, can delete workspace and manage all users." },
-              { role: "admin", desc: "Manage users, custom fields, templates, tenant settings." },
-              { role: "user", desc: "CRUD on contacts, deals, activities. Send emails. View reports." },
-              { role: "viewer", desc: "Read-only access to everything except their own tasks." },
-            ].map(({ role, desc }) => (
+            {(["owner", "admin", "user", "viewer"] as const).map((role) => ({
+              role,
+              desc: t(`roleDesc.${role}`),
+            })).map(({ role, desc }) => (
               <div key={role} className="rounded-lg border p-3">
                 <Badge className={`mb-2 capitalize ${ROLE_COLORS[role]}`}>
                   <Shield className="mr-1 h-3 w-3" />
@@ -404,24 +403,24 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              User Groups ({groups.length})
+              {t("userGroups", { count: groups.length })}
             </CardTitle>
             {["admin", "owner"].includes(currentUserRole) && (
               <GroupModal onSaved={() => getUserGroups().then(setGroups)}>
                 <Button size="sm" variant="outline">
-                  <Plus className="mr-2 h-3.5 w-3.5" />New Group
+                  <Plus className="mr-2 h-3.5 w-3.5" />{t("newGroup")}
                 </Button>
               </GroupModal>
             )}
           </div>
           <CardDescription className="text-xs">
-            Groups let you assign records to a team rather than a single user.
+            {t("userGroupsDesc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {groups.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">
-              No groups yet. Create one to start assigning records to teams.
+              {t("noGroups")}
             </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -455,11 +454,11 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                     ))}
                     {g.members.length > 4 && (
                       <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
-                        +{g.members.length - 4} more
+                        {t("moreMembers", { count: g.members.length - 4 })}
                       </Badge>
                     )}
                     {g.members.length === 0 && (
-                      <span className="text-[10px] text-muted-foreground">No members</span>
+                      <span className="text-[10px] text-muted-foreground">{t("noMembers")}</span>
                     )}
                   </div>
                 </div>
@@ -473,25 +472,23 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
       <Dialog open={inviteOpen} onOpenChange={(open) => { setInviteOpen(open); if (!open) setFallbackInviteUrl(null); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Invite Team Member</DialogTitle>
-            <DialogDescription>
-              Send an invitation email to add a new user to your workspace.
-            </DialogDescription>
+            <DialogTitle>{t("inviteDialog.title")}</DialogTitle>
+            <DialogDescription>{t("inviteDialog.desc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label htmlFor="invite-email">Email Address</Label>
+              <Label htmlFor="invite-email">{t("inviteDialog.emailLabel")}</Label>
               <Input
                 id="invite-email"
                 type="email"
-                placeholder="colleague@company.com"
+                placeholder={t("inviteDialog.emailPlaceholder")}
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 disabled={!!fallbackInviteUrl}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="invite-role">Role</Label>
+              <Label htmlFor="invite-role">{t("inviteDialog.roleLabel")}</Label>
               <Select value={inviteRole} onValueChange={setInviteRole} disabled={!!fallbackInviteUrl}>
                 <SelectTrigger id="invite-role">
                   <SelectValue />
@@ -506,11 +503,10 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
               </Select>
             </div>
 
-            {/* Fallback: email delivery failed — show manual invite link */}
             {fallbackInviteUrl && (
               <div className="rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-950/30 dark:border-orange-800 p-3 space-y-2">
                 <p className="text-sm font-medium text-orange-800 dark:text-orange-300">
-                  Email delivery failed — share this link manually:
+                  {t("inviteDialog.deliveryFailed")}
                 </p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 text-xs bg-background rounded border px-2 py-1.5 truncate select-all">
@@ -520,25 +516,25 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                     size="icon"
                     variant="outline"
                     className="h-8 w-8 shrink-0"
-                    onClick={() => { navigator.clipboard.writeText(fallbackInviteUrl); toast.success("Link copied!"); }}
-                    title="Copy link"
+                    onClick={() => { navigator.clipboard.writeText(fallbackInviteUrl); toast.success(tc("copy")); }}
+                    title={tc("copy")}
                   >
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Check your email provider configuration in Settings → Email.
+                  {t("inviteDialog.emailConfig")}
                 </p>
               </div>
             )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => { setInviteOpen(false); setFallbackInviteUrl(null); }}>
-              {fallbackInviteUrl ? "Close" : "Cancel"}
+              {fallbackInviteUrl ? t("inviteDialog.close") : tc("cancel")}
             </Button>
             {!fallbackInviteUrl && (
               <Button onClick={handleInvite} disabled={isInviting || !inviteEmail}>
-                {isInviting ? "Sending…" : "Send Invitation"}
+                {isInviting ? t("inviteDialog.sending") : t("inviteDialog.send")}
               </Button>
             )}
           </DialogFooter>
@@ -549,27 +545,27 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
       <Dialog open={changePwOpen} onOpenChange={(o) => { setChangePwOpen(o); if (!o) { setCurrentPw(""); setNewPw(""); setConfirmPw(""); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Change Password</DialogTitle>
-            <DialogDescription>Enter your current password and choose a new one.</DialogDescription>
+            <DialogTitle>{t("changePw.title")}</DialogTitle>
+            <DialogDescription>{t("changePw.desc")}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <Label>Current Password</Label>
+              <Label>{t("changePw.current")}</Label>
               <Input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} autoComplete="current-password" />
             </div>
             <div className="space-y-1.5">
-              <Label>New Password</Label>
+              <Label>{t("changePw.new")}</Label>
               <Input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} autoComplete="new-password" />
             </div>
             <div className="space-y-1.5">
-              <Label>Confirm New Password</Label>
+              <Label>{t("changePw.confirm")}</Label>
               <Input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} autoComplete="new-password" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setChangePwOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setChangePwOpen(false)}>{tc("cancel")}</Button>
             <Button onClick={handleChangePassword} disabled={isChangingPw || !currentPw || !newPw || !confirmPw}>
-              {isChangingPw ? "Saving…" : "Save Password"}
+              {isChangingPw ? t("changePw.saving") : t("changePw.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -579,7 +575,7 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
       <Dialog open={!!resetFallbackUrl} onOpenChange={(o) => { if (!o) { setResetFallbackUrl(null); setResetTarget(null); } }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Email Not Delivered</DialogTitle>
+            <DialogTitle>{t("resetFallback.title")}</DialogTitle>
             <DialogDescription>
               The reset link was generated but could not be emailed to <strong>{resetTarget?.email}</strong>. Share it manually:
             </DialogDescription>
@@ -593,15 +589,15 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                 size="icon"
                 variant="outline"
                 className="h-8 w-8 shrink-0"
-                onClick={() => { navigator.clipboard.writeText(resetFallbackUrl!); toast.success("Link copied!"); }}
+                onClick={() => { navigator.clipboard.writeText(resetFallbackUrl!); toast.success(tc("copy")); }}
               >
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">Link expires in 24 hours. Configure email in Settings → Email to avoid this.</p>
+            <p className="text-xs text-muted-foreground">{t("resetFallback.expires")}</p>
           </div>
           <DialogFooter>
-            <Button onClick={() => { setResetFallbackUrl(null); setResetTarget(null); }}>Close</Button>
+            <Button onClick={() => { setResetFallbackUrl(null); setResetTarget(null); }}>{tc("close")}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

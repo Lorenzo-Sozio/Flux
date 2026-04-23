@@ -8,7 +8,7 @@ import {
   isSameMonth, isSameDay, isSameWeek,
   addMonths, subMonths,
   addWeeks, subWeeks,
-  startOfDay, isAfter, isBefore,
+  startOfDay, isBefore,
 } from "date-fns";
 import {
   ChevronLeft, ChevronRight,
@@ -17,6 +17,7 @@ import {
   Clock, AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
 import { FormattedTime } from "@/components/crm/formatted-time";
 import { CalendarNewEventButton } from "@/components/crm/calendar-new-event-button";
@@ -25,18 +26,18 @@ import { CalendarNewEventButton } from "@/components/crm/calendar-new-event-butt
 
 type CalendarEvent = Awaited<ReturnType<typeof getCalendarEvents>>[number];
 
-const TYPE = {
-  task:    { label: "Task",    pill: "bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-200 border-l-blue-500",    dot: "bg-blue-500",    icon: CheckSquare },
-  meeting: { label: "Meeting", pill: "bg-violet-100 dark:bg-violet-950/70 text-violet-800 dark:text-violet-200 border-l-violet-500", dot: "bg-violet-500", icon: Users },
-  call:    { label: "Call",    pill: "bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-200 border-l-emerald-500", dot: "bg-emerald-500", icon: PhoneCall },
+const TYPE_STYLES = {
+  task:    { pill: "bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-200 border-l-blue-500",    dot: "bg-blue-500",    icon: CheckSquare },
+  meeting: { pill: "bg-violet-100 dark:bg-violet-950/70 text-violet-800 dark:text-violet-200 border-l-violet-500", dot: "bg-violet-500", icon: Users },
+  call:    { pill: "bg-emerald-100 dark:bg-emerald-950/70 text-emerald-800 dark:text-emerald-200 border-l-emerald-500", dot: "bg-emerald-500", icon: PhoneCall },
 } as const;
 
-function getType(type: string) {
-  return TYPE[type as keyof typeof TYPE] ?? TYPE.task;
+function getTypeStyle(type: string) {
+  return TYPE_STYLES[type as keyof typeof TYPE_STYLES] ?? TYPE_STYLES.task;
 }
 
 function EventPill({ event, compact = false }: { event: CalendarEvent; compact?: boolean }) {
-  const t = getType(event.type);
+  const t = getTypeStyle(event.type);
   const Icon = t.icon;
   return (
     <Link href={event.link} title={`${event.displayTitle} — ${event.entityName}`}>
@@ -60,7 +61,11 @@ export default async function CalendarPage({
 }: {
   searchParams: Promise<{ view?: string; date?: string }>;
 }) {
-  const { view: viewParam, date: dateParam } = await searchParams;
+  const [{ view: viewParam, date: dateParam }, t] = await Promise.all([
+    searchParams,
+    getTranslations("calendar"),
+  ]);
+
   const currentView = viewParam ?? "month";
   const baseDate = dateParam ? new Date(dateParam) : new Date();
   const today = new Date();
@@ -154,7 +159,7 @@ export default async function CalendarPage({
                 ))}
                 {overflow > 0 && (
                   <Link href={agendaUrl} className="text-[11px] text-muted-foreground hover:text-primary font-medium mt-auto text-center leading-none py-0.5">
-                    +{overflow} more
+                    {t("more", { count: overflow })}
                   </Link>
                 )}
               </div>
@@ -207,7 +212,7 @@ export default async function CalendarPage({
           <div className="border-b">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 border-b">
               <CheckSquare className="h-3.5 w-3.5 text-blue-500" />
-              <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wider">Tasks</span>
+              <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wider">{t("tasks")}</span>
             </div>
             <div className="grid grid-cols-7 divide-x min-h-[80px]">
               {weekDays.map((day, idx) => (
@@ -226,7 +231,7 @@ export default async function CalendarPage({
           <div>
             <div className="flex items-center gap-2 px-3 py-1.5 bg-violet-50 dark:bg-violet-950/30 border-b">
               <Users className="h-3.5 w-3.5 text-violet-500" />
-              <span className="text-xs font-semibold text-violet-700 dark:text-violet-300 uppercase tracking-wider">Meetings & Calls</span>
+              <span className="text-xs font-semibold text-violet-700 dark:text-violet-300 uppercase tracking-wider">{t("meetingsAndCalls")}</span>
             </div>
             <div className="grid grid-cols-7 divide-x min-h-[80px]">
               {weekDays.map((day, idx) => (
@@ -243,7 +248,7 @@ export default async function CalendarPage({
         {/* Empty state */}
         {!hasAnyTask && !hasAnyNonTask && (
           <div className="py-16 text-center text-sm text-muted-foreground">
-            No events scheduled for this week.
+            {t("noEventsThisWeek")}
           </div>
         )}
       </div>
@@ -252,7 +257,6 @@ export default async function CalendarPage({
 
   // ── VIEW: Agenda ─────────────────────────────────────────────────────────────
   const renderAgenda = () => {
-    // Filter from the selected base date onwards (or today if in month/default view)
     const from = startOfDay(baseDate);
     const upcoming = [...events]
       .filter(e => e.date && !isBefore(new Date(e.date), from))
@@ -262,7 +266,7 @@ export default async function CalendarPage({
       return (
         <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-xl text-muted-foreground gap-3">
           <CalendarDays className="h-12 w-12 opacity-20" />
-          <p className="text-sm">No upcoming events.</p>
+          <p className="text-sm">{t("noUpcomingEvents")}</p>
           <CalendarNewEventButton />
         </div>
       );
@@ -277,10 +281,16 @@ export default async function CalendarPage({
 
     const dayLabel = (dateStr: string) => {
       const d = new Date(dateStr);
-      if (isSameDay(d, today)) return "Today";
+      if (isSameDay(d, today)) return t("today");
       const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
-      if (isSameDay(d, tomorrow)) return "Tomorrow";
+      if (isSameDay(d, tomorrow)) return t("tomorrow");
       return format(d, "EEEE");
+    };
+
+    const typeLabels: Record<string, string> = {
+      task: t("typeTask"),
+      meeting: t("typeMeeting"),
+      call: t("typeCall"),
     };
 
     return (
@@ -307,23 +317,23 @@ export default async function CalendarPage({
                   </div>
                 </div>
                 <Badge variant="secondary" className="text-xs tabular-nums">
-                  {dayEvents.length} {dayEvents.length === 1 ? "event" : "events"}
+                  {t("eventCount", { count: dayEvents.length })}
                 </Badge>
               </div>
 
               {/* Events for this day */}
               <div className="divide-y">
                 {dayEvents.map(ev => {
-                  const t = getType(ev.type);
-                  const Icon = t.icon;
+                  const ts = getTypeStyle(ev.type);
+                  const Icon = ts.icon;
                   return (
                     <Link key={ev.id} href={ev.link}>
                       <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors group">
                         {/* Color bar */}
-                        <div className={`w-1 self-stretch rounded-full ${t.dot}`} />
+                        <div className={`w-1 self-stretch rounded-full ${ts.dot}`} />
 
                         {/* Icon */}
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${t.pill} border-l-0`}>
+                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${ts.pill} border-l-0`}>
                           <Icon className="h-4 w-4" />
                         </div>
 
@@ -338,7 +348,9 @@ export default async function CalendarPage({
                             )}
                           </div>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-muted-foreground capitalize">{t.label}</span>
+                            <span className="text-xs text-muted-foreground capitalize">
+                              {typeLabels[ev.type] ?? ev.type}
+                            </span>
                             {ev.entityName && ev.entityName !== "No Entity" && (
                               <>
                                 <span className="text-muted-foreground/40">·</span>
@@ -374,10 +386,10 @@ export default async function CalendarPage({
         {/* Left: title + stats */}
         <div className="flex items-center gap-3">
           <CalendarDays className="h-6 w-6 text-primary shrink-0" />
-          <h1 className="text-xl font-bold">Calendar</h1>
+          <h1 className="text-xl font-bold">{t("title")}</h1>
           {todayEvents.length > 0 && (
             <Badge variant="secondary" className="text-xs">
-              {todayEvents.length} today
+              {t("todayBadge", { count: todayEvents.length })}
             </Badge>
           )}
         </div>
@@ -388,7 +400,7 @@ export default async function CalendarPage({
           <div className="flex rounded-lg border bg-muted/40 p-0.5">
             {(["month", "week", "agenda"] as const).map((v) => {
               const ICONS = { month: LayoutGrid, week: Columns3, agenda: List };
-              const LABELS = { month: "Month", week: "Week", agenda: "Agenda" };
+              const LABELS = { month: t("month"), week: t("week"), agenda: t("agenda") };
               const Icon = ICONS[v];
               const isActive = currentView === v;
               return (
@@ -432,7 +444,7 @@ export default async function CalendarPage({
           {/* Today */}
           {currentView !== "agenda" && (
             <Button variant="outline" size="sm" asChild>
-              <Link href={todayUrl}>Today</Link>
+              <Link href={todayUrl}>{t("today")}</Link>
             </Button>
           )}
 
@@ -448,9 +460,9 @@ export default async function CalendarPage({
             <CalendarDays className="h-4 w-4 text-primary" />
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">Today</div>
+            <div className="text-xs text-muted-foreground">{t("today")}</div>
             <div className="text-lg font-bold leading-tight">{todayEvents.length}
-              <span className="text-xs font-normal text-muted-foreground ml-1">events</span>
+              <span className="text-xs font-normal text-muted-foreground ml-1">{t("events")}</span>
             </div>
           </div>
         </div>
@@ -460,9 +472,9 @@ export default async function CalendarPage({
             <Columns3 className="h-4 w-4 text-violet-500" />
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">This week</div>
+            <div className="text-xs text-muted-foreground">{t("thisWeek")}</div>
             <div className="text-lg font-bold leading-tight">{weekEvents.length}
-              <span className="text-xs font-normal text-muted-foreground ml-1">events</span>
+              <span className="text-xs font-normal text-muted-foreground ml-1">{t("events")}</span>
             </div>
           </div>
         </div>
@@ -472,10 +484,10 @@ export default async function CalendarPage({
             <AlertCircle className={`h-4 w-4 ${overdueEvents.length > 0 ? "text-red-500" : "text-muted-foreground"}`} />
           </div>
           <div>
-            <div className="text-xs text-muted-foreground">Overdue tasks</div>
+            <div className="text-xs text-muted-foreground">{t("overdueTasks")}</div>
             <div className={`text-lg font-bold leading-tight ${overdueEvents.length > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
               {overdueEvents.length}
-              <span className="text-xs font-normal text-muted-foreground ml-1">tasks</span>
+              <span className="text-xs font-normal text-muted-foreground ml-1">{t("tasksLabel")}</span>
             </div>
           </div>
         </div>
@@ -483,12 +495,15 @@ export default async function CalendarPage({
 
       {/* ── Legend ── */}
       <div className="flex items-center gap-4 text-xs text-muted-foreground">
-        {Object.entries(TYPE).map(([key, cfg]) => (
-          <div key={key} className="flex items-center gap-1.5">
-            <span className={`h-2.5 w-2.5 rounded-full ${cfg.dot}`} />
-            <span>{cfg.label}</span>
-          </div>
-        ))}
+        {Object.entries(TYPE_STYLES).map(([key, cfg]) => {
+          const label = { task: t("typeTask"), meeting: t("typeMeeting"), call: t("typeCall") }[key] ?? key;
+          return (
+            <div key={key} className="flex items-center gap-1.5">
+              <span className={`h-2.5 w-2.5 rounded-full ${cfg.dot}`} />
+              <span>{label}</span>
+            </div>
+          );
+        })}
       </div>
 
       {/* ── Calendar view ── */}

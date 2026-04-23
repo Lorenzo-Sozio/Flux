@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 
 export interface NavSubItem {
-  title: string;
+  titleKey: string;
   url: string;
   icon?: LucideIcon;
   comingSoon?: boolean;
@@ -39,7 +39,7 @@ export interface NavSubItem {
 }
 
 export interface NavMainItem {
-  title: string;
+  titleKey: string;
   url: string;
   icon?: LucideIcon;
   subItems?: NavSubItem[];
@@ -50,197 +50,92 @@ export interface NavMainItem {
 
 export interface NavGroup {
   id: number;
-  label?: string;
+  labelKey?: string;
   items: NavMainItem[];
 }
 
 export const sidebarItems: NavGroup[] = [
   {
     id: 1,
-    label: "CRM",
+    labelKey: "crm",
     items: [
-      {
-        title: "Dashboard",
-        url: "/dashboard/crm",
-        icon: ChartBar,
-      },
-      {
-        title: "Pipeline",
-        url: "/dashboard/pipeline",
-        icon: Kanban,
-      },
-      {
-        title: "Calendar",
-        url: "/dashboard/calendar",
-        icon: Calendar,
-      },
-      {
-        title: "Tasks",
-        url: "/dashboard/tasks",
-        icon: CheckSquare,
-      },
-      {
-        title: "Chat",
-        url: "/dashboard/chat",
-        icon: MessageCircle,
-        isNew: true,
-      },
-      {
-        title: "Leads",
-        url: "/dashboard/leads",
-        icon: Users,
-      },
-      {
-        title: "Contacts",
-        url: "/dashboard/contacts",
-        icon: Contact,
-      },
-      {
-        title: "Companies",
-        url: "/dashboard/companies",
-        icon: Building2,
-      },
+      { titleKey: "dashboard", url: "/dashboard/crm", icon: ChartBar },
+      { titleKey: "pipeline", url: "/dashboard/pipeline", icon: Kanban },
+      { titleKey: "calendar", url: "/dashboard/calendar", icon: Calendar },
+      { titleKey: "tasks", url: "/dashboard/tasks", icon: CheckSquare },
+      { titleKey: "chat", url: "/dashboard/chat", icon: MessageCircle, isNew: true },
+      { titleKey: "leads", url: "/dashboard/leads", icon: Users },
+      { titleKey: "contacts", url: "/dashboard/contacts", icon: Contact },
+      { titleKey: "companies", url: "/dashboard/companies", icon: Building2 },
     ],
   },
   {
     id: 2,
-    label: "Sales",
+    labelKey: "sales",
     items: [
-      {
-        title: "Finance",
-        url: "/dashboard/finance",
-        icon: Banknote,
-      },
-      {
-        title: "Quotes",
-        url: "/dashboard/quotes",
-        icon: FileText,
-        isNew: true,
-      },
-      {
-        title: "Products",
-        url: "/dashboard/products",
-        icon: Package,
-        isNew: true,
-      },
-      {
-        title: "Orders",
-        url: "/dashboard/orders",
-        icon: ShoppingCart,
-        isNew: true,
-      },
+      { titleKey: "finance", url: "/dashboard/finance", icon: Banknote },
+      { titleKey: "quotes", url: "/dashboard/quotes", icon: FileText, isNew: true },
+      { titleKey: "products", url: "/dashboard/products", icon: Package, isNew: true },
+      { titleKey: "orders", url: "/dashboard/orders", icon: ShoppingCart, isNew: true },
     ],
   },
   {
     id: 2.5,
-    label: "Automation",
+    labelKey: "automation",
     items: [
-      {
-        title: "Rules",
-        url: "/dashboard/automation",
-        icon: Zap,
-        isNew: true,
-      },
+      { titleKey: "rules", url: "/dashboard/automation", icon: Zap, isNew: true },
     ],
   },
   {
     id: 3,
-    label: "Support",
+    labelKey: "support",
     items: [
-      {
-        title: "Tickets",
-        url: "/dashboard/support/tickets",
-        icon: MessageSquare,
-        isNew: true,
-      },
-      {
-        title: "SLA Management",
-        url: "/dashboard/settings/sla",
-        icon: Clock,
-        isNew: true,
-      },
+      { titleKey: "tickets", url: "/dashboard/support/tickets", icon: MessageSquare, isNew: true },
+      { titleKey: "slaManagement", url: "/dashboard/settings/sla", icon: Clock, isNew: true },
     ],
   },
   {
     id: 4,
-    label: "Marketing",
+    labelKey: "marketing",
     items: [
-      {
-        title: "Templates",
-        url: "/dashboard/marketing/templates",
-        icon: Mail,
-      },
-      {
-        title: "Campaigns",
-        url: "/dashboard/marketing/campaigns",
-        icon: Target,
-      },
+      { titleKey: "templates", url: "/dashboard/marketing/templates", icon: Mail },
+      { titleKey: "campaigns", url: "/dashboard/marketing/campaigns", icon: Target },
     ],
   },
   {
     id: 5,
-    label: "Administration",
+    labelKey: "administration",
     items: [
+      { titleKey: "users", url: "/dashboard/users", icon: Users, isNew: true },
+      { titleKey: "roles", url: "/dashboard/roles", icon: ShieldCheck },
+      { titleKey: "reports", url: "/dashboard/reports", icon: BarChart3, isNew: true },
       {
-        title: "Users",
-        url: "/dashboard/users",
-        icon: Users,
-        isNew: true,
-      },
-      {
-        title: "Roles",
-        url: "/dashboard/roles",
-        icon: ShieldCheck,
-      },
-      {
-        title: "Reports",
-        url: "/dashboard/reports",
-        icon: BarChart3,
-        isNew: true,
-      },
-      {
-        title: "Settings",
+        titleKey: "settings",
         url: "/dashboard/settings",
         icon: Settings,
         subItems: [
-          {
-            title: "Custom Fields",
-            url: "/dashboard/settings/custom-fields",
-            icon: Settings2,
-          },
-          {
-            title: "Email",
-            url: "/dashboard/settings/email",
-            icon: MailOpen,
-          },
-          {
-            title: "Webhooks",
-            url: "/dashboard/settings/webhooks",
-            icon: Webhook,
-          },
+          { titleKey: "customFields", url: "/dashboard/settings/custom-fields", icon: Settings2 },
+          { titleKey: "email", url: "/dashboard/settings/email", icon: MailOpen },
+          { titleKey: "webhooks", url: "/dashboard/settings/webhooks", icon: Webhook },
         ],
       },
     ],
   },
   {
     id: 6,
-    label: "Dashboard Templates",
+    labelKey: "dashboardTemplates",
     items: [
+      { titleKey: "analytics", url: "/dashboard/analytics", icon: Gauge },
       {
-        title: "Analytics",
-        url: "/dashboard/analytics",
-        icon: Gauge,
-      },
-      {
-        title: "Auth Pages",
+        titleKey: "authPages",
         url: "/auth",
         icon: Fingerprint,
         subItems: [
-          { title: "Login v1", url: "/auth/v1/login", newTab: true },
-          { title: "Login v2", url: "/auth/v2/login", newTab: true },
-          { title: "Register v1", url: "/auth/v1/register", newTab: true },
-          { title: "Register v2", url: "/auth/v2/register", newTab: true },
-          { title: "Forgot Password", url: "/auth/v1/forgot-password", newTab: true },
+          { titleKey: "loginV1", url: "/auth/v1/login", newTab: true },
+          { titleKey: "loginV2", url: "/auth/v2/login", newTab: true },
+          { titleKey: "registerV1", url: "/auth/v1/register", newTab: true },
+          { titleKey: "registerV2", url: "/auth/v2/register", newTab: true },
+          { titleKey: "forgotPassword", url: "/auth/v1/forgot-password", newTab: true },
         ],
       },
     ],

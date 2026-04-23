@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Plus, Pencil, Trash2, Clock, ShieldAlert, Loader2 } from "lucide-react";
 import { createSlaAction, updateSlaAction, deleteSlaAction, toggleSlaAction } from "@/actions/sla";
 import { SlaSchema } from "@/actions/sla-validation";
@@ -54,12 +55,13 @@ type Sla = {
 };
 
 type FormValues = z.infer<typeof SlaSchema>;
+type PriorityKey = "low" | "normal" | "high" | "urgent";
 
-const PRIORITY_CONFIG: Record<string, { label: string; className: string }> = {
-  low:    { label: "Low",    className: "border-slate-300 text-slate-600" },
-  normal: { label: "Normal", className: "border-blue-300 text-blue-600 bg-blue-50" },
-  high:   { label: "High",   className: "border-amber-300 text-amber-600 bg-amber-50" },
-  urgent: { label: "Urgent", className: "border-red-300 text-red-600 bg-red-50" },
+const PRIORITY_CLASSNAMES: Record<string, string> = {
+  low:    "border-slate-300 text-slate-600",
+  normal: "border-blue-300 text-blue-600 bg-blue-50",
+  high:   "border-amber-300 text-amber-600 bg-amber-50",
+  urgent: "border-red-300 text-red-600 bg-red-50",
 };
 
 function formatMinutes(minutes: number): string {
@@ -74,6 +76,8 @@ interface Props {
 }
 
 export function SlaClient({ slas: initial }: Props) {
+  const t = useTranslations("support.sla");
+  const tc = useTranslations("common");
   const [slas, setSlas] = useState(initial);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Sla | null>(null);
@@ -123,16 +127,15 @@ export function SlaClient({ slas: initial }: Props) {
       if (editTarget) {
         await updateSlaAction(editTarget.id, data);
         setSlas((prev) => prev.map((s) => s.id === editTarget.id ? { ...s, ...data } : s));
-        toast.success("SLA updated");
+        toast.success(t("updateSuccess"));
       } else {
         await createSlaAction(data);
-        toast.success("SLA created");
-        // Refresh by reloading — simplest since we don't get the new ID back
+        toast.success(t("createSuccess"));
         window.location.reload();
       }
       setDialogOpen(false);
     } catch {
-      toast.error("Failed to save SLA");
+      toast.error(t("saveFailed"));
     }
   }
 
@@ -142,7 +145,7 @@ export function SlaClient({ slas: initial }: Props) {
         await toggleSlaAction(sla.id, isActive);
         setSlas((prev) => prev.map((s) => s.id === sla.id ? { ...s, isActive } : s));
       } catch {
-        toast.error("Failed to update SLA");
+        toast.error(t("updateFailed"));
       }
     });
   }
@@ -153,9 +156,9 @@ export function SlaClient({ slas: initial }: Props) {
       try {
         await deleteSlaAction(deleteTarget.id);
         setSlas((prev) => prev.filter((s) => s.id !== deleteTarget.id));
-        toast.success("SLA deleted");
+        toast.success(t("deleteSuccess"));
       } catch {
-        toast.error("Failed to delete SLA");
+        toast.error(t("deleteFailed"));
       } finally {
         setDeleteTarget(null);
       }
@@ -169,45 +172,43 @@ export function SlaClient({ slas: initial }: Props) {
           <div>
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-primary" />
-              SLA Policies
+              {t("policies")}
             </CardTitle>
             <CardDescription className="text-sm mt-1">
-              Each policy maps a ticket priority to response and resolution targets.
+              {t("policiesDescription")}
             </CardDescription>
           </div>
           <Button size="sm" onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />
-            New SLA
+            {t("newSla")}
           </Button>
         </CardHeader>
         <CardContent className="p-0">
           {slas.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Clock className="h-10 w-10 text-muted-foreground/40 mb-3" />
-              <p className="text-sm font-medium text-muted-foreground">No SLA policies defined</p>
-              <p className="text-xs text-muted-foreground mt-1">
-                Create your first policy to start tracking ticket response times.
-              </p>
+              <p className="text-sm font-medium text-muted-foreground">{t("noSlasYet")}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("noSlasDesc")}</p>
               <Button size="sm" className="mt-4" onClick={openCreate}>
                 <Plus className="mr-2 h-4 w-4" />
-                New SLA
+                {t("newSla")}
               </Button>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="text-xs font-semibold">Name</TableHead>
-                  <TableHead className="text-xs font-semibold">Priority</TableHead>
-                  <TableHead className="text-xs font-semibold text-right">First Response</TableHead>
-                  <TableHead className="text-xs font-semibold text-right">Resolution</TableHead>
-                  <TableHead className="text-xs font-semibold text-center">Active</TableHead>
+                  <TableHead className="text-xs font-semibold">{t("columns.name")}</TableHead>
+                  <TableHead className="text-xs font-semibold">{t("columns.priority")}</TableHead>
+                  <TableHead className="text-xs font-semibold text-right">{t("columns.firstResponse")}</TableHead>
+                  <TableHead className="text-xs font-semibold text-right">{t("columns.resolution")}</TableHead>
+                  <TableHead className="text-xs font-semibold text-center">{t("columns.active")}</TableHead>
                   <TableHead className="w-20" />
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {slas.map((sla) => {
-                  const cfg = PRIORITY_CONFIG[sla.priority] ?? PRIORITY_CONFIG.normal;
+                  const className = PRIORITY_CLASSNAMES[sla.priority] ?? PRIORITY_CLASSNAMES.normal;
                   return (
                     <TableRow key={sla.id}>
                       <TableCell>
@@ -219,8 +220,8 @@ export function SlaClient({ slas: initial }: Props) {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={`text-xs ${cfg.className}`}>
-                          {cfg.label}
+                        <Badge variant="outline" className={`text-xs ${className}`}>
+                          {t(`priorities.${sla.priority as PriorityKey}`)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums font-medium">
@@ -265,28 +266,25 @@ export function SlaClient({ slas: initial }: Props) {
         </CardContent>
       </Card>
 
-      {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{editTarget ? "Edit SLA Policy" : "New SLA Policy"}</DialogTitle>
-            <DialogDescription>
-              Set response and resolution time targets in minutes.
-            </DialogDescription>
+            <DialogTitle>{editTarget ? t("dialog.titleEdit") : t("dialog.titleCreate")}</DialogTitle>
+            <DialogDescription>{t("dialog.description")}</DialogDescription>
           </DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-1">
             <div className="space-y-2">
-              <Label>Name <span className="text-destructive">*</span></Label>
-              <Input placeholder="e.g. Standard SLA" {...form.register("name")} />
+              <Label>{t("columns.name")} <span className="text-destructive">*</span></Label>
+              <Input placeholder={t("dialog.namePlaceholder")} {...form.register("name")} />
               {form.formState.errors.name && (
                 <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
               )}
             </div>
 
             <div className="space-y-2">
-              <Label>Description</Label>
+              <Label>{t("dialog.descriptionLabel")}</Label>
               <Textarea
-                placeholder="Optional notes about this policy…"
+                placeholder={t("dialog.descPlaceholder")}
                 rows={2}
                 className="resize-none text-sm"
                 {...form.register("description")}
@@ -294,19 +292,18 @@ export function SlaClient({ slas: initial }: Props) {
             </div>
 
             <div className="space-y-2">
-              <Label>Priority <span className="text-destructive">*</span></Label>
+              <Label>{t("dialog.priorityLabel")} <span className="text-destructive">*</span></Label>
               <Select
                 value={form.watch("priority")}
                 onValueChange={(v) => form.setValue("priority", v as FormValues["priority"])}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select priority" />
+                  <SelectValue placeholder={t("dialog.selectPriority")} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="normal">Normal</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="urgent">Urgent</SelectItem>
+                  {(["low", "normal", "high", "urgent"] as PriorityKey[]).map((p) => (
+                    <SelectItem key={p} value={p}>{t(`priorities.${p}`)}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               {form.formState.errors.priority && (
@@ -316,7 +313,7 @@ export function SlaClient({ slas: initial }: Props) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>First Response (min) <span className="text-destructive">*</span></Label>
+                <Label>{t("dialog.firstResponse")} <span className="text-destructive">*</span></Label>
                 <Input
                   type="number"
                   min="1"
@@ -329,7 +326,7 @@ export function SlaClient({ slas: initial }: Props) {
                 )}
               </div>
               <div className="space-y-2">
-                <Label>Resolution (min) <span className="text-destructive">*</span></Label>
+                <Label>{t("dialog.resolution")} <span className="text-destructive">*</span></Label>
                 <Input
                   type="number"
                   min="1"
@@ -348,40 +345,39 @@ export function SlaClient({ slas: initial }: Props) {
                 checked={form.watch("isActive")}
                 onCheckedChange={(v) => form.setValue("isActive", v)}
               />
-              <Label className="cursor-pointer">Active</Label>
+              <Label className="cursor-pointer">{t("dialog.activeLabel")}</Label>
             </div>
 
             <DialogFooter className="pt-2">
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                Cancel
+                {tc("cancel")}
               </Button>
               <Button type="submit" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {editTarget ? "Save Changes" : "Create SLA"}
+                {editTarget ? t("dialog.saveChanges") : t("dialog.createSla")}
               </Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirm */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete SLA Policy</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Delete <strong>{deleteTarget?.name}</strong>? Tickets currently using this policy will lose their SLA target.
+              {t("deleteDescription", { name: deleteTarget?.name ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={handleDelete}
               disabled={isPending}
             >
               {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-              Delete
+              {tc("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -2,6 +2,7 @@
 
 import { useMemo, useState, Fragment } from "react";
 import { CheckCircle2, AlertCircle, Clock, ChevronDown, AlertTriangle, RotateCw } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -44,6 +45,7 @@ interface AutomationLogsProps {
 }
 
 export function AutomationLogs({ logs, rules = [], limit = 20 }: AutomationLogsProps) {
+  const t = useTranslations("automation");
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const displayLogs = useMemo(() => {
@@ -61,9 +63,9 @@ export function AutomationLogs({ logs, rules = [], limit = 20 }: AutomationLogsP
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-muted-foreground" />
-            Recent Executions
+            {t("logs.recentExecutions")}
           </CardTitle>
-          <CardDescription>No execution history yet</CardDescription>
+          <CardDescription>{t("logs.noHistory")}</CardDescription>
         </CardHeader>
       </Card>
     );
@@ -74,20 +76,20 @@ export function AutomationLogs({ logs, rules = [], limit = 20 }: AutomationLogsP
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5 text-muted-foreground" />
-          Recent Executions
+          {t("logs.recentExecutions")}
         </CardTitle>
-        <CardDescription>Last {displayLogs.length} automation runs</CardDescription>
+        <CardDescription>{t("logs.lastRuns", { count: displayLogs.length })}</CardDescription>
       </CardHeader>
       <CardContent>
         <Table>
           <TableHeader>
             <TableRow className="border-muted/50">
               <TableHead className="w-6"></TableHead>
-              <TableHead className="w-12">Status</TableHead>
-              <TableHead>Rule</TableHead>
-              <TableHead>Entity</TableHead>
-              <TableHead className="text-center w-20">Actions</TableHead>
-              <TableHead className="text-right">Time</TableHead>
+              <TableHead className="w-12">{t("logs.statusCol")}</TableHead>
+              <TableHead>{t("logs.ruleCol")}</TableHead>
+              <TableHead>{t("logs.entityCol")}</TableHead>
+              <TableHead className="text-center w-20">{t("logs.actionsCol")}</TableHead>
+              <TableHead className="text-right">{t("logs.timeCol")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -126,7 +128,7 @@ export function AutomationLogs({ logs, rules = [], limit = 20 }: AutomationLogsP
                             </div>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {log.success ? "Success" : log.errorMessage || "Failed"}
+                            {log.success ? t("logs.successTooltip") : log.errorMessage || "Failed"}
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -148,7 +150,7 @@ export function AutomationLogs({ logs, rules = [], limit = 20 }: AutomationLogsP
                     <TableCell className="text-center">
                       {log.success ? (
                         <Badge variant="secondary" className="text-xs">
-                          {log.actionsExecuted} {log.actionsExecuted === 1 ? "action" : "actions"}
+                          {t("logs.actionCount", { count: log.actionsExecuted })}
                         </Badge>
                       ) : (
                         <Badge variant="outline" className="text-xs text-muted-foreground">
@@ -173,14 +175,14 @@ export function AutomationLogs({ logs, rules = [], limit = 20 }: AutomationLogsP
                             <div className="flex items-start gap-3 rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-3">
                               <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-2">🔄 Loop Detection</p>
+                                <p className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-2">🔄 {t("logs.loopDetection")}</p>
                                 <div className="text-xs text-amber-800 dark:text-amber-300 space-y-1">
-                                  <p><strong>Depth:</strong> {loopInfo.depth || 0}</p>
+                                  <p><strong>{t("logs.depth")}:</strong> {loopInfo.depth || 0}</p>
                                   {loopInfo.triggeredRules && loopInfo.triggeredRules.length > 0 && (
-                                    <p><strong>Triggered Rules:</strong> {loopInfo.triggeredRules.join(", ")}</p>
+                                    <p><strong>{t("logs.triggeredRules")}:</strong> {loopInfo.triggeredRules.join(", ")}</p>
                                   )}
                                   {loopInfo.chain && loopInfo.chain.length > 0 && (
-                                    <p><strong>Chain:</strong> {loopInfo.chain.join(" → ")}</p>
+                                    <p><strong>{t("logs.chain")}:</strong> {loopInfo.chain.join(" → ")}</p>
                                   )}
                                 </div>
                               </div>
@@ -192,14 +194,14 @@ export function AutomationLogs({ logs, rules = [], limit = 20 }: AutomationLogsP
                             <div className="flex items-start gap-3 rounded border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20 p-3">
                               <RotateCw className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-2">🔁 Retry Attempts</p>
+                                <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-2">🔁 {t("logs.retryAttempts")}</p>
                                 <div className="text-xs text-blue-800 dark:text-blue-300 space-y-1">
-                                  <p><strong>Attempts:</strong> {retryInfo.attempts || log.retryCount} / {retryInfo.maxAttempts || 3}</p>
+                                  <p><strong>{t("logs.attempts")}:</strong> {retryInfo.attempts || log.retryCount} / {retryInfo.maxAttempts || 3}</p>
                                   {retryInfo.exponentialBackoff && (
-                                    <p><strong>Strategy:</strong> Exponential backoff</p>
+                                    <p><strong>{t("logs.strategy")}:</strong> {t("logs.exponentialBackoff")}</p>
                                   )}
                                   {retryInfo.lastError && (
-                                    <p><strong>Last Error:</strong> {retryInfo.lastError}</p>
+                                    <p><strong>{t("logs.lastError")}:</strong> {retryInfo.lastError}</p>
                                   )}
                                 </div>
                               </div>

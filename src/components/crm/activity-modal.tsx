@@ -325,7 +325,7 @@ export function ActivityModal(props: Props) {
                 </Label>
                 <Input
                   {...form.register("participants")}
-                  placeholder="John Doe, jane@example.com…"
+                  placeholder="Mario Rossi, mario@example.com…"
                 />
                 <p className="text-[11px] text-muted-foreground">Separate names or emails with commas</p>
               </div>

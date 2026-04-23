@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { toast } from "sonner";
 
@@ -19,11 +20,6 @@ const TYPE_COLORS: Record<string, string> = {
   partner: "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400",
   vendor: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
 };
-
-const COMPANY_STATUS_OPTIONS = [
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-];
 
 interface Company {
   id: string;
@@ -51,8 +47,14 @@ interface Props {
 }
 
 export function CompaniesTable({ companies, users, canEdit, activeCount }: Props) {
+  const t = useTranslations("companies");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
+
+  const companyStatusOptions = [
+    { value: "active", label: t("statuses.active") },
+    { value: "inactive", label: t("statuses.inactive") },
+  ];
 
   const allIds = companies.map((c) => c.id);
   const allSelected = companies.length > 0 && selected.size === companies.length;
@@ -79,10 +81,10 @@ export function CompaniesTable({ companies, users, canEdit, activeCount }: Props
     startTransition(async () => {
       try {
         await bulkDeleteCompanies(ids);
-        toast.success(`${ids.length} compan${ids.length !== 1 ? "ies" : "y"} deleted`);
+        toast.success(t("bulk.deleted", { count: ids.length }));
         clearSelection();
       } catch {
-        toast.error("Failed to delete companies");
+        toast.error(t("bulk.deleteFailed"));
       }
     });
   }
@@ -92,10 +94,10 @@ export function CompaniesTable({ companies, users, canEdit, activeCount }: Props
     startTransition(async () => {
       try {
         await bulkUpdateCompanyStatus(ids, status);
-        toast.success(`${ids.length} compan${ids.length !== 1 ? "ies" : "y"} updated`);
+        toast.success(t("bulk.updated", { count: ids.length }));
         clearSelection();
       } catch {
-        toast.error("Failed to update companies");
+        toast.error(t("bulk.updateFailed"));
       }
     });
   }
@@ -105,10 +107,10 @@ export function CompaniesTable({ companies, users, canEdit, activeCount }: Props
     startTransition(async () => {
       try {
         await bulkAssignCompanies(ids, userId);
-        toast.success(`${ids.length} compan${ids.length !== 1 ? "ies" : "y"} assigned`);
+        toast.success(t("bulk.assigned", { count: ids.length }));
         clearSelection();
       } catch {
-        toast.error("Failed to assign companies");
+        toast.error(t("bulk.assignFailed"));
       }
     });
   }
@@ -118,7 +120,7 @@ export function CompaniesTable({ companies, users, canEdit, activeCount }: Props
       {canEdit && selected.size > 0 && (
         <BulkActionBar
           count={selected.size}
-          statusOptions={COMPANY_STATUS_OPTIONS}
+          statusOptions={companyStatusOptions}
           users={users}
           onClear={clearSelection}
           onDelete={handleDelete}
@@ -135,14 +137,14 @@ export function CompaniesTable({ companies, users, canEdit, activeCount }: Props
                 <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
               </TableHead>
             )}
-            <TableHead>Name</TableHead>
-            <TableHead>Industry</TableHead>
-            <TableHead>City</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Employees</TableHead>
-            <TableHead>Assigned To</TableHead>
-            {canEdit && <TableHead className="w-[100px] text-right">Actions</TableHead>}
+            <TableHead>{t("columns.name")}</TableHead>
+            <TableHead>{t("columns.industry")}</TableHead>
+            <TableHead>{t("columns.city")}</TableHead>
+            <TableHead>{t("columns.type")}</TableHead>
+            <TableHead>{t("columns.status")}</TableHead>
+            <TableHead>{t("columns.employees")}</TableHead>
+            <TableHead>{t("columns.assignedTo")}</TableHead>
+            {canEdit && <TableHead className="w-[100px] text-right">{t("columns.actions")}</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -173,7 +175,7 @@ export function CompaniesTable({ companies, users, canEdit, activeCount }: Props
               <TableCell>
                 {company.type && (
                   <span className={`text-xs font-medium px-1.5 py-0.5 rounded capitalize ${TYPE_COLORS[company.type] ?? ""}`}>
-                    {company.type}
+                    {t(`types.${company.type as "customer" | "prospect" | "partner" | "vendor"}`)}
                   </span>
                 )}
               </TableCell>
@@ -201,7 +203,7 @@ export function CompaniesTable({ companies, users, canEdit, activeCount }: Props
           {companies.length === 0 && (
             <TableRow>
               <TableCell colSpan={canEdit ? 9 : 8} className="text-center py-10 text-muted-foreground">
-                {activeCount > 0 ? "No companies match the current filters." : "No companies yet."}
+                {activeCount > 0 ? t("noCompaniesFiltered") : t("noCompaniesYet")}
               </TableCell>
             </TableRow>
           )}

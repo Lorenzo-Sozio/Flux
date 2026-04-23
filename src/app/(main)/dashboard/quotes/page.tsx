@@ -56,6 +56,7 @@ import {
 import { getAllQuotes, deleteQuoteAction } from "@/actions/quotes";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 
 type Quote = Awaited<ReturnType<typeof getAllQuotes>>[number];
 
@@ -70,6 +71,8 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 };
 
 export default function QuotesPage() {
+  const t = useTranslations("quotes");
+  const tc = useTranslations("common");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [quotes, setQuotes] = useState<Quote[]>([]);
@@ -122,10 +125,10 @@ export default function QuotesPage() {
     startTransition(async () => {
       try {
         await deleteQuoteAction(deleteTarget.id);
-        toast.success(`Quote ${deleteTarget.quoteNumber} deleted`);
+        toast.success(t("deleteSuccess"));
         setQuotes((prev) => prev.filter((q) => q.id !== deleteTarget.id));
       } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Failed to delete quote");
+        toast.error(err instanceof Error ? err.message : tc("deleteError"));
       } finally {
         setDeleteTarget(null);
       }
@@ -137,15 +140,15 @@ export default function QuotesPage() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Quotes & Proposals</h1>
+          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Create quotes, track views, and close deals faster
+            {t("quoteNumber")}
           </p>
         </div>
         <Link href="/dashboard/quotes/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
-            New Quote
+            {t("newQuote")}
           </Button>
         </Link>
       </div>
@@ -156,7 +159,7 @@ export default function QuotesPage() {
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Quotes</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{tc("total")} {t("title")}</p>
                 <p className="text-2xl font-bold mt-1">{stats.total}</p>
               </div>
               <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center">
@@ -170,7 +173,7 @@ export default function QuotesPage() {
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">In Progress</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("statuses.sent")}</p>
                 <p className="text-2xl font-bold mt-1 text-blue-600">{stats.sent}</p>
               </div>
               <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center">
@@ -184,7 +187,7 @@ export default function QuotesPage() {
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Accepted</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("statuses.accepted")}</p>
                 <p className="text-2xl font-bold mt-1 text-green-600">{stats.accepted}</p>
               </div>
               <div className="h-10 w-10 rounded-full bg-green-50 flex items-center justify-center">
@@ -198,7 +201,7 @@ export default function QuotesPage() {
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Total Value</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{tc("value")} {tc("total")}</p>
                 <p className="text-2xl font-bold mt-1">
                   ${stats.totalValue.toLocaleString("en-US", { maximumFractionDigits: 0 })}
                 </p>
@@ -217,7 +220,7 @@ export default function QuotesPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="text-base">
-                {isLoading ? "Quotes" : `${filteredQuotes.length} Quote${filteredQuotes.length !== 1 ? "s" : ""}`}
+                {isLoading ? t("title") : `${filteredQuotes.length} ${t("title")}`}
               </CardTitle>
               {searchTerm && (
                 <CardDescription className="text-xs mt-0.5">
@@ -229,7 +232,7 @@ export default function QuotesPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Search by #, customer, deal…"
+                  placeholder={`${tc("search")}…`}
                   className="pl-8 h-8 text-sm"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -240,14 +243,14 @@ export default function QuotesPage() {
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="viewed">Viewed</SelectItem>
-                  <SelectItem value="accepted">Accepted</SelectItem>
-                  <SelectItem value="declined">Declined</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
-                  <SelectItem value="converted">Converted</SelectItem>
+                  <SelectItem value="all">{tc("all")}</SelectItem>
+                  <SelectItem value="draft">{t("statuses.draft")}</SelectItem>
+                  <SelectItem value="sent">{t("statuses.sent")}</SelectItem>
+                  <SelectItem value="viewed">{tc("view")}</SelectItem>
+                  <SelectItem value="accepted">{t("statuses.accepted")}</SelectItem>
+                  <SelectItem value="declined">{t("statuses.declined")}</SelectItem>
+                  <SelectItem value="expired">{t("statuses.expired")}</SelectItem>
+                  <SelectItem value="converted">{tc("completed")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -263,17 +266,17 @@ export default function QuotesPage() {
           ) : filteredQuotes.length === 0 ? (
             <div className="text-center py-16">
               <FileText className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
-              <p className="font-medium text-muted-foreground">No quotes found</p>
+              <p className="font-medium text-muted-foreground">{t("noQuotes")}</p>
               <p className="text-sm text-muted-foreground/70 mt-1 mb-5">
                 {searchTerm || statusFilter !== "all"
-                  ? "Try adjusting your filters"
-                  : "Create your first quote to get started"}
+                  ? tc("clearFilters")
+                  : t("newQuote")}
               </p>
               {!searchTerm && statusFilter === "all" && (
                 <Link href="/dashboard/quotes/new">
                   <Button variant="outline" size="sm">
                     <Plus className="mr-2 h-4 w-4" />
-                    Create Quote
+                    {t("newQuote")}
                   </Button>
                 </Link>
               )}
@@ -283,13 +286,13 @@ export default function QuotesPage() {
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="text-xs font-semibold">Quote #</TableHead>
-                    <TableHead className="text-xs font-semibold">Customer</TableHead>
-                    <TableHead className="text-xs font-semibold">Deal</TableHead>
-                    <TableHead className="text-xs font-semibold">Status</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Amount</TableHead>
-                    <TableHead className="text-xs font-semibold">Issued</TableHead>
-                    <TableHead className="text-xs font-semibold">Expires</TableHead>
+                    <TableHead className="text-xs font-semibold">{t("columns.number")}</TableHead>
+                    <TableHead className="text-xs font-semibold">{t("columns.customer")}</TableHead>
+                    <TableHead className="text-xs font-semibold">{t("columns.deal")}</TableHead>
+                    <TableHead className="text-xs font-semibold">{t("columns.status")}</TableHead>
+                    <TableHead className="text-xs font-semibold text-right">{tc("amount")}</TableHead>
+                    <TableHead className="text-xs font-semibold">{t("columns.issued")}</TableHead>
+                    <TableHead className="text-xs font-semibold">{t("columns.expires")}</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
@@ -362,7 +365,7 @@ export default function QuotesPage() {
                               <DropdownMenuItem asChild>
                                 <Link href={`/dashboard/quotes/${quote.id}`}>
                                   <Eye className="mr-2 h-3.5 w-3.5" />
-                                  View Details
+                                  {tc("view")}
                                 </Link>
                               </DropdownMenuItem>
                               {quote.status === "draft" && (
@@ -370,13 +373,13 @@ export default function QuotesPage() {
                                   <DropdownMenuItem asChild>
                                     <Link href={`/dashboard/quotes/${quote.id}/edit`}>
                                       <Pencil className="mr-2 h-3.5 w-3.5" />
-                                      Edit
+                                      {tc("edit")}
                                     </Link>
                                   </DropdownMenuItem>
                                   <DropdownMenuItem asChild>
                                     <Link href={`/dashboard/quotes/${quote.id}?send=1`}>
                                       <Send className="mr-2 h-3.5 w-3.5" />
-                                      Send Quote
+                                      {t("sendQuote")}
                                     </Link>
                                   </DropdownMenuItem>
                                 </>
@@ -395,7 +398,7 @@ export default function QuotesPage() {
                                     onClick={() => setDeleteTarget({ id: quote.id, quoteNumber: quote.quoteNumber })}
                                   >
                                     <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                    Delete
+                                    {tc("delete")}
                                   </DropdownMenuItem>
                                 </>
                               )}
@@ -416,20 +419,20 @@ export default function QuotesPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Quote</AlertDialogTitle>
+            <AlertDialogTitle>{t("deleteQuote")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete{" "}
-              <span className="font-semibold">{deleteTarget?.quoteNumber}</span>? This action cannot be undone.
+              {tc("confirmDelete")}{" "}
+              <span className="font-semibold">{deleteTarget?.quoteNumber}</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isPending}>{tc("cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={isPending}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {isPending ? "Deleting…" : "Delete"}
+              {isPending ? "…" : tc("delete")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

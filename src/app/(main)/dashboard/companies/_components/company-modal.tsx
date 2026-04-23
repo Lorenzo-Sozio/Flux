@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -19,7 +20,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Label } from "@/components/ui/label";
 
-// ── Schema ────────────────────────────────────────────────────────────────────
 const companySchema = z.object({
   name:          z.string().min(1, "Company name is required"),
   type:          z.string().default("prospect"),
@@ -48,18 +48,6 @@ const companySchema = z.object({
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
-const SOURCE_OPTIONS = [
-  { value: "website",        label: "Website" },
-  { value: "referral",       label: "Referral" },
-  { value: "linkedin",       label: "LinkedIn" },
-  { value: "cold_outreach",  label: "Cold Outreach" },
-  { value: "trade_show",     label: "Trade Show" },
-  { value: "advertisement",  label: "Advertisement" },
-  { value: "email_campaign", label: "Email Campaign" },
-  { value: "other",          label: "Other" },
-];
-
-// ── Field helper ──────────────────────────────────────────────────────────────
 function F({
   label, error, required, children,
 }: {
@@ -76,8 +64,9 @@ function F({
   );
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
 export function CompanyModal({ company, children }: { company?: any; children: React.ReactNode }) {
+  const t = useTranslations("companies");
+  const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   const isEditing = !!company;
   const searchParams = useSearchParams();
@@ -86,6 +75,16 @@ export function CompanyModal({ company, children }: { company?: any; children: R
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
   }, [isEditing, searchParams]);
 
+  const sourceOptions = [
+    { value: "website",        label: tc("sources.website") },
+    { value: "referral",       label: tc("sources.referral") },
+    { value: "linkedin",       label: tc("sources.linkedin") },
+    { value: "cold_outreach",  label: tc("sources.cold_outreach") },
+    { value: "trade_show",     label: tc("sources.trade_show") },
+    { value: "advertisement",  label: tc("sources.advertisement") },
+    { value: "email_campaign", label: tc("sources.email_campaign") },
+    { value: "other",          label: tc("sources.other") },
+  ];
 
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
@@ -133,15 +132,15 @@ export function CompanyModal({ company, children }: { company?: any; children: R
       const payload = { ...data, ownerId, groupId, assigneeValue: undefined };
       if (isEditing) {
         await updateCompany(company.id, payload);
-        toast.success("Company updated.");
+        toast.success(t("updateSuccess"));
       } else {
         await createCompany(payload);
-        toast.success("Company created.");
+        toast.success(t("createSuccess"));
       }
       setOpen(false);
       form.reset();
     } catch {
-      toast.error("Failed to save company.");
+      toast.error(t("form.saveFailed"));
     }
   };
 
@@ -154,7 +153,9 @@ export function CompanyModal({ company, children }: { company?: any; children: R
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="text-lg">
-            {isEditing ? `Edit Company — ${company.name}` : "New Company"}
+            {isEditing
+              ? t("form.editTitle", { name: company.name })
+              : t("form.newTitle")}
           </DialogTitle>
         </DialogHeader>
 
@@ -163,19 +164,19 @@ export function CompanyModal({ company, children }: { company?: any; children: R
             <Tabs defaultValue="info">
               <TabsList className="w-full mb-5">
                 <TabsTrigger value="info" className="relative flex-1 gap-1.5">
-                  <BuildingIcon className="h-3.5 w-3.5" />Info
+                  <BuildingIcon className="h-3.5 w-3.5" />{t("form.tabs.info")}
                   <TabDot has={tabErrors.info} />
                 </TabsTrigger>
                 <TabsTrigger value="crm" className="relative flex-1 gap-1.5">
-                  <TagIcon className="h-3.5 w-3.5" />CRM
+                  <TagIcon className="h-3.5 w-3.5" />{t("form.tabs.crm")}
                   <TabDot has={tabErrors.crm} />
                 </TabsTrigger>
                 <TabsTrigger value="address" className="relative flex-1 gap-1.5">
-                  <MapPinIcon className="h-3.5 w-3.5" />Address
+                  <MapPinIcon className="h-3.5 w-3.5" />{t("form.tabs.address")}
                   <TabDot has={tabErrors.address} />
                 </TabsTrigger>
                 <TabsTrigger value="billing" className="relative flex-1 gap-1.5">
-                  <ReceiptIcon className="h-3.5 w-3.5" />Billing
+                  <ReceiptIcon className="h-3.5 w-3.5" />{t("form.tabs.billing")}
                   <TabDot has={tabErrors.billing} />
                 </TabsTrigger>
               </TabsList>
@@ -183,57 +184,57 @@ export function CompanyModal({ company, children }: { company?: any; children: R
               {/* ── Info Tab ─────────────────────────────────────────────── */}
               <TabsContent value="info" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
                 <div className="col-span-2">
-                  <F label="Company Name" required error={e.name?.message}>
+                  <F label={tc("name")} required error={e.name?.message}>
                     <Input {...register("name")} placeholder="Acme Corp" />
                   </F>
                 </div>
-                <F label="Type" error={e.type?.message}>
+                <F label={t("form.type")} error={e.type?.message}>
                   <Controller control={control} name="type" render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("form.selectType")} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="prospect">Prospect</SelectItem>
-                        <SelectItem value="customer">Customer</SelectItem>
-                        <SelectItem value="partner">Partner</SelectItem>
-                        <SelectItem value="vendor">Vendor</SelectItem>
+                        <SelectItem value="prospect">{t("types.prospect")}</SelectItem>
+                        <SelectItem value="customer">{t("types.customer")}</SelectItem>
+                        <SelectItem value="partner">{t("types.partner")}</SelectItem>
+                        <SelectItem value="vendor">{t("types.vendor")}</SelectItem>
                       </SelectContent>
                     </Select>
                   )} />
                 </F>
-                <F label="Status" error={e.status?.message}>
+                <F label={t("form.status")} error={e.status?.message}>
                   <Controller control={control} name="status" render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
+                        <SelectItem value="active">{t("statuses.active")}</SelectItem>
+                        <SelectItem value="inactive">{t("statuses.inactive")}</SelectItem>
                       </SelectContent>
                     </Select>
                   )} />
                 </F>
-                <F label="Industry" error={e.industry?.message}>
+                <F label={t("industry")} error={e.industry?.message}>
                   <Input {...register("industry")} placeholder="Technology" />
                 </F>
-                <F label="Employees" error={e.employeeCount?.message}>
+                <F label={t("form.employeeCount")} error={e.employeeCount?.message}>
                   <Input {...register("employeeCount")} type="number" min={0} placeholder="0" />
                 </F>
-                <F label="Annual Revenue (€)" error={e.annualRevenue?.message}>
+                <F label={t("form.annualRevenue")} error={e.annualRevenue?.message}>
                   <Input {...register("annualRevenue")} type="number" min={0} placeholder="0" />
                 </F>
-                <F label="Website" error={e.website?.message}>
+                <F label={tc("website")} error={e.website?.message}>
                   <Input {...register("website")} placeholder="https://acme.com" />
                 </F>
-                <F label="Phone" error={e.mainPhone?.message}>
+                <F label={tc("phone")} error={e.mainPhone?.message}>
                   <Input {...register("mainPhone")} type="tel" placeholder="+39 02 1234567" />
                 </F>
-                <F label="Email" error={e.mainEmail?.message}>
+                <F label={tc("email")} error={e.mainEmail?.message}>
                   <Input {...register("mainEmail")} type="email" placeholder="info@acme.com" />
                 </F>
                 <F label="LinkedIn URL" error={e.linkedinUrl?.message}>
                   <Input {...register("linkedinUrl")} placeholder="https://linkedin.com/company/…" />
                 </F>
                 <div className="col-span-2">
-                  <F label="Description" error={e.description?.message}>
+                  <F label={tc("description")} error={e.description?.message}>
                     <Textarea {...register("description")} placeholder="Brief description of the company…" className="min-h-[80px] resize-y" />
                   </F>
                 </div>
@@ -242,29 +243,29 @@ export function CompanyModal({ company, children }: { company?: any; children: R
               {/* ── CRM Tab ──────────────────────────────────────────────── */}
               <TabsContent value="crm" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
                 <div className="col-span-2">
-                  <F label="Assigned To">
+                  <F label={t("form.assignedTo")}>
                     <Controller control={control} name="assigneeValue" render={({ field }) => (
                       <AssigneeSelect value={field.value ?? null} onChange={field.onChange} />
                     )} />
                   </F>
                 </div>
-                <F label="Source" error={e.source?.message}>
+                <F label={t("form.source")} error={e.source?.message}>
                   <Controller control={control} name="source" render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                      <SelectTrigger><SelectValue placeholder="— Select source —" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("form.selectSource")} /></SelectTrigger>
                       <SelectContent>
-                        {SOURCE_OPTIONS.map((o) => (
+                        {sourceOptions.map((o) => (
                           <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   )} />
                 </F>
-                <F label="Lead Score (0–100)" error={e.leadScore?.message}>
+                <F label={t("form.leadScore")} error={e.leadScore?.message}>
                   <Input {...register("leadScore")} type="number" min={0} max={100} placeholder="0" />
                 </F>
                 <div className="col-span-2">
-                  <F label="Tags (comma-separated)" error={e.tags?.message}>
+                  <F label={t("form.tags")} error={e.tags?.message}>
                     <Input {...register("tags")} placeholder="tech, enterprise, key-account" />
                   </F>
                 </div>
@@ -273,30 +274,30 @@ export function CompanyModal({ company, children }: { company?: any; children: R
               {/* ── Address Tab ──────────────────────────────────────────── */}
               <TabsContent value="address" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
                 <div className="col-span-2">
-                  <F label="Street" error={e.street?.message}>
+                  <F label={tc("street")} error={e.street?.message}>
                     <Input {...register("street")} placeholder="Via Roma 1" />
                   </F>
                 </div>
-                <F label="City" error={e.city?.message}>
+                <F label={tc("city")} error={e.city?.message}>
                   <Input {...register("city")} placeholder="Milan" />
                 </F>
-                <F label="State / Province" error={e.state?.message}>
+                <F label={tc("state")} error={e.state?.message}>
                   <Input {...register("state")} placeholder="MI" />
                 </F>
-                <F label="ZIP / Postal Code" error={e.zipCode?.message}>
+                <F label={tc("zipCode")} error={e.zipCode?.message}>
                   <Input {...register("zipCode")} placeholder="20100" />
                 </F>
-                <F label="Country" error={e.country?.message}>
+                <F label={tc("country")} error={e.country?.message}>
                   <Input {...register("country")} placeholder="Italy" />
                 </F>
               </TabsContent>
 
               {/* ── Billing Tab ──────────────────────────────────────────── */}
               <TabsContent value="billing" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
-                <F label="VAT Number" error={e.vatNumber?.message}>
+                <F label={t("form.vatNumber")} error={e.vatNumber?.message}>
                   <Input {...register("vatNumber")} placeholder="IT01234567890" />
                 </F>
-                <F label="SDI Code" error={e.sdiCode?.message}>
+                <F label={t("form.sdiCode")} error={e.sdiCode?.message}>
                   <Input {...register("sdiCode")} placeholder="XXXXXXX" />
                 </F>
                 <div className="col-span-2 rounded-md border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
@@ -308,10 +309,10 @@ export function CompanyModal({ company, children }: { company?: any; children: R
           </div>
 
           <DialogFooter className="px-6 py-4 border-t bg-muted/30">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>{tc("cancel")}</Button>
             <Button type="submit" disabled={isSubmitting} className="min-w-[100px]">
               {isSubmitting && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? "Save Changes" : "Create Company"}
+              {isEditing ? t("form.saveChanges") : t("form.createCompany")}
             </Button>
           </DialogFooter>
         </form>
@@ -320,17 +321,17 @@ export function CompanyModal({ company, children }: { company?: any; children: R
   );
 }
 
-// ── Delete ────────────────────────────────────────────────────────────────────
 export function DeleteCompanyButton({ id }: { id: string }) {
+  const t = useTranslations("companies");
   const [isDeleting, setIsDeleting] = useState(false);
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this company?")) return;
+    if (!confirm(t("deleteConfirm"))) return;
     try {
       setIsDeleting(true);
       await deleteCompany(id);
-      toast.success("Company deleted.");
+      toast.success(t("deleteSuccess"));
     } catch {
-      toast.error("Failed to delete company.");
+      toast.error(t("deleteFailed"));
     } finally {
       setIsDeleting(false);
     }

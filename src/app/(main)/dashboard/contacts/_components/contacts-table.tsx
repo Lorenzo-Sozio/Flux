@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { toast } from "sonner";
 
@@ -13,11 +14,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 import { ContactActions } from "./contact-modal";
-
-const CONTACT_STATUS_OPTIONS = [
-  { value: "active", label: "Active" },
-  { value: "inactive", label: "Inactive" },
-];
 
 interface Contact {
   id: string;
@@ -45,8 +41,15 @@ interface Props {
 }
 
 export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) {
+  const t = useTranslations("contacts");
+  const tc = useTranslations("common");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
+
+  const contactStatusOptions = [
+    { value: "active", label: t("statuses.active") },
+    { value: "inactive", label: t("statuses.inactive") },
+  ];
 
   const allIds = contacts.map((c) => c.id);
   const allSelected = contacts.length > 0 && selected.size === contacts.length;
@@ -73,10 +76,10 @@ export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) 
     startTransition(async () => {
       try {
         await bulkDeleteContacts(ids);
-        toast.success(`${ids.length} contact${ids.length !== 1 ? "s" : ""} deleted`);
+        toast.success(t("bulk.deleted", { count: ids.length }));
         clearSelection();
       } catch {
-        toast.error("Failed to delete contacts");
+        toast.error(t("bulk.deleteFailed"));
       }
     });
   }
@@ -86,10 +89,10 @@ export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) 
     startTransition(async () => {
       try {
         await bulkUpdateContactStatus(ids, status);
-        toast.success(`${ids.length} contact${ids.length !== 1 ? "s" : ""} updated`);
+        toast.success(t("bulk.updated", { count: ids.length }));
         clearSelection();
       } catch {
-        toast.error("Failed to update contacts");
+        toast.error(t("bulk.updateFailed"));
       }
     });
   }
@@ -99,21 +102,20 @@ export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) 
     startTransition(async () => {
       try {
         await bulkAssignContacts(ids, userId);
-        toast.success(`${ids.length} contact${ids.length !== 1 ? "s" : ""} assigned`);
+        toast.success(t("bulk.assigned", { count: ids.length }));
         clearSelection();
       } catch {
-        toast.error("Failed to assign contacts");
+        toast.error(t("bulk.assignFailed"));
       }
     });
   }
 
   return (
     <div className="space-y-3">
-      {/* Bulk toolbar */}
       {canEdit && selected.size > 0 && (
         <BulkActionBar
           count={selected.size}
-          statusOptions={CONTACT_STATUS_OPTIONS}
+          statusOptions={contactStatusOptions}
           users={users}
           onClear={clearSelection}
           onDelete={handleDelete}
@@ -134,14 +136,14 @@ export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) 
                 />
               </TableHead>
             )}
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Job Title</TableHead>
-            <TableHead>City</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Score</TableHead>
-            <TableHead>Assigned To</TableHead>
-            {canEdit && <TableHead className="w-[100px] text-right">Actions</TableHead>}
+            <TableHead>{t("columns.name")}</TableHead>
+            <TableHead>{tc("email")}</TableHead>
+            <TableHead>{t("jobTitle")}</TableHead>
+            <TableHead>{tc("address")}</TableHead>
+            <TableHead>{tc("status")}</TableHead>
+            <TableHead>{t("score")}</TableHead>
+            <TableHead>{t("columns.assignedTo")}</TableHead>
+            {canEdit && <TableHead className="w-[100px] text-right">{t("columns.actions")}</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -193,7 +195,7 @@ export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) 
           {contacts.length === 0 && (
             <TableRow>
               <TableCell colSpan={canEdit ? 9 : 8} className="text-center py-10 text-muted-foreground">
-                {activeCount > 0 ? "No contacts match the current filters." : "No contacts yet."}
+                {activeCount > 0 ? t("noContactsFiltered") : t("noContactsYet")}
               </TableCell>
             </TableRow>
           )}

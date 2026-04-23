@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import {
   Building2,
@@ -17,7 +18,6 @@ import {
   Users,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
@@ -53,23 +53,26 @@ const NavItemExpanded = ({
   item,
   isActive,
   isSubmenuOpen,
+  t,
 }: {
   item: NavMainItem;
   isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
   isSubmenuOpen: (subItems?: NavMainItem["subItems"]) => boolean;
+  t: ReturnType<typeof useTranslations<"nav">>;
 }) => {
+  const title = t(`items.${item.titleKey}` as any);
   return (
-    <Collapsible key={item.title} asChild defaultOpen={isSubmenuOpen(item.subItems)} className="group/collapsible">
+    <Collapsible key={item.titleKey} asChild defaultOpen={isSubmenuOpen(item.subItems)} className="group/collapsible">
       <SidebarMenuItem>
         <CollapsibleTrigger asChild>
           {item.subItems ? (
             <SidebarMenuButton
               disabled={item.comingSoon}
               isActive={isActive(item.url, item.subItems)}
-              tooltip={item.title}
+              tooltip={title}
             >
               {item.icon && <item.icon />}
-              <span>{item.title}</span>
+              <span>{title}</span>
               {item.comingSoon && <IsComingSoon />}
               <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
             </SidebarMenuButton>
@@ -78,11 +81,11 @@ const NavItemExpanded = ({
               asChild
               aria-disabled={item.comingSoon}
               isActive={isActive(item.url)}
-              tooltip={item.title}
+              tooltip={title}
             >
               <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
                 {item.icon && <item.icon />}
-                <span>{item.title}</span>
+                <span>{title}</span>
                 {item.comingSoon && <IsComingSoon />}
               </Link>
             </SidebarMenuButton>
@@ -92,11 +95,11 @@ const NavItemExpanded = ({
           <CollapsibleContent>
             <SidebarMenuSub>
               {item.subItems.map((subItem) => (
-                <SidebarMenuSubItem key={subItem.title}>
+                <SidebarMenuSubItem key={subItem.titleKey}>
                   <SidebarMenuSubButton aria-disabled={subItem.comingSoon} isActive={isActive(subItem.url)} asChild>
                     <Link prefetch={false} href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
                       {subItem.icon && <subItem.icon />}
-                      <span>{subItem.title}</span>
+                      <span>{t(`items.${subItem.titleKey}` as any)}</span>
                       {subItem.comingSoon && <IsComingSoon />}
                     </Link>
                   </SidebarMenuSubButton>
@@ -113,29 +116,32 @@ const NavItemExpanded = ({
 const NavItemCollapsed = ({
   item,
   isActive,
+  t,
 }: {
   item: NavMainItem;
   isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
+  t: ReturnType<typeof useTranslations<"nav">>;
 }) => {
+  const title = t(`items.${item.titleKey}` as any);
   return (
-    <SidebarMenuItem key={item.title}>
+    <SidebarMenuItem key={item.titleKey}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <SidebarMenuButton
             disabled={item.comingSoon}
-            tooltip={item.title}
+            tooltip={title}
             isActive={isActive(item.url, item.subItems)}
           >
             {item.icon && <item.icon />}
-            <span>{item.title}</span>
+            <span>{title}</span>
             <ChevronRight />
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent className="w-50 space-y-1" side="right" align="start">
           {item.subItems?.map((subItem) => (
-            <DropdownMenuItem key={subItem.title} asChild>
+            <DropdownMenuItem key={subItem.titleKey} asChild>
               <SidebarMenuSubButton
-                key={subItem.title}
+                key={subItem.titleKey}
                 asChild
                 className="focus-visible:ring-0"
                 aria-disabled={subItem.comingSoon}
@@ -143,7 +149,7 @@ const NavItemCollapsed = ({
               >
                 <Link prefetch={false} href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
                   {subItem.icon && <subItem.icon className="[&>svg]:text-sidebar-foreground" />}
-                  <span>{subItem.title}</span>
+                  <span>{t(`items.${subItem.titleKey}` as any)}</span>
                   {subItem.comingSoon && <IsComingSoon />}
                 </Link>
               </SidebarMenuSubButton>
@@ -158,6 +164,7 @@ const NavItemCollapsed = ({
 export function NavMain({ items }: NavMainProps) {
   const path = usePathname();
   const { state, isMobile } = useSidebar();
+  const t = useTranslations("nav");
 
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
     if (subItems?.length) {
@@ -179,62 +186,62 @@ export function NavMain({ items }: NavMainProps) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <SidebarMenuButton
-                    tooltip="Quick Create"
+                    tooltip={t("quickCreate.title")}
                     className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
                   >
                     <PlusCircleIcon />
-                    <span>Quick Create</span>
+                    <span>{t("quickCreate.title")}</span>
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-52" side="right" align="start">
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">CRM</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">{t("quickCreate.crm")}</DropdownMenuLabel>
                   <DropdownMenuItem asChild>
                     <Link prefetch={false} href="/dashboard/leads?new=true" className="flex items-center gap-2">
-                      <Users className="h-3.5 w-3.5" /> New Lead
+                      <Users className="h-3.5 w-3.5" /> {t("quickCreate.newLead")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link prefetch={false} href="/dashboard/contacts?new=true" className="flex items-center gap-2">
-                      <Contact className="h-3.5 w-3.5" /> New Contact
+                      <Contact className="h-3.5 w-3.5" /> {t("quickCreate.newContact")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link prefetch={false} href="/dashboard/companies?new=true" className="flex items-center gap-2">
-                      <Building2 className="h-3.5 w-3.5" /> New Company
+                      <Building2 className="h-3.5 w-3.5" /> {t("quickCreate.newCompany")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link prefetch={false} href="/dashboard/pipeline?new=true" className="flex items-center gap-2">
-                      <Kanban className="h-3.5 w-3.5" /> New Deal
+                      <Kanban className="h-3.5 w-3.5" /> {t("quickCreate.newDeal")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">Sales</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">{t("quickCreate.sales")}</DropdownMenuLabel>
                   <DropdownMenuItem asChild>
                     <Link prefetch={false} href="/dashboard/quotes/new" className="flex items-center gap-2">
-                      <FileText className="h-3.5 w-3.5" /> New Quote
+                      <FileText className="h-3.5 w-3.5" /> {t("quickCreate.newQuote")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link prefetch={false} href="/dashboard/orders?new=true" className="flex items-center gap-2">
-                      <ShoppingCart className="h-3.5 w-3.5" /> New Order
+                      <ShoppingCart className="h-3.5 w-3.5" /> {t("quickCreate.newOrder")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">Work</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">{t("quickCreate.work")}</DropdownMenuLabel>
                   <DropdownMenuItem asChild>
                     <Link prefetch={false} href="/dashboard/tasks?new=true" className="flex items-center gap-2">
-                      <CheckSquare className="h-3.5 w-3.5" /> New Task
+                      <CheckSquare className="h-3.5 w-3.5" /> {t("quickCreate.newTask")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link prefetch={false} href="/dashboard/support/tickets?new=true" className="flex items-center gap-2">
-                      <Headphones className="h-3.5 w-3.5" /> New Ticket
+                      <Headphones className="h-3.5 w-3.5" /> {t("quickCreate.newTicket")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
                     <Link prefetch={false} href="/dashboard/marketing/campaigns?new=true" className="flex items-center gap-2">
-                      <MessageSquare className="h-3.5 w-3.5" /> New Campaign
+                      <MessageSquare className="h-3.5 w-3.5" /> {t("quickCreate.newCampaign")}
                     </Link>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -245,35 +252,34 @@ export function NavMain({ items }: NavMainProps) {
       </SidebarGroup>
       {items.map((group) => (
         <SidebarGroup key={group.id}>
-          {group.label && <SidebarGroupLabel>{group.label}</SidebarGroupLabel>}
+          {group.labelKey && (
+            <SidebarGroupLabel>{t(`groups.${group.labelKey}` as any)}</SidebarGroupLabel>
+          )}
           <SidebarGroupContent className="flex flex-col gap-2">
             <SidebarMenu>
               {group.items.map((item) => {
                 if (state === "collapsed" && !isMobile) {
-                  // If no subItems, just render the button as a link
                   if (!item.subItems) {
                     return (
-                      <SidebarMenuItem key={item.title}>
+                      <SidebarMenuItem key={item.titleKey}>
                         <SidebarMenuButton
                           asChild
                           aria-disabled={item.comingSoon}
-                          tooltip={item.title}
+                          tooltip={t(`items.${item.titleKey}` as any)}
                           isActive={isItemActive(item.url)}
                         >
                           <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
                             {item.icon && <item.icon />}
-                            <span>{item.title}</span>
+                            <span>{t(`items.${item.titleKey}` as any)}</span>
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>
                     );
                   }
-                  // Otherwise, render the dropdown as before
-                  return <NavItemCollapsed key={item.title} item={item} isActive={isItemActive} />;
+                  return <NavItemCollapsed key={item.titleKey} item={item} isActive={isItemActive} t={t} />;
                 }
-                // Expanded view
                 return (
-                  <NavItemExpanded key={item.title} item={item} isActive={isItemActive} isSubmenuOpen={isSubmenuOpen} />
+                  <NavItemExpanded key={item.titleKey} item={item} isActive={isItemActive} isSubmenuOpen={isSubmenuOpen} t={t} />
                 );
               })}
             </SidebarMenu>

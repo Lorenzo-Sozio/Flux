@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { CompanyModal } from "./_components/company-modal";
 import { CompaniesTable } from "./_components/companies-table";
 import { auth } from "@/auth";
+import { getTranslations } from "next-intl/server";
 
 export default async function CompaniesPage({
   searchParams,
@@ -31,19 +32,21 @@ export default async function CompaniesPage({
     getAllUsers(),
   ]);
 
+  const t = await getTranslations("companies");
+  const tc = await getTranslations("common");
   const tree = encoded ? decodeFilter(encoded) : null;
   const activeCount = tree ? countActive(tree.conditions) : 0;
   const fields = { ...toFieldMetaMap(COMPANY_FIELDS), ...customFieldsToMetaMap(customDefs) };
 
   return (
-    <div className="p-8">
+    <div className="p-6">
       <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
-          <h1 className="font-bold text-2xl">Companies</h1>
+          <h1 className="font-bold text-2xl">{t("title")}</h1>
           <Badge variant="secondary">{allCompanies.length}</Badge>
           {activeCount > 0 && (
             <Badge variant="outline" className="text-xs gap-1">
-              {activeCount} filter{activeCount !== 1 ? "s" : ""} active
+              {tc("filtersActive", { count: activeCount })}
               <Link href="/dashboard/companies" className="ml-1 hover:text-destructive">✕</Link>
             </Badge>
           )}
@@ -62,7 +65,7 @@ export default async function CompaniesPage({
           <ImportExportButtons entityType="companies" />
           {canEdit && (
             <CompanyModal>
-              <Button>Add Company</Button>
+              <Button>{t("newCompany")}</Button>
             </CompanyModal>
           )}
         </div>

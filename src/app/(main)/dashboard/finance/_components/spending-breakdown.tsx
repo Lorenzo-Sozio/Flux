@@ -1,3 +1,4 @@
+import { getTranslations } from "next-intl/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 
@@ -9,13 +10,14 @@ interface Props {
   };
 }
 
-export function SpendingBreakdown({ revenueBreakdown }: Props) {
+export async function SpendingBreakdown({ revenueBreakdown }: Props) {
+  const t = await getTranslations("finance");
   const { dealsRevenue, quotesRevenue, ordersRevenue } = revenueBreakdown;
 
   const sources = [
-    { key: "deals", label: "Deals Won", amount: dealsRevenue },
-    { key: "orders", label: "Orders Completed", amount: ordersRevenue },
-    { key: "quotes", label: "Quotes Accepted", amount: quotesRevenue },
+    { key: "deals", label: t("dealsWonLabel"), amount: dealsRevenue },
+    { key: "orders", label: t("ordersCompletedLabel"), amount: ordersRevenue },
+    { key: "quotes", label: t("quotesAcceptedLabel"), amount: quotesRevenue },
   ];
 
   const total = sources.reduce((sum, item) => sum + item.amount, 0);
@@ -23,11 +25,10 @@ export function SpendingBreakdown({ revenueBreakdown }: Props) {
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">Revenue Sources</CardTitle>
-        <CardDescription className="text-xs">Breakdown of total revenue by source</CardDescription>
+        <CardTitle className="text-base">{t("revenueSources")}</CardTitle>
+        <CardDescription className="text-xs">{t("revenueSourcesDesc")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 pt-0">
-        {/* Progress bar */}
         {total > 0 ? (
           <div className="flex h-3 w-full overflow-hidden rounded-full bg-muted">
             {sources
@@ -52,7 +53,6 @@ export function SpendingBreakdown({ revenueBreakdown }: Props) {
           <div className="h-3 w-full rounded-full bg-muted" />
         )}
 
-        {/* Legend */}
         <div className="space-y-2">
           {sources.map((item, index) => {
             const pct = total > 0 ? Math.round((item.amount / total) * 100) : 0;
@@ -77,7 +77,7 @@ export function SpendingBreakdown({ revenueBreakdown }: Props) {
 
         {total > 0 && (
           <div className="border-t pt-3 flex justify-between text-sm">
-            <span className="text-muted-foreground">Total</span>
+            <span className="text-muted-foreground">{t("total")}</span>
             <span className="font-semibold">{formatCurrency(total, { noDecimals: true })}</span>
           </div>
         )}

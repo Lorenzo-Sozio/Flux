@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { updateDealStage } from "@/actions/pipeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +48,7 @@ export function PipelineBoard({
   contacts: any[];
   canEdit?: boolean;
 }) {
+  const t = useTranslations("pipeline");
   const [isMounted, setIsMounted] = useState(false);
   const [deals, setDeals] = useState(initialDeals);
 
@@ -90,21 +92,21 @@ export function PipelineBoard({
     <div className="flex flex-col h-[calc(100vh-120px)] w-full overflow-hidden">
       <div className="flex items-center justify-between mb-6 shrink-0 px-1">
         <div>
-          <h2 className="text-xl font-bold">Sales Pipeline</h2>
-          <p className="text-sm text-muted-foreground">Drag and drop deals to change their progress</p>
+          <h2 className="text-xl font-bold">{t("title")}</h2>
+          <p className="text-sm text-muted-foreground">{t("boardSubtitle")}</p>
         </div>
 
         {/* Raggruppa i bottoni in un container flex */}
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href="/dashboard/pipeline/report">
-              <BarChart2 className="mr-2 h-4 w-4" /> Pipeline Report
+              <BarChart2 className="mr-2 h-4 w-4" /> {t("report")}
             </Link>
           </Button>
           {canEdit && (
             <DealModal stages={initialStages} companies={companies} contacts={contacts}>
               <Button size="sm" className="gap-2">
-                <PlusIcon className="w-4 h-4" /> New Deal
+                <PlusIcon className="w-4 h-4" /> {t("newDeal")}
               </Button>
             </DealModal>
           )}
@@ -183,7 +185,7 @@ export function PipelineBoard({
                                     </Badge>
                                   </div>
                                   <div className="flex items-center gap-1 text-[9px] text-muted-foreground italic">
-                                    {deal.createdAt && `Created: ${new Date(deal.createdAt).toLocaleDateString()}`}
+                                    {deal.createdAt && t("created", { date: new Date(deal.createdAt).toLocaleDateString(undefined) })}
                                   </div>
                                 </CardContent>
                               </Card>

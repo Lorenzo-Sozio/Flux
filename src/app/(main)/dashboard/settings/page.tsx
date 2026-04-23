@@ -3,6 +3,7 @@ import { Settings2, Webhook, Mail } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { getTranslations } from "next-intl/server";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -11,20 +12,22 @@ export default async function SettingsPage() {
   const role = (session.user as any).role;
   if (!["admin", "owner"].includes(role)) redirect("/dashboard/crm");
 
+  const t = await getTranslations("settings");
+
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">Configure your workspace.</p>
+        <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+        <p className="text-muted-foreground">{t("general.title")}</p>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link href="/dashboard/settings/custom-fields">
           <Card className="cursor-pointer transition-shadow hover:shadow-md">
             <CardHeader>
               <Settings2 className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>Custom Fields</CardTitle>
+              <CardTitle>{t("customFields.title")}</CardTitle>
               <CardDescription>
-                Add extra fields to contacts, leads, companies, and deals.
+                {t("customFields.description")}
               </CardDescription>
             </CardHeader>
           </Card>
@@ -33,9 +36,9 @@ export default async function SettingsPage() {
           <Card className="cursor-pointer transition-shadow hover:shadow-md">
             <CardHeader>
               <Webhook className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>Webhooks</CardTitle>
+              <CardTitle>{t("webhooks.title")}</CardTitle>
               <CardDescription>
-                Send real-time HTTP notifications to external services on CRM events.
+                {t("webhooks.description")}
               </CardDescription>
             </CardHeader>
           </Card>
@@ -44,9 +47,9 @@ export default async function SettingsPage() {
           <Card className="cursor-pointer transition-shadow hover:shadow-md">
             <CardHeader>
               <Mail className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>Email</CardTitle>
+              <CardTitle>{t("email.title")}</CardTitle>
               <CardDescription>
-                Configure SMTP or Resend for sending marketing campaigns and system emails.
+                {t("email.description")}
               </CardDescription>
             </CardHeader>
           </Card>

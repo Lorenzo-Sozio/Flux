@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 import { toast } from "sonner";
 
@@ -19,14 +20,6 @@ const RATING_COLORS: Record<string, string> = {
   warm: "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400",
   cold: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400",
 };
-
-const LEAD_STATUS_OPTIONS = [
-  { value: "new", label: "New" },
-  { value: "contacting", label: "Contacting" },
-  { value: "engaged", label: "Engaged" },
-  { value: "qualified", label: "Qualified" },
-  { value: "unqualified", label: "Unqualified" },
-];
 
 interface Lead {
   id: string;
@@ -55,8 +48,18 @@ interface Props {
 }
 
 export function LeadsTable({ leads, users, canEdit, activeCount }: Props) {
+  const t = useTranslations("leads");
+  const tc = useTranslations("common");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
+
+  const leadStatusOptions = [
+    { value: "new", label: t("statuses.new") },
+    { value: "contacting", label: t("statuses.contacting") },
+    { value: "engaged", label: t("statuses.engaged") },
+    { value: "qualified", label: t("statuses.qualified") },
+    { value: "unqualified", label: t("statuses.unqualified") },
+  ];
 
   const allIds = leads.map((l) => l.id);
   const allSelected = leads.length > 0 && selected.size === leads.length;
@@ -83,10 +86,10 @@ export function LeadsTable({ leads, users, canEdit, activeCount }: Props) {
     startTransition(async () => {
       try {
         await bulkDeleteLeads(ids);
-        toast.success(`${ids.length} lead${ids.length !== 1 ? "s" : ""} deleted`);
+        toast.success(t("bulk.deleted", { count: ids.length }));
         clearSelection();
       } catch {
-        toast.error("Failed to delete leads");
+        toast.error(t("bulk.deleteFailed"));
       }
     });
   }
@@ -96,10 +99,10 @@ export function LeadsTable({ leads, users, canEdit, activeCount }: Props) {
     startTransition(async () => {
       try {
         await bulkUpdateLeadStatus(ids, status);
-        toast.success(`${ids.length} lead${ids.length !== 1 ? "s" : ""} updated`);
+        toast.success(t("bulk.updated", { count: ids.length }));
         clearSelection();
       } catch {
-        toast.error("Failed to update leads");
+        toast.error(t("bulk.updateFailed"));
       }
     });
   }
@@ -109,21 +112,20 @@ export function LeadsTable({ leads, users, canEdit, activeCount }: Props) {
     startTransition(async () => {
       try {
         await bulkAssignLeads(ids, userId);
-        toast.success(`${ids.length} lead${ids.length !== 1 ? "s" : ""} assigned`);
+        toast.success(t("bulk.assigned", { count: ids.length }));
         clearSelection();
       } catch {
-        toast.error("Failed to assign leads");
+        toast.error(t("bulk.assignFailed"));
       }
     });
   }
 
   return (
     <div className="space-y-3">
-      {/* Bulk toolbar */}
       {canEdit && selected.size > 0 && (
         <BulkActionBar
           count={selected.size}
-          statusOptions={LEAD_STATUS_OPTIONS}
+          statusOptions={leadStatusOptions}
           users={users}
           onClear={clearSelection}
           onDelete={handleDelete}
@@ -144,15 +146,15 @@ export function LeadsTable({ leads, users, canEdit, activeCount }: Props) {
                 />
               </TableHead>
             )}
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Company</TableHead>
-            <TableHead>City</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Rating</TableHead>
-            <TableHead>Score</TableHead>
-            <TableHead>Assigned To</TableHead>
-            {canEdit && <TableHead className="w-[100px] text-right">Actions</TableHead>}
+            <TableHead>{t("columns.name")}</TableHead>
+            <TableHead>{tc("email")}</TableHead>
+            <TableHead>{tc("company")}</TableHead>
+            <TableHead>{t("columns.city")}</TableHead>
+            <TableHead>{tc("status")}</TableHead>
+            <TableHead>{t("columns.rating")}</TableHead>
+            <TableHead>{t("columns.score")}</TableHead>
+            <TableHead>{t("columns.assignedTo")}</TableHead>
+            {canEdit && <TableHead className="w-[100px] text-right">{t("columns.actions")}</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -182,7 +184,7 @@ export function LeadsTable({ leads, users, canEdit, activeCount }: Props) {
               <TableCell>
                 {lead.rating && (
                   <span className={`text-xs font-medium px-1.5 py-0.5 rounded capitalize ${RATING_COLORS[lead.rating] ?? ""}`}>
-                    {lead.rating}
+                    {t(`ratings.${lead.rating as "hot" | "warm" | "cold"}`)}
                   </span>
                 )}
               </TableCell>
@@ -211,7 +213,7 @@ export function LeadsTable({ leads, users, canEdit, activeCount }: Props) {
           {leads.length === 0 && (
             <TableRow>
               <TableCell colSpan={canEdit ? 10 : 9} className="text-center py-10 text-muted-foreground">
-                {activeCount > 0 ? "No leads match the current filters." : "No leads yet."}
+                {activeCount > 0 ? t("noLeadsFiltered") : t("noLeadsYet")}
               </TableCell>
             </TableRow>
           )}

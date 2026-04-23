@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getTranslations } from "next-intl/server";
 
 import {
   AlertCircleIcon,
@@ -41,6 +42,9 @@ function timeAgo(date: Date | null): string {
 }
 
 export default async function CRMPage() {
+  const t = await getTranslations("crm");
+  const tc = await getTranslations("common");
+
   const [stats, leads, topDeals, recentActivities] = await Promise.all([
     getDashboardStats(),
     getLeads(),
@@ -55,8 +59,8 @@ export default async function CRMPage() {
   return (
     <div className="p-6 space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Sales Dashboard</h1>
-        <p className="text-muted-foreground">Monitor your team's performance and sales pipeline in real-time.</p>
+        <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>
+        <p className="text-muted-foreground">{t("subtitle")}</p>
       </div>
 
       {/* Metric Cards */}
@@ -64,12 +68,12 @@ export default async function CRMPage() {
         <Link href="/dashboard/pipeline" className="group">
           <Card className="border-l-4 border-l-blue-500 shadow-sm transition-shadow group-hover:shadow-md cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Pipeline Value</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("pipelineValue")}</CardTitle>
               <TrendingUpIcon className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">€{stats.totalDealValue.toLocaleString()}</div>
-              <p className="text-xs text-muted-foreground mt-1">Total value of open deals</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("pipelineValueDesc")}</p>
             </CardContent>
           </Card>
         </Link>
@@ -77,12 +81,12 @@ export default async function CRMPage() {
         <Link href="/dashboard/leads" className="group">
           <Card className="border-l-4 border-l-green-500 shadow-sm transition-shadow group-hover:shadow-md cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Active Leads</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("activeLeads")}</CardTitle>
               <UsersIcon className="h-4 w-4 text-green-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.activeLeadsCount}</div>
-              <p className="text-xs text-muted-foreground mt-1">New or currently in contact</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("activeLeadsDesc")}</p>
             </CardContent>
           </Card>
         </Link>
@@ -90,12 +94,12 @@ export default async function CRMPage() {
         <Link href="/dashboard/leads" className="group">
           <Card className="border-l-4 border-l-orange-500 shadow-sm transition-shadow group-hover:shadow-md cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Conversion Rate</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("conversionRate")}</CardTitle>
               <TargetIcon className="h-4 w-4 text-orange-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.conversionRate}%</div>
-              <p className="text-xs text-muted-foreground mt-1">Overall lead to customer ratio</p>
+              <p className="text-xs text-muted-foreground mt-1">{t("conversionRateDesc")}</p>
             </CardContent>
           </Card>
         </Link>
@@ -103,14 +107,14 @@ export default async function CRMPage() {
         <Link href="/dashboard/tasks" className="group">
           <Card className="border-l-4 border-l-red-500 shadow-sm transition-shadow group-hover:shadow-md cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Pending Tasks</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("pendingTasks")}</CardTitle>
               <AlertCircleIcon className="h-4 w-4 text-red-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{stats.todayTasks + stats.overdueTasks}</div>
               <div className="flex gap-2 mt-1">
-                <span className="text-[10px] text-red-600 font-bold uppercase">{stats.overdueTasks} Overdue</span>
-                <span className="text-[10px] text-muted-foreground uppercase">{stats.todayTasks} Today</span>
+                <span className="text-[10px] text-red-600 font-bold uppercase">{t("overdueLabel", { count: stats.overdueTasks })}</span>
+                <span className="text-[10px] text-muted-foreground uppercase">{t("todayLabel", { count: stats.todayTasks })}</span>
               </div>
             </CardContent>
           </Card>
@@ -119,13 +123,13 @@ export default async function CRMPage() {
         <Link href="/dashboard/quotes" className="group">
           <Card className="border-l-4 border-l-violet-500 shadow-sm transition-shadow group-hover:shadow-md cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Quotes Pipeline</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("quotesPipeline")}</CardTitle>
               <FileTextIcon className="h-4 w-4 text-violet-500" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">€{stats.quotesPipelineValue.toLocaleString()}</div>
               <div className="flex gap-2 mt-1">
-                <span className="text-[10px] text-muted-foreground uppercase">{stats.quotesOpenCount} open quotes</span>
+                <span className="text-[10px] text-muted-foreground uppercase">{t("openQuotesCount", { count: stats.quotesOpenCount })}</span>
               </div>
             </CardContent>
           </Card>
@@ -134,7 +138,7 @@ export default async function CRMPage() {
         <Link href="/dashboard/support/tickets" className="group">
           <Card className="border-l-4 border-l-amber-500 shadow-sm transition-shadow group-hover:shadow-md cursor-pointer">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Open Tickets</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("openTickets")}</CardTitle>
               <HeadphonesIcon className="h-4 w-4 text-amber-500" />
             </CardHeader>
             <CardContent>
@@ -142,10 +146,10 @@ export default async function CRMPage() {
               <div className="flex gap-2 mt-1">
                 {stats.urgentTicketsCount > 0 ? (
                   <span className="text-[10px] text-red-600 font-bold uppercase">
-                    {stats.urgentTicketsCount} Urgent
+                    {t("urgentLabel", { count: stats.urgentTicketsCount })}
                   </span>
                 ) : (
-                  <span className="text-[10px] text-muted-foreground uppercase">No urgent tickets</span>
+                  <span className="text-[10px] text-muted-foreground uppercase">{t("noUrgentTickets")}</span>
                 )}
               </div>
             </CardContent>
@@ -164,17 +168,17 @@ export default async function CRMPage() {
             <div>
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-blue-500" />
-                Top Deals
+                {t("topDeals")}
               </CardTitle>
-              <CardDescription>Highest-value open opportunities</CardDescription>
+              <CardDescription>{t("highestValueOpportunities")}</CardDescription>
             </div>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/pipeline">View Pipeline</Link>
+              <Link href="/dashboard/pipeline">{t("viewPipeline")}</Link>
             </Button>
           </CardHeader>
           <CardContent className="p-0">
             {topDeals.length === 0 ? (
-              <p className="text-center text-muted-foreground italic py-8">No open deals yet.</p>
+              <p className="text-center text-muted-foreground italic py-8">{t("noOpenDeals")}</p>
             ) : (
               <div className="divide-y">
                 {topDeals.map((deal) => (
@@ -202,7 +206,7 @@ export default async function CRMPage() {
                     <div className="text-right ml-4 shrink-0">
                       <p className="font-semibold text-sm">€{deal.amount.toLocaleString()}</p>
                       {deal.probability != null && (
-                        <p className="text-[11px] text-muted-foreground">{deal.probability}% prob.</p>
+                        <p className="text-[11px] text-muted-foreground">{t("probPercent", { prob: deal.probability })}</p>
                       )}
                     </div>
                   </Link>
@@ -217,13 +221,13 @@ export default async function CRMPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquareIcon className="h-4 w-4 text-green-500" />
-              Recent Activities
+              {t("recentActivity")}
             </CardTitle>
-            <CardDescription>Latest interactions across all entities</CardDescription>
+            <CardDescription>{t("latestInteractions")}</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
             {recentActivities.length === 0 ? (
-              <p className="text-center text-muted-foreground italic py-8">No activities recorded yet.</p>
+              <p className="text-center text-muted-foreground italic py-8">{t("noActivitiesYet")}</p>
             ) : (
               <div className="divide-y">
                 {recentActivities.map((act) => {
@@ -262,22 +266,22 @@ export default async function CRMPage() {
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Recent Leads</CardTitle>
-            <CardDescription>Latest potential customers entered into the system</CardDescription>
+            <CardTitle>{t("recentLeads")}</CardTitle>
+            <CardDescription>{t("latestCustomers")}</CardDescription>
           </div>
           <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/leads">View All</Link>
+            <Link href="/dashboard/leads">{t("viewAll")}</Link>
           </Button>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Action</TableHead>
+                <TableHead>{tc("name")}</TableHead>
+                <TableHead>{tc("company")}</TableHead>
+                <TableHead>{tc("status")}</TableHead>
+                <TableHead>{tc("createdAt")}</TableHead>
+                <TableHead className="text-right">{t("tableAction")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -299,7 +303,7 @@ export default async function CRMPage() {
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" asChild>
-                      <Link href={`/dashboard/leads/${lead.id}`}>View →</Link>
+                      <Link href={`/dashboard/leads/${lead.id}`}>{t("viewAll")} →</Link>
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -307,7 +311,7 @@ export default async function CRMPage() {
               {recentLeads.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-4 text-muted-foreground">
-                    No leads found. Start by adding one!
+                    {t("noLeadsFound")}
                   </TableCell>
                 </TableRow>
               )}

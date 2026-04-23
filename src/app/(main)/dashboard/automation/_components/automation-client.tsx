@@ -25,6 +25,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { RuleModal } from "@/components/crm/automation/rule-builder";
+import { useTranslations } from "next-intl";
 import { deleteAutomationRule, toggleAutomationRuleActive } from "@/actions/automation";
 import { cn } from "@/lib/utils";
 
@@ -46,25 +47,21 @@ interface Props {
   canEdit: boolean;
 }
 
-const ENTITY_META: Record<string, { label: string; color: string }> = {
-  deal:    { label: "Deal",    color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
-  lead:    { label: "Lead",    color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" },
-  contact: { label: "Contact", color: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300" },
-  company: { label: "Company", color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
+const ENTITY_COLORS: Record<string, string> = {
+  deal:    "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  lead:    "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+  contact: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
+  company: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
 };
 
-const TRIGGER_META: Record<string, { label: string; icon: React.ReactNode; color: string; description: string }> = {
+const TRIGGER_STYLES: Record<string, { icon: React.ReactNode; color: string }> = {
   onCreate: {
-    label: "On Create",
     icon: <Plus className="h-3 w-3" />,
     color: "bg-green-100 text-green-700 dark:bg-green-900/40",
-    description: "Runs when a new record is created"
   },
   onUpdate: {
-    label: "On Update",
     icon: <Pencil className="h-3 w-3" />,
     color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40",
-    description: "Runs when a record is modified"
   },
 };
 
@@ -79,37 +76,41 @@ function getScheduledTrigger(triggerOn: string[] | null): string | null {
   return scheduledTrigger.substring("scheduled:".length);
 }
 
-/**
- * Converte cron expression a descrizione leggibile
- */
-function formatCronDescription(cronExpr: string): string {
-  const parts = cronExpr.split(" ");
-  if (parts.length < 5) return cronExpr;
-
-  const minute = parts[0];
-  const hour = parts[1];
-  const dayOfMonth = parts[2];
-  const dayOfWeek = parts[4];
-
-  // Common patterns
-  if (dayOfMonth === "*" && dayOfWeek === "*") {
-    return `Daily at ${hour}:${minute.padStart(2, "0")}`;
-  }
-  if (dayOfMonth === "*" && dayOfWeek !== "*") {
-    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    const dayNum = parseInt(dayOfWeek);
-    return `Every ${days[dayNum] || "??"} at ${hour}:${minute.padStart(2, "0")}`;
-  }
-  if (hour === "*/6") return "Every 6 hours";
-  if (hour === "*/4") return "Every 4 hours";
-  if (hour === "*/2") return "Every 2 hours";
-  
-  return cronExpr; // Fallback to raw
-}
 
 export function AutomationClient({ rules, canEdit }: Props) {
+  const t = useTranslations("automation");
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+
+  const formatCronDescription = (cronExpr: string): string => {
+    const parts = cronExpr.split(" ");
+    if (parts.length < 5) return cronExpr;
+    const minute = parts[0];
+    const hour = parts[1];
+    const dayOfMonth = parts[2];
+    const dayOfWeek = parts[4];
+    if (dayOfMonth === "*" && dayOfWeek === "*") {
+      return t("cron.daily", { hour, minute: minute.padStart(2, "0") });
+    }
+    if (dayOfMonth === "*" && dayOfWeek !== "*") {
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const dayNum = parseInt(dayOfWeek);
+      return t("cron.weekly", { day: days[dayNum] ?? "??", hour, minute: minute.padStart(2, "0") });
+    }
+    if (hour === "*/6") return t("cron.every6h");
+    if (hour === "*/4") return t("cron.every4h");
+    if (hour === "*/2") return t("cron.every2h");
+    return cronExpr;
+  };
+
+  const triggerLabels: Record<string, string> = {
+    onCreate: t("triggers.onCreate"),
+    onUpdate: t("triggers.onUpdate"),
+  };
+  const triggerDescs: Record<string, string> = {
+    onCreate: t("triggers.onCreateDesc"),
+    onUpdate: t("triggers.onUpdateDesc"),
+  };
 
   const handleToggle = (id: string, current: boolean) => {
     startTransition(async () => {
@@ -122,10 +123,10 @@ export function AutomationClient({ rules, canEdit }: Props) {
     startTransition(async () => {
       try {
         await deleteAutomationRule(id);
-        toast.success("Rule deleted.");
+        toast.success(t("deleteSuccess"));
         router.refresh();
       } catch {
-        toast.error("Failed to delete rule.");
+        toast.error(t("deleteFailed"));
       }
     });
   };
@@ -140,16 +141,16 @@ export function AutomationClient({ rules, canEdit }: Props) {
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
               <Zap className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
             </span>
-            Automation Rules
+            {t("title")}
           </h1>
           <p className="text-muted-foreground text-sm mt-1.5">
-            Trigger-based rules that run automatically when CRM records change.
+            {t("subtitle")}
           </p>
         </div>
         {canEdit && (
           <RuleModal onSaved={() => router.refresh()}>
             <Button className="gap-2">
-              <Plus className="h-4 w-4" /> New Rule
+              <Plus className="h-4 w-4" /> {t("newRule")}
             </Button>
           </RuleModal>
         )}
@@ -161,14 +162,14 @@ export function AutomationClient({ rules, canEdit }: Props) {
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted mx-auto mb-4">
             <Zap className="h-7 w-7 text-muted-foreground" />
           </div>
-          <p className="font-semibold">No automation rules yet</p>
+          <p className="font-semibold">{t("emptyTitle")}</p>
           <p className="text-sm text-muted-foreground mt-1">
-            Rules run automatically when records are created or updated.
+            {t("emptyDesc")}
           </p>
           {canEdit && (
             <RuleModal onSaved={() => router.refresh()}>
               <Button className="mt-5 gap-2">
-                <Plus className="h-4 w-4" /> Create your first rule
+                <Plus className="h-4 w-4" /> {t("createFirstRule")}
               </Button>
             </RuleModal>
           )}
@@ -178,7 +179,8 @@ export function AutomationClient({ rules, canEdit }: Props) {
         /* ── Rule List ────────────────────────────────────────────────── */
         <div className="rounded-xl border overflow-hidden">
           {rules.map((rule, i) => {
-            const em = ENTITY_META[rule.targetEntity];
+            const entityColor = ENTITY_COLORS[rule.targetEntity];
+            const entityLabel = t(`entities.${rule.targetEntity as "deal" | "lead" | "contact" | "company"}`);
             return (
               <div
                 key={rule.id}
@@ -197,17 +199,16 @@ export function AutomationClient({ rules, canEdit }: Props) {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-sm">{rule.name}</span>
-                    {em && (
-                      <Badge className={`text-[11px] px-2 py-0 h-5 font-medium border-0 ${em.color}`}>
-                        {em.label}
+                    {entityColor && (
+                      <Badge className={`text-[11px] px-2 py-0 h-5 font-medium border-0 ${entityColor}`}>
+                        {entityLabel}
                       </Badge>
                     )}
-                    
+
                     {/* Trigger Badges */}
                     {(rule.triggerOn ?? []).map((trigger) => {
-                      const meta = TRIGGER_META[trigger];
-                      if (!meta) return null;
-                      
+                      const style = TRIGGER_STYLES[trigger];
+                      if (!style) return null;
                       return (
                         <TooltipProvider key={trigger}>
                           <Tooltip>
@@ -216,19 +217,19 @@ export function AutomationClient({ rules, canEdit }: Props) {
                                 variant="outline"
                                 className={cn(
                                   "text-[11px] px-2 py-0 h-5 font-medium border-0 cursor-help gap-1",
-                                  meta.color
+                                  style.color
                                 )}
                               >
-                                {meta.icon}
-                                {meta.label}
+                                {style.icon}
+                                {triggerLabels[trigger] ?? trigger}
                               </Badge>
                             </TooltipTrigger>
-                            <TooltipContent>{meta.description}</TooltipContent>
+                            <TooltipContent>{triggerDescs[trigger]}</TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
                       );
                     })}
-                    
+
                     {/* Scheduled Trigger Badge */}
                     {getScheduledTrigger(rule.triggerOn) && (
                       <TooltipProvider>
@@ -239,7 +240,7 @@ export function AutomationClient({ rules, canEdit }: Props) {
                               className="text-[11px] px-2 py-0 h-5 font-medium border-0 gap-1 bg-amber-100 text-amber-700 dark:bg-amber-900/40 cursor-help"
                             >
                               <Clock className="h-3 w-3" />
-                              Scheduled
+                              {t("triggers.scheduled")}
                             </Badge>
                           </TooltipTrigger>
                           <TooltipContent>
@@ -248,10 +249,10 @@ export function AutomationClient({ rules, canEdit }: Props) {
                         </Tooltip>
                       </TooltipProvider>
                     )}
-                    
+
                     {!rule.isActive && (
                       <Badge variant="outline" className="text-[11px] px-2 py-0 h-5 text-muted-foreground/60">
-                        Disabled
+                        {t("disabled")}
                       </Badge>
                     )}
                   </div>
@@ -284,9 +285,9 @@ export function AutomationClient({ rules, canEdit }: Props) {
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
-                          <AlertDialogTitle>Delete this rule?</AlertDialogTitle>
+                          <AlertDialogTitle>{t("deleteTitle")}</AlertDialogTitle>
                           <AlertDialogDescription>
-                            This permanently deletes <strong>{rule.name}</strong> and all its execution logs. This action cannot be undone.
+                            {t("deleteDesc", { name: rule.name })}
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -295,7 +296,7 @@ export function AutomationClient({ rules, canEdit }: Props) {
                             className="bg-destructive hover:bg-destructive/90"
                             onClick={() => handleDelete(rule.id)}
                           >
-                            Delete
+                            {t("deleteRule")}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
