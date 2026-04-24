@@ -25,13 +25,14 @@ import { CreateQuoteButton } from "@/components/crm/create-quote-button";
 import { DealEditButton } from "@/components/crm/deal-edit-button";
 import { db } from "@/db";
 import { products } from "@/db/schema";
+import { getTranslations } from "next-intl/server";
 
 export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: dealId } = await params;
   const session = await auth();
   const userId = session?.user?.id;
 
-  const [row, { stages }, activitiesList, tasksList, allUsers, quotesList, productsList, companiesList, contactsList] = await Promise.all([
+  const [row, { stages }, activitiesList, tasksList, allUsers, quotesList, productsList, companiesList, contactsList, t, tD] = await Promise.all([
     getDealById(dealId),
     getPipelineData(),
     getActivitiesByDeal(dealId),
@@ -41,6 +42,8 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     db.query.products.findMany(),
     getCompanies(),
     getContacts(),
+    getTranslations("pipeline"),
+    getTranslations("entityDetail"),
   ]);
 
   if (!row) return notFound();
@@ -101,7 +104,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         <div>
           <Link href="/dashboard/pipeline" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3">
             <ChevronLeftIcon className="h-4 w-4" />
-            Back to Pipeline
+            {t("backToPipeline")}
           </Link>
           <Card>
             <CardHeader className="pb-3">
@@ -124,7 +127,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               {/* Stage */}
               <div className="flex items-center gap-2">
                 <KanbanIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-muted-foreground">Stage:</span>
+                <span className="text-muted-foreground">{t("fieldStage")}</span>
                 <span className="flex items-center gap-1.5 font-medium">
                   <span className="h-2 w-2 rounded-full shrink-0" style={{ background: stageColor ?? "#94a3b8" }} />
                   {stageName ?? "—"}
@@ -134,7 +137,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               {/* Amount */}
               <div className="flex items-center gap-2">
                 <TrendingUpIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-muted-foreground">Value:</span>
+                <span className="text-muted-foreground">{t("fieldValue")}</span>
                 <span className="font-semibold text-base">
                   {deal.amount
                     ? new Intl.NumberFormat("it-IT", { style: "currency", currency: deal.currency || "EUR" }).format(Number(deal.amount))
@@ -149,7 +152,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               {companyName && (
                 <div className="flex items-center gap-2">
                   <BuildingIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Company:</span>
+                  <span className="text-muted-foreground">{t("fieldCompany")}</span>
                   {deal.companyId
                     ? <Link href={`/dashboard/companies/${deal.companyId}`} className="font-medium hover:underline">{companyName}</Link>
                     : <span className="font-medium">{companyName}</span>}
@@ -160,7 +163,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               {(contactFirstName || contactLastName) && (
                 <div className="flex items-center gap-2">
                   <UserIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Contact:</span>
+                  <span className="text-muted-foreground">{t("fieldContact")}</span>
                   {deal.contactId
                     ? <Link href={`/dashboard/contacts/${deal.contactId}`} className="font-medium hover:underline">{contactFirstName} {contactLastName}</Link>
                     : <span className="font-medium">{contactFirstName} {contactLastName}</span>}
@@ -170,10 +173,10 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               {/* Close date */}
               <div className="flex items-center gap-2">
                 <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                <span className="text-muted-foreground">Expected close:</span>
+                <span className="text-muted-foreground">{t("fieldExpectedClose")}</span>
                 <span className="font-medium">
                   {deal.expectedCloseDate
-                    ? new Date(deal.expectedCloseDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                    ? new Date(deal.expectedCloseDate).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })
                     : "—"}
                 </span>
               </div>
@@ -182,7 +185,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               {ownerName && (
                 <div className="flex items-center gap-2">
                   <UserIcon className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <span className="text-muted-foreground">Owner:</span>
+                  <span className="text-muted-foreground">{t("fieldOwner")}</span>
                   <span className="font-medium">{ownerName}</span>
                 </div>
               )}
@@ -190,13 +193,13 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               {/* Notes */}
               {deal.notes && (
                 <div className="pt-2 border-t">
-                  <p className="text-xs text-muted-foreground mb-1">Notes</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t("fieldNotes")}</p>
                   <p className="text-sm whitespace-pre-wrap">{deal.notes}</p>
                 </div>
               )}
 
               <div className="pt-2 border-t text-xs text-muted-foreground">
-                Created <FormattedDate date={deal.createdAt} />
+                {t("createdOn")} <FormattedDate date={deal.createdAt} />
               </div>
             </CardContent>
           </Card>
@@ -208,7 +211,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         {/* Quotes */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base">Quotes & Proposals</CardTitle>
+            <CardTitle className="text-base">{t("quotesProposals")}</CardTitle>
             <CreateQuoteButton
               dealId={dealId}
               companyId={deal.companyId || ""}
@@ -218,7 +221,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           </CardHeader>
           <CardContent>
             {quotesList.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No quotes yet. Create one to start proposal management.</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">{t("noQuotesYet")}</p>
             ) : (
               <div className="space-y-2">
                 {quotesList.map((quote) => (
@@ -247,24 +250,24 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         {/* Activities */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base">Activity Timeline</CardTitle>
+            <CardTitle className="text-base">{t("activityTimeline")}</CardTitle>
             <ActivityModal mode="create" entityType="deal" entityId={dealId} ownerId={userId} revalidatePathStr={revalidatePath_} />
           </CardHeader>
           <CardContent className="space-y-1">
             {/* Quick log form */}
             <form action={handleAddActivity} className="flex gap-2 pb-4 border-b">
               <select name="type" className="h-9 rounded-md border border-input bg-background px-2 text-sm">
-                <option value="note">Note</option>
-                <option value="call">Call</option>
-                <option value="meeting">Meeting</option>
-                <option value="email">Email</option>
+                <option value="note">{tD("activityTypes.note")}</option>
+                <option value="call">{tD("activityTypes.call")}</option>
+                <option value="meeting">{tD("activityTypes.meeting")}</option>
+                <option value="email">{tD("activityTypes.email")}</option>
               </select>
-              <Textarea name="content" placeholder="Log a note, call, meeting…" className="min-h-[36px] h-9 resize-none py-1.5 text-sm flex-1" />
-              <Button type="submit" size="sm" variant="outline">Log</Button>
+              <Textarea name="content" placeholder={t("logActivityPlaceholder")} className="min-h-[36px] h-9 resize-none py-1.5 text-sm flex-1" />
+              <Button type="submit" size="sm" variant="outline">{t("logBtn")}</Button>
             </form>
 
             {activitiesList.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No activities yet.</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">{t("noActivitiesYet")}</p>
             ) : (
               <div className="space-y-3 pt-1">
                 {activitiesList.map((act) => (
@@ -288,24 +291,24 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         {/* Tasks */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base">Tasks</CardTitle>
-            <span className="text-xs text-muted-foreground">{tasksList.filter((t) => t.status !== "done").length} open</span>
+            <CardTitle className="text-base">{tD("tasksNextStepsTitle")}</CardTitle>
+            <span className="text-xs text-muted-foreground">{t("openTasksCount", { count: tasksList.filter((tk) => tk.status !== "done").length })}</span>
           </CardHeader>
           <CardContent className="space-y-1">
             {/* Quick add task */}
             <form action={handleAddTask} className="flex gap-2 pb-4 border-b">
-              <input name="title" placeholder="New task…" className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm" />
+              <input name="title" placeholder={t("newTaskPlaceholder")} className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm" />
               <select name="priority" className="h-9 rounded-md border border-input bg-background px-2 text-sm">
-                <option value="normal">Normal</option>
-                <option value="high">High</option>
-                <option value="low">Low</option>
+                <option value="normal">{tD("priorityNormal")}</option>
+                <option value="high">{tD("priorityHigh")}</option>
+                <option value="low">{tD("priorityLow")}</option>
               </select>
               <input name="dueDate" type="date" className="h-9 rounded-md border border-input bg-background px-2 text-sm" />
-              <Button type="submit" size="sm" variant="outline">Add</Button>
+              <Button type="submit" size="sm" variant="outline">{t("addBtn")}</Button>
             </form>
 
             {tasksList.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No tasks yet.</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">{t("noTasksYet")}</p>
             ) : (
               <div className="space-y-2 pt-1">
                 {tasksList.map((task) => (

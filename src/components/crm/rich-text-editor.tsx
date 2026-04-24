@@ -22,6 +22,7 @@ interface Props {
   onChange?: (html: string) => void;
   placeholder?: string;
   className?: string;
+  macroVariables?: boolean;
 }
 
 type ToolbarButtonProps = {
@@ -52,7 +53,10 @@ function ToolbarButton({ onClick, active, disabled, label, children }: ToolbarBu
   );
 }
 
-export function RichTextEditor({ value, onChange, placeholder, className }: Props) {
+const EMAIL_VARS = ["{{nome}}", "{{cognome}}", "{{email}}"];
+const MACRO_VARS = ["{ticket.number}", "{contact.firstName}", "{agent.name}"];
+
+export function RichTextEditor({ value, onChange, placeholder, className, macroVariables = false }: Props) {
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -62,6 +66,7 @@ export function RichTextEditor({ value, onChange, placeholder, className }: Prop
       TextAlign.configure({ types: ["heading", "paragraph"] }),
     ],
     content: value ?? "",
+    immediatelyRender: false,
     editorProps: {
       attributes: {
         class: "prose prose-sm dark:prose-invert max-w-none min-h-[200px] focus:outline-none p-4",
@@ -165,8 +170,8 @@ export function RichTextEditor({ value, onChange, placeholder, className }: Prop
 
           {/* Variable chip insertions */}
           <Separator orientation="vertical" className="mx-1 h-5" />
-          <span className="text-[10px] text-muted-foreground">Variables:</span>
-          {["{{nome}}", "{{cognome}}", "{{email}}"].map((v) => (
+          <span className="text-[10px] text-muted-foreground">Var:</span>
+          {(macroVariables ? MACRO_VARS : EMAIL_VARS).map((v) => (
             <button
               key={v}
               type="button"

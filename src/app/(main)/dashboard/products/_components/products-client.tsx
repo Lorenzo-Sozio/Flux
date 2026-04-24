@@ -299,7 +299,7 @@ export function ProductsClient({ products: initial }: Props) {
     new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(Number(price));
 
   return (
-    <div className="space-y-5">
+    <div className="p-6 space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

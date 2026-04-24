@@ -23,6 +23,7 @@ import { TaskModal } from "@/components/crm/task-modal";
 import { FormattedDate } from "@/components/crm/formatted-date";
 import { SendEmailModal } from "@/components/crm/send-email-modal";
 import { getEmailTemplates } from "@/actions/marketing";
+import { getTranslations } from "next-intl/server";
 
 export default async function LeadDetailPage({
   params,
@@ -50,12 +51,14 @@ export default async function LeadDetailPage({
     return notFound();
   }
 
-  const [leadActivities, leadTasks, allUsers, customFieldDefs, customFieldVals] = await Promise.all([
+  const [leadActivities, leadTasks, allUsers, customFieldDefs, customFieldVals, t, tD] = await Promise.all([
     getActivitiesByLead(leadId),
     getTasksByLead(leadId),
     getAllUsers(),
     getCustomFieldDefinitions("lead"),
     getCustomFieldValues("lead", leadId),
+    getTranslations("leads"),
+    getTranslations("entityDetail"),
   ]);
 
   async function handleAddActivity(formData: FormData) {
@@ -81,7 +84,7 @@ export default async function LeadDetailPage({
     const priority = formData.get("priority") as string;
     const dueDateStr = formData.get("dueDate") as string;
     const assigneeId = formData.get("assigneeId") as string;
-    
+
     if (title) {
       await createTask({
         title,
@@ -114,10 +117,10 @@ export default async function LeadDetailPage({
       <div className="w-full md:w-1/3 flex flex-col gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Lead Details</CardTitle>
+            <CardTitle>{t("leadDetails")}</CardTitle>
             <div className="flex items-center gap-1">
               <LeadModal lead={lead}>
-                <Button variant="ghost" size="icon" title="Edit lead">
+                <Button variant="ghost" size="icon" title={t("editLead")}>
                   <PencilIcon className="h-4 w-4" />
                 </Button>
               </LeadModal>
@@ -127,40 +130,40 @@ export default async function LeadDetailPage({
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm text-muted-foreground">Name</p>
+              <p className="text-sm text-muted-foreground">{tD("fieldName")}</p>
               <p className="font-medium">{lead.firstName} {lead.lastName}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Status</p>
+              <p className="text-sm text-muted-foreground">{tD("fieldStatus")}</p>
               <Badge variant="outline" className="capitalize">{lead.status}</Badge>
             </div>
             {lead.email && (
               <div>
-                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="text-sm text-muted-foreground">{tD("fieldEmail")}</p>
                 <p>{lead.email}</p>
               </div>
             )}
             {lead.phone && (
               <div>
-                <p className="text-sm text-muted-foreground">Phone</p>
+                <p className="text-sm text-muted-foreground">{tD("fieldPhone")}</p>
                 <p>{lead.phone}</p>
               </div>
             )}
             {lead.companyName && (
               <div>
-                <p className="text-sm text-muted-foreground">Company</p>
+                <p className="text-sm text-muted-foreground">{tD("fieldCompany")}</p>
                 <p>{lead.companyName}</p>
               </div>
             )}
             {lead.jobTitle && (
               <div>
-                <p className="text-sm text-muted-foreground">Job Title</p>
+                <p className="text-sm text-muted-foreground">{tD("fieldJobTitle")}</p>
                 <p>{lead.jobTitle}</p>
               </div>
             )}
             {lead.source && (
               <div>
-                <p className="text-sm text-muted-foreground">Source</p>
+                <p className="text-sm text-muted-foreground">{tD("fieldSource")}</p>
                 <p className="capitalize">{lead.source}</p>
               </div>
             )}
@@ -179,37 +182,37 @@ export default async function LeadDetailPage({
 
       {/* Right side: Timeline & Tasks */}
       <div className="w-full md:w-2/3 flex flex-col gap-6">
-        
+
         {/* Notes / Activities */}
         <Card>
           <CardHeader>
-            <CardTitle>Timeline & Activities</CardTitle>
+            <CardTitle>{tD("timelineTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <form action={handleAddActivity} className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/20">
               <Textarea
                 name="content"
-                placeholder="Log a call, meeting or note..."
+                placeholder={tD("activityPlaceholder")}
                 required
                 className="bg-background"
               />
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Type:</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">{tD("typeLabel")}</p>
                   <select name="type" className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm transition-colors">
-                    <option value="note">Note</option>
-                    <option value="call">Call</option>
-                    <option value="meeting">Meeting</option>
-                    <option value="email">Email</option>
+                    <option value="note">{tD("activityTypes.note")}</option>
+                    <option value="call">{tD("activityTypes.call")}</option>
+                    <option value="meeting">{tD("activityTypes.meeting")}</option>
+                    <option value="email">{tD("activityTypes.email")}</option>
                   </select>
                 </div>
-                <Button type="submit" size="sm">Log Activity</Button>
+                <Button type="submit" size="sm">{tD("logActivity")}</Button>
               </div>
             </form>
-            
+
             <div className="space-y-4 mt-6">
               {leadActivities.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No activities yet.</p>
+                <p className="text-sm text-muted-foreground">{tD("noActivities")}</p>
               ) : (
                 leadActivities.map(activity => (
                   <div key={activity.id} className="border-l-2 border-primary/30 pl-4 py-2 relative">
@@ -217,7 +220,7 @@ export default async function LeadDetailPage({
                     <div className="flex justify-between items-start">
                        <p className="text-xs font-semibold flex items-center gap-1 text-primary">
                         <UserIcon className="w-3 h-3" />
-                        {activity.ownerName || "System"}
+                        {activity.ownerName || tD("system")}
                       </p>
                       <div className="flex items-center gap-2">
                         <p className="text-[10px] text-muted-foreground">
@@ -238,41 +241,41 @@ export default async function LeadDetailPage({
         {/* Tasks */}
         <Card>
           <CardHeader>
-            <CardTitle>Tasks & Next Steps</CardTitle>
+            <CardTitle>{tD("tasksNextStepsTitle")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <form action={handleAddTask} className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/20">
-              <Input name="title" placeholder="Task title..." required />
-              <Textarea name="description" placeholder="Short description (optional)..." className="h-20" />
+              <Input name="title" placeholder={tD("taskTitlePlaceholder")} required />
+              <Textarea name="description" placeholder={tD("taskDescPlaceholder")} className="h-20" />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">Priority</p>
+                  <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">{tD("priorityLabel")}</p>
                   <select name="priority" defaultValue="normal" className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors">
-                    <option value="low">Low</option>
-                    <option value="normal">Normal</option>
-                    <option value="high">High</option>
+                    <option value="low">{tD("priorityLow")}</option>
+                    <option value="normal">{tD("priorityNormal")}</option>
+                    <option value="high">{tD("priorityHigh")}</option>
                   </select>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">Due Date & Time</p>
+                  <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">{tD("dueDateLabel")}</p>
                   <Input name="dueDate" type="datetime-local" className="h-9" />
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">Assign To</p>
+                  <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">{tD("assignToLabel")}</p>
                   <select name="assigneeId" className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors">
-                    <option value="">Myself</option>
+                    <option value="">{tD("myself")}</option>
                     {allUsers.filter(u => u.id !== userId).map(u => (
-                      <option key={u.id} value={u.id}>{u.name || "Unnamed User"}</option>
+                      <option key={u.id} value={u.id}>{u.name || tD("unnamedUser")}</option>
                     ))}
                   </select>
                 </div>
               </div>
-              <Button type="submit" size="sm" className="mt-2">Create Task</Button>
+              <Button type="submit" size="sm" className="mt-2">{tD("createTask")}</Button>
             </form>
-            
+
             <div className="space-y-3 mt-4">
               {leadTasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No tasks pending.</p>
+                <p className="text-sm text-muted-foreground">{tD("noTasks")}</p>
               ) : (
                 leadTasks.map(task => (
                   <div key={task.id} className={`flex flex-col gap-2 border p-3 rounded-md transition-all ${task.status === "done" ? "opacity-60 bg-muted/30" : "bg-card shadow-sm"}`}>
@@ -293,23 +296,23 @@ export default async function LeadDetailPage({
                         <TaskModal task={task} users={allUsers} revalidatePathStr={`/dashboard/leads/${leadId}`} />
                       </div>
                     </div>
-                    
+
                     <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-dashed">
                       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <ClockIcon className="w-3 h-3 text-blue-500" />
-                          Created: <FormattedDate date={task.createdAt} />
+                          {tD("createdLabel")} <FormattedDate date={task.createdAt} />
                         </span>
                         {task.status === "done" && task.completedAt && (
                           <span className="flex items-center gap-1 font-medium text-green-600">
                             <CheckCircle2Icon className="w-3 h-3" />
-                            Completed: <FormattedDate date={task.completedAt} />
+                            {tD("completedLabel")} <FormattedDate date={task.completedAt} />
                           </span>
                         )}
                         {task.dueDate && (
                           <span className={`flex items-center gap-1 font-semibold ${task.status !== "done" && new Date(task.dueDate) < new Date() ? "text-destructive" : "text-foreground/70"}`}>
                             <CalendarIcon className="w-3 h-3" />
-                            Due: <FormattedDate date={task.dueDate} />
+                            {tD("dueLabel")} <FormattedDate date={task.dueDate} />
                           </span>
                         )}
                       </div>
@@ -317,16 +320,16 @@ export default async function LeadDetailPage({
                         <div className="flex items-center gap-3 text-[10px]">
                           <span className="flex items-center gap-1">
                             <UserIcon className="w-3 h-3" />
-                            By: {task.ownerName || "System"}
+                            {tD("byLabel")} {task.ownerName || tD("system")}
                           </span>
                           <span className="flex items-center gap-1 font-medium text-primary/80">
                             <UserCheckIcon className="w-3 h-3" />
-                            To: {task.assigneeName || "Myself"}
+                            {tD("toLabel")} {task.assigneeName || tD("myself")}
                           </span>
                         </div>
                         <form action={async () => { "use server"; await toggleTask(task.id, task.status); }}>
                           <Button variant="outline" size="sm" className="h-6 px-2 text-[10px] bg-background">
-                            {task.status === "done" ? "Undo" : "Mark as Done"}
+                            {task.status === "done" ? tD("undo") : tD("markDone")}
                           </Button>
                         </form>
                       </div>

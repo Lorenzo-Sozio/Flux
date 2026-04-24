@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Loader2, CheckSquare, Phone, Users } from "lucide-react";
 import { toast } from "sonner";
+import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,7 @@ interface Props {
 type EventType = "task" | "meeting" | "call";
 
 export function CalendarNewEventButton({ defaultDate }: Props) {
+  const t = useTranslations("calendar");
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -43,8 +45,8 @@ export function CalendarNewEventButton({ defaultDate }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) { toast.error("Title is required."); return; }
-    if (!dateTime) { toast.error("Date and time are required."); return; }
+    if (!title.trim()) { toast.error(t("newEventDialog.titleRequired")); return; }
+    if (!dateTime) { toast.error(t("newEventDialog.dateRequired")); return; }
 
     startTransition(async () => {
       try {
@@ -60,33 +62,33 @@ export function CalendarNewEventButton({ defaultDate }: Props) {
           } as any);
         }
 
-        toast.success(`${eventType === "task" ? "Task" : eventType === "meeting" ? "Meeting" : "Call"} created.`);
+        toast.success(t("createSuccess"));
         setOpen(false);
         reset();
         router.refresh();
       } catch {
-        toast.error("Failed to create event.");
+        toast.error(t("newEventDialog.createError"));
       }
     });
   };
 
   const TYPE_CONFIG: Record<EventType, { label: string; icon: React.ReactNode; color: string }> = {
-    task: { label: "Task", icon: <CheckSquare className="h-4 w-4" />, color: "bg-blue-500" },
-    meeting: { label: "Meeting", icon: <Users className="h-4 w-4" />, color: "bg-violet-500" },
-    call: { label: "Call", icon: <Phone className="h-4 w-4" />, color: "bg-emerald-500" },
+    task:    { label: t("typeTask"),    icon: <CheckSquare className="h-4 w-4" />, color: "bg-blue-500" },
+    meeting: { label: t("typeMeeting"), icon: <Users className="h-4 w-4" />,       color: "bg-violet-500" },
+    call:    { label: t("typeCall"),    icon: <Phone className="h-4 w-4" />,        color: "bg-emerald-500" },
   };
 
   return (
     <>
       <Button size="sm" className="gap-2 shrink-0" onClick={() => setOpen(true)}>
         <Plus className="h-4 w-4" />
-        New Event
+        {t("newEvent")}
       </Button>
 
       <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>New Event</DialogTitle>
+            <DialogTitle>{t("newEvent")}</DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
@@ -112,20 +114,20 @@ export function CalendarNewEventButton({ defaultDate }: Props) {
             {/* Title */}
             <div className="space-y-1.5">
               <Label htmlFor="new-event-title">
-                {eventType === "task" ? "Task title" : "Description"}
+                {eventType === "task" ? t("newEventDialog.titleLabel") : t("newEventDialog.descLabel")}
               </Label>
               <Input
                 id="new-event-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder={eventType === "task" ? "Follow up with..." : "Topic or notes..."}
+                placeholder={eventType === "task" ? t("newEventDialog.titlePlaceholderTask") : t("newEventDialog.titlePlaceholderOther")}
                 autoFocus
               />
             </div>
 
             {/* Date & time */}
             <div className="space-y-1.5">
-              <Label htmlFor="new-event-datetime">Date & Time</Label>
+              <Label htmlFor="new-event-datetime">{t("newEventDialog.dateTimeLabel")}</Label>
               <input
                 id="new-event-datetime"
                 type="datetime-local"
@@ -138,27 +140,27 @@ export function CalendarNewEventButton({ defaultDate }: Props) {
             {/* Priority (tasks only) */}
             {eventType === "task" && (
               <div className="space-y-1.5">
-                <Label htmlFor="new-event-priority">Priority</Label>
+                <Label htmlFor="new-event-priority">{t("newEventDialog.priorityLabel")}</Label>
                 <select
                   id="new-event-priority"
                   value={priority}
                   onChange={(e) => setPriority(e.target.value)}
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
-                  <option value="low">Low</option>
-                  <option value="normal">Normal</option>
-                  <option value="high">High</option>
+                  <option value="low">{t("newEventDialog.priorityLow")}</option>
+                  <option value="normal">{t("newEventDialog.priorityNormal")}</option>
+                  <option value="high">{t("newEventDialog.priorityHigh")}</option>
                 </select>
               </div>
             )}
 
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-                Cancel
+                {t("newEventDialog.cancel")}
               </Button>
               <Button type="submit" disabled={isPending} className="gap-2">
                 {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                Create {TYPE_CONFIG[eventType].label}
+                {t("newEventDialog.createBtn", { label: TYPE_CONFIG[eventType].label })}
               </Button>
             </DialogFooter>
           </form>

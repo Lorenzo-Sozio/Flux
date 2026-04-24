@@ -627,7 +627,15 @@ export const tickets = pgTable("ticket", {
   channel: text("channel").notNull(), // email, chat, phone, social
   priority: text("priority").default("normal").notNull(), // low, normal, high, urgent
   severity: text("severity").default("normal").notNull(), // low, normal, high, critical
-  status: text("status").default("open").notNull(), // open, in_progress, waiting, resolved, closed
+  status: text("status").default("new").notNull(), // new, open, in_progress, waiting, on_hold, resolved, closed
+  type: text("type").default("support"), // support, bug, complaint, info_request, internal_task
+  component: text("component"),
+  groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
+  parentTicketId: text("parent_ticket_id"),
+  slaDeadlineAt: timestamp("sla_deadline_at", { mode: "date" }),
+  slaPausedAt: timestamp("sla_paused_at", { mode: "date" }),
+  slaPauseMinutes: integer("sla_pause_minutes").default(0).notNull(),
+  slaBreachedAt: timestamp("sla_breached_at", { mode: "date" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
   leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
@@ -652,6 +660,8 @@ export const ticketMessages = pgTable("ticket_message", {
   content: text("content").notNull(),
   isPublic: boolean("is_public").default(true).notNull(),
   attachmentIds: text("attachment_ids").array().default([]), // document IDs
+  emailMessageId: text("email_message_id"),
+  emailInReplyTo: text("email_in_reply_to"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -687,6 +697,29 @@ export const chatSessions = pgTable("chat_session", {
   startedAt: timestamp("started_at", { mode: "date" }).defaultNow().notNull(),
   endedAt: timestamp("ended_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const ticketAuditLogs = pgTable("ticket_audit_log", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  ticketId: text("ticket_id").notNull().references(() => tickets.id, { onDelete: "cascade" }),
+  actorId: text("actor_id").references(() => users.id),
+  actorName: text("actor_name"),
+  action: text("action").notNull(), // status_changed | priority_changed | assigned | message_added | created | field_changed
+  field: text("field"),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const ticketMacros = pgTable("ticket_macro", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  description: text("description"),
+  body: text("body").notNull(),
+  isPublic: boolean("is_public").default(true).notNull(),
+  createdBy: text("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 // --- WEBHOOKS ---
@@ -766,12 +799,23 @@ export const ticketsRelations = relations(tickets, ({ one, many }) => ({
   assignee: one(users, { fields: [tickets.assigneeId], references: [users.id] }),
   owner: one(users, { fields: [tickets.ownerId], references: [users.id] }),
   sla: one(slas, { fields: [tickets.slaId], references: [slas.id] }),
+  group: one(userGroups, { fields: [tickets.groupId], references: [userGroups.id] }),
   messages: many(ticketMessages),
+  auditLogs: many(ticketAuditLogs),
 }));
 
 export const ticketMessagesRelations = relations(ticketMessages, ({ one }) => ({
   ticket: one(tickets, { fields: [ticketMessages.ticketId], references: [tickets.id] }),
   sender: one(users, { fields: [ticketMessages.senderId], references: [users.id] }),
+}));
+
+export const ticketAuditLogsRelations = relations(ticketAuditLogs, ({ one }) => ({
+  ticket: one(tickets, { fields: [ticketAuditLogs.ticketId], references: [tickets.id] }),
+  actor: one(users, { fields: [ticketAuditLogs.actorId], references: [users.id] }),
+}));
+
+export const ticketMacrosRelations = relations(ticketMacros, ({ one }) => ({
+  creator: one(users, { fields: [ticketMacros.createdBy], references: [users.id] }),
 }));
 
 export const slasRelations = relations(slas, ({ many }) => ({

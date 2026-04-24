@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 
 import { Command as CommandPrimitive } from "cmdk";
 import {
@@ -46,65 +47,8 @@ type SearchResults = {
   orders: SearchResult[];
 };
 
-const ENTITY_CONFIG: Record<
-  string,
-  { icon: React.ReactNode; badge: string; badgeClass: string; href: string }
-> = {
-  contact: {
-    icon: <Contact className="h-4 w-4" />,
-    badge: "Contact",
-    badgeClass: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-    href: "/dashboard/contacts",
-  },
-  lead: {
-    icon: <Users className="h-4 w-4" />,
-    badge: "Lead",
-    badgeClass: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
-    href: "/dashboard/leads",
-  },
-  company: {
-    icon: <Building2 className="h-4 w-4" />,
-    badge: "Company",
-    badgeClass: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-    href: "/dashboard/companies",
-  },
-  deal: {
-    icon: <Kanban className="h-4 w-4" />,
-    badge: "Deal",
-    badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-    href: "/dashboard/pipeline",
-  },
-  ticket: {
-    icon: <Headphones className="h-4 w-4" />,
-    badge: "Ticket",
-    badgeClass: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
-    href: "/dashboard/support/tickets",
-  },
-  quote: {
-    icon: <FileText className="h-4 w-4" />,
-    badge: "Quote",
-    badgeClass: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
-    href: "/dashboard/quotes",
-  },
-  order: {
-    icon: <ShoppingCart className="h-4 w-4" />,
-    badge: "Order",
-    badgeClass: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
-    href: "/dashboard/orders",
-  },
-};
-
-const QUICK_LINKS: { label: string; entity: string }[] = [
-  { label: "Contacts", entity: "contact" },
-  { label: "Leads", entity: "lead" },
-  { label: "Companies", entity: "company" },
-  { label: "Deals", entity: "deal" },
-  { label: "Tickets", entity: "ticket" },
-  { label: "Quotes", entity: "quote" },
-  { label: "Orders", entity: "order" },
-];
-
 export function SearchDialog() {
+  const t = useTranslations("search");
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -112,6 +56,74 @@ export function SearchDialog() {
   const [loading, setLoading] = React.useState(false);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  const ENTITY_CONFIG: Record<
+    string,
+    { icon: React.ReactNode; badge: string; badgeClass: string; href: string }
+  > = {
+    contact: {
+      icon: <Contact className="h-4 w-4" />,
+      badge: t("badges.contact"),
+      badgeClass: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
+      href: "/dashboard/contacts",
+    },
+    lead: {
+      icon: <Users className="h-4 w-4" />,
+      badge: t("badges.lead"),
+      badgeClass: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
+      href: "/dashboard/leads",
+    },
+    company: {
+      icon: <Building2 className="h-4 w-4" />,
+      badge: t("badges.company"),
+      badgeClass: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+      href: "/dashboard/companies",
+    },
+    deal: {
+      icon: <Kanban className="h-4 w-4" />,
+      badge: t("badges.deal"),
+      badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+      href: "/dashboard/pipeline",
+    },
+    ticket: {
+      icon: <Headphones className="h-4 w-4" />,
+      badge: t("badges.ticket"),
+      badgeClass: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
+      href: "/dashboard/support/tickets",
+    },
+    quote: {
+      icon: <FileText className="h-4 w-4" />,
+      badge: t("badges.quote"),
+      badgeClass: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
+      href: "/dashboard/quotes",
+    },
+    order: {
+      icon: <ShoppingCart className="h-4 w-4" />,
+      badge: t("badges.order"),
+      badgeClass: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
+      href: "/dashboard/orders",
+    },
+  };
+
+  const QUICK_LINKS: { label: string; entity: string }[] = [
+    { label: t("groups.contacts"), entity: "contact" },
+    { label: t("groups.leads"),    entity: "lead" },
+    { label: t("groups.companies"), entity: "company" },
+    { label: t("groups.deals"),    entity: "deal" },
+    { label: t("groups.tickets"),  entity: "ticket" },
+    { label: t("groups.quotes"),   entity: "quote" },
+    { label: t("groups.orders"),   entity: "order" },
+  ];
+
+  const groups: { key: keyof SearchResults; label: string }[] = [
+    { key: "contacts",  label: t("groups.contacts") },
+    { key: "leads",     label: t("groups.leads") },
+    { key: "companies", label: t("groups.companies") },
+    { key: "deals",     label: t("groups.deals") },
+    { key: "tickets",   label: t("groups.tickets") },
+    { key: "quotes",    label: t("groups.quotes") },
+    { key: "orders",    label: t("groups.orders") },
+  ];
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -164,16 +176,6 @@ export function SearchDialog() {
     router.push(url);
   };
 
-  const groups: { key: keyof SearchResults; label: string }[] = [
-    { key: "contacts", label: "Contacts" },
-    { key: "leads", label: "Leads" },
-    { key: "companies", label: "Companies" },
-    { key: "deals", label: "Deals" },
-    { key: "tickets", label: "Tickets" },
-    { key: "quotes", label: "Quotes" },
-    { key: "orders", label: "Orders" },
-  ];
-
   const hasResults = results && groups.some((g) => results[g.key]?.length > 0);
   const totalCount = results ? groups.reduce((acc, g) => acc + (results[g.key]?.length ?? 0), 0) : 0;
 
@@ -185,7 +187,7 @@ export function SearchDialog() {
         className="px-0! font-normal text-muted-foreground hover:no-underline"
       >
         <Search data-icon="inline-start" />
-        Search
+        {t("buttonLabel")}
         <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-medium text-[10px]">
           <span className="text-xs">⌘</span>J
         </kbd>
@@ -207,7 +209,7 @@ export function SearchDialog() {
             </div>
             <CommandPrimitive.Input
               ref={inputRef}
-              placeholder="Search contacts, leads, deals, tickets, quotes…"
+              placeholder={t("placeholder")}
               value={query}
               onValueChange={handleValueChange}
               className="h-8 flex-1 bg-transparent text-base text-foreground outline-none placeholder:text-muted-foreground/60"
@@ -221,7 +223,7 @@ export function SearchDialog() {
                 }}
                 className="shrink-0 rounded-sm text-xs text-muted-foreground ring-offset-background transition-colors hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
-                Clear
+                {t("clear")}
               </button>
             )}
           </div>
@@ -232,7 +234,7 @@ export function SearchDialog() {
             {!query && (
               <div className="p-4">
                 <p className="mb-3 px-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Quick access
+                  {t("quickAccess")}
                 </p>
                 <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
                   {QUICK_LINKS.map(({ label, entity }) => {
@@ -255,7 +257,7 @@ export function SearchDialog() {
 
             {/* Typing but < 2 chars */}
             {query.length === 1 && (
-              <div className="py-8 text-center text-sm text-muted-foreground">Keep typing to search…</div>
+              <div className="py-8 text-center text-sm text-muted-foreground">{t("keepTyping")}</div>
             )}
 
             {/* No results */}
@@ -263,11 +265,11 @@ export function SearchDialog() {
               <CommandEmpty>
                 <div className="py-8">
                   <p className="text-sm text-muted-foreground">
-                    No results for{" "}
+                    {t("noResults")}{" "}
                     <span className="font-medium text-foreground">&ldquo;{query}&rdquo;</span>
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground/60">
-                    Try a different name, number, email, or subject.
+                    {t("noResultsTip")}
                   </p>
                 </div>
               </CommandEmpty>
@@ -277,8 +279,8 @@ export function SearchDialog() {
             {hasResults && (
               <>
                 <div className="flex items-center justify-between px-4 pt-3 pb-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Results</p>
-                  <span className="text-xs text-muted-foreground">{totalCount} found</span>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("resultsHeading")}</p>
+                  <span className="text-xs text-muted-foreground">{t("foundCount", { count: totalCount })}</span>
                 </div>
                 {groups.map((group, idx) => {
                   const items = results![group.key];
@@ -328,16 +330,16 @@ export function SearchDialog() {
           {/* Footer */}
           <div className="flex items-center gap-4 border-t bg-muted/30 px-4 py-2.5 text-[11px] text-muted-foreground">
             <span className="flex items-center gap-1">
-              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">↑↓</kbd> navigate
+              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">↑↓</kbd> {t("navigate")}
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">↵</kbd> open
+              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">↵</kbd> {t("open")}
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">esc</kbd> close
+              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">esc</kbd> {t("close")}
             </span>
             <span className="ml-auto flex items-center gap-1">
-              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">⌘J</kbd> toggle
+              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">⌘J</kbd> {t("toggle")}
             </span>
           </div>
         </CommandPrimitive>

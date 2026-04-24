@@ -2,17 +2,18 @@
 
 import { format } from "date-fns";
 import { Mail, Eye, MousePointerClick, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  sent:    { label: "Sent",    className: "border-blue-300   text-blue-700   bg-blue-50" },
-  opened:  { label: "Opened",  className: "border-violet-300 text-violet-700 bg-violet-50" },
-  clicked: { label: "Clicked", className: "border-green-300  text-green-700  bg-green-50" },
-  failed:  { label: "Failed",  className: "border-red-400    text-red-800    bg-red-50" },
+const STATUS_CLASS: Record<string, string> = {
+  sent:    "border-blue-300   text-blue-700   bg-blue-50",
+  opened:  "border-violet-300 text-violet-700 bg-violet-50",
+  clicked: "border-green-300  text-green-700  bg-green-50",
+  failed:  "border-red-400    text-red-800    bg-red-50",
 };
 
 interface EmailLog {
@@ -32,6 +33,8 @@ interface Props {
 }
 
 export function AutomationEmailLogs({ logs }: Props) {
+  const t = useTranslations("automation.emailLogs");
+
   const total   = logs.length;
   const sent    = logs.filter((l) => l.status !== "failed").length;
   const opened  = logs.filter((l) => ["opened", "clicked"].includes(l.status)).length;
@@ -41,15 +44,22 @@ export function AutomationEmailLogs({ logs }: Props) {
   const openRate  = sent > 0 ? ((opened  / sent) * 100).toFixed(1) : "0";
   const clickRate = sent > 0 ? ((clicked / sent) * 100).toFixed(1) : "0";
 
+  const statusLabels: Record<string, string> = {
+    sent:    t("statusSent"),
+    opened:  t("statusOpened"),
+    clicked: t("statusClicked"),
+    failed:  t("statusFailed"),
+  };
+
   return (
     <div className="space-y-4">
       {/* Mini stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: "Sent",         value: sent,    icon: Mail,              color: "text-blue-500" },
-          { label: `Opened (${openRate}%)`,  value: opened,  icon: Eye,               color: "text-violet-500" },
-          { label: `Clicked (${clickRate}%)`, value: clicked, icon: MousePointerClick, color: "text-green-500" },
-          { label: "Failed",       value: failed,  icon: AlertCircle,       color: "text-red-500" },
+          { label: t("statusSent"),                            value: sent,    icon: Mail,              color: "text-blue-500" },
+          { label: t("openedWithRate",  { rate: openRate }),   value: opened,  icon: Eye,               color: "text-violet-500" },
+          { label: t("clickedWithRate", { rate: clickRate }),  value: clicked, icon: MousePointerClick, color: "text-green-500" },
+          { label: t("statusFailed"),                          value: failed,  icon: AlertCircle,       color: "text-red-500" },
         ].map(({ label, value, icon: Icon, color }) => (
           <Card key={label} className="border shadow-none">
             <CardContent className="pt-4 pb-3 flex items-center gap-3">
@@ -68,37 +78,35 @@ export function AutomationEmailLogs({ logs }: Props) {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold flex items-center gap-2">
             <Mail className="h-4 w-4 text-emerald-500" />
-            Automation Email Log
+            {t("cardTitle")}
           </CardTitle>
           <CardDescription className="text-xs">
-            Emails sent by automation rules — last {total} records.
-            Open/click tracking is self-hosted; data updates when recipients interact.
+            {t("cardDesc", { total })}
           </CardDescription>
         </CardHeader>
 
         {logs.length === 0 ? (
           <CardContent className="py-10 text-center">
             <CheckCircle2 className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-sm text-muted-foreground">No automation emails sent yet.</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              Enable "Track Opens" or "Track Clicks" in an automation rule to start collecting data here.
-            </p>
+            <p className="text-sm text-muted-foreground">{t("noEmailsYet")}</p>
+            <p className="text-xs text-muted-foreground mt-1">{t("noEmailsDesc")}</p>
           </CardContent>
         ) : (
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/40 hover:bg-muted/40">
-                <TableHead className="text-xs font-semibold">Recipient</TableHead>
-                <TableHead className="text-xs font-semibold">Type</TableHead>
-                <TableHead className="text-xs font-semibold">Status</TableHead>
-                <TableHead className="text-xs font-semibold">Sent At</TableHead>
-                <TableHead className="text-xs font-semibold">Opened</TableHead>
-                <TableHead className="text-xs font-semibold">Clicked</TableHead>
+                <TableHead className="text-xs font-semibold">{t("colRecipient")}</TableHead>
+                <TableHead className="text-xs font-semibold">{t("colType")}</TableHead>
+                <TableHead className="text-xs font-semibold">{t("colStatus")}</TableHead>
+                <TableHead className="text-xs font-semibold">{t("colSentAt")}</TableHead>
+                <TableHead className="text-xs font-semibold">{t("colOpened")}</TableHead>
+                <TableHead className="text-xs font-semibold">{t("colClicked")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {logs.map((log) => {
-                const cfg = STATUS_CONFIG[log.status] ?? STATUS_CONFIG.sent;
+                const statusClass = STATUS_CLASS[log.status] ?? STATUS_CLASS.sent;
+                const statusLabel = statusLabels[log.status] ?? log.status;
                 return (
                   <TableRow key={log.id}>
                     <TableCell className="text-sm">
@@ -115,8 +123,8 @@ export function AutomationEmailLogs({ logs }: Props) {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={`text-xs ${cfg.className}`}>
-                        {cfg.label}
+                      <Badge variant="outline" className={`text-xs ${statusClass}`}>
+                        {statusLabel}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">

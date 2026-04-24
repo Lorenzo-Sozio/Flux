@@ -23,6 +23,7 @@ import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { DocumentPanel } from "@/components/crm/document-panel";
 import { RecordVisit } from "@/components/crm/record-visit";
 import { getEmailTemplates } from "@/actions/marketing";
+import { getTranslations } from "next-intl/server";
 
 export default async function ContactDetailPage({
   params,
@@ -59,12 +60,14 @@ export default async function ContactDetailPage({
   }
 
   const { contact: cData, companyName } = contact;
-  const [activitiesList, tasksList, allUsers, customFieldDefs, customFieldVals] = await Promise.all([
+  const [activitiesList, tasksList, allUsers, customFieldDefs, customFieldVals, t, tD] = await Promise.all([
     getActivitiesByContact(contactId),
     getTasksByContact(contactId),
     getAllUsers(),
     getCustomFieldDefinitions("contact"),
     getCustomFieldValues("contact", contactId),
+    getTranslations("contacts"),
+    getTranslations("entityDetail"),
   ]);
 
   async function handleAddActivity(formData: FormData) {
@@ -90,7 +93,7 @@ export default async function ContactDetailPage({
     const priority = formData.get("priority") as string;
     const dueDateStr = formData.get("dueDate") as string;
     const assigneeId = formData.get("assigneeId") as string;
-    
+
     if (title) {
       await createTask({
         title,
@@ -123,10 +126,10 @@ export default async function ContactDetailPage({
       <div className="w-full md:w-1/3 flex flex-col gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Contact Details</CardTitle>
+            <CardTitle>{t("contactDetails")}</CardTitle>
             <div className="flex items-center gap-1">
               <ContactModal contact={cData}>
-                <Button variant="ghost" size="icon" title="Edit contact">
+                <Button variant="ghost" size="icon" title={t("editContact")}>
                   <PencilIcon className="h-4 w-4" />
                 </Button>
               </ContactModal>
@@ -135,41 +138,41 @@ export default async function ContactDetailPage({
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="text-sm text-muted-foreground">Name</p>
+              <p className="text-sm text-muted-foreground">{tD("fieldName")}</p>
               <p className="font-medium">{cData.firstName} {cData.lastName}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Company</p>
+              <p className="text-sm text-muted-foreground">{tD("fieldCompany")}</p>
               {cData.companyId ? (
                 <Link href={`/dashboard/companies/${cData.companyId}`} className="flex items-center gap-1 text-primary hover:underline font-medium">
                   <BuildingIcon className="w-4 h-4" />
                   {companyName}
                 </Link>
               ) : (
-                <p className="text-muted-foreground italic text-sm">No company linked</p>
+                <p className="text-muted-foreground italic text-sm">{tD("noCompanyLinked")}</p>
               )}
             </div>
             {cData.email && (
               <div>
-                <p className="text-sm text-muted-foreground">Email</p>
+                <p className="text-sm text-muted-foreground">{tD("fieldEmail")}</p>
                 <p className="text-sm">{cData.email}</p>
               </div>
             )}
             {cData.phone && (
               <div>
-                <p className="text-sm text-muted-foreground">Phone</p>
+                <p className="text-sm text-muted-foreground">{tD("fieldPhone")}</p>
                 <p className="text-sm">{cData.phone}</p>
               </div>
             )}
             {cData.jobTitle && (
               <div>
-                <p className="text-sm text-muted-foreground">Job Title</p>
+                <p className="text-sm text-muted-foreground">{tD("fieldJobTitle")}</p>
                 <p className="text-sm">{cData.jobTitle}</p>
               </div>
             )}
             <div className="pt-2">
               <Badge variant={cData.marketingConsent ? "default" : "outline"} className="text-[10px]">
-                Marketing: {cData.marketingConsent ? "Agreed" : "No Consent"}
+                {tD("marketingLabel")} {cData.marketingConsent ? tD("marketingAgreed") : tD("marketingNoConsent")}
               </Badge>
             </div>
           </CardContent>
@@ -189,26 +192,26 @@ export default async function ContactDetailPage({
       <div className="w-full md:w-2/3 flex flex-col gap-6">
         {/* Notes / Activities */}
         <Card>
-          <CardHeader><CardTitle>Timeline & Activities</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{tD("timelineTitle")}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <form action={handleAddActivity} className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/20">
-              <Textarea name="content" placeholder="Log a call, meeting or note..." required className="bg-background" />
+              <Textarea name="content" placeholder={tD("activityPlaceholder")} required className="bg-background" />
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Type:</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">{tD("typeLabel")}</p>
                   <select name="type" className="h-8 rounded-md border bg-background px-2 text-xs">
-                    <option value="note">Note</option>
-                    <option value="call">Call</option>
-                    <option value="meeting">Meeting</option>
-                    <option value="email">Email</option>
+                    <option value="note">{tD("activityTypes.note")}</option>
+                    <option value="call">{tD("activityTypes.call")}</option>
+                    <option value="meeting">{tD("activityTypes.meeting")}</option>
+                    <option value="email">{tD("activityTypes.email")}</option>
                   </select>
                 </div>
-                <Button type="submit" size="sm">Log Activity</Button>
+                <Button type="submit" size="sm">{tD("logActivity")}</Button>
               </div>
             </form>
             <div className="space-y-4 mt-6">
               {activitiesList.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No activities yet.</p>
+                <p className="text-sm text-muted-foreground">{tD("noActivities")}</p>
               ) : (
                 activitiesList.map(activity => (
                   <div key={activity.id} className="border-l-2 border-primary/30 pl-4 py-2 relative">
@@ -216,7 +219,7 @@ export default async function ContactDetailPage({
                     <div className="flex justify-between items-start">
                        <p className="text-xs font-semibold flex items-center gap-1 text-primary">
                         <UserIcon className="w-3 h-3" />
-                        {activity.ownerName || "System"}
+                        {activity.ownerName || tD("system")}
                       </p>
                       <div className="flex items-center gap-2">
                         <p className="text-[10px] text-muted-foreground"><FormattedDate date={activity.date || activity.createdAt} /></p>
@@ -234,34 +237,34 @@ export default async function ContactDetailPage({
 
         {/* Tasks */}
         <Card>
-          <CardHeader><CardTitle>Tasks & Next Steps</CardTitle></CardHeader>
+          <CardHeader><CardTitle>{tD("tasksNextStepsTitle")}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <form action={handleAddTask} className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/20">
-              <Input name="title" placeholder="Task title..." required />
+              <Input name="title" placeholder={tD("taskTitlePlaceholder")} required />
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <p className="text-[10px] uppercase font-bold mb-1 text-muted-foreground">Priority</p>
+                  <p className="text-[10px] uppercase font-bold mb-1 text-muted-foreground">{tD("priorityLabel")}</p>
                   <select name="priority" defaultValue="normal" className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
-                    <option value="low">Low</option>
-                    <option value="normal">Normal</option>
-                    <option value="high">High</option>
+                    <option value="low">{tD("priorityLow")}</option>
+                    <option value="normal">{tD("priorityNormal")}</option>
+                    <option value="high">{tD("priorityHigh")}</option>
                   </select>
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase font-bold mb-1 text-muted-foreground">Due Date & Time</p>
+                  <p className="text-[10px] uppercase font-bold mb-1 text-muted-foreground">{tD("dueDateLabel")}</p>
                   <Input name="dueDate" type="datetime-local" className="h-9" />
                 </div>
                 <div>
-                  <p className="text-[10px] uppercase font-bold mb-1 text-muted-foreground">Assign To</p>
+                  <p className="text-[10px] uppercase font-bold mb-1 text-muted-foreground">{tD("assignToLabel")}</p>
                   <select name="assigneeId" className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm">
-                    <option value="">Myself</option>
+                    <option value="">{tD("myself")}</option>
                     {allUsers.filter(u => u.id !== userId).map(u => (
-                      <option key={u.id} value={u.id}>{u.name || "User"}</option>
+                      <option key={u.id} value={u.id}>{u.name || tD("unnamedUser")}</option>
                     ))}
                   </select>
                 </div>
               </div>
-              <Button type="submit" size="sm">Create Task</Button>
+              <Button type="submit" size="sm">{tD("createTask")}</Button>
             </form>
             <div className="space-y-3 mt-4">
               {tasksList.map(task => (
@@ -276,13 +279,26 @@ export default async function ContactDetailPage({
                   <div className="flex items-center justify-between mt-1">
                     <div className="flex flex-col gap-1 text-[10px] text-muted-foreground">
                       <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-1"><ClockIcon className="w-3 h-3" />Created: {new Date(task.createdAt).toLocaleString()}</span>
-                        {task.dueDate && <span className="flex items-center gap-1 font-semibold"><CalendarIcon className="w-3 h-3" />Due: {new Date(task.dueDate).toLocaleString()}</span>}
+                        <span className="flex items-center gap-1">
+                          <ClockIcon className="w-3 h-3" />
+                          {tD("createdLabel")} <FormattedDate date={task.createdAt} />
+                        </span>
+                        {task.dueDate && (
+                          <span className="flex items-center gap-1 font-semibold">
+                            <CalendarIcon className="w-3 h-3" />
+                            {tD("dueLabel")} <FormattedDate date={task.dueDate} />
+                          </span>
+                        )}
                       </div>
-                      <span className="flex items-center gap-1 font-medium text-primary/80"><UserCheckIcon className="w-3 h-3" />To: {task.assigneeName || "Myself"}</span>
+                      <span className="flex items-center gap-1 font-medium text-primary/80">
+                        <UserCheckIcon className="w-3 h-3" />
+                        {tD("toLabel")} {task.assigneeName || tD("myself")}
+                      </span>
                     </div>
                     <form action={async () => { "use server"; await toggleTask(task.id, task.status); }}>
-                      <Button variant="outline" size="sm" className="h-6 px-2 text-[10px]">{task.status === "done" ? "Undo" : "Mark as Done"}</Button>
+                      <Button variant="outline" size="sm" className="h-6 px-2 text-[10px]">
+                        {task.status === "done" ? tD("undo") : tD("markDone")}
+                      </Button>
                     </form>
                   </div>
                 </div>

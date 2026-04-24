@@ -2,10 +2,9 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-
 import { Loader2Icon, SparklesIcon } from "lucide-react";
 import { toast } from "sonner";
-
+import { useTranslations } from "next-intl";
 import { convertLead } from "@/actions/crm";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,6 +21,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 
 export function ConvertLeadButton({ leadId }: { leadId: string }) {
+  const t = useTranslations("leads");
   const [open, setOpen] = useState(false);
   const [shouldCreateDeal, setShouldCreateDeal] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -31,13 +31,13 @@ export function ConvertLeadButton({ leadId }: { leadId: string }) {
     startTransition(async () => {
       try {
         await convertLead(leadId, shouldCreateDeal);
-        toast.success("Lead converted successfully!");
+        toast.success(t("convertSuccessToast"));
         setOpen(false);
-        router.push("/dashboard/leads"); // Redirect to leads list
-        router.refresh(); // Revalidate the data
+        router.push("/dashboard/leads");
+        router.refresh();
       } catch (error) {
         console.error("Failed to convert lead:", error);
-        toast.error("Failed to convert lead. Please try again.");
+        toast.error(t("convertErrorToast"));
       }
     });
   };
@@ -48,15 +48,13 @@ export function ConvertLeadButton({ leadId }: { leadId: string }) {
         <Button className="flex items-center gap-2" disabled={isPending}>
           {isPending && <Loader2Icon className="h-4 w-4 animate-spin" />}
           <SparklesIcon className="h-4 w-4" />
-          Convert Lead
+          {t("convertLead")}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Convert Lead</DialogTitle>
-          <DialogDescription>
-            Are you sure you want to convert this lead? This will create a new company and contact, and mark the lead as converted.
-          </DialogDescription>
+          <DialogTitle>{t("convertLead")}</DialogTitle>
+          <DialogDescription>{t("convertLeadDesc")}</DialogDescription>
         </DialogHeader>
         <div className="flex items-center space-x-2">
           <Switch
@@ -65,17 +63,17 @@ export function ConvertLeadButton({ leadId }: { leadId: string }) {
             onCheckedChange={setShouldCreateDeal}
             disabled={isPending}
           />
-          <Label htmlFor="create-deal">Create a new Deal/Opportunity</Label>
+          <Label htmlFor="create-deal">{t("convertCreateDeal")}</Label>
         </div>
         <DialogFooter>
           <DialogClose asChild>
             <Button variant="outline" disabled={isPending}>
-              Cancel
+              {t("convertCancel")}
             </Button>
           </DialogClose>
           <Button type="button" onClick={handleConvert} disabled={isPending}>
             {isPending && <Loader2Icon className="h-4 w-4 animate-spin" />}
-            Confirm Conversion
+            {t("convertConfirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

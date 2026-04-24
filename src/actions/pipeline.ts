@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { dispatchWebhook } from "@/actions/webhooks";
 import { createNotificationAction } from "@/actions/auth";
-import { requireWriteAccess } from "@/lib/auth-guard";
+import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 
 export async function getPipelineData() {
@@ -194,4 +194,56 @@ export async function getPipelineReport() {
       : "0";
 
   return { stageReport, totalWonValue, totalPipeline, winRate, wonCount: wonDeals.length, lostCount: lostDeals.length, openCount: openDeals.length };
+}
+
+// ── Pipeline Stage Management ────────────────────────────────────────────────
+
+export async function getPipelineStages() {
+  return db.select().from(pipelineStages).orderBy(pipelineStages.order);
+}
+
+export async function createPipelineStage(data: {
+  name: string;
+  color?: string;
+  defaultProbability?: number;
+}) {
+  await requireAdminAccess();
+  const stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
+  const maxOrder = stages.length > 0 ? Math.max(...stages.map((s) => s.order)) : 0;
+  const [stage] = await db
+    .insert(pipelineStages)
+    .values({
+      name: data.name.trim(),
+      order: maxOrder + 1,
+      color: data.color ?? "#94a3b8",
+      defaultProbability: data.defaultProbability ?? 0,
+    })
+    .returning();
+  revalidatePath("/dashboard/pipeline");
+  revalidatePath("/dashboard/settings/pipeline");
+  return stage;
+}
+
+export async function updatePipelineStage(
+  id: string,
+  data: { name?: string; color?: string; defaultProbability?: number; order?: number },
+) {
+  await requireAdminAccess();
+  await db
+    .update(pipelineStages)
+    .set({ ...data, updatedAt: new Date() })
+    .where(eq(pipelineStages.id, id));
+  revalidatePath("/dashboard/pipeline");
+  revalidatePath("/dashboard/settings/pipeline");
+}
+
+export async function deletePipelineStage(id: string) {
+  await requireAdminAccess();
+  const dealsInStage = await db.select().from(deals).where(eq(deals.stageId, id));
+  if (dealsInStage.length > 0) {
+    throw new Error("Cannot delete a stage with active deals.");
+  }
+  await db.delete(pipelineStages).where(eq(pipelineStages.id, id));
+  revalidatePath("/dashboard/pipeline");
+  revalidatePath("/dashboard/settings/pipeline");
 }

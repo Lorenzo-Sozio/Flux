@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
 import { updateTicketStatusAction } from "@/actions/support";
 import { Badge } from "@/components/ui/badge";
@@ -30,13 +31,13 @@ type Ticket = {
   messages?: unknown[];
 };
 
-const COLUMNS: { id: string; label: string; color: string; textColor: string; borderColor: string }[] = [
-  { id: "open",        label: "Open",        color: "bg-blue-50 dark:bg-blue-950/30",   textColor: "text-blue-700 dark:text-blue-300",   borderColor: "#3b82f6" },
-  { id: "in_progress", label: "In Progress", color: "bg-amber-50 dark:bg-amber-950/30", textColor: "text-amber-700 dark:text-amber-300", borderColor: "#f59e0b" },
-  { id: "waiting",     label: "Waiting",     color: "bg-orange-50 dark:bg-orange-950/30", textColor: "text-orange-700 dark:text-orange-300", borderColor: "#f97316" },
-  { id: "resolved",    label: "Resolved",    color: "bg-green-50 dark:bg-green-950/30", textColor: "text-green-700 dark:text-green-300",  borderColor: "#22c55e" },
-  { id: "closed",      label: "Closed",      color: "bg-gray-50 dark:bg-gray-900/30",   textColor: "text-gray-600 dark:text-gray-400",   borderColor: "#6b7280" },
-];
+const COLUMN_CONFIG = [
+  { id: "open",        color: "bg-blue-50 dark:bg-blue-950/30",     textColor: "text-blue-700 dark:text-blue-300",    borderColor: "#3b82f6" },
+  { id: "in_progress", color: "bg-amber-50 dark:bg-amber-950/30",   textColor: "text-amber-700 dark:text-amber-300",  borderColor: "#f59e0b" },
+  { id: "waiting",     color: "bg-orange-50 dark:bg-orange-950/30", textColor: "text-orange-700 dark:text-orange-300", borderColor: "#f97316" },
+  { id: "resolved",    color: "bg-green-50 dark:bg-green-950/30",   textColor: "text-green-700 dark:text-green-300",  borderColor: "#22c55e" },
+  { id: "closed",      color: "bg-gray-50 dark:bg-gray-900/30",     textColor: "text-gray-600 dark:text-gray-400",    borderColor: "#6b7280" },
+] as const;
 
 const PRIORITY_BORDER: Record<string, string> = {
   urgent: "#ef4444",
@@ -129,6 +130,11 @@ export function TicketKanbanBoard({
   initialTickets: Ticket[];
   canEdit?: boolean;
 }) {
+  const t = useTranslations("support.tickets");
+  const COLUMNS = COLUMN_CONFIG.map((col) => ({
+    ...col,
+    label: t(`statuses.${col.id}`),
+  }));
   const [isMounted, setIsMounted] = useState(false);
   const [tickets, setTickets] = useState(initialTickets);
 
@@ -219,7 +225,7 @@ export function TicketKanbanBoard({
 
                       {colTickets.length === 0 && !snapshot.isDraggingOver && (
                         <div className="flex-1 flex items-center justify-center py-6">
-                          <p className="text-xs text-muted-foreground italic">No tickets</p>
+                          <p className="text-xs text-muted-foreground italic">{t("emptyColumn")}</p>
                         </div>
                       )}
                     </div>

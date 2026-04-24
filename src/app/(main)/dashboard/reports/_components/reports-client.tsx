@@ -98,6 +98,7 @@ function StatCard({
   icon: Icon,
   color,
   trend,
+  trendLabel,
 }: {
   title: string;
   value: string | number;
@@ -105,6 +106,7 @@ function StatCard({
   icon: React.ElementType;
   color: string;
   trend?: number;
+  trendLabel?: string;
 }) {
   return (
     <Card className={`border-l-4 shadow-sm ${color}`}>
@@ -115,13 +117,21 @@ function StatCard({
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
         {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
-        {trend !== undefined && (
+        {trend !== undefined && trendLabel && (
           <div className={`text-xs font-medium mt-1 ${trend >= 0 ? "text-green-600" : "text-red-600"}`}>
-            {trend >= 0 ? "▲" : "▼"} {Math.abs(trend)}% vs prev. period
+            {trend >= 0 ? "▲" : "▼"} {trendLabel}
           </div>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function EmptyChart({ label }: { label: string }) {
+  return (
+    <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">
+      {label}
+    </div>
   );
 }
 
@@ -173,6 +183,7 @@ export function ReportsClient({ users, initial }: Props) {
   };
 
   const { kpis, activityByUser, activityByAction, dailyTrend, taskPerf, recentLog, campaignPerf, salesReport } = data;
+  const noDataLabel = t("noData");
 
   return (
     <div className="space-y-6">
@@ -283,23 +294,23 @@ export function ReportsClient({ users, initial }: Props) {
         <TabsList className="w-full max-w-2xl">
           <TabsTrigger value="activity" className="flex-1 gap-1.5">
             <Activity className="h-3.5 w-3.5" />
-            Activity
+            {t("tabs.activity")}
           </TabsTrigger>
           <TabsTrigger value="performance" className="flex-1 gap-1.5">
             <Medal className="h-3.5 w-3.5" />
-            Performance
+            {t("tabs.performance")}
           </TabsTrigger>
           <TabsTrigger value="sales" className="flex-1 gap-1.5">
             <DollarSign className="h-3.5 w-3.5" />
-            Sales
+            {t("tabs.sales")}
           </TabsTrigger>
           <TabsTrigger value="campaigns" className="flex-1 gap-1.5">
             <Target className="h-3.5 w-3.5" />
-            Campaigns
+            {t("tabs.campaigns")}
           </TabsTrigger>
           <TabsTrigger value="log" className="flex-1 gap-1.5">
             <FileText className="h-3.5 w-3.5" />
-            Audit Log
+            {t("tabs.auditLog")}
           </TabsTrigger>
         </TabsList>
 
@@ -309,12 +320,12 @@ export function ReportsClient({ users, initial }: Props) {
             {/* Daily trend */}
             <Card className="border-0 shadow-sm">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Daily Activity Trend</CardTitle>
-                <CardDescription className="text-xs">Actions logged per day</CardDescription>
+                <CardTitle className="text-sm font-semibold">{t("charts.dailyTrend")}</CardTitle>
+                <CardDescription className="text-xs">{t("charts.dailyTrendDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {dailyTrend.length === 0 ? (
-                  <EmptyChart />
+                  <EmptyChart label={noDataLabel} />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <LineChart data={dailyTrend}>
@@ -336,7 +347,7 @@ export function ReportsClient({ users, initial }: Props) {
                         strokeWidth={2}
                         dot={{ r: 3 }}
                         activeDot={{ r: 5 }}
-                        name="Actions"
+                        name={t("charts.actionsLabel")}
                       />
                     </LineChart>
                   </ResponsiveContainer>
@@ -347,12 +358,12 @@ export function ReportsClient({ users, initial }: Props) {
             {/* Actions by type */}
             <Card className="border-0 shadow-sm">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Actions by Type</CardTitle>
-                <CardDescription className="text-xs">Distribution of tracked operations</CardDescription>
+                <CardTitle className="text-sm font-semibold">{t("charts.actionsByType")}</CardTitle>
+                <CardDescription className="text-xs">{t("charts.actionsByTypeDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {activityByAction.length === 0 ? (
-                  <EmptyChart />
+                  <EmptyChart label={noDataLabel} />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={activityByAction.slice(0, 10)} layout="vertical" margin={{ left: 8, right: 8 }}>
@@ -362,11 +373,11 @@ export function ReportsClient({ users, initial }: Props) {
                         dataKey="action"
                         tick={{ fontSize: 10 }}
                         width={110}
-                        tickFormatter={(v) => ACTION_LABELS[v] ?? v}
+                        tickFormatter={(v) => actionLabels[v] ?? v}
                       />
                       <Tooltip
                         contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", fontSize: 12 }}
-                        formatter={(v, _n, props) => [v, ACTION_LABELS[props.payload.action] ?? props.payload.action]}
+                        formatter={(v, _n, props) => [v, actionLabels[props.payload.action] ?? props.payload.action]}
                       />
                       <Bar dataKey="count" radius={[0, 4, 4, 0]} name="Count">
                         {activityByAction.slice(0, 10).map((_e, i) => (
@@ -383,12 +394,12 @@ export function ReportsClient({ users, initial }: Props) {
           {/* User leaderboard */}
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">User Activity Leaderboard</CardTitle>
-              <CardDescription className="text-xs">Ranked by total tracked actions</CardDescription>
+              <CardTitle className="text-sm font-semibold">{t("charts.userLeaderboard")}</CardTitle>
+              <CardDescription className="text-xs">{t("charts.userLeaderboardDesc")}</CardDescription>
             </CardHeader>
             <CardContent>
               {activityByUser.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-8 text-center">No activity recorded yet.</p>
+                <p className="text-sm text-muted-foreground py-8 text-center">{t("noActivity")}</p>
               ) : (
                 <div className="space-y-3">
                   {activityByUser.slice(0, 10).map((u, i) => {
@@ -416,21 +427,21 @@ export function ReportsClient({ users, initial }: Props) {
         <TabsContent value="performance" className="space-y-5 mt-5">
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Task Performance by User</CardTitle>
-              <CardDescription className="text-xs">Completion rate, totals, overdue tasks</CardDescription>
+              <CardTitle className="text-sm font-semibold">{t("charts.taskPerf")}</CardTitle>
+              <CardDescription className="text-xs">{t("charts.taskPerfDesc")}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {taskPerf.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-8 text-center px-6">No task data for selected period.</p>
+                <p className="text-sm text-muted-foreground py-8 text-center px-6">{t("noTaskData")}</p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
-                      <TableHead className="text-xs font-semibold">User</TableHead>
-                      <TableHead className="text-xs font-semibold text-right">Total</TableHead>
-                      <TableHead className="text-xs font-semibold text-right">Done</TableHead>
-                      <TableHead className="text-xs font-semibold text-right">Overdue</TableHead>
-                      <TableHead className="text-xs font-semibold">Completion Rate</TableHead>
+                      <TableHead className="text-xs font-semibold">{t("cols.user")}</TableHead>
+                      <TableHead className="text-xs font-semibold text-right">{t("cols.total")}</TableHead>
+                      <TableHead className="text-xs font-semibold text-right">{t("cols.done")}</TableHead>
+                      <TableHead className="text-xs font-semibold text-right">{t("cols.overdue")}</TableHead>
+                      <TableHead className="text-xs font-semibold">{t("cols.completionRate")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -473,32 +484,32 @@ export function ReportsClient({ users, initial }: Props) {
           {/* Revenue KPI cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              title="Total Revenue"
+              title={t("kpi.totalRevenue")}
               value={`€${salesReport.totalRevenue.toLocaleString()}`}
               icon={DollarSign}
               color="border-l-green-500"
-              sub="Deals won + Orders completed"
+              sub={t("kpi.totalRevenueSub")}
             />
             <StatCard
-              title="Deals Won"
+              title={t("kpi.dealsWonSales")}
               value={salesReport.dealsWon.count}
               icon={TrendingUp}
               color="border-l-blue-500"
-              sub={`€${salesReport.dealsWon.revenue.toLocaleString()} revenue`}
+              sub={t("kpi.dealsWonSalesSub", { value: salesReport.dealsWon.revenue.toLocaleString() })}
             />
             <StatCard
-              title="Quotes Accepted"
+              title={t("kpi.quotesAccepted")}
               value={salesReport.quotesAccepted.count}
               icon={FileText}
               color="border-l-violet-500"
-              sub={`€${salesReport.quotesAccepted.revenue.toLocaleString()} value`}
+              sub={t("kpi.quotesAcceptedSub", { value: salesReport.quotesAccepted.revenue.toLocaleString() })}
             />
             <StatCard
-              title="Orders Completed"
+              title={t("kpi.ordersCompleted")}
               value={salesReport.ordersCompleted.count}
               icon={ShoppingCart}
               color="border-l-orange-500"
-              sub={`€${salesReport.ordersCompleted.revenue.toLocaleString()} revenue`}
+              sub={t("kpi.ordersCompletedSub", { value: salesReport.ordersCompleted.revenue.toLocaleString() })}
             />
           </div>
 
@@ -506,12 +517,12 @@ export function ReportsClient({ users, initial }: Props) {
             {/* Monthly revenue trend */}
             <Card className="border-0 shadow-sm">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Monthly Revenue (Deals Won)</CardTitle>
-                <CardDescription className="text-xs">Revenue from closed-won deals by month</CardDescription>
+                <CardTitle className="text-sm font-semibold">{t("charts.monthlyRevenue")}</CardTitle>
+                <CardDescription className="text-xs">{t("charts.monthlyRevenueDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {salesReport.monthlyRevenue.length === 0 ? (
-                  <EmptyChart />
+                  <EmptyChart label={noDataLabel} />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={salesReport.monthlyRevenue}>
@@ -520,9 +531,9 @@ export function ReportsClient({ users, initial }: Props) {
                       <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `€${(v / 1000).toFixed(0)}k`} />
                       <Tooltip
                         contentStyle={{ borderRadius: 8, border: "1px solid hsl(var(--border))", fontSize: 12 }}
-                        formatter={(v: number) => [`€${v.toLocaleString()}`, "Revenue"]}
+                        formatter={(v: number) => [`€${v.toLocaleString()}`, t("charts.revenueLabel")]}
                       />
-                      <Bar dataKey="revenue" fill="#22c55e" radius={[4, 4, 0, 0]} name="Revenue" />
+                      <Bar dataKey="revenue" fill="#22c55e" radius={[4, 4, 0, 0]} name={t("charts.revenueLabel")} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -532,12 +543,12 @@ export function ReportsClient({ users, initial }: Props) {
             {/* Revenue by stage */}
             <Card className="border-0 shadow-sm">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Revenue by Pipeline Stage</CardTitle>
-                <CardDescription className="text-xs">Won deal revenue grouped by last stage</CardDescription>
+                <CardTitle className="text-sm font-semibold">{t("charts.revenueByStage")}</CardTitle>
+                <CardDescription className="text-xs">{t("charts.revenueByStageDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {salesReport.revenueByStage.length === 0 ? (
-                  <EmptyChart />
+                  <EmptyChart label={noDataLabel} />
                 ) : (
                   <ResponsiveContainer width="100%" height={220}>
                     <BarChart data={salesReport.revenueByStage} layout="vertical" margin={{ left: 8, right: 8 }}>
@@ -549,7 +560,7 @@ export function ReportsClient({ users, initial }: Props) {
                       <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={100} />
                       <Tooltip
                         contentStyle={{ borderRadius: 8, fontSize: 12 }}
-                        formatter={(v: number) => [`€${v.toLocaleString()}`, "Revenue"]}
+                        formatter={(v: number) => [`€${v.toLocaleString()}`, t("charts.revenueLabel")]}
                       />
                       <Bar dataKey="revenue" radius={[0, 4, 4, 0]}>
                         {salesReport.revenueByStage.map((entry, i) => (
@@ -569,12 +580,12 @@ export function ReportsClient({ users, initial }: Props) {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <Card className="border-0 shadow-sm">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Campaign Engagement</CardTitle>
-                <CardDescription className="text-xs">Open and click rates per campaign</CardDescription>
+                <CardTitle className="text-sm font-semibold">{t("charts.campaignEngagement")}</CardTitle>
+                <CardDescription className="text-xs">{t("charts.campaignEngagementDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {campaignPerf.length === 0 ? (
-                  <EmptyChart />
+                  <EmptyChart label={noDataLabel} />
                 ) : (
                   <ResponsiveContainer width="100%" height={240}>
                     <BarChart data={campaignPerf.filter((c) => c.sent > 0)}>
@@ -587,8 +598,8 @@ export function ReportsClient({ users, initial }: Props) {
                       <YAxis tick={{ fontSize: 11 }} unit="%" />
                       <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
                       <Legend />
-                      <Bar dataKey="openRate" name="Open %" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="clickRate" name="Click %" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="openRate" name={t("charts.openPct")} fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="clickRate" name={t("charts.clickPct")} fill="#10b981" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -597,12 +608,12 @@ export function ReportsClient({ users, initial }: Props) {
 
             <Card className="border-0 shadow-sm">
               <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-semibold">Campaign Volume</CardTitle>
-                <CardDescription className="text-xs">Emails sent per campaign</CardDescription>
+                <CardTitle className="text-sm font-semibold">{t("charts.campaignVolume")}</CardTitle>
+                <CardDescription className="text-xs">{t("charts.campaignVolumeDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
                 {campaignPerf.filter((c) => c.sent > 0).length === 0 ? (
-                  <EmptyChart />
+                  <EmptyChart label={noDataLabel} />
                 ) : (
                   <ResponsiveContainer width="100%" height={240}>
                     <PieChart>
@@ -633,32 +644,32 @@ export function ReportsClient({ users, initial }: Props) {
           {/* Campaign table */}
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Campaign Summary Table</CardTitle>
+              <CardTitle className="text-sm font-semibold">{t("charts.campaignSummary")}</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               {campaignPerf.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-8 text-center">No campaigns in selected period.</p>
+                <p className="text-sm text-muted-foreground py-8 text-center">{t("noCampaigns")}</p>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/40 hover:bg-muted/40">
-                      <TableHead className="text-xs font-semibold">Campaign</TableHead>
-                      <TableHead className="text-xs font-semibold">Status</TableHead>
-                      <TableHead className="text-xs font-semibold text-right">Recipients</TableHead>
+                      <TableHead className="text-xs font-semibold">{t("cols.campaign")}</TableHead>
+                      <TableHead className="text-xs font-semibold">{t("cols.status")}</TableHead>
+                      <TableHead className="text-xs font-semibold text-right">{t("cols.recipients")}</TableHead>
                       <TableHead className="text-xs font-semibold text-right">
                         <span className="flex items-center justify-end gap-1">
                           <Eye className="h-3 w-3" />
-                          Opens
+                          {t("cols.opens")}
                         </span>
                       </TableHead>
                       <TableHead className="text-xs font-semibold text-right">
                         <span className="flex items-center justify-end gap-1">
                           <MousePointerClick className="h-3 w-3" />
-                          Clicks
+                          {t("cols.clicks")}
                         </span>
                       </TableHead>
-                      <TableHead className="text-xs font-semibold text-right">Open%</TableHead>
-                      <TableHead className="text-xs font-semibold text-right">Click%</TableHead>
+                      <TableHead className="text-xs font-semibold text-right">{t("cols.openPct")}</TableHead>
+                      <TableHead className="text-xs font-semibold text-right">{t("cols.clickPct")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -690,9 +701,9 @@ export function ReportsClient({ users, initial }: Props) {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-sm font-semibold">Audit Log</CardTitle>
+                  <CardTitle className="text-sm font-semibold">{t("tabs.auditLog")}</CardTitle>
                   <CardDescription className="text-xs mt-0.5">
-                    Last {recentLog.length} events — most recent first
+                    {t("auditDesc", { count: recentLog.length })}
                   </CardDescription>
                 </div>
               </div>
@@ -700,17 +711,17 @@ export function ReportsClient({ users, initial }: Props) {
             <Separator />
             {recentLog.length === 0 ? (
               <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                No activity recorded yet. Actions performed by users will appear here.
+                {t("auditNoActivity")}
               </CardContent>
             ) : (
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="text-xs font-semibold">Time</TableHead>
-                    <TableHead className="text-xs font-semibold">User</TableHead>
-                    <TableHead className="text-xs font-semibold">Action</TableHead>
-                    <TableHead className="text-xs font-semibold">Entity</TableHead>
-                    <TableHead className="text-xs font-semibold">IP Address</TableHead>
+                    <TableHead className="text-xs font-semibold">{t("cols.time")}</TableHead>
+                    <TableHead className="text-xs font-semibold">{t("cols.user")}</TableHead>
+                    <TableHead className="text-xs font-semibold">{t("cols.action")}</TableHead>
+                    <TableHead className="text-xs font-semibold">{t("cols.entity")}</TableHead>
+                    <TableHead className="text-xs font-semibold">{t("cols.ipAddress")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -722,7 +733,7 @@ export function ReportsClient({ users, initial }: Props) {
                       <TableCell className="text-sm font-medium">{entry.userName}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs font-mono">
-                          {ACTION_LABELS[entry.action] ?? entry.action}
+                          {actionLabels[entry.action] ?? entry.action}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-xs text-muted-foreground">
@@ -739,14 +750,6 @@ export function ReportsClient({ users, initial }: Props) {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function EmptyChart() {
-  return (
-    <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">
-      No data for selected period
     </div>
   );
 }

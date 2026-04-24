@@ -21,6 +21,9 @@ import { getTranslations } from "next-intl/server";
 import { Button } from "@/components/ui/button";
 import { FormattedTime } from "@/components/crm/formatted-time";
 import { CalendarNewEventButton } from "@/components/crm/calendar-new-event-button";
+import { CalendarTaskPill } from "@/components/crm/calendar-task-pill";
+import { OverdueTasksPopover } from "@/components/crm/overdue-tasks-popover";
+import { CalendarOverdueSection } from "@/components/crm/calendar-overdue-section";
 
 // ─── Event type helpers ───────────────────────────────────────────────────────
 
@@ -36,13 +39,14 @@ function getTypeStyle(type: string) {
   return TYPE_STYLES[type as keyof typeof TYPE_STYLES] ?? TYPE_STYLES.task;
 }
 
+// Non-task events (meetings/calls) — static server component pill
 function EventPill({ event, compact = false }: { event: CalendarEvent; compact?: boolean }) {
-  const t = getTypeStyle(event.type);
-  const Icon = t.icon;
+  const ts = getTypeStyle(event.type);
+  const Icon = ts.icon;
   return (
     <Link href={event.link} title={`${event.displayTitle} — ${event.entityName}`}>
-      <div className={`flex items-center gap-1 rounded border-l-[3px] px-1.5 py-0.5 text-[11px] leading-tight hover:opacity-80 transition-opacity ${t.pill}`}>
-        <Icon className="h-2.5 w-2.5 shrink-0" />
+      <div className={`flex items-center gap-1.5 rounded border-l-[3px] px-1.5 py-1 text-xs leading-tight hover:opacity-80 transition-opacity ${ts.pill}`}>
+        <Icon className="h-3 w-3 shrink-0" />
         {!compact && event.date && (
           <span className="font-semibold shrink-0 tabular-nums opacity-70">
             <FormattedTime date={event.date} />
@@ -73,19 +77,19 @@ export default async function CalendarPage({
   const events = await getCalendarEvents();
 
   // ── Quick stats ──────────────────────────────────────────────────────────────
-  const todayEvents = events.filter(e => e.date && isSameDay(new Date(e.date), today));
-  const weekEvents  = events.filter(e => e.date && isSameWeek(new Date(e.date), today, { weekStartsOn: 1 }));
+  const todayEvents   = events.filter(e => e.date && isSameDay(new Date(e.date), today));
+  const weekEvents    = events.filter(e => e.date && isSameWeek(new Date(e.date), today, { weekStartsOn: 1 }));
   const overdueEvents = events.filter(e =>
     e.date && isBefore(new Date(e.date), startOfDay(today)) &&
     e.type === "task" && (e as any).status !== "done"
   );
 
   // ── Navigation URLs ──────────────────────────────────────────────────────────
-  const todayUrl  = `/dashboard/calendar?view=${currentView}&date=${format(today, "yyyy-MM-dd")}`;
-  const prevUrl   = currentView === "week"
+  const todayUrl = `/dashboard/calendar?view=${currentView}&date=${format(today, "yyyy-MM-dd")}`;
+  const prevUrl  = currentView === "week"
     ? `/dashboard/calendar?view=week&date=${format(subWeeks(baseDate, 1), "yyyy-MM-dd")}`
     : `/dashboard/calendar?view=month&date=${format(subMonths(baseDate, 1), "yyyy-MM-dd")}`;
-  const nextUrl   = currentView === "week"
+  const nextUrl  = currentView === "week"
     ? `/dashboard/calendar?view=week&date=${format(addWeeks(baseDate, 1), "yyyy-MM-dd")}`
     : `/dashboard/calendar?view=month&date=${format(addMonths(baseDate, 1), "yyyy-MM-dd")}`;
 
@@ -101,8 +105,11 @@ export default async function CalendarPage({
     const startDate  = startOfWeek(startOfMonth(baseDate), { weekStartsOn: 1 });
     const endDate    = endOfWeek(endOfMonth(baseDate), { weekStartsOn: 1 });
     const calDays    = eachDayOfInterval({ start: startDate, end: endDate });
-    const DAYS       = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-    const MAX_VISIBLE = 3;
+    const DAYS = [
+      t("days.mon"), t("days.tue"), t("days.wed"), t("days.thu"),
+      t("days.fri"), t("days.sat"), t("days.sun"),
+    ];
+    const MAX_VISIBLE = 4;
 
     return (
       <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
@@ -111,8 +118,8 @@ export default async function CalendarPage({
           {DAYS.map((d, i) => (
             <div
               key={d}
-              className={`py-2.5 text-center text-xs font-semibold uppercase tracking-wider ${
-                i >= 5 ? "text-muted-foreground/60" : "text-muted-foreground"
+              className={`py-3 text-center text-xs font-semibold uppercase tracking-wider ${
+                i >= 5 ? "text-muted-foreground/50" : "text-muted-foreground"
               }`}
             >
               {d}
@@ -123,20 +130,21 @@ export default async function CalendarPage({
         {/* Day cells */}
         <div className="grid grid-cols-7 divide-x divide-y">
           {calDays.map((day, idx) => {
-            const dayEvents    = events.filter(e => e.date && isSameDay(new Date(e.date), day));
-            const inMonth      = isSameMonth(day, baseDate);
-            const isToday      = isSameDay(day, today);
-            const isWeekend    = idx % 7 >= 5;
-            const overflow     = dayEvents.length - MAX_VISIBLE;
-            const agendaUrl    = `/dashboard/calendar?view=agenda&date=${format(day, "yyyy-MM-dd")}`;
+            const dayEvents = events.filter(e => e.date && isSameDay(new Date(e.date), day));
+            const inMonth   = isSameMonth(day, baseDate);
+            const isToday   = isSameDay(day, today);
+            const isWeekend = idx % 7 >= 5;
+            const overflow  = dayEvents.length - MAX_VISIBLE;
+            const agendaUrl = `/dashboard/calendar?view=agenda&date=${format(day, "yyyy-MM-dd")}`;
+            const addUrl    = `/dashboard/calendar?view=month&date=${format(baseDate, "yyyy-MM-dd")}&new=${format(day, "yyyy-MM-dd")}`;
 
             return (
               <div
                 key={day.toISOString()}
-                className={`min-h-[130px] p-2 flex flex-col gap-1 transition-colors ${
-                  isToday       ? "bg-primary/[0.04] dark:bg-primary/[0.06]"
-                  : !inMonth    ? "bg-muted/30 dark:bg-muted/10"
-                  : isWeekend   ? "bg-muted/10"
+                className={`min-h-[160px] p-2 flex flex-col gap-1 transition-colors ${
+                  isToday    ? "bg-primary/[0.04] dark:bg-primary/[0.06]"
+                  : !inMonth ? "bg-muted/30 dark:bg-muted/10"
+                  : isWeekend ? "bg-muted/10"
                   : "bg-background"
                 }`}
               >
@@ -147,16 +155,18 @@ export default async function CalendarPage({
                       {format(day, "d")}
                     </span>
                   ) : (
-                    <span className={`text-xs font-semibold ${!inMonth ? "text-muted-foreground/40" : isWeekend ? "text-muted-foreground" : ""}`}>
+                    <span className={`text-xs font-semibold ${!inMonth ? "text-muted-foreground/40" : isWeekend ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
                       {format(day, "d")}
                     </span>
                   )}
                 </div>
 
-                {/* Events */}
-                {dayEvents.slice(0, MAX_VISIBLE).map(ev => (
-                  <EventPill key={ev.id} event={ev} />
-                ))}
+                {/* Events — task events get quick-complete pill */}
+                {dayEvents.slice(0, MAX_VISIBLE).map(ev =>
+                  ev.type === "task"
+                    ? <CalendarTaskPill key={ev.id} event={ev} compact />
+                    : <EventPill key={ev.id} event={ev} compact />
+                )}
                 {overflow > 0 && (
                   <Link href={agendaUrl} className="text-[11px] text-muted-foreground hover:text-primary font-medium mt-auto text-center leading-none py-0.5">
                     {t("more", { count: overflow })}
@@ -177,6 +187,12 @@ export default async function CalendarPage({
       end: endOfWeek(baseDate, { weekStartsOn: 1 }),
     });
 
+    // getDay() returns 0=Sun,1=Mon,...,6=Sat
+    const DAY_KEYS: Record<number, string> = {
+      1: t("days.mon"), 2: t("days.tue"), 3: t("days.wed"),
+      4: t("days.thu"), 5: t("days.fri"), 6: t("days.sat"), 0: t("days.sun"),
+    };
+
     const taskDays    = weekDays.map(d => events.filter(e => e.date && isSameDay(new Date(e.date), d) && e.type === "task"));
     const nonTaskDays = weekDays.map(d => events.filter(e => e.date && isSameDay(new Date(e.date), d) && e.type !== "task"));
     const hasAnyTask    = taskDays.some(arr => arr.length > 0);
@@ -191,12 +207,12 @@ export default async function CalendarPage({
             return (
               <div
                 key={day.toISOString()}
-                className={`py-3 text-center border-r last:border-r-0 ${isToday ? "bg-primary/5" : ""}`}
+                className={`py-3.5 text-center border-r last:border-r-0 ${isToday ? "bg-primary/5" : ""}`}
               >
                 <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  {format(day, "EEE")}
+                  {DAY_KEYS[day.getDay()]}
                 </div>
-                <div className={`mt-0.5 text-xl font-bold ${isToday ? "text-primary" : ""}`}>
+                <div className={`mt-1 text-2xl font-bold ${isToday ? "text-primary" : ""}`}>
                   {format(day, "d")}
                 </div>
                 <div className="text-[10px] text-muted-foreground/60 mt-0.5">
@@ -207,18 +223,18 @@ export default async function CalendarPage({
           })}
         </div>
 
-        {/* Tasks row */}
+        {/* Tasks row — with quick-complete */}
         {hasAnyTask && (
           <div className="border-b">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 border-b">
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-950/30 border-b">
               <CheckSquare className="h-3.5 w-3.5 text-blue-500" />
               <span className="text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wider">{t("tasks")}</span>
             </div>
-            <div className="grid grid-cols-7 divide-x min-h-[80px]">
+            <div className="grid grid-cols-7 divide-x min-h-[120px]">
               {weekDays.map((day, idx) => (
-                <div key={day.toISOString()} className={`p-2 space-y-1 ${isSameDay(day, today) ? "bg-primary/[0.02]" : ""}`}>
+                <div key={day.toISOString()} className={`p-2.5 space-y-1.5 ${isSameDay(day, today) ? "bg-primary/[0.02]" : ""}`}>
                   {taskDays[idx].map(ev => (
-                    <EventPill key={ev.id} event={ev} />
+                    <CalendarTaskPill key={ev.id} event={ev} />
                   ))}
                 </div>
               ))}
@@ -229,13 +245,13 @@ export default async function CalendarPage({
         {/* Meetings & Calls row */}
         {hasAnyNonTask && (
           <div>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-violet-50 dark:bg-violet-950/30 border-b">
+            <div className="flex items-center gap-2 px-3 py-2 bg-violet-50 dark:bg-violet-950/30 border-b">
               <Users className="h-3.5 w-3.5 text-violet-500" />
               <span className="text-xs font-semibold text-violet-700 dark:text-violet-300 uppercase tracking-wider">{t("meetingsAndCalls")}</span>
             </div>
-            <div className="grid grid-cols-7 divide-x min-h-[80px]">
+            <div className="grid grid-cols-7 divide-x min-h-[120px]">
               {weekDays.map((day, idx) => (
-                <div key={day.toISOString()} className={`p-2 space-y-1.5 ${isSameDay(day, today) ? "bg-primary/[0.02]" : ""}`}>
+                <div key={day.toISOString()} className={`p-2.5 space-y-1.5 ${isSameDay(day, today) ? "bg-primary/[0.02]" : ""}`}>
                   {nonTaskDays[idx].map(ev => (
                     <EventPill key={ev.id} event={ev} />
                   ))}
@@ -247,7 +263,7 @@ export default async function CalendarPage({
 
         {/* Empty state */}
         {!hasAnyTask && !hasAnyNonTask && (
-          <div className="py-16 text-center text-sm text-muted-foreground">
+          <div className="py-20 text-center text-sm text-muted-foreground">
             {t("noEventsThisWeek")}
           </div>
         )}
@@ -262,17 +278,6 @@ export default async function CalendarPage({
       .filter(e => e.date && !isBefore(new Date(e.date), from))
       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    if (upcoming.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center py-24 border-2 border-dashed rounded-xl text-muted-foreground gap-3">
-          <CalendarDays className="h-12 w-12 opacity-20" />
-          <p className="text-sm">{t("noUpcomingEvents")}</p>
-          <CalendarNewEventButton />
-        </div>
-      );
-    }
-
-    // Group by day
     const grouped = upcoming.reduce<Record<string, CalendarEvent[]>>((acc, ev) => {
       const key = format(new Date(ev.date), "yyyy-MM-dd");
       (acc[key] = acc[key] ?? []).push(ev);
@@ -288,13 +293,32 @@ export default async function CalendarPage({
     };
 
     const typeLabels: Record<string, string> = {
-      task: t("typeTask"),
+      task:    t("typeTask"),
       meeting: t("typeMeeting"),
-      call: t("typeCall"),
+      call:    t("typeCall"),
     };
 
     return (
-      <div className="space-y-1">
+      <div className="space-y-2">
+        {/* Overdue section — collapsible, at the top */}
+        {overdueEvents.length > 0 && (
+          <CalendarOverdueSection tasks={overdueEvents} />
+        )}
+
+        {upcoming.length === 0 && overdueEvents.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-28 border-2 border-dashed rounded-xl text-muted-foreground gap-3">
+            <CalendarDays className="h-12 w-12 opacity-20" />
+            <p className="text-sm">{t("noUpcomingEvents")}</p>
+            <CalendarNewEventButton />
+          </div>
+        )}
+
+        {upcoming.length === 0 && overdueEvents.length > 0 && (
+          <div className="text-center py-10 text-sm text-muted-foreground">
+            {t("noUpcomingEvents")}
+          </div>
+        )}
+
         {Object.entries(grouped).map(([dateStr, dayEvents]) => {
           const d = new Date(dateStr);
           const isToday = isSameDay(d, today);
@@ -302,7 +326,7 @@ export default async function CalendarPage({
           return (
             <div key={dateStr} className="rounded-xl overflow-hidden border bg-card shadow-sm">
               {/* Date header */}
-              <div className={`flex items-center justify-between px-4 py-2.5 border-b ${isToday ? "bg-primary/5" : "bg-muted/30"}`}>
+              <div className={`flex items-center justify-between px-4 py-3 border-b ${isToday ? "bg-primary/5" : "bg-muted/30"}`}>
                 <div className="flex items-center gap-3">
                   <div className={`text-2xl font-black tabular-nums leading-none ${isToday ? "text-primary" : ""}`}>
                     {format(d, "d")}
@@ -328,16 +352,11 @@ export default async function CalendarPage({
                   const Icon = ts.icon;
                   return (
                     <Link key={ev.id} href={ev.link}>
-                      <div className="flex items-center gap-4 px-4 py-3 hover:bg-muted/30 transition-colors group">
-                        {/* Color bar */}
+                      <div className="flex items-center gap-4 px-4 py-3.5 hover:bg-muted/30 transition-colors group">
                         <div className={`w-1 self-stretch rounded-full ${ts.dot}`} />
-
-                        {/* Icon */}
-                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${ts.pill} border-l-0`}>
+                        <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${ts.pill} border-l-0`}>
                           <Icon className="h-4 w-4" />
                         </div>
-
-                        {/* Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-semibold truncate group-hover:text-primary transition-colors">
@@ -359,8 +378,6 @@ export default async function CalendarPage({
                             )}
                           </div>
                         </div>
-
-                        {/* Time */}
                         <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0 tabular-nums">
                           <Clock className="h-3 w-3" />
                           <FormattedTime date={ev.date} />
@@ -379,27 +396,50 @@ export default async function CalendarPage({
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-5 p-6 max-w-[1400px] mx-auto">
+    <div className="p-6 space-y-4">
 
       {/* ── Header ── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        {/* Left: title + stats */}
-        <div className="flex items-center gap-3">
-          <CalendarDays className="h-6 w-6 text-primary shrink-0" />
-          <h1 className="text-xl font-bold">{t("title")}</h1>
-          {todayEvents.length > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {t("todayBadge", { count: todayEvents.length })}
-            </Badge>
-          )}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        {/* Left: title + stats + legend inline */}
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <div className="flex items-center gap-3 mt-1.5 flex-wrap text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <CalendarDays className="h-3.5 w-3.5" />
+              <span className="font-semibold text-foreground">{todayEvents.length}</span>
+              {" "}{t("today")}
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="flex items-center gap-1.5">
+              <Columns3 className="h-3.5 w-3.5" />
+              <span className="font-semibold text-foreground">{weekEvents.length}</span>
+              {" "}{t("thisWeek")}
+            </span>
+            {overdueEvents.length > 0 && (
+              <>
+                <span className="text-muted-foreground/40">·</span>
+                <OverdueTasksPopover tasks={overdueEvents} />
+              </>
+            )}
+            <span className="text-muted-foreground/40">·</span>
+            {Object.entries(TYPE_STYLES).map(([key, cfg]) => {
+              const label = { task: t("typeTask"), meeting: t("typeMeeting"), call: t("typeCall") }[key] ?? key;
+              return (
+                <span key={key} className="flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full shrink-0 ${cfg.dot}`} />
+                  {label}
+                </span>
+              );
+            })}
+          </div>
         </div>
 
         {/* Right: controls */}
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
           {/* View toggle */}
           <div className="flex rounded-lg border bg-muted/40 p-0.5">
             {(["month", "week", "agenda"] as const).map((v) => {
-              const ICONS = { month: LayoutGrid, week: Columns3, agenda: List };
+              const ICONS  = { month: LayoutGrid, week: Columns3, agenda: List };
               const LABELS = { month: t("month"), week: t("week"), agenda: t("agenda") };
               const Icon = ICONS[v];
               const isActive = currentView === v;
@@ -429,7 +469,7 @@ export default async function CalendarPage({
               >
                 <ChevronLeft className="h-4 w-4" />
               </Link>
-              <span className="min-w-[140px] text-center text-sm font-semibold px-2">
+              <span className="min-w-[148px] text-center text-sm font-semibold px-2">
                 {periodTitle}
               </span>
               <Link
@@ -453,63 +493,10 @@ export default async function CalendarPage({
         </div>
       </div>
 
-      {/* ── Stats strip ── */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-lg border bg-card px-4 py-3 flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <CalendarDays className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">{t("today")}</div>
-            <div className="text-lg font-bold leading-tight">{todayEvents.length}
-              <span className="text-xs font-normal text-muted-foreground ml-1">{t("events")}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-lg border bg-card px-4 py-3 flex items-center gap-3">
-          <div className="h-8 w-8 rounded-full bg-violet-500/10 flex items-center justify-center shrink-0">
-            <Columns3 className="h-4 w-4 text-violet-500" />
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">{t("thisWeek")}</div>
-            <div className="text-lg font-bold leading-tight">{weekEvents.length}
-              <span className="text-xs font-normal text-muted-foreground ml-1">{t("events")}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className={`rounded-lg border bg-card px-4 py-3 flex items-center gap-3 ${overdueEvents.length > 0 ? "border-red-200 dark:border-red-900/50" : ""}`}>
-          <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${overdueEvents.length > 0 ? "bg-red-500/10" : "bg-muted"}`}>
-            <AlertCircle className={`h-4 w-4 ${overdueEvents.length > 0 ? "text-red-500" : "text-muted-foreground"}`} />
-          </div>
-          <div>
-            <div className="text-xs text-muted-foreground">{t("overdueTasks")}</div>
-            <div className={`text-lg font-bold leading-tight ${overdueEvents.length > 0 ? "text-red-600 dark:text-red-400" : ""}`}>
-              {overdueEvents.length}
-              <span className="text-xs font-normal text-muted-foreground ml-1">{t("tasksLabel")}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Legend ── */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-        {Object.entries(TYPE_STYLES).map(([key, cfg]) => {
-          const label = { task: t("typeTask"), meeting: t("typeMeeting"), call: t("typeCall") }[key] ?? key;
-          return (
-            <div key={key} className="flex items-center gap-1.5">
-              <span className={`h-2.5 w-2.5 rounded-full ${cfg.dot}`} />
-              <span>{label}</span>
-            </div>
-          );
-        })}
-      </div>
-
       {/* ── Calendar view ── */}
       <div>
-        {currentView === "month" && renderMonth()}
-        {currentView === "week"  && renderWeek()}
+        {currentView === "month"  && renderMonth()}
+        {currentView === "week"   && renderWeek()}
         {currentView === "agenda" && renderAgenda()}
       </div>
     </div>

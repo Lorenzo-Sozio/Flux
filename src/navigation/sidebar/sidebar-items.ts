@@ -27,6 +27,7 @@ import {
   Users,
   Webhook,
   Zap,
+  BookOpen,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -115,8 +116,10 @@ export const sidebarItems: NavGroup[] = [
         icon: Settings,
         subItems: [
           { titleKey: "customFields", url: "/dashboard/settings/custom-fields", icon: Settings2 },
+          { titleKey: "pipelineStages", url: "/dashboard/settings/pipeline", icon: Kanban },
           { titleKey: "email", url: "/dashboard/settings/email", icon: MailOpen },
           { titleKey: "webhooks", url: "/dashboard/settings/webhooks", icon: Webhook },
+          { titleKey: "macros", url: "/dashboard/settings/macros", icon: BookOpen },
         ],
       },
     ],

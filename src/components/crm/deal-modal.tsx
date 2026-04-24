@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -62,12 +63,6 @@ const CURRENCIES = [
   { value: "GBP", label: "GBP (£)" },
 ];
 
-const DEAL_STATUSES = [
-  { value: "open", label: "Open" },
-  { value: "won",  label: "Won" },
-  { value: "lost", label: "Lost" },
-];
-
 // ── Field helper ──────────────────────────────────────────────────────────────
 function F({
   label, error, required, children,
@@ -101,9 +96,16 @@ export function DealModal({
   children?: React.ReactNode;
   onSuccess?: () => void;
 }) {
+  const t = useTranslations("pipeline");
   const [open, setOpen] = useState(false);
   const isEditing   = !!deal;
   const searchParams = useSearchParams();
+
+  const DEAL_STATUSES = [
+    { value: "open", label: t("modal.statusOpen") },
+    { value: "won",  label: t("modal.statusWon") },
+    { value: "lost", label: t("modal.statusLost") },
+  ];
 
   useEffect(() => {
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
@@ -158,16 +160,16 @@ export function DealModal({
 
       if (isEditing) {
         await updateDeal(deal.id, payload as any);
-        toast.success("Deal updated.");
+        toast.success(t("updateSuccess"));
       } else {
         await createDeal(payload as any);
-        toast.success("Deal created.");
+        toast.success(t("createSuccess"));
       }
       setOpen(false);
       if (!isEditing) form.reset();
       onSuccess?.();
     } catch {
-      toast.error("Failed to save deal.");
+      toast.error(t("modal.saveError"));
     }
   };
 
@@ -187,7 +189,7 @@ export function DealModal({
       <DialogContent className="sm:max-w-[640px] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="text-lg">
-            {isEditing ? `Edit Deal — ${deal.name}` : "New Deal"}
+            {isEditing ? t("modal.editTitle", { name: deal.name }) : t("modal.newTitle")}
           </DialogTitle>
         </DialogHeader>
 
@@ -196,15 +198,15 @@ export function DealModal({
             <Tabs defaultValue="deal">
               <TabsList className="w-full mb-5">
                 <TabsTrigger value="deal" className="relative flex-1 gap-1.5">
-                  <DollarSignIcon className="h-3.5 w-3.5" />Deal
+                  <DollarSignIcon className="h-3.5 w-3.5" />{t("modal.tabDeal")}
                   <TabDot has={tabErrors.deal} />
                 </TabsTrigger>
                 <TabsTrigger value="details" className="relative flex-1 gap-1.5">
-                  <KanbanIcon className="h-3.5 w-3.5" />Pipeline
+                  <KanbanIcon className="h-3.5 w-3.5" />{t("modal.tabPipeline")}
                   <TabDot has={tabErrors.details} />
                 </TabsTrigger>
                 <TabsTrigger value="notes" className="relative flex-1 gap-1.5">
-                  <FileTextIcon className="h-3.5 w-3.5" />Notes
+                  <FileTextIcon className="h-3.5 w-3.5" />{t("modal.tabNotes")}
                   <TabDot has={tabErrors.notes} />
                 </TabsTrigger>
               </TabsList>
@@ -212,14 +214,14 @@ export function DealModal({
               {/* ── Deal Tab ──────────────────────────────────────────────── */}
               <TabsContent value="deal" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
                 <div className="col-span-2">
-                  <F label="Deal Name" required error={e.name?.message}>
-                    <Input {...register("name")} placeholder="e.g. Q1 Software License" />
+                  <F label={t("modal.fieldDealName")} required error={e.name?.message}>
+                    <Input {...register("name")} placeholder={t("modal.namePlaceholder")} />
                   </F>
                 </div>
-                <F label="Amount" error={e.amount?.message}>
+                <F label={t("modal.fieldAmount")} error={e.amount?.message}>
                   <Input {...register("amount")} type="number" placeholder="0.00" min={0} step="0.01" />
                 </F>
-                <F label="Currency" error={e.currency?.message}>
+                <F label={t("modal.fieldCurrency")} error={e.currency?.message}>
                   <Controller control={control} name="currency" render={({ field }) => (
                     <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
@@ -232,7 +234,7 @@ export function DealModal({
                   )} />
                 </F>
                 <div className="col-span-2">
-                  <F label="Status" error={e.status?.message}>
+                  <F label={t("modal.fieldStatus")} error={e.status?.message}>
                     <div className="grid grid-cols-3 gap-2">
                       <Controller control={control} name="status" render={({ field }) => (
                         <>
@@ -264,10 +266,10 @@ export function DealModal({
               {/* ── Pipeline Tab ──────────────────────────────────────────── */}
               <TabsContent value="details" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
                 <div className="col-span-2">
-                  <F label="Stage" required error={e.stageId?.message}>
+                  <F label={t("modal.fieldStageLabel")} required error={e.stageId?.message}>
                     <Controller control={control} name="stageId" render={({ field }) => (
                       <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger><SelectValue placeholder="Select stage" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t("form.selectStage")} /></SelectTrigger>
                         <SelectContent>
                           {stages.map((s) => (
                             <SelectItem key={s.id} value={s.id}>
@@ -282,25 +284,25 @@ export function DealModal({
                     )} />
                   </F>
                 </div>
-                <F label="Probability (%)" error={e.probability?.message}>
+                <F label={t("modal.fieldProbability")} error={e.probability?.message}>
                   <Input {...register("probability")} type="number" placeholder="0" min={0} max={100} />
                 </F>
-                <F label="Expected Close Date" error={e.expectedCloseDate?.message}>
+                <F label={t("modal.fieldExpectedClose")} error={e.expectedCloseDate?.message}>
                   <Input {...register("expectedCloseDate")} type="date" />
                 </F>
                 <div className="col-span-2">
-                  <F label="Assigned To">
+                  <F label={t("modal.fieldAssignedTo")}>
                     <Controller control={control} name="assigneeValue" render={({ field }) => (
                       <AssigneeSelect value={field.value ?? null} onChange={field.onChange} />
                     )} />
                   </F>
                 </div>
-                <F label="Company" error={e.companyId?.message}>
+                <F label={t("modal.fieldCompany")} error={e.companyId?.message}>
                   <Controller control={control} name="companyId" render={({ field }) => (
                     <Select onValueChange={(v) => field.onChange(v === "__none__" ? null : v)} value={field.value ?? "__none__"}>
-                      <SelectTrigger><SelectValue placeholder="— None —" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("modal.noneOption")} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">— None —</SelectItem>
+                        <SelectItem value="__none__">{t("modal.noneOption")}</SelectItem>
                         {companies?.map((c) => (
                           <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                         ))}
@@ -308,12 +310,12 @@ export function DealModal({
                     </Select>
                   )} />
                 </F>
-                <F label="Contact" error={e.contactId?.message}>
+                <F label={t("modal.fieldContact")} error={e.contactId?.message}>
                   <Controller control={control} name="contactId" render={({ field }) => (
                     <Select onValueChange={(v) => field.onChange(v === "__none__" ? null : v)} value={field.value ?? "__none__"}>
-                      <SelectTrigger><SelectValue placeholder="— None —" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t("modal.noneOption")} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">— None —</SelectItem>
+                        <SelectItem value="__none__">{t("modal.noneOption")}</SelectItem>
                         {contacts?.map((c) => (
                           <SelectItem key={c.id} value={c.id}>{c.firstName} {c.lastName}</SelectItem>
                         ))}
@@ -325,10 +327,10 @@ export function DealModal({
 
               {/* ── Notes Tab ─────────────────────────────────────────────── */}
               <TabsContent value="notes" className="mt-0">
-                <F label="Notes" error={e.notes?.message}>
+                <F label={t("modal.fieldNotes")} error={e.notes?.message}>
                   <Textarea
                     {...register("notes")}
-                    placeholder="Internal notes about this deal…"
+                    placeholder={t("modal.notesPlaceholder")}
                     className="min-h-[180px] resize-y"
                   />
                 </F>
@@ -338,11 +340,11 @@ export function DealModal({
 
           <DialogFooter className="px-6 py-4 border-t bg-muted/30">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {t("modal.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting} className="min-w-[110px]">
               {isSubmitting && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? "Save Changes" : "Create Deal"}
+              {isEditing ? t("modal.saveChanges") : t("modal.createDeal")}
             </Button>
           </DialogFooter>
         </form>

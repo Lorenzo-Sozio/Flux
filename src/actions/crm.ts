@@ -13,6 +13,7 @@ import type { FilterTree } from "@/lib/filter-types";
 import { customFieldDefinitions } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
 import { computeLeadScore } from "@/lib/lead-score";
+import { getTranslations } from "next-intl/server";
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export async function getAllUsers() {
@@ -130,10 +131,11 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
     const [firstStage] = await db.select().from(pipelineStages).orderBy(pipelineStages.order).limit(1);
     if (!firstStage) throw new Error("No pipeline stages found. Please create one first.");
 
+    const tLeads = await getTranslations("leads");
     const [newDeal] = await db.insert(deals).values({
-      name: `Deal for ${lead.firstName} ${lead.lastName}`,
-      amount: "0", // Default to 0, converted to string for numeric type
-      currency: "USD",
+      name: tLeads("dealForName", { firstName: lead.firstName, lastName: lead.lastName }),
+      amount: "0",
+      currency: "EUR",
       stageId: firstStage.id,
       companyId: companyId,
       contactId: newContact.id,

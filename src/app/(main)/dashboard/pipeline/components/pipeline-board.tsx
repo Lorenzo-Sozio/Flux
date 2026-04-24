@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DealModal } from "@/components/crm/deal-modal";
 import { Button } from "@/components/ui/button";
-import { PlusIcon, DollarSignIcon, PencilIcon, BarChart2 } from "lucide-react";
+import { PlusIcon, CoinsIcon, PencilIcon, BarChart2 } from "lucide-react";
 
 type Deal = {
   id: string;
@@ -130,7 +130,7 @@ export function PipelineBoard({
                     </Badge>
                   </div>
                   <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-                    <DollarSignIcon className="w-3 h-3" />
+                    <CoinsIcon className="w-3 h-3" />
                     {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </p>
                 </div>
@@ -168,7 +168,7 @@ export function PipelineBoard({
                                     </CardTitle>
                                     {canEdit && (
                                       <DealModal deal={deal} stages={initialStages} companies={companies} contacts={contacts}>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" title="Edit deal">
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" title={t("editDealTitle")}>
                                           <PencilIcon className="h-3 w-3" />
                                         </Button>
                                       </DealModal>

@@ -4,6 +4,7 @@ import React, { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Activity,
   ArrowLeft,
   ChevronDown,
   Clock,
@@ -20,12 +21,13 @@ import {
   User,
   UserCheck,
   Users,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/crm/rich-text-editor";
 import {
   Select,
   SelectContent,
@@ -58,6 +60,7 @@ import {
   deleteTicketAction,
   reassignTicketAction,
   escalateTicketAction,
+  getMacros,
 } from "@/actions/support";
 
 const CHANNEL_ICONS: Record<string, React.ReactNode> = {
@@ -75,9 +78,11 @@ const PRIORITY_OPTIONS = [
 ];
 
 const STATUS_OPTIONS = [
+  { value: "new",         label: "New" },
   { value: "open",        label: "Open" },
   { value: "in_progress", label: "In Progress" },
   { value: "waiting",     label: "Waiting" },
+  { value: "on_hold",     label: "On Hold" },
   { value: "resolved",    label: "Resolved" },
   { value: "closed",      label: "Closed" },
 ];
@@ -116,6 +121,43 @@ function SLATimer({ targetDate }: { targetDate: Date | null }) {
     <span className={`font-mono text-xs font-semibold ${isOverdue ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
       {remaining}
     </span>
+  );
+}
+
+const AUDIT_ACTION_LABELS: Record<string, string> = {
+  created:          "Ticket created",
+  status_changed:   "Status changed",
+  priority_changed: "Priority changed",
+  assigned:         "Assignee changed",
+  message_added:    "Message added",
+  field_changed:    "Field updated",
+};
+
+function AuditLogEntry({ entry }: { entry: any }) {
+  const actor = entry.actor?.name ?? entry.actorName ?? "System";
+  const time = new Date(entry.createdAt).toLocaleString("en-US", {
+    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+  const label = AUDIT_ACTION_LABELS[entry.action] ?? entry.action;
+
+  return (
+    <div className="flex items-start gap-2 text-xs">
+      <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 mt-1.5 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <span className="font-medium">{actor}</span>
+        {" — "}
+        <span className="text-muted-foreground">{label}</span>
+        {entry.oldValue && entry.newValue && (
+          <span className="text-muted-foreground">
+            {": "}
+            <span className="line-through">{entry.oldValue}</span>
+            {" → "}
+            <span className="text-foreground">{entry.newValue}</span>
+          </span>
+        )}
+      </div>
+      <span className="text-muted-foreground/70 flex-shrink-0">{time}</span>
+    </div>
   );
 }
 
@@ -166,9 +208,17 @@ function MessageBubble({ msg }: { msg: any }) {
           )}
           <span className="text-xs text-muted-foreground">{timeStr}</span>
         </div>
-        <p className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
-          {msg.content}
-        </p>
+        {msg.content?.startsWith("<") ? (
+          <div
+            className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
+            // Content comes from authenticated agents only — no untrusted input
+            dangerouslySetInnerHTML={{ __html: msg.content }}
+          />
+        ) : (
+          <p className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
+            {msg.content}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -181,6 +231,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
   const [ticket, setTicket] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [macros, setMacros] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Reply form
@@ -204,6 +256,10 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
           (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
         );
         setMessages(sorted);
+        const sortedLogs = [...(data.auditLogs ?? [])].sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        setAuditLogs(sortedLogs);
         setSelectedAssignee(encodeAssignee(data.assigneeId, null));
       }
     } catch (error) {
@@ -215,14 +271,17 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
   useEffect(() => {
     loadTicket();
+    getMacros().then(setMacros).catch(() => {});
   }, [id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  const isReplyEmpty = !replyContent.trim() || replyContent === "<p></p>";
+
   const handleSendReply = async () => {
-    if (!replyContent.trim()) return;
+    if (isReplyEmpty) return;
     setSending(true);
     try {
       await addTicketMessageAction(id, {
@@ -230,7 +289,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
         channel: ticket?.channel ?? "email",
         isPublic: !isInternal,
       });
-      setReplyContent("");
+      setReplyContent("<p></p>");
       await loadTicket();
     } catch (err: any) {
       toast.error(err.message ?? "Failed to send reply");
@@ -241,7 +300,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
   const handleStatusChange = async (status: string) => {
     try {
-      await updateTicketAction(id, { status: status as "open" | "in_progress" | "waiting" | "resolved" | "closed" });
+      await updateTicketAction(id, { status: status as "new" | "open" | "in_progress" | "waiting" | "on_hold" | "resolved" | "closed" });
       setTicket((prev: any) => ({ ...prev, status }));
       toast.success("Status updated");
     } catch (err: any) {
@@ -485,20 +544,16 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                     </button>
                   </div>
 
-                  <Textarea
+                  <RichTextEditor
+                    value={replyContent}
+                    onChange={setReplyContent}
                     placeholder={
                       isInternal
                         ? "Write an internal note (only visible to your team)..."
                         : "Type your reply to the customer..."
                     }
-                    value={replyContent}
-                    onChange={(e) => setReplyContent(e.target.value)}
-                    className={`min-h-[100px] resize-none text-sm ${
-                      isInternal ? "border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/10" : ""
-                    }`}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSendReply();
-                    }}
+                    className={isInternal ? "border-amber-300 dark:border-amber-700" : ""}
+                    macroVariables
                   />
 
                   <div className="flex items-center justify-between">
@@ -513,11 +568,44 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                       )}
                     </p>
                     <div className="flex gap-2">
+                      {macros.length > 0 && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm" className="gap-1.5">
+                              <Zap className="h-3.5 w-3.5" />
+                              Macros
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-y-auto">
+                            {macros.map((macro: any) => (
+                              <DropdownMenuItem
+                                key={macro.id}
+                                className="flex flex-col items-start gap-0.5 py-2"
+                                onClick={() => {
+                                  const resolved = macro.body
+                                    .replace(/\{ticket\.number\}/g, ticket?.ticketNumber ?? "")
+                                    .replace(/\{contact\.firstName\}/g, ticket?.contact?.firstName ?? ticket?.contact?.name?.split(" ")[0] ?? "")
+                                    .replace(/\{agent\.name\}/g, "");
+                                  setReplyContent(resolved);
+                                  setIsInternal(!macro.isPublic);
+                                }}
+                              >
+                                <span className="font-medium text-xs">{macro.name}</span>
+                                {macro.description && (
+                                  <span className="text-muted-foreground text-[10px] truncate w-full">
+                                    {macro.description}
+                                  </span>
+                                )}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setReplyContent("")}
-                        disabled={!replyContent}
+                        onClick={() => setReplyContent("<p></p>")}
+                        disabled={isReplyEmpty}
                       >
                         Clear
                       </Button>
@@ -525,7 +613,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                         size="sm"
                         className="gap-1.5"
                         onClick={handleSendReply}
-                        disabled={!replyContent.trim() || sending}
+                        disabled={isReplyEmpty || sending}
                       >
                         <Send className="h-3.5 w-3.5" />
                         {sending ? "Sending…" : isInternal ? "Add Note" : "Send Reply"}
@@ -705,6 +793,28 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                 )}
               </CardContent>
             </Card>
+
+            {/* Activity Log */}
+            {auditLogs.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm flex items-center gap-1.5">
+                    <Activity className="h-3.5 w-3.5 text-muted-foreground" />
+                    Activity Log
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {auditLogs.slice(0, 20).map((entry: any) => (
+                    <AuditLogEntry key={entry.id} entry={entry} />
+                  ))}
+                  {auditLogs.length > 20 && (
+                    <p className="text-xs text-muted-foreground text-center pt-1">
+                      +{auditLogs.length - 20} more entries
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
