@@ -11,11 +11,14 @@ import {
   chatChannels,
   chatSessions,
   users,
+  contacts,
 } from "@/db/schema";
 import { eq, desc, and, lt } from "drizzle-orm";
 import { z } from "zod";
 import crypto from "crypto";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { runAutomations } from "@/components/crm/automation/rule-engine";
 import {
   CreateTicketSchema,
   UpdateTicketSchema,
@@ -27,6 +30,7 @@ import {
 } from "@/actions/support-validation";
 import { canTransition, isSLAPauseStatus } from "@/lib/ticket-state-machine";
 import { logTicketChange } from "@/lib/ticket-audit";
+import { sendEmail } from "@/lib/email-provider";
 
 // --- HELPERS ---
 
@@ -93,6 +97,16 @@ export async function createTicketAction(data: z.infer<typeof CreateTicketSchema
 
   revalidatePath("/dashboard/support/tickets");
   revalidatePath("/dashboard/support");
+
+  after(() => runAutomations({
+    entityType: "ticket",
+    entityId:   ticket.id,
+    event:      "onCreate",
+    oldData:    {},
+    newData:    ticket as Record<string, unknown>,
+    currentUserId: session.user.id,
+  }));
+
   return { success: true, ticketId: ticket.id, ticketNumber };
 }
 
@@ -264,6 +278,16 @@ export async function updateTicketAction(
 
   revalidatePath("/dashboard/support/tickets");
   revalidatePath(`/dashboard/support/tickets/${ticketId}`);
+
+  after(() => runAutomations({
+    entityType: "ticket",
+    entityId:   ticketId,
+    event:      "onUpdate",
+    oldData:    ticket as Record<string, unknown>,
+    newData:    updated as Record<string, unknown>,
+    currentUserId: session.user.id,
+  }));
+
   return { success: true, ticket: updated };
 }
 
@@ -287,6 +311,37 @@ export async function addTicketMessageAction(
     session.user.role !== "admin"
   ) {
     throw new Error("Unauthorized");
+  }
+
+  // Reply to closed ticket → open new linked ticket instead
+  if (ticket.status === "closed") {
+    const newNumber = generateTicketNumber();
+    const [newTicket] = await db.insert(tickets).values({
+      ticketNumber: newNumber,
+      subject: `Re: ${ticket.subject}`,
+      description: validated.content,
+      channel: ticket.channel,
+      priority: ticket.priority,
+      severity: ticket.severity,
+      status: "open",
+      type: ticket.type,
+      contactId: ticket.contactId,
+      companyId: ticket.companyId,
+      assigneeId: ticket.assigneeId,
+      ownerId: session.user.id,
+      parentTicketId: ticket.id,
+    }).returning();
+
+    await logTicketChange({
+      ticketId: newTicket.id,
+      actorId: session.user.id,
+      actorName: session.user.name ?? session.user.email ?? undefined,
+      action: "created",
+      newValue: `linked from ${ticket.ticketNumber}`,
+    });
+
+    revalidatePath("/dashboard/support/tickets");
+    return { success: true, newTicketId: newTicket.id, newTicketNumber: newNumber, linkedFromClosed: true, message: null };
   }
 
   const [message] = await db
@@ -316,6 +371,47 @@ export async function addTicketMessageAction(
     action: "message_added",
     newValue: validated.isPublic ? "public" : "internal_note",
   });
+
+  // Send outbound email to customer for public replies (fire-and-forget)
+  // Store returned Message-ID for email threading
+  if (validated.isPublic && ticket.contactId) {
+    after(async () => {
+      const contact = await db.query.contacts.findFirst({
+        where: eq(contacts.id, ticket.contactId!),
+      });
+      const customerEmail = contact?.email ?? null;
+      if (!customerEmail) return;
+
+      const result = await sendEmail({
+        to: customerEmail,
+        subject: `[${ticket.ticketNumber}] Re: ${ticket.subject}`,
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+            <p style="color:#6b7280;font-size:12px;margin-bottom:16px">
+              Reply to your support ticket <strong>${ticket.ticketNumber}</strong>
+            </p>
+            ${validated.content}
+            <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0">
+            <p style="color:#9ca3af;font-size:11px">
+              To reply, simply reply to this email and include the ticket number in the subject.
+            </p>
+          </div>
+        `,
+      }).catch((err) => {
+        console.error("[support] outbound email error:", err);
+        return null;
+      });
+
+      // Store the provider's Message-ID for email threading
+      if (result?.success && result.messageId) {
+        await db
+          .update(ticketMessages)
+          .set({ emailMessageId: result.messageId })
+          .where(eq(ticketMessages.id, message.id))
+          .catch(() => {});
+      }
+    });
+  }
 
   revalidatePath(`/dashboard/support/tickets/${ticketId}`);
   return { success: true, message };

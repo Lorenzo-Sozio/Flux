@@ -49,7 +49,8 @@
       "Bash(node -e \"const p = require\\('./node_modules/next-intl/package.json'\\); console.log\\(p.version\\)\")",
       "Bash(node -e \"const fs = require\\('fs'\\); const exports = require\\('./node_modules/next-intl/package.json'\\).exports; console.log\\(JSON.stringify\\(Object.keys\\(exports\\).slice\\(0, 20\\), null, 2\\)\\)\")",
       "Bash(grep -E \"\\\\.\\(tsx|ts|jsx|js\\)$\")",
-      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); deps={**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}; [print\\(k,v\\) for k,v in deps.items\\(\\) if any\\(x in k for x in ['tiptap','quill','editor','prosemirror','slate','lexical','dompurify','sanitize']\\)]\")"
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); deps={**d.get\\('dependencies',{}\\), **d.get\\('devDependencies',{}\\)}; [print\\(k,v\\) for k,v in deps.items\\(\\) if any\\(x in k for x in ['tiptap','quill','editor','prosemirror','slate','lexical','dompurify','sanitize']\\)]\")",
+      "Bash(npm list *)"
     ]
   }
 }

@@ -1,6 +1,7 @@
 import {
   Banknote,
   BarChart3,
+  BookOpen,
   Building2,
   Calendar,
   ChartBar,
@@ -9,9 +10,9 @@ import {
   Contact,
   FileText,
   Fingerprint,
+  GanttChartSquare,
   Gauge,
   Kanban,
-  LayoutDashboard,
   type LucideIcon,
   Mail,
   MailOpen,
@@ -23,11 +24,10 @@ import {
   ShieldCheck,
   ShoppingCart,
   Target,
-  TrendingUp,
   Users,
+  Users2,
   Webhook,
   Zap,
-  BookOpen,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -63,7 +63,15 @@ export const sidebarItems: NavGroup[] = [
       { titleKey: "dashboard", url: "/dashboard/crm", icon: ChartBar },
       { titleKey: "pipeline", url: "/dashboard/pipeline", icon: Kanban },
       { titleKey: "calendar", url: "/dashboard/calendar", icon: Calendar },
-      { titleKey: "tasks", url: "/dashboard/tasks", icon: CheckSquare },
+      {
+        titleKey: "tasks",
+        url: "/dashboard/tasks",
+        icon: CheckSquare,
+        subItems: [
+          { titleKey: "gantt", url: "/dashboard/tasks/gantt", icon: GanttChartSquare },
+          { titleKey: "workload", url: "/dashboard/tasks/workload", icon: Users2 },
+        ],
+      },
       { titleKey: "chat", url: "/dashboard/chat", icon: MessageCircle, isNew: true },
       { titleKey: "leads", url: "/dashboard/leads", icon: Users },
       { titleKey: "contacts", url: "/dashboard/contacts", icon: Contact },
@@ -83,9 +91,7 @@ export const sidebarItems: NavGroup[] = [
   {
     id: 2.5,
     labelKey: "automation",
-    items: [
-      { titleKey: "rules", url: "/dashboard/automation", icon: Zap, isNew: true },
-    ],
+    items: [{ titleKey: "rules", url: "/dashboard/automation", icon: Zap, isNew: true }],
   },
   {
     id: 3,

@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
+
 import { useRouter } from "next/navigation";
+
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
 import {
   ArrowDown,
   Building2,
@@ -25,98 +26,69 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { getContactsForSelect, getCompaniesForSelect, getLeadsForSelect } from "@/actions/crm";
-import { AssigneeSelect, encodeAssignee, decodeAssignee } from "@/components/crm/assignee-select";
+import { useTranslations } from "next-intl";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
+import type { z } from "zod";
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { getCompaniesForSelect, getContactsForSelect, getLeadsForSelect } from "@/actions/crm";
 import { createTicketAction } from "@/actions/support";
 import { CreateTicketSchema } from "@/actions/support-validation";
+import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
-// ── Visual option configs ────────────────────────────────────────────────────
+// ── Config ───────────────────────────────────────────────────────────────────
 
 const CHANNELS = [
   {
     value: "email",
-    label: "Email",
     icon: Mail,
     idle: "border-input hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-950/20",
     active: "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-500",
   },
   {
     value: "chat",
-    label: "Chat",
     icon: MessageCircle,
     idle: "border-input hover:border-green-400 hover:bg-green-50/50 dark:hover:bg-green-950/20",
-    active: "border-green-500 bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-300 dark:border-green-500",
+    active:
+      "border-green-500 bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-300 dark:border-green-500",
   },
   {
     value: "phone",
-    label: "Phone",
     icon: Phone,
     idle: "border-input hover:border-violet-400 hover:bg-violet-50/50 dark:hover:bg-violet-950/20",
-    active: "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300 dark:border-violet-500",
+    active:
+      "border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300 dark:border-violet-500",
   },
   {
     value: "social",
-    label: "Social",
     icon: Users,
     idle: "border-input hover:border-orange-400 hover:bg-orange-50/50 dark:hover:bg-orange-950/20",
-    active: "border-orange-500 bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300 dark:border-orange-500",
+    active:
+      "border-orange-500 bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300 dark:border-orange-500",
   },
 ] as const;
 
 const PRIORITIES = [
   {
     value: "low",
-    label: "Low",
     icon: ArrowDown,
     idle: "border-input hover:border-green-400 hover:bg-green-50/50 dark:hover:bg-green-950/20",
-    active: "border-green-500 bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-300 dark:border-green-500",
+    active:
+      "border-green-500 bg-green-50 text-green-700 dark:bg-green-950/30 dark:text-green-300 dark:border-green-500",
     dot: "bg-green-500",
   },
   {
     value: "normal",
-    label: "Normal",
     icon: Minus,
     idle: "border-input hover:border-blue-400 hover:bg-blue-50/50 dark:hover:bg-blue-950/20",
     active: "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 dark:border-blue-500",
@@ -124,15 +96,14 @@ const PRIORITIES = [
   },
   {
     value: "high",
-    label: "High",
     icon: Zap,
     idle: "border-input hover:border-orange-400 hover:bg-orange-50/50 dark:hover:bg-orange-950/20",
-    active: "border-orange-500 bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300 dark:border-orange-500",
+    active:
+      "border-orange-500 bg-orange-50 text-orange-700 dark:bg-orange-950/30 dark:text-orange-300 dark:border-orange-500",
     dot: "bg-orange-500",
   },
   {
     value: "urgent",
-    label: "Urgent",
     icon: Zap,
     idle: "border-input hover:border-red-400 hover:bg-red-50/50 dark:hover:bg-red-950/20",
     active: "border-red-500 bg-red-50 text-red-700 dark:bg-red-950/30 dark:text-red-300 dark:border-red-500",
@@ -140,14 +111,33 @@ const PRIORITIES = [
   },
 ] as const;
 
+type RecordType = "contact" | "company" | "lead";
+type ContactOption = { id: string; firstName: string | null; lastName: string | null; email: string | null };
+type CompanyOption = { id: string; name: string };
+type LeadOption = { id: string; firstName: string | null; lastName: string | null; email: string | null };
+type AnyOption = { id: string; label: string; sub?: string };
+
+const RECORD_TYPE_ICONS: Record<RecordType, React.ElementType> = {
+  contact: UserCircle,
+  company: Building2,
+  lead: UserSearch,
+};
+
+function toOption(item: ContactOption | LeadOption): AnyOption {
+  const name = [item.firstName, item.lastName].filter(Boolean).join(" ") || item.email || item.id;
+  return { id: item.id, label: name, sub: item.email ?? undefined };
+}
+
 // ── Tags input ───────────────────────────────────────────────────────────────
 
 function TagsInput({
   value,
   onChange,
+  placeholder,
 }: {
   value: string[];
   onChange: (v: string[]) => void;
+  placeholder: string;
 }) {
   const [input, setInput] = useState("");
 
@@ -158,13 +148,9 @@ function TagsInput({
   };
 
   return (
-    <div className="flex flex-wrap gap-1.5 min-h-[38px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+    <div className="flex min-h-[38px] w-full flex-wrap gap-1.5 rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
       {value.map((tag) => (
-        <Badge
-          key={tag}
-          variant="secondary"
-          className="h-5 gap-1 pl-2 pr-1 text-xs font-normal"
-        >
+        <Badge key={tag} variant="secondary" className="h-5 gap-1 pr-1 pl-2 font-normal text-xs">
           {tag}
           <button
             type="button"
@@ -183,19 +169,17 @@ function TagsInput({
             e.preventDefault();
             addTag();
           }
-          if (e.key === "Backspace" && !input && value.length > 0) {
-            onChange(value.slice(0, -1));
-          }
+          if (e.key === "Backspace" && !input && value.length > 0) onChange(value.slice(0, -1));
         }}
         onBlur={addTag}
-        placeholder={value.length === 0 ? "Add tags… press Enter to confirm" : ""}
-        className="flex-1 min-w-[120px] bg-transparent outline-none placeholder:text-muted-foreground"
+        placeholder={value.length === 0 ? placeholder : ""}
+        className="min-w-[120px] flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
       />
     </div>
   );
 }
 
-// ── Anagrafica picker ────────────────────────────────────────────────────────
+// ── AnagraficaPicker ─────────────────────────────────────────────────────────
 
 interface AnagraficaPickerProps {
   recordType: RecordType;
@@ -216,43 +200,59 @@ function AnagraficaPicker({
   popoverOpen,
   onPopoverOpenChange,
 }: AnagraficaPickerProps) {
+  const t = useTranslations("support.tickets.createModal");
   const selectedOption = options.find((o) => o.id === selectedId) ?? null;
-  const TypeIcon = RECORD_TYPES.find((t) => t.value === recordType)?.icon ?? UserCircle;
+  const TypeIcon = RECORD_TYPE_ICONS[recordType];
+  const RECORD_LABELS: Record<RecordType, string> = {
+    contact: t("recordTypes.contact"),
+    company: t("recordTypes.company"),
+    lead: t("recordTypes.lead"),
+  };
+  const typeLabel = RECORD_LABELS[recordType];
+
+  const recordTypes: { value: RecordType; icon: React.ElementType }[] = [
+    { value: "contact", icon: UserCircle },
+    { value: "company", icon: Building2 },
+    { value: "lead", icon: UserSearch },
+  ];
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-medium flex items-center gap-1.5">
+      <p className="flex items-center gap-1.5 font-medium text-sm">
         <TypeIcon className="h-3.5 w-3.5 text-muted-foreground" />
-        Link to record
-        <span className="text-muted-foreground font-normal">(optional)</span>
-      </label>
+        {t("linkToRecord")}
+        <span className="font-normal text-muted-foreground">{t("optional")}</span>
+      </p>
 
       {/* Type toggle */}
-      <div className="flex rounded-md border overflow-hidden text-xs font-medium">
-        {RECORD_TYPES.map((rt) => {
+      <div className="flex overflow-hidden rounded-md border font-medium text-xs">
+        {recordTypes.map((rt) => {
           const Icon = rt.icon;
           const active = recordType === rt.value;
           return (
             <button
               key={rt.value}
               type="button"
-              onClick={() => onTypeChange(rt.value)}
+              onClick={() => {
+                onTypeChange(rt.value);
+                onPopoverOpenChange(false);
+              }}
               className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 py-1.5 px-2 transition-colors select-none",
+                "flex flex-1 select-none items-center justify-center gap-1.5 px-2 py-1.5 transition-colors",
                 active
                   ? "bg-primary text-primary-foreground"
                   : "bg-background text-muted-foreground hover:bg-muted hover:text-foreground",
-                "not-last:border-r"
+                "not-last:border-r",
               )}
             >
               <Icon className="h-3 w-3 shrink-0" />
-              {rt.label}
+              {RECORD_LABELS[rt.value]}
             </button>
           );
         })}
       </div>
 
-      {/* Searchable record picker */}
+      {/* Searchable picker */}
       <Popover open={popoverOpen} onOpenChange={onPopoverOpenChange}>
         <PopoverTrigger asChild>
           <button
@@ -260,33 +260,35 @@ function AnagraficaPicker({
             role="combobox"
             aria-expanded={popoverOpen}
             className={cn(
-              "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs ring-offset-background",
-              "hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-              "transition-colors"
+              "flex h-9 w-full items-center justify-between rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs",
+              "transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
             )}
           >
             {selectedOption ? (
-              <span className="flex items-center gap-2 min-w-0">
-                <TypeIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+              <span className="flex min-w-0 items-center gap-2">
+                <TypeIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate font-medium">{selectedOption.label}</span>
                 {selectedOption.sub && (
-                  <span className="text-muted-foreground truncate text-xs">{selectedOption.sub}</span>
+                  <span className="truncate text-muted-foreground text-xs">{selectedOption.sub}</span>
                 )}
               </span>
             ) : (
-              <span className="text-muted-foreground">Search {RECORD_TYPES.find((t) => t.value === recordType)?.label.toLowerCase()}…</span>
+              <span className="text-muted-foreground">
+                {t("linkToRecord")} {typeLabel.toLowerCase()}…
+              </span>
             )}
-            <div className="flex items-center gap-1 ml-2 shrink-0">
+            <div className="ml-2 flex shrink-0 items-center gap-1">
               {selectedOption && (
-                <span
-                  role="button"
-                  tabIndex={0}
-                  onClick={(e) => { e.stopPropagation(); onSelect(null); }}
-                  onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onSelect(null); } }}
-                  className="rounded-sm p-0.5 hover:bg-muted text-muted-foreground hover:text-foreground"
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelect(null);
+                  }}
+                  className="rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                   <X className="h-3.5 w-3.5" />
-                </span>
+                </button>
               )}
               <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
@@ -294,9 +296,9 @@ function AnagraficaPicker({
         </PopoverTrigger>
         <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
           <Command>
-            <CommandInput placeholder={`Search ${RECORD_TYPES.find((t) => t.value === recordType)?.label.toLowerCase()}…`} />
+            <CommandInput placeholder={`${t("linkToRecord")} ${typeLabel.toLowerCase()}…`} />
             <CommandList>
-              <CommandEmpty>No results found.</CommandEmpty>
+              <CommandEmpty>{t("noResults")}</CommandEmpty>
               <CommandGroup>
                 {options.map((opt) => (
                   <CommandItem
@@ -308,9 +310,9 @@ function AnagraficaPicker({
                     }}
                     className="flex items-center justify-between gap-2"
                   >
-                    <span className="flex flex-col min-w-0">
+                    <span className="flex min-w-0 flex-col">
                       <span className="truncate font-medium">{opt.label}</span>
-                      {opt.sub && <span className="text-xs text-muted-foreground truncate">{opt.sub}</span>}
+                      {opt.sub && <span className="truncate text-muted-foreground text-xs">{opt.sub}</span>}
                     </span>
                     <Check className={cn("h-4 w-4 shrink-0", opt.id === selectedId ? "opacity-100" : "opacity-0")} />
                   </CommandItem>
@@ -334,23 +336,6 @@ interface CreateTicketModalProps {
   onSuccess?: (ticketId: string) => void;
 }
 
-type RecordType = "contact" | "company" | "lead";
-type ContactOption = { id: string; firstName: string | null; lastName: string | null; email: string | null };
-type CompanyOption = { id: string; name: string };
-type LeadOption = { id: string; firstName: string | null; lastName: string | null; email: string | null };
-type AnyOption = { id: string; label: string; sub?: string };
-
-const RECORD_TYPES: { value: RecordType; label: string; icon: React.ElementType }[] = [
-  { value: "contact", label: "Contact", icon: UserCircle },
-  { value: "company", label: "Company", icon: Building2 },
-  { value: "lead", label: "Lead", icon: UserSearch },
-];
-
-function toOption(item: ContactOption | LeadOption, _type: "contact" | "lead"): AnyOption {
-  const name = [item.firstName, item.lastName].filter(Boolean).join(" ") || item.email || item.id;
-  return { id: item.id, label: name, sub: item.email ?? undefined };
-}
-
 export function CreateTicketModal({
   open,
   onOpenChange,
@@ -359,10 +344,10 @@ export function CreateTicketModal({
   onSuccess,
 }: CreateTicketModalProps) {
   const router = useRouter();
+  const t = useTranslations("support.tickets.createModal");
   const [isLoading, setIsLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  // Anagrafica state
   const [recordType, setRecordType] = useState<RecordType>("contact");
   const [popoverOpen, setPopoverOpen] = useState(false);
   const [contactOptions, setContactOptions] = useState<ContactOption[]>([]);
@@ -371,17 +356,17 @@ export function CreateTicketModal({
 
   useEffect(() => {
     if (!open) return;
-    getContactsForSelect().then(setContactOptions).catch(() => {});
-    getCompaniesForSelect().then(setCompanyOptions).catch(() => {});
-    getLeadsForSelect().then(setLeadOptions).catch(() => {});
+    getContactsForSelect().then(setContactOptions).catch(console.error);
+    getCompaniesForSelect().then(setCompanyOptions).catch(console.error);
+    getLeadsForSelect().then(setLeadOptions).catch(console.error);
   }, [open]);
 
-  // Build the flat option list for the current type
-  const currentOptions: AnyOption[] = recordType === "company"
-    ? companyOptions.map((c) => ({ id: c.id, label: c.name }))
-    : recordType === "lead"
-      ? leadOptions.map((l) => toOption(l, "lead"))
-      : contactOptions.map((c) => toOption(c, "contact"));
+  const currentOptions: AnyOption[] =
+    recordType === "company"
+      ? companyOptions.map((c) => ({ id: c.id, label: c.name }))
+      : recordType === "lead"
+        ? leadOptions.map((l) => toOption(l))
+        : contactOptions.map((c) => toOption(c));
 
   const form = useForm<z.infer<typeof CreateTicketSchema>>({
     resolver: zodResolver(CreateTicketSchema),
@@ -399,8 +384,20 @@ export function CreateTicketModal({
   });
 
   const description = form.watch("description") ?? "";
-  const tags = form.watch("tags") ?? [];
   const DESC_LIMIT = 1000;
+
+  const CHANNEL_LABELS: Record<string, string> = {
+    email: t("channels.email"),
+    chat: t("channels.chat"),
+    phone: t("channels.phone"),
+    social: t("channels.social"),
+  };
+  const PRIORITY_LABELS: Record<string, string> = {
+    low: t("priorities.low"),
+    normal: t("priorities.normal"),
+    high: t("priorities.high"),
+    urgent: t("priorities.urgent"),
+  };
 
   async function onSubmit(data: z.infer<typeof CreateTicketSchema>) {
     setIsLoading(true);
@@ -409,20 +406,17 @@ export function CreateTicketModal({
       onOpenChange(false);
       form.reset();
       setShowAdvanced(false);
-
       router.refresh();
-
-      toast.success(`Ticket ${result.ticketNumber} opened`, {
-        description: "Your support ticket has been created.",
+      toast.success(t("successTitle", { number: result.ticketNumber }), {
+        description: t("successDesc"),
         action: {
-          label: "View ticket",
+          label: t("viewTicket"),
           onClick: () => router.push(`/dashboard/support/tickets/${result.ticketId}`),
         },
       });
-
       onSuccess?.(result.ticketId);
-    } catch (error: any) {
-      toast.error(error.message ?? "Failed to create ticket");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t("errorCreate"));
     } finally {
       setIsLoading(false);
     }
@@ -434,59 +428,53 @@ export function CreateTicketModal({
       onOpenChange={(v) => {
         if (!isLoading) {
           onOpenChange(v);
-          if (!v) { form.reset(); setShowAdvanced(false); }
+          if (!v) {
+            form.reset();
+            setShowAdvanced(false);
+          }
         }
       }}
     >
-      <DialogContent className="sm:max-w-[580px] p-0 gap-0 overflow-hidden">
-        {/* ── Colored header ── */}
-        <DialogHeader className="px-6 pt-6 pb-5 border-b bg-muted/30">
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[580px]">
+        {/* Header */}
+        <DialogHeader className="border-b bg-muted/30 px-6 pt-6 pb-5">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
               <Headphones className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <DialogTitle className="text-lg font-semibold">
-                New Support Ticket
-              </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground mt-0.5">
-                Open a new case or customer issue for your team
-              </DialogDescription>
+              <DialogTitle className="font-semibold text-lg">{t("title")}</DialogTitle>
+              <DialogDescription className="mt-0.5 text-muted-foreground text-sm">{t("subtitle")}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        {/* ── Form body ── */}
+        {/* Body */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
-
+            <div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5">
               {/* Subject */}
               <FormField
                 control={form.control}
                 name="subject"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-sm font-medium">
-                      Subject <span className="text-destructive">*</span>
+                    <FormLabel className="font-medium text-sm">
+                      {t("subjectLabel")} <span className="text-destructive">*</span>
                     </FormLabel>
                     <FormControl>
-                      <Input
-                        placeholder="Briefly describe the issue…"
-                        className="h-10"
-                        {...field}
-                      />
+                      <Input placeholder={t("subjectPlaceholder")} className="h-10" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              {/* ── Linked record (anagrafica) ── */}
+              {/* Linked record */}
               <AnagraficaPicker
                 recordType={recordType}
-                onTypeChange={(t) => {
-                  setRecordType(t);
+                onTypeChange={(type) => {
+                  setRecordType(type);
                   setPopoverOpen(false);
                   form.setValue("contactId", undefined);
                   form.setValue("companyId", undefined);
@@ -494,9 +482,11 @@ export function CreateTicketModal({
                 }}
                 options={currentOptions}
                 selectedId={
-                  recordType === "contact" ? (form.watch("contactId") ?? null)
-                  : recordType === "company" ? (form.watch("companyId") ?? null)
-                  : (form.watch("leadId") ?? null)
+                  recordType === "contact"
+                    ? (form.watch("contactId") ?? null)
+                    : recordType === "company"
+                      ? (form.watch("companyId") ?? null)
+                      : (form.watch("leadId") ?? null)
                 }
                 onSelect={(id) => {
                   form.setValue("contactId", undefined);
@@ -514,11 +504,11 @@ export function CreateTicketModal({
 
               {/* Assign to */}
               <div className="space-y-2">
-                <label className="text-sm font-medium flex items-center gap-1.5">
+                <p className="flex items-center gap-1.5 font-medium text-sm">
                   <UserCheck className="h-3.5 w-3.5 text-muted-foreground" />
-                  Assign to
-                  <span className="text-muted-foreground font-normal">(optional)</span>
-                </label>
+                  {t("assignTo")}
+                  <span className="font-normal text-muted-foreground">{t("optional")}</span>
+                </p>
                 <AssigneeSelect
                   value={encodeAssignee(form.watch("assigneeId"), null)}
                   onChange={(encoded) => {
@@ -534,7 +524,7 @@ export function CreateTicketModal({
                 name="channel"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-sm font-medium">Channel</FormLabel>
+                    <FormLabel className="font-medium text-sm">{t("channelLabel")}</FormLabel>
                     <FormControl>
                       <div className="grid grid-cols-4 gap-2">
                         {CHANNELS.map((ch) => {
@@ -546,13 +536,12 @@ export function CreateTicketModal({
                               type="button"
                               onClick={() => field.onChange(ch.value)}
                               className={cn(
-                                "flex flex-col items-center gap-1.5 rounded-lg border py-3 px-2 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                "flex cursor-pointer select-none flex-col items-center gap-1.5 rounded-lg border px-2 py-3 font-medium text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                 isSelected ? ch.active : ch.idle,
-                                "cursor-pointer select-none"
                               )}
                             >
                               <Icon className="h-4 w-4" />
-                              {ch.label}
+                              {CHANNEL_LABELS[ch.value]}
                             </button>
                           );
                         })}
@@ -569,7 +558,7 @@ export function CreateTicketModal({
                 name="priority"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-sm font-medium">Priority</FormLabel>
+                    <FormLabel className="font-medium text-sm">{t("priorityLabel")}</FormLabel>
                     <FormControl>
                       <div className="grid grid-cols-4 gap-2">
                         {PRIORITIES.map((p) => {
@@ -581,18 +570,15 @@ export function CreateTicketModal({
                               type="button"
                               onClick={() => field.onChange(p.value)}
                               className={cn(
-                                "flex flex-col items-center gap-1.5 rounded-lg border py-3 px-2 text-xs font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                                "flex cursor-pointer select-none flex-col items-center gap-1.5 rounded-lg border px-2 py-3 font-medium text-xs transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                                 isSelected ? p.active : p.idle,
-                                "cursor-pointer select-none"
                               )}
                             >
                               <div className="flex items-center gap-1">
-                                {isSelected && (
-                                  <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", p.dot)} />
-                                )}
+                                {isSelected && <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", p.dot)} />}
                                 <Icon className="h-3.5 w-3.5" />
                               </div>
-                              {p.label}
+                              {PRIORITY_LABELS[p.value]}
                             </button>
                           );
                         })}
@@ -610,16 +596,14 @@ export function CreateTicketModal({
                 render={({ field }) => (
                   <FormItem>
                     <div className="flex items-center justify-between">
-                      <FormLabel className="text-sm font-medium">
-                        Description{" "}
-                        <span className="text-muted-foreground font-normal">(optional)</span>
+                      <FormLabel className="font-medium text-sm">
+                        {t("descriptionLabel")}{" "}
+                        <span className="font-normal text-muted-foreground">{t("optional")}</span>
                       </FormLabel>
                       <span
                         className={cn(
                           "text-xs tabular-nums",
-                          description.length > DESC_LIMIT * 0.9
-                            ? "text-orange-500"
-                            : "text-muted-foreground"
+                          description.length > DESC_LIMIT * 0.9 ? "text-orange-500" : "text-muted-foreground",
                         )}
                       >
                         {description.length} / {DESC_LIMIT}
@@ -627,8 +611,8 @@ export function CreateTicketModal({
                     </div>
                     <FormControl>
                       <Textarea
-                        placeholder="Provide additional context, steps to reproduce, or expected vs. actual behaviour…"
-                        className="resize-none text-sm min-h-[88px]"
+                        placeholder={t("descriptionPlaceholder")}
+                        className="min-h-[88px] resize-none text-sm"
                         maxLength={DESC_LIMIT}
                         {...field}
                       />
@@ -638,31 +622,27 @@ export function CreateTicketModal({
                 )}
               />
 
-              {/* Advanced options (collapsible) */}
-              <div className="rounded-lg border overflow-hidden">
+              {/* Advanced options */}
+              <div className="overflow-hidden rounded-lg border">
                 <button
                   type="button"
                   onClick={() => setShowAdvanced((v) => !v)}
-                  className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  className="flex w-full items-center justify-between px-4 py-2.5 font-medium text-muted-foreground text-sm transition-colors hover:bg-muted/50 hover:text-foreground"
                 >
-                  <span>Advanced options</span>
-                  {showAdvanced ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
+                  <span>{t("advancedOptions")}</span>
+                  {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                 </button>
 
                 {showAdvanced && (
-                  <div className="px-4 pb-4 pt-1 space-y-4 border-t bg-muted/20">
+                  <div className="space-y-4 border-t bg-muted/20 px-4 pt-1 pb-4">
                     {/* Severity */}
                     <FormField
                       control={form.control}
                       name="severity"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Severity
+                          <FormLabel className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                            {t("severityLabel")}
                           </FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
@@ -671,10 +651,10 @@ export function CreateTicketModal({
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="low">Low — Minor inconvenience</SelectItem>
-                              <SelectItem value="normal">Normal — Standard issue</SelectItem>
-                              <SelectItem value="high">High — Business impact</SelectItem>
-                              <SelectItem value="critical">Critical — System down</SelectItem>
+                              <SelectItem value="low">{t("severity.low")}</SelectItem>
+                              <SelectItem value="normal">{t("severity.normal")}</SelectItem>
+                              <SelectItem value="high">{t("severity.high")}</SelectItem>
+                              <SelectItem value="critical">{t("severity.critical")}</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -688,11 +668,15 @@ export function CreateTicketModal({
                       name="tags"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                            Tags
+                          <FormLabel className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                            {t("tagsLabel")}
                           </FormLabel>
                           <FormControl>
-                            <TagsInput value={field.value} onChange={field.onChange} />
+                            <TagsInput
+                              value={field.value}
+                              onChange={field.onChange}
+                              placeholder={t("tagsPlaceholder")}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -703,27 +687,31 @@ export function CreateTicketModal({
               </div>
             </div>
 
-            {/* ── Footer ── */}
-            <div className="flex items-center justify-between gap-3 px-6 py-4 border-t bg-muted/20">
+            {/* Footer */}
+            <div className="flex items-center justify-between gap-3 border-t bg-muted/20 px-6 py-4">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                onClick={() => { onOpenChange(false); form.reset(); setShowAdvanced(false); }}
+                onClick={() => {
+                  onOpenChange(false);
+                  form.reset();
+                  setShowAdvanced(false);
+                }}
                 disabled={isLoading}
               >
-                Cancel
+                {t("cancelButton")}
               </Button>
-              <Button type="submit" size="sm" disabled={isLoading} className="gap-2 min-w-[130px]">
+              <Button type="submit" size="sm" disabled={isLoading} className="min-w-[130px] gap-2">
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Creating…
+                    {t("creatingButton")}
                   </>
                 ) : (
                   <>
                     <Headphones className="h-4 w-4" />
-                    Open Ticket
+                    {t("openTicketButton")}
                   </>
                 )}
               </Button>

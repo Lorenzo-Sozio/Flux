@@ -2,8 +2,8 @@ import { z } from "zod"
 
 // ─── Entities & Events ────────────────────────────────────────────────────────
 
-export const TARGET_ENTITIES = ["deal", "lead", "contact", "company"] as const
-export const TRIGGER_EVENTS  = ["onCreate", "onUpdate"] as const
+export const TARGET_ENTITIES = ["deal", "lead", "contact", "company", "ticket"] as const
+export const TRIGGER_EVENTS  = ["onCreate", "onUpdate", "onSLABreach"] as const
 
 export type TargetEntity = typeof TARGET_ENTITIES[number]
 export type TriggerEvent  = typeof TRIGGER_EVENTS[number]
@@ -156,7 +156,7 @@ export type AutomationRuleFormData = z.infer<typeof AutomationRuleFormSchema>
 export interface RuleContext {
   entityType:    TargetEntity
   entityId:      string
-  event:         TriggerEvent
+  event:         TriggerEvent | "onSLABreach"
   oldData:       Record<string, unknown>
   newData:       Record<string, unknown>
   currentUserId?: string
@@ -236,6 +236,30 @@ export const ENTITY_FIELDS: Record<TargetEntity, FieldDef[]> = {
     { key: "employeeCount", label: "Employee Count", type: "number" },
     { key: "annualRevenue", label: "Annual Revenue", type: "number" },
     { key: "industry",      label: "Industry",      type: "text" },
+  ],
+  ticket: [
+    { key: "status",   label: "Status",   type: "enum",
+      options: [
+        { value: "new",         label: "New" },
+        { value: "open",        label: "Open" },
+        { value: "in_progress", label: "In Progress" },
+        { value: "waiting",     label: "Waiting" },
+        { value: "on_hold",     label: "On Hold" },
+        { value: "resolved",    label: "Resolved" },
+        { value: "closed",      label: "Closed" },
+      ],
+    },
+    { key: "priority", label: "Priority", type: "enum",
+      options: [
+        { value: "low",    label: "Low" },
+        { value: "normal", label: "Normal" },
+        { value: "high",   label: "High" },
+        { value: "urgent", label: "Urgent" },
+      ],
+    },
+    { key: "severity", label: "Severity", type: "text" },
+    { key: "channel",  label: "Channel",  type: "text" },
+    { key: "subject",  label: "Subject",  type: "text" },
   ],
 }
 

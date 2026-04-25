@@ -234,6 +234,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [macros, setMacros] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [presence, setPresence] = useState<any[]>([]);
 
   // Reply form
   const [replyContent, setReplyContent] = useState("");
@@ -278,17 +279,39 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Presence: announce self as "viewing", poll others every 15s
+  useEffect(() => {
+    const announce = (action: "viewing" | "typing") =>
+      fetch(`/api/tickets/${id}/presence`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }).catch(() => {});
+
+    const poll = () =>
+      fetch(`/api/tickets/${id}/presence`)
+        .then((r) => r.json())
+        .then((data: any[]) => setPresence(data))
+        .catch(() => {});
+
+    announce("viewing");
+    poll();
+    const interval = setInterval(() => { announce("viewing"); poll(); }, 15_000);
+    return () => clearInterval(interval);
+  }, [id]);
+
   const isReplyEmpty = !replyContent.trim() || replyContent === "<p></p>";
 
   const handleSendReply = async () => {
     if (isReplyEmpty) return;
     setSending(true);
     try {
-      await addTicketMessageAction(id, {
+      const result = await addTicketMessageAction(id, {
         content: replyContent,
         channel: ticket?.channel ?? "email",
         isPublic: !isInternal,
       });
+      if (result?.linkedFromClosed) {
+        toast.info(`Ticket chiuso — nuovo ticket ${result.newTicketNumber} creato`);
+        router.push(`/dashboard/support/tickets/${result.newTicketId}`);
+        return;
+      }
       setReplyContent("<p></p>");
       await loadTicket();
     } catch (err: any) {
@@ -499,6 +522,17 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               </CardHeader>
 
               <CardContent className="p-4 flex-1">
+                {/* Presence banner */}
+                {presence.filter((p) => p.action === "typing").length > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-lg px-3 py-2 mb-3">
+                    <span className="flex gap-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </span>
+                    {presence.filter((p) => p.action === "typing").map((p: any) => p.userName).join(", ")} sta scrivendo una risposta…
+                  </div>
+                )}
                 {/* Messages list */}
                 <div className="space-y-4 max-h-[480px] overflow-y-auto pr-1 mb-4">
                   {messages.length === 0 ? (
@@ -546,7 +580,10 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
                   <RichTextEditor
                     value={replyContent}
-                    onChange={setReplyContent}
+                    onChange={(html) => {
+                      setReplyContent(html);
+                      fetch(`/api/tickets/${id}/presence`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "typing" }) }).catch(() => {});
+                    }}
                     placeholder={
                       isInternal
                         ? "Write an internal note (only visible to your team)..."

@@ -1,5 +1,5 @@
 import { db } from "@/db"
-import { tasks, notifications, deals, leads, contacts, companies, emailTemplates } from "@/db/schema"
+import { tasks, notifications, deals, leads, contacts, companies, tickets, emailTemplates } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { runAutomations } from "../../crm/automation/rule-engine"
 import { sendAutomationEmailWithContext } from "../../crm/automation/email-service"
@@ -72,6 +72,7 @@ export class ActionDispatcher {
       lead:    "leadId",
       contact: "contactId",
       company: "companyId",
+      ticket:  "ticketId",
     }
     const entityFk = entityFkMap[context.entityType]
 
@@ -249,6 +250,7 @@ export class ActionDispatcher {
       case "lead":    return leads
       case "contact": return contacts
       case "company": return companies
+      case "ticket":  return tickets
       default:        return null
     }
   }
@@ -259,6 +261,7 @@ export class ActionDispatcher {
       case "lead":    return `/dashboard/leads/${context.entityId}`
       case "contact": return `/dashboard/contacts/${context.entityId}`
       case "company": return `/dashboard/companies/${context.entityId}`
+      case "ticket":  return `/dashboard/support/tickets/${context.entityId}`
       default:        return "/dashboard"
     }
   }

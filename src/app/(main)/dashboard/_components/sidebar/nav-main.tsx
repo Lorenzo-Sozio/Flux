@@ -32,6 +32,7 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarMenuSub,
@@ -64,19 +65,28 @@ const NavItemExpanded = ({
   return (
     <Collapsible key={item.titleKey} asChild defaultOpen={isSubmenuOpen(item.subItems)} className="group/collapsible">
       <SidebarMenuItem>
-        <CollapsibleTrigger asChild>
-          {item.subItems ? (
+        {item.subItems ? (
+          <>
             <SidebarMenuButton
-              disabled={item.comingSoon}
+              asChild
+              aria-disabled={item.comingSoon}
               isActive={isActive(item.url, item.subItems)}
               tooltip={title}
             >
-              {item.icon && <item.icon />}
-              <span>{title}</span>
-              {item.comingSoon && <IsComingSoon />}
-              <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
+              <Link prefetch={false} href={item.url}>
+                {item.icon && <item.icon />}
+                <span>{title}</span>
+                {item.comingSoon && <IsComingSoon />}
+              </Link>
             </SidebarMenuButton>
-          ) : (
+            <CollapsibleTrigger asChild>
+              <SidebarMenuAction className="data-[state=open]:rotate-90">
+                <ChevronRight />
+              </SidebarMenuAction>
+            </CollapsibleTrigger>
+          </>
+        ) : (
+          <CollapsibleTrigger asChild>
             <SidebarMenuButton
               asChild
               aria-disabled={item.comingSoon}
@@ -89,8 +99,8 @@ const NavItemExpanded = ({
                 {item.comingSoon && <IsComingSoon />}
               </Link>
             </SidebarMenuButton>
-          )}
-        </CollapsibleTrigger>
+          </CollapsibleTrigger>
+        )}
         {item.subItems && (
           <CollapsibleContent>
             <SidebarMenuSub>

@@ -12,7 +12,7 @@
 
 import cron, { type ScheduledTask } from 'node-cron'
 import { db } from '@/db'
-import { automationRules, deals, leads, contacts, companies } from '@/db/schema'
+import { automationRules, deals, leads, contacts, companies, tickets } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { runAutomations } from './rule-engine'
 import { TargetEntity } from '../../crm/automation/types'
@@ -132,10 +132,11 @@ class SchedulerService {
     entityType: TargetEntity
   ): Promise<Array<{ id: string; [key: string]: unknown }>> {
     const schemaMap = {
-      deal: deals,
-      lead: leads,
+      deal:    deals,
+      lead:    leads,
       contact: contacts,
       company: companies,
+      ticket:  tickets,
     }
 
     const schema = schemaMap[entityType]

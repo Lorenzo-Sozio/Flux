@@ -247,3 +247,7 @@ export async function deletePipelineStage(id: string) {
   revalidatePath("/dashboard/pipeline");
   revalidatePath("/dashboard/settings/pipeline");
 }
+
+export async function getDealsForSelect() {
+  return db.select({ id: deals.id, name: deals.name }).from(deals).orderBy(deals.name);
+}

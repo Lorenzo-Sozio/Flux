@@ -1,13 +1,5 @@
-import {
-  timestamp,
-  pgTable,
-  text,
-  primaryKey,
-  integer,
-  numeric,
-  boolean,
-} from "drizzle-orm/pg-core"
-import type { AdapterAccountType } from "next-auth/adapters"
+import { boolean, integer, numeric, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import type { AdapterAccountType } from "next-auth/adapters";
 
 export const users = pgTable("user", {
   id: text("id")
@@ -19,28 +11,34 @@ export const users = pgTable("user", {
   image: text("image"),
   password: text("password"),
   role: text("role").default("user").notNull(),
-})
+});
 
 // ─── User Groups ──────────────────────────────────────────────────────────────
 
 export const userGroups = pgTable("user_group", {
-  id:          text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  name:        text("name").notNull(),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
   description: text("description"),
-  color:       text("color").default("#6366f1").notNull(),
-  createdAt:   timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt:   timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-})
+  color: text("color").default("#6366f1").notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
 
 export const userGroupMembers = pgTable(
   "user_group_member",
   {
-    groupId:   text("group_id").notNull().references(() => userGroups.id, { onDelete: "cascade" }),
-    userId:    text("user_id").notNull().references(() => users.id,       { onDelete: "cascade" }),
+    groupId: text("group_id")
+      .notNull()
+      .references(() => userGroups.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (t) => ({ pk: primaryKey({ columns: [t.groupId, t.userId] }) }),
-)
+);
 
 export const accounts = pgTable(
   "account",
@@ -63,8 +61,8 @@ export const accounts = pgTable(
     compoundKey: primaryKey({
       columns: [account.provider, account.providerAccountId],
     }),
-  })
-)
+  }),
+);
 
 export const sessions = pgTable("session", {
   sessionToken: text("sessionToken").primaryKey(),
@@ -72,7 +70,7 @@ export const sessions = pgTable("session", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   expires: timestamp("expires", { mode: "date" }).notNull(),
-})
+});
 
 export const verificationTokens = pgTable(
   "verificationToken",
@@ -83,8 +81,8 @@ export const verificationTokens = pgTable(
   },
   (vt) => ({
     compoundKey: primaryKey({ columns: [vt.identifier, vt.token] }),
-  })
-)
+  }),
+);
 
 // --- CRM CORE ENTITIES ---
 
@@ -110,14 +108,14 @@ export const companies = pgTable("company", {
   status: text("status").default("active").notNull(),
   source: text("source"),
   leadScore: integer("lead_score"),
-  ownerId:  text("owner_id").references(() => users.id,       { onDelete: "set null" }),
-  groupId:  text("group_id").references(() => userGroups.id,  { onDelete: "set null" }),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
   vatNumber: text("vat_number"),
   sdiCode: text("sdi_code"),
   tags: text("tags").array(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-})
+});
 
 export const leads = pgTable("lead", {
   id: text("id")
@@ -142,15 +140,15 @@ export const leads = pgTable("lead", {
   rating: text("rating"), // hot, warm, cold
   leadScore: integer("lead_score"),
   notes: text("notes"),
-  ownerId:  text("owner_id").references(() => users.id,      { onDelete: "set null" }),
-  groupId:  text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
   marketingConsent: boolean("marketing_consent").default(false),
   consentDate: timestamp("consent_date", { mode: "date" }),
   tags: text("tags").array(),
   isConverted: boolean("is_converted").default(false).notNull(), // Added this line
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-})
+});
 
 export const contacts = pgTable("contact", {
   id: text("id")
@@ -174,14 +172,14 @@ export const contacts = pgTable("contact", {
   leadScore: integer("lead_score"),
   notes: text("notes"),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
-  ownerId:   text("owner_id").references(() => users.id,       { onDelete: "set null" }),
-  groupId:   text("group_id").references(() => userGroups.id,  { onDelete: "set null" }),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
   marketingConsent: boolean("marketing_consent").default(false),
   consentDate: timestamp("consent_date", { mode: "date" }),
   tags: text("tags").array(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-})
+});
 
 export const opportunities = pgTable("opportunity", {
   id: text("id")
@@ -197,8 +195,7 @@ export const opportunities = pgTable("opportunity", {
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-})
-
+});
 
 export const products = pgTable("product", {
   id: text("id")
@@ -211,10 +208,12 @@ export const products = pgTable("product", {
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-})
+});
 
 export const orders = pgTable("order", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   orderNumber: text("order_number").notNull().unique(),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
@@ -225,21 +224,29 @@ export const orders = pgTable("order", {
   orderDate: timestamp("order_date", { mode: "date" }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-})
+});
 
 export const orderItems = pgTable("order_item", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  orderId: text("order_id").notNull().references(() => orders.id, { onDelete: "cascade" }),
-  productId: text("product_id").notNull().references(() => products.id, { onDelete: "restrict" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  orderId: text("order_id")
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  productId: text("product_id")
+    .notNull()
+    .references(() => products.id, { onDelete: "restrict" }),
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
   totalPrice: numeric("total_price", { precision: 12, scale: 2 }).notNull(),
-})
+});
 
 import { relations } from "drizzle-orm";
 
 export const pipelineStages = pgTable("pipeline_stage", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   order: integer("order").notNull(),
   color: text("color"),
@@ -249,7 +256,9 @@ export const pipelineStages = pgTable("pipeline_stage", {
 });
 
 export const deals = pgTable("deal", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }),
   currency: text("currency").default("USD").notNull(),
@@ -257,9 +266,9 @@ export const deals = pgTable("deal", {
   expectedCloseDate: timestamp("expected_close_date", { mode: "date" }),
   stageId: text("stage_id").references(() => pipelineStages.id, { onDelete: "restrict" }),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
-  contactId: text("contact_id").references(() => contacts.id,  { onDelete: "set null" }),
-  ownerId:   text("owner_id").references(() => users.id,       { onDelete: "set null" }),
-  groupId:   text("group_id").references(() => userGroups.id,  { onDelete: "set null" }),
+  contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
   status: text("status").default("open").notNull(), // open, won, lost
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -290,13 +299,15 @@ export const dealsRelations = relations(deals, ({ one }) => ({
 }));
 
 export const activities = pgTable("activity", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   type: text("type").notNull(), // note, call, meeting, email
   content: text("content"),
   date: timestamp("date", { mode: "date" }),
-  durationMinutes: integer("duration_minutes"),           // call/meeting duration
-  reminderMinutes: integer("reminder_minutes"),           // minutes before date to remind (null = off)
-  participants: text("participants"),                     // comma-separated names/emails for meetings
+  durationMinutes: integer("duration_minutes"), // call/meeting duration
+  reminderMinutes: integer("reminder_minutes"), // minutes before date to remind (null = off)
+  participants: text("participants"), // comma-separated names/emails for meetings
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
@@ -306,24 +317,78 @@ export const activities = pgTable("activity", {
 });
 
 export const tasks = pgTable("task", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   title: text("title").notNull(),
   description: text("description"),
   dueDate: timestamp("due_date", { mode: "date" }),
-  status: text("status").default("todo").notNull(), // todo, done
-  priority: text("priority").default("normal").notNull(), // low, normal, high
+  startDate: timestamp("start_date", { mode: "date" }),
+  status: text("status").default("todo").notNull(), // todo, in_progress, done
+  priority: text("priority").default("normal").notNull(), // low, normal, high, critical, blocker
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
   completedAt: timestamp("completed_at", { mode: "date" }),
+  parentId: text("parent_id"), // self-reference, set FK via migration
+  depth: integer("depth").default(0).notNull(), // 0=root, 1=subtask, 2=sub-subtask, 3=leaf max
+  progressPct: integer("progress_pct").default(0).notNull(), // 0-100, auto-calculated from children
   leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
   companyId: text("company_id").references(() => companies.id, { onDelete: "cascade" }),
   dealId: text("deal_id").references(() => deals.id, { onDelete: "cascade" }),
+  estimatedHours: numeric("estimated_hours", { precision: 5, scale: 2 }),
+  actualHours: numeric("actual_hours", { precision: 5, scale: 2 }).default("0"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+export const taskTimeLogs = pgTable("task_time_log", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  taskId: text("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  startedAt: timestamp("started_at", { mode: "date" }).notNull(),
+  stoppedAt: timestamp("stopped_at", { mode: "date" }),
+  hours: numeric("hours", { precision: 5, scale: 2 }),
+  note: text("note"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const taskAssignees = pgTable("task_assignee", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  taskId: text("task_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  role: text("role").notNull().default("responsible"), // responsible | accountable | consulted | informed
+});
+
+export const taskDependencies = pgTable("task_dependency", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  predecessorId: text("predecessor_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  successorId: text("successor_id")
+    .notNull()
+    .references(() => tasks.id, { onDelete: "cascade" }),
+  type: text("type").notNull().default("FS"), // FS | SS | FF | SF
+  lagDays: integer("lag_days").default(0).notNull(),
+});
+
 export const emailTemplates = pgTable("email_template", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
   subject: text("subject").notNull(),
@@ -339,7 +404,9 @@ export const emailTemplates = pgTable("email_template", {
 });
 
 export const marketingCampaigns = pgTable("marketing_campaign", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
   status: text("status").default("draft").notNull(), // draft, active, completed
@@ -350,7 +417,9 @@ export const marketingCampaigns = pgTable("marketing_campaign", {
 });
 
 export const campaignLogs = pgTable("campaign_log", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   campaignId: text("campaign_id").references(() => marketingCampaigns.id, { onDelete: "cascade" }),
   leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
@@ -364,7 +433,9 @@ export const campaignLogs = pgTable("campaign_log", {
 
 // --- EMAIL SETTINGS ---
 export const emailSettings = pgTable("email_settings", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   provider: text("provider").notNull().default("resend"), // resend | smtp
   resendApiKey: text("resend_api_key"),
   smtpHost: text("smtp_host"),
@@ -380,7 +451,9 @@ export const emailSettings = pgTable("email_settings", {
 
 // --- EMAIL QUEUE ---
 export const emailJobs = pgTable("email_job", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   campaignId: text("campaign_id").references(() => marketingCampaigns.id, { onDelete: "cascade" }),
   campaignLogId: text("campaign_log_id").references(() => campaignLogs.id, { onDelete: "cascade" }),
   toEmail: text("to_email").notNull(),
@@ -397,7 +470,9 @@ export const emailJobs = pgTable("email_job", {
 
 // --- EMAIL SUPPRESSIONS (unsubscribes + bounces) ---
 export const emailSuppressions = pgTable("email_suppression", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   email: text("email").notNull().unique(),
   reason: text("reason").notNull().default("unsubscribe"), // unsubscribe | bounce_hard | bounce_soft | complaint
   campaignId: text("campaign_id"),
@@ -406,11 +481,15 @@ export const emailSuppressions = pgTable("email_suppression", {
 
 // --- CUSTOM FILTERS ---
 export const customFilters = pgTable("custom_filter", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
   entityType: text("entity_type").notNull(), // leads, contacts, companies, deals, activities, tasks
-  ownerId: text("owner_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  ownerId: text("owner_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
   criteria: text("criteria").notNull(), // JSON stringified array of filter conditions
   isPublic: boolean("is_public").default(false), // true = shared with team
   isPinned: boolean("is_pinned").default(false), // true = shows in quick access
@@ -419,13 +498,19 @@ export const customFilters = pgTable("custom_filter", {
 });
 
 export const customFilterTags = pgTable("custom_filter_tag", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  filterId: text("filter_id").references(() => customFilters.id, { onDelete: "cascade" }).notNull(),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  filterId: text("filter_id")
+    .references(() => customFilters.id, { onDelete: "cascade" })
+    .notNull(),
   tag: text("tag").notNull(), // e.g., "sales", "high-priority", "q2-2026"
 });
 
 export const filterPresets = pgTable("filter_preset", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
   entityType: text("entity_type").notNull(), // leads, contacts, etc.
@@ -442,12 +527,41 @@ export const activitiesRelations = relations(activities, ({ one }) => ({
   deal: one(deals, { fields: [activities.dealId], references: [deals.id] }),
 }));
 
-export const tasksRelations = relations(tasks, ({ one }) => ({
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
   owner: one(users, { fields: [tasks.ownerId], references: [users.id] }),
   lead: one(leads, { fields: [tasks.leadId], references: [leads.id] }),
   contact: one(contacts, { fields: [tasks.contactId], references: [contacts.id] }),
   company: one(companies, { fields: [tasks.companyId], references: [companies.id] }),
   deal: one(deals, { fields: [tasks.dealId], references: [deals.id] }),
+  parent: one(tasks, { fields: [tasks.parentId], references: [tasks.id], relationName: "subtasks" }),
+  subtasks: many(tasks, { relationName: "subtasks" }),
+  assignees: many(taskAssignees),
+  timeLogs: many(taskTimeLogs),
+  predecessorDeps: many(taskDependencies, { relationName: "successors" }),
+  successorDeps: many(taskDependencies, { relationName: "predecessors" }),
+}));
+
+export const taskDependenciesRelations = relations(taskDependencies, ({ one }) => ({
+  predecessor: one(tasks, {
+    fields: [taskDependencies.predecessorId],
+    references: [tasks.id],
+    relationName: "successors",
+  }),
+  successor: one(tasks, {
+    fields: [taskDependencies.successorId],
+    references: [tasks.id],
+    relationName: "predecessors",
+  }),
+}));
+
+export const taskAssigneesRelations = relations(taskAssignees, ({ one }) => ({
+  task: one(tasks, { fields: [taskAssignees.taskId], references: [tasks.id] }),
+  user: one(users, { fields: [taskAssignees.userId], references: [users.id] }),
+}));
+
+export const taskTimeLogsRelations = relations(taskTimeLogs, ({ one }) => ({
+  task: one(tasks, { fields: [taskTimeLogs.taskId], references: [tasks.id] }),
+  user: one(users, { fields: [taskTimeLogs.userId], references: [users.id] }),
 }));
 
 export const emailTemplatesRelations = relations(emailTemplates, ({ one, many }) => ({
@@ -497,12 +611,14 @@ export const passwordResetTokens = pgTable(
     token: text("token").notNull(),
     expires: timestamp("expires", { mode: "date" }).notNull(),
   },
-  (t) => ({ compoundKey: primaryKey({ columns: [t.identifier, t.token] }) })
+  (t) => ({ compoundKey: primaryKey({ columns: [t.identifier, t.token] }) }),
 );
 
 // --- USER INVITATIONS ---
 export const userInvitations = pgTable("user_invitation", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   email: text("email").notNull(),
   token: text("token").notNull().unique(),
   role: text("role").default("user").notNull(), // owner, admin, user, viewer
@@ -514,8 +630,12 @@ export const userInvitations = pgTable("user_invitation", {
 
 // --- IN-APP NOTIFICATIONS ---
 export const notifications = pgTable("notification", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(), // task_due, deal_won, lead_assigned, email_sent, system
   title: text("title").notNull(),
   message: text("message"),
@@ -526,12 +646,14 @@ export const notifications = pgTable("notification", {
 
 // --- CUSTOM FIELD DEFINITIONS ---
 export const customFieldDefinitions = pgTable("custom_field_definition", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(),         // e.g. "LinkedIn URL"
-  slug: text("slug").notNull(),          // e.g. "linkedin_url"
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(), // e.g. "LinkedIn URL"
+  slug: text("slug").notNull(), // e.g. "linkedin_url"
   entityType: text("entity_type").notNull(), // contact, lead, company, deal
-  fieldType: text("field_type").notNull(),   // text, number, date, select, multiselect, boolean, url
-  options: text("options"),              // JSON array for select/multiselect options
+  fieldType: text("field_type").notNull(), // text, number, date, select, multiselect, boolean, url
+  options: text("options"), // JSON array for select/multiselect options
   isRequired: boolean("is_required").default(false).notNull(),
   order: integer("order").default(0).notNull(),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
@@ -541,23 +663,29 @@ export const customFieldDefinitions = pgTable("custom_field_definition", {
 
 // --- CUSTOM FIELD VALUES ---
 export const customFieldValues = pgTable("custom_field_value", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  fieldId: text("field_id").notNull().references(() => customFieldDefinitions.id, { onDelete: "cascade" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  fieldId: text("field_id")
+    .notNull()
+    .references(() => customFieldDefinitions.id, { onDelete: "cascade" }),
   entityType: text("entity_type").notNull(), // contact, lead, company, deal
   entityId: text("entity_id").notNull(),
-  value: text("value"),                       // stored as text, cast on read based on fieldType
+  value: text("value"), // stored as text, cast on read based on fieldType
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 // --- DOCUMENTS / ATTACHMENTS ---
 export const documents = pgTable("document", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
-  url: text("url").notNull(),             // S3/Uploadthing URL
+  url: text("url").notNull(), // S3/Uploadthing URL
   mimeType: text("mime_type"),
-  size: integer("size"),                  // bytes
+  size: integer("size"), // bytes
   version: integer("version").default(1).notNull(),
-  entityType: text("entity_type"),        // contact, deal, lead, company, quote
+  entityType: text("entity_type"), // contact, deal, lead, company, quote
   entityId: text("entity_id"),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -565,10 +693,16 @@ export const documents = pgTable("document", {
 
 // --- QUOTES & PROPOSALS ---
 export const quotes = pgTable("quote", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   quoteNumber: text("quote_number").notNull().unique(),
-  dealId: text("deal_id").notNull().references(() => deals.id, { onDelete: "cascade" }),
-  companyId: text("company_id").notNull().references(() => companies.id, { onDelete: "cascade" }),
+  dealId: text("deal_id")
+    .notNull()
+    .references(() => deals.id, { onDelete: "cascade" }),
+  companyId: text("company_id")
+    .notNull()
+    .references(() => companies.id, { onDelete: "cascade" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   status: text("status").default("draft").notNull(), // draft, sent, viewed, accepted, declined, expired, converted
@@ -588,14 +722,20 @@ export const quotes = pgTable("quote", {
   declineReason: text("decline_reason"),
   version: integer("version").default(1).notNull(),
   notes: text("notes"),
-  publicToken: text("public_token").unique().$defaultFn(() => crypto.randomUUID()),
+  publicToken: text("public_token")
+    .unique()
+    .$defaultFn(() => crypto.randomUUID()),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 export const quoteItems = pgTable("quote_item", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  quoteId: text("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  quoteId: text("quote_id")
+    .notNull()
+    .references(() => quotes.id, { onDelete: "cascade" }),
   productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
   description: text("description"),
   quantity: integer("quantity").notNull(),
@@ -608,8 +748,12 @@ export const quoteItems = pgTable("quote_item", {
 });
 
 export const quoteActivities = pgTable("quote_activity", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  quoteId: text("quote_id").notNull().references(() => quotes.id, { onDelete: "cascade" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  quoteId: text("quote_id")
+    .notNull()
+    .references(() => quotes.id, { onDelete: "cascade" }),
   type: text("type").notNull(), // sent, viewed, opened_email, clicked_email, accepted, declined, reminded, created, updated
   userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   email: text("email"),
@@ -620,7 +764,9 @@ export const quoteActivities = pgTable("quote_activity", {
 
 // --- SUPPORT TICKETS & CASES (Omnichannel) ---
 export const tickets = pgTable("ticket", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   ticketNumber: text("ticket_number").notNull().unique(),
   subject: text("subject").notNull(),
   description: text("description"),
@@ -651,8 +797,12 @@ export const tickets = pgTable("ticket", {
 });
 
 export const ticketMessages = pgTable("ticket_message", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  ticketId: text("ticket_id").notNull().references(() => tickets.id, { onDelete: "cascade" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  ticketId: text("ticket_id")
+    .notNull()
+    .references(() => tickets.id, { onDelete: "cascade" }),
   senderId: text("sender_id").references(() => users.id, { onDelete: "set null" }),
   senderEmail: text("sender_email"),
   senderName: text("sender_name"),
@@ -666,7 +816,9 @@ export const ticketMessages = pgTable("ticket_message", {
 });
 
 export const slas = pgTable("sla", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
   priority: text("priority").notNull(), // low, normal, high, urgent
@@ -677,7 +829,9 @@ export const slas = pgTable("sla", {
 });
 
 export const chatChannels = pgTable("chat_channel", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   type: text("type").notNull(), // live_chat, whatsapp, telegram, slack
   isActive: boolean("is_active").default(true).notNull(),
@@ -686,7 +840,9 @@ export const chatChannels = pgTable("chat_channel", {
 });
 
 export const chatSessions = pgTable("chat_session", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   ticketId: text("ticket_id").references(() => tickets.id, { onDelete: "cascade" }),
   channelId: text("channel_id").references(() => chatChannels.id),
   visitorId: text("visitor_id"),
@@ -700,8 +856,12 @@ export const chatSessions = pgTable("chat_session", {
 });
 
 export const ticketAuditLogs = pgTable("ticket_audit_log", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  ticketId: text("ticket_id").notNull().references(() => tickets.id, { onDelete: "cascade" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  ticketId: text("ticket_id")
+    .notNull()
+    .references(() => tickets.id, { onDelete: "cascade" }),
   actorId: text("actor_id").references(() => users.id),
   actorName: text("actor_name"),
   action: text("action").notNull(), // status_changed | priority_changed | assigned | message_added | created | field_changed
@@ -712,7 +872,9 @@ export const ticketAuditLogs = pgTable("ticket_audit_log", {
 });
 
 export const ticketMacros = pgTable("ticket_macro", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
   body: text("body").notNull(),
@@ -724,11 +886,13 @@ export const ticketMacros = pgTable("ticket_macro", {
 
 // --- WEBHOOKS ---
 export const webhooks = pgTable("webhook", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   url: text("url").notNull(),
   events: text("events").array().notNull(), // ["contact.created", "deal.won", ...]
-  secret: text("secret"),                   // for HMAC signature verification
+  secret: text("secret"), // for HMAC signature verification
   isActive: boolean("is_active").default(true).notNull(),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -736,10 +900,14 @@ export const webhooks = pgTable("webhook", {
 });
 
 export const webhookLogs = pgTable("webhook_log", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  webhookId: text("webhook_id").notNull().references(() => webhooks.id, { onDelete: "cascade" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  webhookId: text("webhook_id")
+    .notNull()
+    .references(() => webhooks.id, { onDelete: "cascade" }),
   event: text("event").notNull(),
-  payload: text("payload"),               // JSON
+  payload: text("payload"), // JSON
   statusCode: integer("status_code"),
   response: text("response"),
   sentAt: timestamp("sent_at", { mode: "date" }).defaultNow().notNull(),
@@ -834,7 +1002,9 @@ export const chatSessionsRelations = relations(chatSessions, ({ one }) => ({
 
 // --- AUTOMATION RULES ---
 export const automationRules = pgTable("automation_rule", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
   isActive: boolean("is_active").default(true).notNull(),
@@ -844,18 +1014,22 @@ export const automationRules = pgTable("automation_rule", {
   conditions: text("conditions").notNull(), // JSON: Condition[]
   // NEW: Espressione logica avanzata (es: "(C0 OR C1) AND C2")
   conditionExpression: text("condition_expression"), // Advanced logic with parentheses
-  actions: text("actions").notNull(),       // JSON: AutomationAction[]
+  actions: text("actions").notNull(), // JSON: AutomationAction[]
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 export const automationLogs = pgTable("automation_log", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  ruleId: text("rule_id").notNull().references(() => automationRules.id, { onDelete: "cascade" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  ruleId: text("rule_id")
+    .notNull()
+    .references(() => automationRules.id, { onDelete: "cascade" }),
   entityType: text("entity_type").notNull(),
   entityId: text("entity_id").notNull(),
-  event: text("event").notNull(), // "onCreate" | "onUpdate"
+  event: text("event").notNull(), // "onCreate" | "onUpdate" | "onSLABreach"
   success: boolean("success").notNull(),
   actionsExecuted: integer("actions_executed").default(0).notNull(),
   errorMessage: text("error_message"),
@@ -868,12 +1042,14 @@ export const automationLogs = pgTable("automation_log", {
 
 // --- USER ACTIVITY LOG (audit trail for reports) ---
 export const userActivityLogs = pgTable("user_activity_log", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   userId: text("user_id").references(() => users.id, { onDelete: "cascade" }),
   action: text("action").notNull(), // e.g. "login", "create_deal", "complete_task", "send_campaign"
-  entityType: text("entity_type"),  // "deal" | "contact" | "lead" | "task" | "quote" | "ticket" | "campaign"
+  entityType: text("entity_type"), // "deal" | "contact" | "lead" | "task" | "quote" | "ticket" | "campaign"
   entityId: text("entity_id"),
-  metadata: text("metadata"),       // JSON string for extra context
+  metadata: text("metadata"), // JSON string for extra context
   ipAddress: text("ip_address"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -899,49 +1075,64 @@ export const userGroupsRelations = relations(userGroups, ({ many }) => ({
 
 export const userGroupMembersRelations = relations(userGroupMembers, ({ one }) => ({
   group: one(userGroups, { fields: [userGroupMembers.groupId], references: [userGroups.id] }),
-  user:  one(users,      { fields: [userGroupMembers.userId],  references: [users.id]       }),
+  user: one(users, { fields: [userGroupMembers.userId], references: [users.id] }),
 }));
 
 // ─── Internal DM / Group Chat ─────────────────────────────────────────────────
 
 export const dmConversations = pgTable("dm_conversation", {
-  id:        text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  type:      text("type").notNull(), // "direct" | "group"
-  name:      text("name"),          // only for group conversations
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  type: text("type").notNull(), // "direct" | "group"
+  name: text("name"), // only for group conversations
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 export const dmConversationMembers = pgTable("dm_conversation_member", {
-  id:             text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  conversationId: text("conversation_id").notNull().references(() => dmConversations.id, { onDelete: "cascade" }),
-  userId:         text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  lastReadAt:     timestamp("last_read_at",  { mode: "date" }),
-  mutedUntil:     timestamp("muted_until",   { mode: "date" }), // null = not muted
-  joinedAt:       timestamp("joined_at",     { mode: "date" }).defaultNow().notNull(),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  conversationId: text("conversation_id")
+    .notNull()
+    .references(() => dmConversations.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  lastReadAt: timestamp("last_read_at", { mode: "date" }),
+  mutedUntil: timestamp("muted_until", { mode: "date" }), // null = not muted
+  joinedAt: timestamp("joined_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 export const dmMessages = pgTable("dm_message", {
-  id:             text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  conversationId: text("conversation_id").notNull().references(() => dmConversations.id, { onDelete: "cascade" }),
-  senderId:       text("sender_id").references(() => users.id, { onDelete: "set null" }),
-  content:        text("content").notNull(),
-  createdAt:      timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  conversationId: text("conversation_id")
+    .notNull()
+    .references(() => dmConversations.id, { onDelete: "cascade" }),
+  senderId: text("sender_id").references(() => users.id, { onDelete: "set null" }),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 // ─── DM relations ─────────────────────────────────────────────────────────────
 
 export const dmConversationsRelations = relations(dmConversations, ({ many }) => ({
-  members:  many(dmConversationMembers),
+  members: many(dmConversationMembers),
   messages: many(dmMessages),
 }));
 
 export const dmConversationMembersRelations = relations(dmConversationMembers, ({ one }) => ({
-  conversation: one(dmConversations, { fields: [dmConversationMembers.conversationId], references: [dmConversations.id] }),
-  user:         one(users,           { fields: [dmConversationMembers.userId],         references: [users.id]           }),
+  conversation: one(dmConversations, {
+    fields: [dmConversationMembers.conversationId],
+    references: [dmConversations.id],
+  }),
+  user: one(users, { fields: [dmConversationMembers.userId], references: [users.id] }),
 }));
 
 export const dmMessagesRelations = relations(dmMessages, ({ one }) => ({
   conversation: one(dmConversations, { fields: [dmMessages.conversationId], references: [dmConversations.id] }),
-  sender:       one(users,           { fields: [dmMessages.senderId],       references: [users.id]           }),
+  sender: one(users, { fields: [dmMessages.senderId], references: [users.id] }),
 }));
