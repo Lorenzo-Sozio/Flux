@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { and, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -10,7 +12,10 @@ import { taskAssignees, taskDependencies, tasks, users } from "@/db/schema";
 export type WorkloadTaskEntry = {
   id: string;
   title: string;
-  hours: number;
+  hours: number;        // per-day allocation within the view window
+  estimatedHours: number;
+  startDate: string | null;
+  dueDate: string;
 };
 
 export type WorkloadCell = {
@@ -56,6 +61,7 @@ export async function getWorkloadMatrix(startDate: Date, endDate: Date): Promise
       dueDate: tasks.dueDate,
       estimatedHours: tasks.estimatedHours,
       assigneeId: tasks.assigneeId,
+      parentId: tasks.parentId,
     })
     .from(tasks)
     // overlap: task overlaps [startDate, endDate] iff dueDate >= startDate AND (startDate IS NULL OR startDate <= endDate)
@@ -103,29 +109,43 @@ export async function getWorkloadMatrix(startDate: Date, endDate: Date): Promise
     }
   }
 
+  // Tasks whose ID appears as parentId of another task are "containers" — skip them
+  // to avoid double-counting (their work is represented by their subtasks)
+  const parentTaskIds = new Set(taskList.map((t) => t.parentId).filter(Boolean));
+
   for (const task of taskList) {
-    const estH = task.estimatedHours ? parseFloat(task.estimatedHours) : 0;
-    if (estH <= 0) continue;
+    if (parentTaskIds.has(task.id)) continue;
+    const estH = task.estimatedHours ? parseFloat(task.estimatedHours) : 1; // default 1h when no estimate
 
     // biome-ignore lint/style/noNonNullAssertion: filtered by isNotNull above
     const end = new Date(task.dueDate!);
-    const start = task.startDate ? new Date(task.startDate) : new Date(end.getTime() - 86400000);
+    const start = task.startDate ? new Date(task.startDate) : new Date(startDate);
     const allDayStrs = new Set(allDays.map(toDateStr));
-    const workDays = getWorkingDays(start, end).filter((d) => allDayStrs.has(toDateStr(d)));
-    if (workDays.length === 0) continue;
+    const totalWorkDays = getWorkingDays(start, end);
+    const visibleWorkDays = totalWorkDays.filter((d) => allDayStrs.has(toDateStr(d)));
+    if (visibleWorkDays.length === 0) continue;
 
-    const hoursPerDay = estH / workDays.length;
+    // divide by TOTAL span so partially-visible tasks don't inflate the daily rate
+    const hoursPerDay = estH / totalWorkDays.length;
     const assignedUsers = new Set<string>();
     if (task.assigneeId) assignedUsers.add(task.assigneeId);
     for (const uid of raciByTask[task.id] ?? []) assignedUsers.add(uid);
 
     for (const uid of assignedUsers) {
       if (!matrix[uid]) continue;
-      for (const d of workDays) {
+      for (const d of visibleWorkDays) {
         const ds = toDateStr(d);
         if (!matrix[uid][ds]) continue;
         matrix[uid][ds].hours = Math.round((matrix[uid][ds].hours + hoursPerDay) * 100) / 100;
-        matrix[uid][ds].tasks.push({ id: task.id, title: task.title, hours: Math.round(hoursPerDay * 100) / 100 });
+        matrix[uid][ds].tasks.push({
+          id: task.id,
+          title: task.title,
+          hours: Math.round(hoursPerDay * 100) / 100,
+          estimatedHours: estH,
+          startDate: task.startDate ? toDateStr(new Date(task.startDate)) : null,
+          // biome-ignore lint/style/noNonNullAssertion: filtered above
+          dueDate: toDateStr(new Date(task.dueDate!)),
+        });
       }
     }
   }
@@ -157,6 +177,22 @@ export async function getWorkloadConflicts(startDate: Date, endDate: Date): Prom
     }
   }
   return conflicts.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export async function rescheduleTaskDueDate(
+  taskId: string,
+  newDueDate: Date,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { requireWriteAccess } = await import("@/lib/auth-guard");
+    await requireWriteAccess();
+    await db.update(tasks).set({ dueDate: newDueDate }).where(eq(tasks.id, taskId));
+    revalidatePath("/dashboard/tasks/workload");
+    revalidatePath("/dashboard/tasks");
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Errore sconosciuto" };
+  }
 }
 
 export async function autoScheduleChain(rootTaskId: string): Promise<{ rescheduled: string[]; conflicts: string[] }> {

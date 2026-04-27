@@ -1,36 +1,39 @@
 "use server";
 
-import { auth } from "@/auth";
-import { db } from "@/db";
-import {
-  tickets,
-  ticketMessages,
-  ticketAuditLogs,
-  ticketMacros,
-  slas,
-  chatChannels,
-  chatSessions,
-  users,
-  contacts,
-} from "@/db/schema";
-import { eq, desc, and, lt } from "drizzle-orm";
-import { z } from "zod";
-import crypto from "crypto";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { runAutomations } from "@/components/crm/automation/rule-engine";
+
+import { and, desc, eq, isNotNull, lt, notInArray } from "drizzle-orm";
+import type { z } from "zod";
+
 import {
-  CreateTicketSchema,
-  UpdateTicketSchema,
   AddMessageSchema,
-  CreateSLASchema,
-  UpdateSLASchema,
   CreateMacroSchema,
+  CreateSLASchema,
+  CreateTicketSchema,
   UpdateMacroSchema,
+  UpdateSLASchema,
+  UpdateTicketSchema,
 } from "@/actions/support-validation";
-import { canTransition, isSLAPauseStatus } from "@/lib/ticket-state-machine";
-import { logTicketChange } from "@/lib/ticket-audit";
+import { auth } from "@/auth";
+import { runAutomations } from "@/components/crm/automation/rule-engine";
+import { db } from "@/db";
+import {
+  chatChannels,
+  chatSessions,
+  contacts,
+  slas,
+  ticketAuditLogs,
+  ticketMacros,
+  ticketMessages,
+  tickets,
+  users,
+} from "@/db/schema";
 import { sendEmail } from "@/lib/email-provider";
+import { logTicketChange } from "@/lib/ticket-audit";
+import { canTransition, isSLAPauseStatus } from "@/lib/ticket-state-machine";
+
+import crypto from "node:crypto";
 
 // --- HELPERS ---
 
@@ -98,14 +101,16 @@ export async function createTicketAction(data: z.infer<typeof CreateTicketSchema
   revalidatePath("/dashboard/support/tickets");
   revalidatePath("/dashboard/support");
 
-  after(() => runAutomations({
-    entityType: "ticket",
-    entityId:   ticket.id,
-    event:      "onCreate",
-    oldData:    {},
-    newData:    ticket as Record<string, unknown>,
-    currentUserId: session.user.id,
-  }));
+  after(() =>
+    runAutomations({
+      entityType: "ticket",
+      entityId: ticket.id,
+      event: "onCreate",
+      oldData: {},
+      newData: ticket as Record<string, unknown>,
+      currentUserId: session.user.id,
+    }),
+  );
 
   return { success: true, ticketId: ticket.id, ticketNumber };
 }
@@ -185,10 +190,7 @@ export async function getTicketsByStatus(status: string) {
   return ticketList;
 }
 
-export async function updateTicketAction(
-  ticketId: string,
-  data: z.infer<typeof UpdateTicketSchema>
-) {
+export async function updateTicketAction(ticketId: string, data: z.infer<typeof UpdateTicketSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -199,11 +201,7 @@ export async function updateTicketAction(
 
   if (!ticket) throw new Error("Ticket not found");
 
-  if (
-    session.user.id !== ticket.ownerId &&
-    session.user.id !== ticket.assigneeId &&
-    session.user.role !== "admin"
-  ) {
+  if (session.user.id !== ticket.ownerId && session.user.id !== ticket.assigneeId && session.user.role !== "admin") {
     throw new Error("Unauthorized");
   }
 
@@ -245,56 +243,69 @@ export async function updateTicketAction(
   }
   if (validated.tags) updateData.tags = validated.tags;
 
-  const [updated] = await db
-    .update(tickets)
-    .set(updateData)
-    .where(eq(tickets.id, ticketId))
-    .returning();
+  const [updated] = await db.update(tickets).set(updateData).where(eq(tickets.id, ticketId)).returning();
 
   // Audit log changed fields
   const auditPromises: Promise<void>[] = [];
   if (validated.status && validated.status !== ticket.status) {
-    auditPromises.push(logTicketChange({
-      ticketId, actorId: session.user.id, actorName,
-      action: "status_changed", field: "status",
-      oldValue: ticket.status, newValue: validated.status,
-    }));
+    auditPromises.push(
+      logTicketChange({
+        ticketId,
+        actorId: session.user.id,
+        actorName,
+        action: "status_changed",
+        field: "status",
+        oldValue: ticket.status,
+        newValue: validated.status,
+      }),
+    );
   }
   if (validated.priority && validated.priority !== ticket.priority) {
-    auditPromises.push(logTicketChange({
-      ticketId, actorId: session.user.id, actorName,
-      action: "priority_changed", field: "priority",
-      oldValue: ticket.priority, newValue: validated.priority,
-    }));
+    auditPromises.push(
+      logTicketChange({
+        ticketId,
+        actorId: session.user.id,
+        actorName,
+        action: "priority_changed",
+        field: "priority",
+        oldValue: ticket.priority,
+        newValue: validated.priority,
+      }),
+    );
   }
   if (validated.assigneeId !== undefined && validated.assigneeId !== ticket.assigneeId) {
-    auditPromises.push(logTicketChange({
-      ticketId, actorId: session.user.id, actorName,
-      action: "assigned", field: "assigneeId",
-      oldValue: ticket.assigneeId ?? undefined, newValue: validated.assigneeId ?? undefined,
-    }));
+    auditPromises.push(
+      logTicketChange({
+        ticketId,
+        actorId: session.user.id,
+        actorName,
+        action: "assigned",
+        field: "assigneeId",
+        oldValue: ticket.assigneeId ?? undefined,
+        newValue: validated.assigneeId ?? undefined,
+      }),
+    );
   }
   await Promise.all(auditPromises);
 
   revalidatePath("/dashboard/support/tickets");
   revalidatePath(`/dashboard/support/tickets/${ticketId}`);
 
-  after(() => runAutomations({
-    entityType: "ticket",
-    entityId:   ticketId,
-    event:      "onUpdate",
-    oldData:    ticket as Record<string, unknown>,
-    newData:    updated as Record<string, unknown>,
-    currentUserId: session.user.id,
-  }));
+  after(() =>
+    runAutomations({
+      entityType: "ticket",
+      entityId: ticketId,
+      event: "onUpdate",
+      oldData: ticket as Record<string, unknown>,
+      newData: updated as Record<string, unknown>,
+      currentUserId: session.user.id,
+    }),
+  );
 
   return { success: true, ticket: updated };
 }
 
-export async function addTicketMessageAction(
-  ticketId: string,
-  data: z.infer<typeof AddMessageSchema>
-) {
+export async function addTicketMessageAction(ticketId: string, data: z.infer<typeof AddMessageSchema>) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -305,32 +316,31 @@ export async function addTicketMessageAction(
 
   if (!ticket) throw new Error("Ticket not found");
 
-  if (
-    session.user.id !== ticket.ownerId &&
-    session.user.id !== ticket.assigneeId &&
-    session.user.role !== "admin"
-  ) {
+  if (session.user.id !== ticket.ownerId && session.user.id !== ticket.assigneeId && session.user.role !== "admin") {
     throw new Error("Unauthorized");
   }
 
   // Reply to closed ticket → open new linked ticket instead
   if (ticket.status === "closed") {
     const newNumber = generateTicketNumber();
-    const [newTicket] = await db.insert(tickets).values({
-      ticketNumber: newNumber,
-      subject: `Re: ${ticket.subject}`,
-      description: validated.content,
-      channel: ticket.channel,
-      priority: ticket.priority,
-      severity: ticket.severity,
-      status: "open",
-      type: ticket.type,
-      contactId: ticket.contactId,
-      companyId: ticket.companyId,
-      assigneeId: ticket.assigneeId,
-      ownerId: session.user.id,
-      parentTicketId: ticket.id,
-    }).returning();
+    const [newTicket] = await db
+      .insert(tickets)
+      .values({
+        ticketNumber: newNumber,
+        subject: `Re: ${ticket.subject}`,
+        description: validated.content,
+        channel: ticket.channel,
+        priority: ticket.priority,
+        severity: ticket.severity,
+        status: "open",
+        type: ticket.type,
+        contactId: ticket.contactId,
+        companyId: ticket.companyId,
+        assigneeId: ticket.assigneeId,
+        ownerId: session.user.id,
+        parentTicketId: ticket.id,
+      })
+      .returning();
 
     await logTicketChange({
       ticketId: newTicket.id,
@@ -341,7 +351,24 @@ export async function addTicketMessageAction(
     });
 
     revalidatePath("/dashboard/support/tickets");
-    return { success: true, newTicketId: newTicket.id, newTicketNumber: newNumber, linkedFromClosed: true, message: null };
+    return {
+      success: true,
+      newTicketId: newTicket.id,
+      newTicketNumber: newNumber,
+      linkedFromClosed: true,
+      message: null,
+    };
+  }
+
+  // Pre-query email threading chain (only when this will be a public outbound reply)
+  let threadMsgIds: string[] = [];
+  if (validated.isPublic && ticket.contactId) {
+    const rows = await db
+      .select({ emailMessageId: ticketMessages.emailMessageId })
+      .from(ticketMessages)
+      .where(and(eq(ticketMessages.ticketId, ticketId), isNotNull(ticketMessages.emailMessageId)))
+      .orderBy(ticketMessages.createdAt);
+    threadMsgIds = rows.map((r) => r.emailMessageId as string);
   }
 
   const [message] = await db
@@ -354,6 +381,7 @@ export async function addTicketMessageAction(
       isPublic: validated.isPublic,
       senderEmail: validated.senderEmail,
       senderName: validated.senderName,
+      emailInReplyTo: threadMsgIds.at(-1) ?? null,
     })
     .returning();
 
@@ -373,7 +401,7 @@ export async function addTicketMessageAction(
   });
 
   // Send outbound email to customer for public replies (fire-and-forget)
-  // Store returned Message-ID for email threading
+  // Includes In-Reply-To + References for native email client thread grouping
   if (validated.isPublic && ticket.contactId) {
     after(async () => {
       const contact = await db.query.contacts.findFirst({
@@ -397,18 +425,20 @@ export async function addTicketMessageAction(
             </p>
           </div>
         `,
+        inReplyTo: threadMsgIds.at(-1),
+        references: threadMsgIds.length > 0 ? threadMsgIds.join(" ") : undefined,
       }).catch((err) => {
         console.error("[support] outbound email error:", err);
         return null;
       });
 
-      // Store the provider's Message-ID for email threading
+      // Store the provider's Message-ID for future replies to thread against
       if (result?.success && result.messageId) {
         await db
           .update(ticketMessages)
           .set({ emailMessageId: result.messageId })
           .where(eq(ticketMessages.id, message.id))
-          .catch(() => {});
+          .catch(console.error);
       }
     });
   }
@@ -477,11 +507,7 @@ export async function getChatChannels() {
   });
 }
 
-export async function createChatChannelAction(
-  name: string,
-  type: string,
-  config?: Record<string, unknown>
-) {
+export async function createChatChannelAction(name: string, type: string, config?: Record<string, unknown>) {
   const session = await auth();
   if (session?.user?.role !== "admin") throw new Error("Only admins can create chat channels");
 
@@ -495,11 +521,7 @@ export async function createChatChannelAction(
 
 // --- CHAT SESSIONS ---
 
-export async function startChatSessionAction(
-  channelId: string,
-  visitorEmail?: string,
-  visitorName?: string
-) {
+export async function startChatSessionAction(channelId: string, visitorEmail?: string, visitorName?: string) {
   const [chatSession] = await db
     .insert(chatSessions)
     .values({ channelId, visitorEmail, visitorName, status: "active" })
@@ -508,11 +530,7 @@ export async function startChatSessionAction(
   return { success: true, session: chatSession };
 }
 
-export async function assignChatSessionAction(
-  sessionId: string,
-  agentId: string,
-  ticketId?: string
-) {
+export async function assignChatSessionAction(sessionId: string, agentId: string, ticketId?: string) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -569,11 +587,7 @@ export async function reassignTicketAction(ticketId: string, assigneeId: string 
   const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
   if (!ticket) throw new Error("Ticket not found");
 
-  if (
-    session.user.id !== ticket.ownerId &&
-    session.user.id !== ticket.assigneeId &&
-    session.user.role !== "admin"
-  ) {
+  if (session.user.id !== ticket.ownerId && session.user.id !== ticket.assigneeId && session.user.role !== "admin") {
     throw new Error("Unauthorized");
   }
 
@@ -611,11 +625,7 @@ export async function escalateTicketAction(ticketId: string) {
   const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
   if (!ticket) throw new Error("Ticket not found");
 
-  if (
-    session.user.id !== ticket.ownerId &&
-    session.user.id !== ticket.assigneeId &&
-    session.user.role !== "admin"
-  ) {
+  if (session.user.id !== ticket.ownerId && session.user.id !== ticket.assigneeId && session.user.role !== "admin") {
     throw new Error("Unauthorized");
   }
 
@@ -672,11 +682,7 @@ export async function updateTicketStatusAction(ticketId: string, status: string)
     updateData.slaPausedAt = null;
   }
 
-  const [updated] = await db
-    .update(tickets)
-    .set(updateData)
-    .where(eq(tickets.id, ticketId))
-    .returning();
+  const [updated] = await db.update(tickets).set(updateData).where(eq(tickets.id, ticketId)).returning();
 
   await logTicketChange({
     ticketId,
@@ -742,6 +748,16 @@ export async function deleteMacroAction(macroId: string) {
 
   revalidatePath("/dashboard/settings/macros");
   return { success: true };
+}
+
+// --- SELECT HELPERS ---
+
+export async function getTicketsForSelect() {
+  return db
+    .select({ id: tickets.id, ticketNumber: tickets.ticketNumber, subject: tickets.subject })
+    .from(tickets)
+    .where(notInArray(tickets.status, ["closed", "resolved"]))
+    .orderBy(desc(tickets.createdAt));
 }
 
 // --- CRON HELPERS ---

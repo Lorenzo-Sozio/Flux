@@ -70,11 +70,8 @@ export default auth((req) => {
     // ── Role-based access control ───────────────────────────────────────────
     const role = (session?.user as any)?.role ?? "viewer";
 
-    // Users and Roles management → admin/owner only
-    if (
-      pathname.startsWith("/dashboard/users") ||
-      pathname.startsWith("/dashboard/roles")
-    ) {
+    // Users management → admin/owner only
+    if (pathname.startsWith("/dashboard/users")) {
       if (!["admin", "owner"].includes(role)) {
         return Response.redirect(new URL("/unauthorized", nextUrl));
       }

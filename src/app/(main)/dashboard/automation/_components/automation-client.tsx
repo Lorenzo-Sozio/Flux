@@ -1,12 +1,15 @@
 "use client";
 
 import { useTransition } from "react";
+
 import { useRouter } from "next/navigation";
-import { Zap, Plus, Trash2, Pencil, Eye, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+
+import { Clock, Pencil, Plus, Trash2, Zap } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
+
+import { deleteAutomationRule, toggleAutomationRuleActive } from "@/actions/automation";
+import { RuleModal } from "@/components/crm/automation/rule-builder";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,15 +21,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import { RuleModal } from "@/components/crm/automation/rule-builder";
-import { useTranslations } from "next-intl";
-import { deleteAutomationRule, toggleAutomationRuleActive } from "@/actions/automation";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 type Rule = {
@@ -48,8 +46,8 @@ interface Props {
 }
 
 const ENTITY_COLORS: Record<string, string> = {
-  deal:    "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  lead:    "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+  deal: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  lead: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
   contact: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
   company: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
 };
@@ -76,7 +74,6 @@ function getScheduledTrigger(triggerOn: string[] | null): string | null {
   return scheduledTrigger.substring("scheduled:".length);
 }
 
-
 export function AutomationClient({ rules, canEdit }: Props) {
   const t = useTranslations("automation");
   const router = useRouter();
@@ -94,7 +91,7 @@ export function AutomationClient({ rules, canEdit }: Props) {
     }
     if (dayOfMonth === "*" && dayOfWeek !== "*") {
       const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const dayNum = parseInt(dayOfWeek);
+      const dayNum = parseInt(dayOfWeek, 10);
       return t("cron.weekly", { day: days[dayNum] ?? "??", hour, minute: minute.padStart(2, "0") });
     }
     if (hour === "*/6") return t("cron.every6h");
@@ -133,19 +130,16 @@ export function AutomationClient({ rules, canEdit }: Props) {
 
   return (
     <div className="space-y-5">
-
       {/* ── Page Header ───────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2.5">
+          <h1 className="flex items-center gap-2.5 font-bold text-2xl">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
               <Zap className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
             </span>
             {t("title")}
           </h1>
-          <p className="text-muted-foreground text-sm mt-1.5">
-            {t("subtitle")}
-          </p>
+          <p className="mt-1.5 text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
         {canEdit && (
           <RuleModal onSaved={() => router.refresh()}>
@@ -158,14 +152,12 @@ export function AutomationClient({ rules, canEdit }: Props) {
 
       {/* ── Empty State ───────────────────────────────────────────────── */}
       {rules.length === 0 ? (
-        <div className="border-2 border-dashed rounded-xl p-16 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted mx-auto mb-4">
+        <div className="rounded-xl border-2 border-dashed p-16 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-muted">
             <Zap className="h-7 w-7 text-muted-foreground" />
           </div>
           <p className="font-semibold">{t("emptyTitle")}</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t("emptyDesc")}
-          </p>
+          <p className="mt-1 text-muted-foreground text-sm">{t("emptyDesc")}</p>
           {canEdit && (
             <RuleModal onSaved={() => router.refresh()}>
               <Button className="mt-5 gap-2">
@@ -175,32 +167,33 @@ export function AutomationClient({ rules, canEdit }: Props) {
           )}
         </div>
       ) : (
-
         /* ── Rule List ────────────────────────────────────────────────── */
-        <div className="rounded-xl border overflow-hidden">
+        <div className="overflow-hidden rounded-xl border">
           {rules.map((rule, i) => {
             const entityColor = ENTITY_COLORS[rule.targetEntity];
             const entityLabel = t(`entities.${rule.targetEntity as "deal" | "lead" | "contact" | "company"}`);
             return (
               <div
                 key={rule.id}
-                className={`flex items-center gap-4 px-5 py-4 bg-card hover:bg-muted/30 transition-colors ${
+                className={`flex items-center gap-4 bg-card px-5 py-4 transition-colors hover:bg-muted/30 ${
                   i < rules.length - 1 ? "border-b" : ""
                 }`}
               >
                 {/* Status dot */}
-                <div className={`h-2.5 w-2.5 rounded-full flex-shrink-0 ring-2 ${
-                  rule.isActive
-                    ? "bg-green-500 ring-green-200 dark:ring-green-900"
-                    : "bg-muted-foreground/30 ring-transparent"
-                }`} />
+                <div
+                  className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ring-2 ${
+                    rule.isActive
+                      ? "bg-green-500 ring-green-200 dark:ring-green-900"
+                      : "bg-muted-foreground/30 ring-transparent"
+                  }`}
+                />
 
                 {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-sm">{rule.name}</span>
                     {entityColor && (
-                      <Badge className={`text-[11px] px-2 py-0 h-5 font-medium border-0 ${entityColor}`}>
+                      <Badge className={`h-5 border-0 px-2 py-0 font-medium text-[11px] ${entityColor}`}>
                         {entityLabel}
                       </Badge>
                     )}
@@ -216,8 +209,8 @@ export function AutomationClient({ rules, canEdit }: Props) {
                               <Badge
                                 variant="outline"
                                 className={cn(
-                                  "text-[11px] px-2 py-0 h-5 font-medium border-0 cursor-help gap-1",
-                                  style.color
+                                  "h-5 cursor-help gap-1 border-0 px-2 py-0 font-medium text-[11px]",
+                                  style.color,
                                 )}
                               >
                                 {style.icon}
@@ -237,33 +230,33 @@ export function AutomationClient({ rules, canEdit }: Props) {
                           <TooltipTrigger asChild>
                             <Badge
                               variant="outline"
-                              className="text-[11px] px-2 py-0 h-5 font-medium border-0 gap-1 bg-amber-100 text-amber-700 dark:bg-amber-900/40 cursor-help"
+                              className="h-5 cursor-help gap-1 border-0 bg-amber-100 px-2 py-0 font-medium text-[11px] text-amber-700 dark:bg-amber-900/40"
                             >
                               <Clock className="h-3 w-3" />
                               {t("triggers.scheduled")}
                             </Badge>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {formatCronDescription(getScheduledTrigger(rule.triggerOn)!)}
+                            {formatCronDescription(getScheduledTrigger(rule.triggerOn) ?? "")}
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
                     )}
 
                     {!rule.isActive && (
-                      <Badge variant="outline" className="text-[11px] px-2 py-0 h-5 text-muted-foreground/60">
+                      <Badge variant="outline" className="h-5 px-2 py-0 text-[11px] text-muted-foreground/60">
                         {t("disabled")}
                       </Badge>
                     )}
                   </div>
                   {rule.description && (
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">{rule.description}</p>
+                    <p className="mt-0.5 truncate text-muted-foreground text-xs">{rule.description}</p>
                   )}
                 </div>
 
                 {/* Row actions */}
                 {canEdit && (
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <div className="flex flex-shrink-0 items-center gap-1">
                     <Switch
                       checked={rule.isActive}
                       onCheckedChange={() => handleToggle(rule.id, rule.isActive)}
@@ -279,16 +272,18 @@ export function AutomationClient({ rules, canEdit }: Props) {
 
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                        >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>{t("deleteTitle")}</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            {t("deleteDesc", { name: rule.name })}
-                          </AlertDialogDescription>
+                          <AlertDialogDescription>{t("deleteDesc", { name: rule.name })}</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel>Cancel</AlertDialogCancel>

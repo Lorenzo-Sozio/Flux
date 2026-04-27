@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { DealModal } from "@/components/crm/deal-modal";
 import { Button } from "@/components/ui/button";
-import { PlusIcon, CoinsIcon, PencilIcon, BarChart2 } from "lucide-react";
+import { PlusIcon, CoinsIcon, PencilIcon, BarChart2, Settings2 } from "lucide-react";
 
 type Deal = {
   id: string;
@@ -41,12 +41,14 @@ export function PipelineBoard({
   companies,
   contacts,
   canEdit = true,
+  canManageStages = false,
 }: {
   initialStages: Stage[];
   initialDeals: Deal[];
   companies: any[];
   contacts: any[];
   canEdit?: boolean;
+  canManageStages?: boolean;
 }) {
   const t = useTranslations("pipeline");
   const [isMounted, setIsMounted] = useState(false);
@@ -96,13 +98,19 @@ export function PipelineBoard({
           <p className="text-sm text-muted-foreground">{t("boardSubtitle")}</p>
         </div>
 
-        {/* Raggruppa i bottoni in un container flex */}
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href="/dashboard/pipeline/report">
               <BarChart2 className="mr-2 h-4 w-4" /> {t("report")}
             </Link>
           </Button>
+          {canManageStages && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/settings/pipeline">
+                <Settings2 className="mr-2 h-4 w-4" /> {t("manageStages")}
+              </Link>
+            </Button>
+          )}
           {canEdit && (
             <DealModal stages={initialStages} companies={companies} contacts={contacts}>
               <Button size="sm" className="gap-2">

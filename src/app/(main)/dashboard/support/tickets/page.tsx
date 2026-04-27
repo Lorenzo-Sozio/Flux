@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowUpDown,
+  BookOpen,
   ChevronLeft,
   Kanban,
   LayoutList,
@@ -130,7 +131,15 @@ export default function TicketsListPage() {
           <ChevronLeft className="h-4 w-4" />
           {t("supportCenter")}
         </Link>
-        <CreateTicketButton />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/dashboard/settings/macros">
+              <BookOpen className="mr-2 h-4 w-4" />
+              {t("macros")}
+            </Link>
+          </Button>
+          <CreateTicketButton />
+        </div>
       </div>
 
       {/* Title + View Toggle */}

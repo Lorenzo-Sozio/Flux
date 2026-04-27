@@ -338,6 +338,7 @@ export const tasks = pgTable("task", {
   dealId: text("deal_id").references(() => deals.id, { onDelete: "cascade" }),
   estimatedHours: numeric("estimated_hours", { precision: 5, scale: 2 }),
   actualHours: numeric("actual_hours", { precision: 5, scale: 2 }).default("0"),
+  ticketId: text("ticket_id").references(() => tickets.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -533,6 +534,7 @@ export const tasksRelations = relations(tasks, ({ one, many }) => ({
   contact: one(contacts, { fields: [tasks.contactId], references: [contacts.id] }),
   company: one(companies, { fields: [tasks.companyId], references: [companies.id] }),
   deal: one(deals, { fields: [tasks.dealId], references: [deals.id] }),
+  ticket: one(tickets, { fields: [tasks.ticketId], references: [tickets.id] }),
   parent: one(tasks, { fields: [tasks.parentId], references: [tasks.id], relationName: "subtasks" }),
   subtasks: many(tasks, { relationName: "subtasks" }),
   assignees: many(taskAssignees),
@@ -970,6 +972,7 @@ export const ticketsRelations = relations(tickets, ({ one, many }) => ({
   group: one(userGroups, { fields: [tickets.groupId], references: [userGroups.id] }),
   messages: many(ticketMessages),
   auditLogs: many(ticketAuditLogs),
+  tasks: many(tasks),
 }));
 
 export const ticketMessagesRelations = relations(ticketMessages, ({ one }) => ({

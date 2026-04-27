@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Kanban, Settings2, Webhook, Mail } from "lucide-react";
+import { Settings2, Webhook, Mail } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
@@ -32,18 +32,7 @@ export default async function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
-        <Link href="/dashboard/settings/pipeline">
-          <Card className="cursor-pointer transition-shadow hover:shadow-md">
-            <CardHeader>
-              <Kanban className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>{t("pipeline.title")}</CardTitle>
-              <CardDescription>
-                {t("pipeline.description")}
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
-        <Link href="/dashboard/settings/webhooks">
+<Link href="/dashboard/settings/webhooks">
           <Card className="cursor-pointer transition-shadow hover:shadow-md">
             <CardHeader>
               <Webhook className="mb-2 h-8 w-8 text-primary" />

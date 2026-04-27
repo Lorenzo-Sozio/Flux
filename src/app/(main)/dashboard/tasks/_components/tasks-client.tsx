@@ -14,6 +14,7 @@ import {
   Circle,
   Clock,
   Filter,
+  Headphones,
   Kanban,
   List,
   Lock,
@@ -67,11 +68,14 @@ type Task = {
   contactId: string | null;
   companyId: string | null;
   dealId: string | null;
+  ticketId: string | null;
   leadName: string | null;
   leadLastName: string | null;
   contactName: string | null;
   contactLastName: string | null;
   companyName: string | null;
+  ticketNumber: string | null;
+  ticketSubject: string | null;
   blockedByDeps?: number;
 };
 
@@ -97,6 +101,12 @@ const BOARD_COLUMN_COLORS: Record<BoardColId, string> = {
 };
 
 function entityLink(task: Task): { label: string; href: string; icon: React.ElementType } | null {
+  if (task.ticketId)
+    return {
+      label: task.ticketNumber ? `#${task.ticketNumber}` : "Ticket",
+      href: `/dashboard/support/tickets/${task.ticketId}`,
+      icon: Headphones,
+    };
   if (task.contactId)
     return {
       label: `${task.contactName ?? ""} ${task.contactLastName ?? ""}`.trim(),
@@ -135,11 +145,19 @@ function TaskCard({
   index,
   onToggle,
   onDelete,
+  onUpdated,
+  users,
+  currentUserId,
+  defaultOpen,
 }: {
   task: Task;
   index: number;
   onToggle: (task: Task) => void;
   onDelete: (id: string) => void;
+  onUpdated: (updated: Task) => void;
+  users: TaskUser[];
+  currentUserId: string;
+  defaultOpen?: boolean;
 }) {
   const t = useTranslations("tasks");
   const overdue = isOverdue(task);
@@ -236,13 +254,25 @@ function TaskCard({
 
           <div className="flex items-center justify-between pl-5">
             <span className="text-[10px] text-muted-foreground">{task.assigneeName ?? task.ownerName ?? ""}</span>
-            <button
-              type="button"
-              onClick={() => onDelete(task.id)}
-              className="text-muted-foreground/40 transition-colors hover:text-destructive"
-            >
-              <Trash2 className="h-3 w-3" />
-            </button>
+            <div className="flex items-center gap-0.5">
+              <TaskModal
+                task={task}
+                users={users}
+                currentUserId={currentUserId}
+                revalidatePathStr="/dashboard/tasks"
+                defaultOpen={defaultOpen}
+                onUpdated={onUpdated}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 hover:text-destructive"
+                onClick={() => onDelete(task.id)}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           </div>
 
           {hasProgress && (
@@ -279,9 +309,21 @@ interface Props {
   contacts: { id: string; firstName: string; lastName: string }[];
   companies: { id: string; name: string }[];
   deals: { id: string; name: string }[];
+  tickets: { id: string; ticketNumber: string; subject: string }[];
+  initialOpenTaskId?: string;
 }
 
-export function TasksClient({ tasks: initialTasks, users, currentUserId, leads, contacts, companies, deals }: Props) {
+export function TasksClient({
+  tasks: initialTasks,
+  users,
+  currentUserId,
+  leads,
+  contacts,
+  companies,
+  deals,
+  tickets,
+  initialOpenTaskId,
+}: Props) {
   const t = useTranslations("tasks");
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -462,6 +504,7 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId, leads, 
             contacts={contacts}
             companies={companies}
             deals={deals}
+            tickets={tickets}
             currentUserId={currentUserId}
             onCreated={handleCreated}
           />
@@ -604,6 +647,12 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId, leads, 
                             index={idx}
                             onToggle={handleToggleStatus}
                             onDelete={handleDelete}
+                            onUpdated={(updated) =>
+                              setTasks((prev) => prev.map((tk) => (tk.id === updated.id ? { ...tk, ...updated } : tk)))
+                            }
+                            users={users}
+                            currentUserId={currentUserId}
+                            defaultOpen={task.id === initialOpenTaskId}
                           />
                         ))}
                         {provided.placeholder}
@@ -788,6 +837,7 @@ export function TasksClient({ tasks: initialTasks, users, currentUserId, leads, 
                               users={users}
                               currentUserId={currentUserId}
                               revalidatePathStr="/dashboard/tasks"
+                              defaultOpen={task.id === initialOpenTaskId}
                               onUpdated={(updated) =>
                                 setTasks((prev) =>
                                   prev.map((tk) => (tk.id === updated.id ? { ...tk, ...updated } : tk)),

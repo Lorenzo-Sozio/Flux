@@ -32,6 +32,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   Table,
   TableBody,
   TableCell,
@@ -40,7 +46,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { getInitials } from "@/lib/utils";
-import { Copy, Info, KeyRound, Mail, Pencil, Plus, RotateCcw, Shield, Trash2, UserCog, Users } from "lucide-react";
+import { Check, ChevronDown, Copy, Crown, Eye, Info, KeyRound, Mail, Pencil, Plus, RotateCcw, Shield, Trash2, UserCog, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { GroupModal } from "./group-modal";
 import { getUserGroups } from "@/actions/user-groups";
@@ -69,6 +75,77 @@ const ROLE_COLORS: Record<string, string> = {
   viewer: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
 };
 
+type RoleId = "owner" | "admin" | "user" | "viewer";
+
+const ROLES: { id: RoleId; icon: React.ElementType; color: string }[] = [
+  { id: "owner", icon: Crown, color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
+  { id: "admin", icon: Shield, color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
+  { id: "user", icon: Pencil, color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
+  { id: "viewer", icon: Eye, color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
+];
+
+function RoleSelector({
+  userId,
+  role,
+  canChange,
+  availableRoles,
+  onRoleChange,
+}: {
+  userId: string;
+  role: string;
+  canChange: boolean;
+  availableRoles: string[];
+  onRoleChange: (userId: string, role: string) => void;
+}) {
+  const tr = useTranslations("roles");
+  const cfg = ROLES.find((r) => r.id === role) ?? ROLES[3];
+  const Icon = cfg.icon;
+
+  const pill = (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium select-none ${cfg.color}`}>
+      <Icon className="h-3 w-3" />
+      {tr(`roleLabel.${cfg.id}`)}
+    </span>
+  );
+
+  if (!canChange) return pill;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-opacity hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${cfg.color}`}
+        >
+          <Icon className="h-3 w-3" />
+          {tr(`roleLabel.${cfg.id}`)}
+          <ChevronDown className="h-3 w-3 opacity-50 ml-0.5" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-44 p-1">
+        {availableRoles.map((r) => {
+          const rc = ROLES.find((x) => x.id === r) ?? ROLES[3];
+          const RIcon = rc.icon;
+          const isActive = r === role;
+          return (
+            <DropdownMenuItem
+              key={r}
+              onSelect={() => onRoleChange(userId, r)}
+              className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 cursor-pointer"
+            >
+              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${rc.color}`}>
+                <RIcon className="h-3 w-3" />
+                {tr(`roleLabel.${rc.id}`)}
+              </span>
+              {isActive && <Check className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 interface Props {
   users: User[];
   pendingInvitations: Invitation[];
@@ -81,6 +158,7 @@ type Group = Awaited<ReturnType<typeof getUserGroups>>[number];
 export function UsersClient({ users: initialUsers, pendingInvitations: initialInvitations, currentUserId, currentUserRole }: Props) {
   const t = useTranslations("users");
   const tc = useTranslations("common");
+  const tr = useTranslations("roles");
   const [users, setUsers] = useState(initialUsers);
   const [invitations] = useState(initialInvitations);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -257,30 +335,17 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                     </div>
                   </TableCell>
                   <TableCell>
-                    {/* Admin/owner can change other users' roles; own role and viewer roles are read-only */}
-                    {(currentUserRole === "owner" || currentUserRole === "admin") && user.id !== currentUserId ? (
-                      <Select
-                        defaultValue={user.role}
-                        onValueChange={(val) => handleRoleChange(user.id, val)}
-                        disabled={user.role === "owner" && currentUserRole !== "owner"}
-                      >
-                        <SelectTrigger className="h-7 w-32 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableRoles.map((r) => (
-                            <SelectItem key={r} value={r} className="capitalize text-xs">
-                              {r}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Badge variant="outline" className={ROLE_COLORS[user.role] ?? ""}>
-                        <Shield className="mr-1 h-3 w-3" />
-                        {user.role}
-                      </Badge>
-                    )}
+                    <RoleSelector
+                      userId={user.id}
+                      role={user.role}
+                      canChange={
+                        (currentUserRole === "owner" || currentUserRole === "admin") &&
+                        user.id !== currentUserId &&
+                        !(user.role === "owner" && currentUserRole !== "owner")
+                      }
+                      availableRoles={availableRoles}
+                      onRoleChange={handleRoleChange}
+                    />
                   </TableCell>
                   <TableCell>
                     <Badge variant={user.emailVerified ? "default" : "secondary"}>
@@ -374,25 +439,34 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
         </Card>
       )}
 
-      {/* Role Legend */}
+      {/* Role Permissions Matrix */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-sm">{t("rolePermissions")}</CardTitle>
+          <CardTitle className="text-sm">{tr("permissionOverview")}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {(["owner", "admin", "user", "viewer"] as const).map((role) => ({
-              role,
-              desc: t(`roleDesc.${role}`),
-            })).map(({ role, desc }) => (
-              <div key={role} className="rounded-lg border p-3">
-                <Badge className={`mb-2 capitalize ${ROLE_COLORS[role]}`}>
-                  <Shield className="mr-1 h-3 w-3" />
-                  {role}
-                </Badge>
-                <p className="text-xs text-muted-foreground">{desc}</p>
-              </div>
-            ))}
+            {ROLES.map((r) => {
+              const Icon = r.icon;
+              const perms = tr.raw(`rolePerms.${r.id}`) as string[];
+              return (
+                <div key={r.id} className="rounded-lg border p-3">
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full mb-2 ${r.color}`}>
+                    <Icon className="h-3 w-3" />
+                    {tr(`roleLabel.${r.id}`)}
+                  </span>
+                  <p className="text-xs text-muted-foreground mb-2">{tr(`roleDesc.${r.id}`)}</p>
+                  <ul className="space-y-1">
+                    {perms.map((perm) => (
+                      <li key={perm} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                        <span className="mt-0.5 text-green-500">✓</span>
+                        {perm}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>

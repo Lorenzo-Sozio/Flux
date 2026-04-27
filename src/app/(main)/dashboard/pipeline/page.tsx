@@ -1,14 +1,13 @@
 import { getPipelineData } from "@/actions/pipeline";
 import { getCompanies, getContacts } from "@/actions/crm";
 import { PipelineBoard } from "./components/pipeline-board";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
-import { BarChart2 } from "lucide-react";
 import { auth } from "@/auth";
 
 export default async function PipelinePage() {
   const session = await auth();
-  const canEdit = session?.user?.role !== "viewer";
+  const role = session?.user?.role;
+  const canEdit = role !== "viewer";
+  const canManageStages = role === "admin" || role === "owner";
 
   const [data, companies, contacts] = await Promise.all([
     getPipelineData(),
@@ -24,6 +23,7 @@ export default async function PipelinePage() {
         companies={companies}
         contacts={contacts}
         canEdit={canEdit}
+        canManageStages={canManageStages}
       />
     </div>
   );

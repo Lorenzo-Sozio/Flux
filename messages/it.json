@@ -554,6 +554,7 @@
     "expectedClose": "Chiusura Prevista",
     "probability": "Probabilità",
     "report": "Report Pipeline",
+    "manageStages": "Gestisci fasi",
     "totalValue": "Valore Totale",
     "weightedValue": "Valore Ponderato",
     "dealCount": "Numero Trattative",
@@ -731,7 +732,8 @@
       "tabs": {
         "details": "Dettagli",
         "assignment": "Assegnazione",
-        "links": "Collegamento"
+        "links": "Collegamento",
+        "subtasks": "Sottoattività"
       },
       "titleLabel": "Titolo",
       "titlePlaceholder": "Titolo attività…",
@@ -769,7 +771,16 @@
       "createButton": "Crea attività",
       "saving": "Salvataggio…",
       "cancel": "Annulla",
-      "saveFailed": "Errore durante la creazione."
+      "saveFailed": "Errore durante la creazione.",
+      "subtasks": {
+        "empty": "Nessuna sottoattività",
+        "emptyDesc": "Aggiungi sottoattività per suddividere questa attività.",
+        "add": "Aggiungi sottoattività",
+        "titlePlaceholder": "Titolo sottoattività…",
+        "expand": "Mostra dettagli",
+        "collapse": "Nascondi dettagli",
+        "hint": "{count} di {total} sottoattività valide · {hours}h stimate totali"
+      }
     },
     "gantt": {
       "title": "Diagramma di Gantt",
@@ -1140,6 +1151,7 @@
       "updateSuccess": "Ticket aggiornato.",
       "deleteSuccess": "Ticket eliminato.",
       "replySuccess": "Risposta inviata.",
+      "macros": "Macro",
       "supportCenter": "Centro Assistenza",
       "supportTickets": "Ticket di Supporto",
       "totalOpen": "{total} totali · {open} aperti",
@@ -2082,7 +2094,11 @@
     "recentLeads": "Lead Recenti",
     "noLeadsFound": "Nessun lead trovato. Inizia aggiungendone uno!",
     "probPercent": "{prob}% prob.",
-    "tableAction": "Azione"
+    "tableAction": "Azione",
+    "dealsByStageDesc": "Numero di opportunità attive per fase della pipeline",
+    "leadsBySource": "Lead per fonte",
+    "leadsBySourceDesc": "Efficacia dei canali di acquisizione",
+    "noLeadSourceData": "Nessun dato sulle fonti disponibile"
   },
   "auth": {
     "login": {

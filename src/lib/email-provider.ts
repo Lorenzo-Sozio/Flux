@@ -25,6 +25,8 @@ export interface SendOptions {
   html: string;
   replyTo?: string;
   fromOverride?: string;
+  inReplyTo?: string;  // Message-ID of the message being replied to
+  references?: string; // Space-separated chain of Message-IDs for thread history
 }
 
 export interface SendResult {
@@ -95,12 +97,17 @@ async function sendViaResend(options: SendOptions, config: EmailConfig): Promise
     const resend = new Resend(apiKey);
     const from = options.fromOverride ?? `${config.fromName} <${config.fromEmail}>`;
 
+    const threadHeaders: Record<string, string> = {};
+    if (options.inReplyTo) threadHeaders["In-Reply-To"] = options.inReplyTo;
+    if (options.references) threadHeaders["References"] = options.references;
+
     const { data, error } = await resend.emails.send({
       from,
       to: options.to,
       subject: options.subject,
       html: options.html,
       ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+      ...(Object.keys(threadHeaders).length ? { headers: threadHeaders } : {}),
     });
 
     if (error) return { success: false, error: error.message };
@@ -135,6 +142,8 @@ async function sendViaSMTP(options: SendOptions, config: EmailConfig): Promise<S
       subject: options.subject,
       html: options.html,
       ...(options.replyTo ? { replyTo: options.replyTo } : {}),
+      ...(options.inReplyTo ? { inReplyTo: options.inReplyTo } : {}),
+      ...(options.references ? { references: options.references } : {}),
     });
 
     return { success: true, messageId: info.messageId };

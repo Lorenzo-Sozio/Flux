@@ -70,7 +70,7 @@ export default async function CalendarPage({
     getTranslations("calendar"),
   ]);
 
-  const currentView = viewParam ?? "month";
+  const currentView = viewParam ?? "week";
   const baseDate = dateParam ? new Date(dateParam) : new Date();
   const today = new Date();
 

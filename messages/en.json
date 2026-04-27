@@ -554,6 +554,7 @@
     "expectedClose": "Expected Close",
     "probability": "Probability",
     "report": "Pipeline Report",
+    "manageStages": "Manage stages",
     "totalValue": "Total Value",
     "weightedValue": "Weighted Value",
     "dealCount": "Deal Count",
@@ -731,7 +732,8 @@
       "tabs": {
         "details": "Details",
         "assignment": "Assignment",
-        "links": "Links"
+        "links": "Links",
+        "subtasks": "Subtasks"
       },
       "titleLabel": "Title",
       "titlePlaceholder": "Task title…",
@@ -769,7 +771,16 @@
       "createButton": "Create task",
       "saving": "Saving…",
       "cancel": "Cancel",
-      "saveFailed": "Failed to create task."
+      "saveFailed": "Failed to create task.",
+      "subtasks": {
+        "empty": "No subtasks",
+        "emptyDesc": "Add subtasks to break this task into smaller pieces.",
+        "add": "Add subtask",
+        "titlePlaceholder": "Subtask title…",
+        "expand": "Show details",
+        "collapse": "Hide details",
+        "hint": "{count} of {total} valid subtasks · {hours}h estimated total"
+      }
     },
     "gantt": {
       "title": "Gantt Chart",
@@ -1140,6 +1151,7 @@
       "updateSuccess": "Ticket updated.",
       "deleteSuccess": "Ticket deleted.",
       "replySuccess": "Reply sent.",
+      "macros": "Macros",
       "supportCenter": "Support Center",
       "supportTickets": "Support Tickets",
       "totalOpen": "{total} total · {open} open",
@@ -2082,7 +2094,11 @@
     "recentLeads": "Recent Leads",
     "noLeadsFound": "No leads found. Start by adding one!",
     "probPercent": "{prob}% prob.",
-    "tableAction": "Action"
+    "tableAction": "Action",
+    "dealsByStageDesc": "Number of active opportunities per pipeline stage",
+    "leadsBySource": "Leads by Source",
+    "leadsBySourceDesc": "Acquisition channel effectiveness",
+    "noLeadSourceData": "No lead source data available"
   },
   "auth": {
     "login": {

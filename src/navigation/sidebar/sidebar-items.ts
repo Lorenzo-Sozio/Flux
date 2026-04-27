@@ -1,7 +1,6 @@
 import {
   Banknote,
   BarChart3,
-  BookOpen,
   Building2,
   Calendar,
   ChartBar,
@@ -21,7 +20,6 @@ import {
   Package,
   Settings,
   Settings2,
-  ShieldCheck,
   ShoppingCart,
   Target,
   Users,
@@ -114,7 +112,6 @@ export const sidebarItems: NavGroup[] = [
     labelKey: "administration",
     items: [
       { titleKey: "users", url: "/dashboard/users", icon: Users, isNew: true },
-      { titleKey: "roles", url: "/dashboard/roles", icon: ShieldCheck },
       { titleKey: "reports", url: "/dashboard/reports", icon: BarChart3, isNew: true },
       {
         titleKey: "settings",
@@ -122,10 +119,8 @@ export const sidebarItems: NavGroup[] = [
         icon: Settings,
         subItems: [
           { titleKey: "customFields", url: "/dashboard/settings/custom-fields", icon: Settings2 },
-          { titleKey: "pipelineStages", url: "/dashboard/settings/pipeline", icon: Kanban },
           { titleKey: "email", url: "/dashboard/settings/email", icon: MailOpen },
           { titleKey: "webhooks", url: "/dashboard/settings/webhooks", icon: Webhook },
-          { titleKey: "macros", url: "/dashboard/settings/macros", icon: BookOpen },
         ],
       },
     ],

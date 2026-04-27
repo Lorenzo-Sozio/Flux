@@ -17,6 +17,7 @@ import {
   taskDependencies,
   tasks,
   taskTimeLogs,
+  tickets,
   users,
 } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
@@ -35,6 +36,7 @@ export async function createTask(data: {
   contactId?: string;
   companyId?: string;
   dealId?: string;
+  ticketId?: string;
   estimatedHours?: string;
 }) {
   await requireWriteAccess();
@@ -52,6 +54,7 @@ export async function createTask(data: {
   if (data.leadId) revalidatePath(`/dashboard/leads/${data.leadId}`);
   if (data.contactId) revalidatePath(`/dashboard/contacts/${data.contactId}`);
   if (data.companyId) revalidatePath(`/dashboard/companies/${data.companyId}`);
+  if (data.ticketId) revalidatePath(`/dashboard/support/tickets/${data.ticketId}`);
   if (data.parentId) await recalcParentProgress(data.parentId);
   revalidatePath("/dashboard/tasks");
   revalidatePath("/dashboard/calendar");
@@ -320,18 +323,22 @@ export async function getAllTasks(userId: string, role: string) {
       contactId: tasks.contactId,
       companyId: tasks.companyId,
       dealId: tasks.dealId,
+      ticketId: tasks.ticketId,
       leadName: leadAlias.firstName,
       leadLastName: leadAlias.lastName,
       contactName: contactAlias.firstName,
       contactLastName: contactAlias.lastName,
       companyName: companyAlias.name,
+      ticketNumber: tickets.ticketNumber,
+      ticketSubject: tickets.subject,
     })
     .from(tasks)
     .leftJoin(ownerAlias, eq(tasks.ownerId, ownerAlias.id))
     .leftJoin(assigneeAlias, eq(tasks.assigneeId, assigneeAlias.id))
     .leftJoin(leadAlias, eq(tasks.leadId, leadAlias.id))
     .leftJoin(contactAlias, eq(tasks.contactId, contactAlias.id))
-    .leftJoin(companyAlias, eq(tasks.companyId, companyAlias.id));
+    .leftJoin(companyAlias, eq(tasks.companyId, companyAlias.id))
+    .leftJoin(tickets, eq(tasks.ticketId, tickets.id));
 
   const isPrivileged = role === "admin" || role === "owner";
   const result = isPrivileged
@@ -360,6 +367,42 @@ export async function getAllTasks(userId: string, role: string) {
   }
 
   return result.map((t) => ({ ...t, blockedByDeps: blockedCountMap[t.id] ?? 0 }));
+}
+
+export async function getTasksByTicketId(ticketId: string) {
+  const ownerAlias = alias(users, "owner");
+  const assigneeAlias = alias(users, "assignee");
+  return db
+    .select({
+      id: tasks.id,
+      title: tasks.title,
+      description: tasks.description,
+      status: tasks.status,
+      priority: tasks.priority,
+      dueDate: tasks.dueDate,
+      startDate: tasks.startDate,
+      depth: tasks.depth,
+      progressPct: tasks.progressPct,
+      parentId: tasks.parentId,
+      estimatedHours: tasks.estimatedHours,
+      actualHours: tasks.actualHours,
+      completedAt: tasks.completedAt,
+      createdAt: tasks.createdAt,
+      ownerId: tasks.ownerId,
+      assigneeId: tasks.assigneeId,
+      ownerName: ownerAlias.name,
+      assigneeName: assigneeAlias.name,
+      leadId: tasks.leadId,
+      contactId: tasks.contactId,
+      companyId: tasks.companyId,
+      dealId: tasks.dealId,
+      ticketId: tasks.ticketId,
+    })
+    .from(tasks)
+    .leftJoin(ownerAlias, eq(tasks.ownerId, ownerAlias.id))
+    .leftJoin(assigneeAlias, eq(tasks.assigneeId, assigneeAlias.id))
+    .where(eq(tasks.ticketId, ticketId))
+    .orderBy(desc(tasks.createdAt));
 }
 
 export async function getTasksDueToday() {

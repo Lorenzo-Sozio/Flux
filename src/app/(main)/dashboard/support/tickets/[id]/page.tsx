@@ -1,19 +1,29 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
 import {
   Activity,
+  AlertTriangle,
   ArrowLeft,
+  Building2,
+  CheckCircle2,
   ChevronDown,
+  Circle,
   Clock,
+  ExternalLink,
+  FileText,
   Lock,
   Mail,
   MessageCircle,
   MessageSquare,
   MoreHorizontal,
+  Paperclip,
   Phone,
+  Plus,
   Send,
   Shield,
   Trash2,
@@ -23,18 +33,27 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
+
+import {
+  addTicketMessageAction,
+  deleteTicketAction,
+  escalateTicketAction,
+  getMacros,
+  getTicketById,
+  reassignTicketAction,
+  updateTicketAction,
+} from "@/actions/support";
+import { createTask, getAllUsers, getTasksByTicketId } from "@/actions/tasks";
+import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
+import { RichTextEditor } from "@/components/crm/rich-text-editor";
+import { TaskModal } from "@/components/crm/task-modal";
+import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
+import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { RichTextEditor } from "@/components/crm/rich-text-editor";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
@@ -50,42 +69,195 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
-import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
-import { AssigneeSelect, encodeAssignee, decodeAssignee } from "@/components/crm/assignee-select";
-import {
-  getTicketById,
-  addTicketMessageAction,
-  updateTicketAction,
-  deleteTicketAction,
-  reassignTicketAction,
-  escalateTicketAction,
-  getMacros,
-} from "@/actions/support";
+import { Input } from "@/components/ui/input";
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const CHANNEL_ICONS: Record<string, React.ReactNode> = {
-  email:  <Mail className="h-3.5 w-3.5" />,
-  chat:   <MessageCircle className="h-3.5 w-3.5" />,
-  phone:  <Phone className="h-3.5 w-3.5" />,
+  email: <Mail className="h-3.5 w-3.5" />,
+  chat: <MessageCircle className="h-3.5 w-3.5" />,
+  phone: <Phone className="h-3.5 w-3.5" />,
   social: <Users className="h-3.5 w-3.5" />,
 };
 
-const PRIORITY_OPTIONS = [
-  { value: "urgent", label: "Urgent" },
-  { value: "high",   label: "High" },
-  { value: "normal", label: "Normal" },
-  { value: "low",    label: "Low" },
+const STATUS_OPTIONS = [
+  { value: "new",         label: "Nuovo",       color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
+  { value: "open",        label: "Aperto",      color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+  { value: "in_progress", label: "In corso",    color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
+  { value: "waiting",     label: "In attesa",   color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
+  { value: "on_hold",     label: "Sospeso",     color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" },
+  { value: "resolved",    label: "Risolto",     color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
+  { value: "closed",      label: "Chiuso",      color: "bg-muted text-muted-foreground" },
 ];
 
-const STATUS_OPTIONS = [
-  { value: "new",         label: "New" },
-  { value: "open",        label: "Open" },
-  { value: "in_progress", label: "In Progress" },
-  { value: "waiting",     label: "Waiting" },
-  { value: "on_hold",     label: "On Hold" },
-  { value: "resolved",    label: "Resolved" },
-  { value: "closed",      label: "Closed" },
+const PRIORITY_OPTIONS = [
+  { value: "urgent", label: "Urgente", color: "text-red-600 dark:text-red-400" },
+  { value: "high",   label: "Alta",    color: "text-orange-600 dark:text-orange-400" },
+  { value: "normal", label: "Normale", color: "text-blue-600 dark:text-blue-400" },
+  { value: "low",    label: "Bassa",   color: "text-slate-500" },
 ];
+
+const PRIORITY_DOT: Record<string, string> = {
+  blocker: "bg-red-600", critical: "bg-orange-500",
+  high: "bg-red-400",    normal: "bg-blue-500",    low: "bg-slate-400",
+};
+
+const TASK_PRIORITY_OPTIONS = [
+  { value: "normal", label: "Normale" }, { value: "high", label: "Alta" },
+  { value: "critical", label: "Critica" }, { value: "blocker", label: "Bloccante" },
+  { value: "low", label: "Bassa" },
+];
+
+const AUDIT_LABELS: Record<string, string> = {
+  created: "Ticket creato", status_changed: "Stato modificato",
+  priority_changed: "Priorità modificata", assigned: "Assegnatario cambiato",
+  message_added: "Messaggio aggiunto", field_changed: "Campo aggiornato",
+};
+
+const AVATAR_PALETTE = [
+  "from-violet-500 to-violet-700", "from-blue-500 to-blue-700",
+  "from-emerald-500 to-emerald-700", "from-rose-500 to-rose-700",
+  "from-indigo-500 to-indigo-700", "from-cyan-500 to-cyan-700",
+  "from-amber-500 to-amber-700",
+];
+
+type LinkedTask = Awaited<ReturnType<typeof getTasksByTicketId>>[number];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function avatarColor(name: string) {
+  const h = [...name].reduce((a, c) => a + c.charCodeAt(0), 0);
+  return AVATAR_PALETTE[h % AVATAR_PALETTE.length];
+}
+
+function initials(name: string) {
+  return name.split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+}
+
+function formatBytes(b: number) {
+  if (b < 1024) return `${b} B`;
+  if (b < 1048576) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1048576).toFixed(1)} MB`;
+}
+
+function formatStamp(date: Date) {
+  const now = Date.now();
+  const diff = now - date.getTime();
+  if (diff < 60_000) return "Adesso";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m fa`;
+  if (diff < 86_400_000)
+    return date.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleDateString("it-IT", {
+    day: "numeric", month: "short",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+// ─── LinkedTasksCard ──────────────────────────────────────────────────────────
+
+function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; currentUserId?: string }) {
+  const [tasks, setTasks] = useState<LinkedTask[]>([]);
+  const [users, setUsers] = useState<{ id: string; name: string | null }[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const { register, handleSubmit, reset } = useForm<{ title: string; priority: string; dueDate: string }>({
+    defaultValues: { priority: "normal", dueDate: "", title: "" },
+  });
+
+  const load = () => getTasksByTicketId(ticketId).then(setTasks).catch(console.error);
+
+  useEffect(() => {
+    getTasksByTicketId(ticketId).then(setTasks).catch(console.error);
+    getAllUsers().then(setUsers).catch(console.error);
+  }, [ticketId]);
+
+  const onSubmit = async (data: { title: string; priority: string; dueDate: string }) => {
+    if (!data.title.trim()) return;
+    setSaving(true);
+    try {
+      await createTask({ title: data.title.trim(), priority: data.priority, dueDate: data.dueDate ? new Date(data.dueDate) : undefined, ticketId });
+      reset(); setAdding(false); load();
+    } catch { toast.error("Errore nella creazione dell'attività"); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-2 pt-3 px-3">
+        <CardTitle className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          <span className="flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            Attività
+            {tasks.length > 0 && (
+              <span className="rounded-full bg-muted px-1.5 py-0.5 font-normal normal-case tracking-normal text-[10px]">
+                {tasks.length}
+              </span>
+            )}
+          </span>
+          <button type="button" onClick={() => setAdding((v) => !v)}
+            className="flex items-center gap-0.5 font-medium normal-case tracking-normal text-xs hover:text-foreground transition-colors">
+            <Plus className="h-3.5 w-3.5" /> Nuova
+          </button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-3 pb-3 space-y-1">
+        {adding && (
+          <form onSubmit={handleSubmit(onSubmit)} className="mb-2 space-y-2 rounded-lg border bg-muted/30 p-2.5">
+            <Input {...register("title")} placeholder="Titolo attività…" className="h-8 text-sm" autoFocus />
+            <div className="flex gap-2">
+              <select {...register("priority")}
+                className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
+                {TASK_PRIORITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <input type="date" {...register("dueDate")}
+                className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+            </div>
+            <div className="flex justify-end gap-1.5">
+              <button type="button" onClick={() => { setAdding(false); reset(); }}
+                className="rounded px-2 py-1 text-xs text-muted-foreground hover:text-foreground">Annulla</button>
+              <button type="submit" disabled={saving}
+                className="rounded bg-primary px-3 py-1 font-semibold text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+                {saving ? "…" : "Crea"}
+              </button>
+            </div>
+          </form>
+        )}
+        {tasks.length === 0 && !adding && (
+          <p className="py-1 text-muted-foreground text-sm italic">Nessuna attività</p>
+        )}
+        {tasks.map((task) => {
+          const done = task.status === "done";
+          return (
+            <div key={task.id} className="group flex items-start gap-2 rounded-md p-1.5 transition-colors hover:bg-muted/50">
+              {done
+                ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                : <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+              <div className="min-w-0 flex-1">
+                <p className={`truncate font-medium text-sm leading-snug ${done ? "text-muted-foreground line-through" : ""}`}>
+                  {task.title}
+                </p>
+                <div className="mt-0.5 flex items-center gap-1.5">
+                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOT[task.priority] ?? PRIORITY_DOT.normal}`} />
+                  {task.dueDate && (
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {new Date(task.dueDate).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}
+                    </span>
+                  )}
+                  {task.assigneeName && <span className="truncate text-xs text-muted-foreground">{task.assigneeName}</span>}
+                </div>
+              </div>
+              <TaskModal task={task} users={users} currentUserId={currentUserId}
+                revalidatePathStr={`/dashboard/support/tickets/${ticketId}`}
+                onUpdated={(updated) => setTasks((prev) => prev.map((t) => t.id === updated.id ? { ...t, ...updated } : t))} />
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── SLATimer ─────────────────────────────────────────────────────────────────
 
 function SLATimer({ targetDate }: { targetDate: Date | null }) {
   const [remaining, setRemaining] = useState<string | null>(null);
@@ -93,141 +265,353 @@ function SLATimer({ targetDate }: { targetDate: Date | null }) {
 
   useEffect(() => {
     if (!targetDate) return;
-
     const update = () => {
       const diff = new Date(targetDate).getTime() - Date.now();
       if (diff <= 0) {
         setIsOverdue(true);
-        const overdueMs = Math.abs(diff);
-        const h = Math.floor(overdueMs / 3_600_000);
-        const m = Math.floor((overdueMs % 3_600_000) / 60_000);
-        setRemaining(`${h}h ${m}m overdue`);
+        const ms = Math.abs(diff);
+        setRemaining(`${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m in ritardo`);
       } else {
         setIsOverdue(false);
-        const h = Math.floor(diff / 3_600_000);
-        const m = Math.floor((diff % 3_600_000) / 60_000);
-        setRemaining(`${h}h ${m}m`);
+        setRemaining(`${Math.floor(diff / 3_600_000)}h ${Math.floor((diff % 3_600_000) / 60_000)}m`);
       }
     };
-
     update();
-    const interval = setInterval(update, 60_000);
-    return () => clearInterval(interval);
+    const t = setInterval(update, 60_000);
+    return () => clearInterval(t);
   }, [targetDate]);
 
-  if (!targetDate || !remaining) return <span className="text-muted-foreground">—</span>;
-
+  if (!targetDate || !remaining) return <span className="text-muted-foreground text-sm">—</span>;
   return (
-    <span className={`font-mono text-xs font-semibold ${isOverdue ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
-      {remaining}
+    <span className={`font-mono font-semibold text-sm tabular-nums ${isOverdue ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
+      {isOverdue && <AlertTriangle className="mr-1 inline h-3 w-3" />}{remaining}
     </span>
   );
 }
 
-const AUDIT_ACTION_LABELS: Record<string, string> = {
-  created:          "Ticket created",
-  status_changed:   "Status changed",
-  priority_changed: "Priority changed",
-  assigned:         "Assignee changed",
-  message_added:    "Message added",
-  field_changed:    "Field updated",
-};
+// ─── Timeline sub-components ──────────────────────────────────────────────────
 
-function AuditLogEntry({ entry }: { entry: any }) {
-  const actor = entry.actor?.name ?? entry.actorName ?? "System";
-  const time = new Date(entry.createdAt).toLocaleString("en-US", {
-    month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-  });
-  const label = AUDIT_ACTION_LABELS[entry.action] ?? entry.action;
-
+function AuditEvent({ entry }: { entry: any }) {
+  const actor = entry.actor?.name ?? entry.actorName ?? "Sistema";
+  const label = AUDIT_LABELS[entry.action] ?? entry.action;
   return (
-    <div className="flex items-start gap-2 text-xs">
-      <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 mt-1.5 flex-shrink-0" />
-      <div className="flex-1 min-w-0">
+    <div className="flex items-center gap-3 py-1">
+      <div className="flex-1 h-px bg-border" />
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+        <Activity className="h-2.5 w-2.5 shrink-0" />
         <span className="font-medium">{actor}</span>
-        {" — "}
-        <span className="text-muted-foreground">{label}</span>
+        <span>·</span>
+        <span>{label}</span>
         {entry.oldValue && entry.newValue && (
-          <span className="text-muted-foreground">
-            {": "}
-            <span className="line-through">{entry.oldValue}</span>
-            {" → "}
-            <span className="text-foreground">{entry.newValue}</span>
+          <span className="flex items-center gap-1">
+            <span className="line-through opacity-60">{entry.oldValue}</span>
+            <span>→</span>
+            <span className="font-medium">{entry.newValue}</span>
           </span>
         )}
+        <span>·</span>
+        <span>{formatStamp(new Date(entry.createdAt))}</span>
       </div>
-      <span className="text-muted-foreground/70 flex-shrink-0">{time}</span>
+      <div className="flex-1 h-px bg-border" />
     </div>
   );
 }
 
-function MessageBubble({ msg }: { msg: any }) {
-  const senderName =
-    msg.sender?.name ?? msg.senderName ?? msg.senderEmail?.split("@")[0] ?? "Unknown";
-  const initials = senderName
-    .split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
-  const date = new Date(msg.createdAt);
-  const timeStr = date.toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
-  const isInternal = !msg.isPublic;
-
+function AttachmentChips({ docs }: { docs: any[] }) {
+  if (!docs.length) return null;
   return (
-    <div
-      className={`flex gap-3 group ${
-        isInternal
-          ? "bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30 rounded-lg p-3"
-          : ""
-      }`}
-    >
-      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 mt-0.5">
-        {initials}
+    <div className="mt-2.5 flex flex-wrap gap-1.5">
+      {docs.map((doc) => {
+        const isPdf = doc.mimeType === "application/pdf";
+        return (
+          <a key={doc.id} href={`/api/documents/${doc.id}${isPdf ? "?view=1" : ""}`}
+            target={isPdf ? "_blank" : undefined} download={!isPdf ? doc.name : undefined}
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-md border bg-background/80 px-2 py-1 text-xs transition-colors hover:bg-muted">
+            <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
+            <span className="max-w-[140px] truncate font-medium">{doc.name}</span>
+            {doc.size != null && <span className="text-muted-foreground">({formatBytes(doc.size)})</span>}
+          </a>
+        );
+      })}
+    </div>
+  );
+}
+
+function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent: boolean }) {
+  const senderName = msg.sender?.name ?? msg.senderName ?? msg.senderEmail?.split("@")[0] ?? "Sconosciuto";
+  const isInternal = !msg.isPublic;
+  const stamp = formatStamp(new Date(msg.createdAt));
+
+  if (isInternal) {
+    return (
+      <div className="rounded-xl border border-amber-200/60 bg-amber-50/70 px-4 py-3 dark:border-amber-800/30 dark:bg-amber-950/20">
+        <div className="mb-1.5 flex items-center gap-2">
+          <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-[10px] font-bold ${avatarColor(senderName)}`}>
+            {initials(senderName)}
+          </div>
+          <span className="font-semibold text-sm text-amber-800 dark:text-amber-300">{senderName}</span>
+          <Badge variant="secondary" className="h-4 gap-0.5 bg-amber-100 px-1.5 text-[10px] text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+            <Lock className="h-2.5 w-2.5" /> Nota interna
+          </Badge>
+          <span className="ml-auto text-xs text-amber-600/70 dark:text-amber-500/60">{stamp}</span>
+        </div>
+        {msg.content?.startsWith("<")
+          ? <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed prose-p:text-amber-900 dark:prose-p:text-amber-100" dangerouslySetInnerHTML={{ __html: msg.content }} />
+          : <p className="whitespace-pre-wrap text-sm leading-relaxed text-amber-900 dark:text-amber-100">{msg.content}</p>}
+        <AttachmentChips docs={docs ?? []} />
       </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1 flex-wrap">
+    );
+  }
+
+  if (isAgent) {
+    return (
+      <div className="flex gap-3 justify-end">
+        <div className="max-w-[85%] min-w-0">
+          <div className="mb-1 flex items-center justify-end gap-2">
+            {msg.channel && <span className="text-muted-foreground/60">{CHANNEL_ICONS[msg.channel]}</span>}
+            <span className="text-xs text-muted-foreground/70">{stamp}</span>
+            <span className="font-semibold text-sm">{senderName}</span>
+          </div>
+          <div className="rounded-2xl rounded-tr-sm bg-primary/8 dark:bg-primary/12 border border-primary/12 px-4 py-3">
+            {msg.content?.startsWith("<")
+              ? <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: msg.content }} />
+              : <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>}
+            <AttachmentChips docs={docs ?? []} />
+          </div>
+        </div>
+        <div className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-[10px] font-bold self-start ${avatarColor(senderName)}`}>
+          {initials(senderName)}
+        </div>
+      </div>
+    );
+  }
+
+  // Customer message
+  return (
+    <div className="flex gap-3">
+      <div className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-[10px] font-bold self-start ${avatarColor(senderName)}`}>
+        {initials(senderName)}
+      </div>
+      <div className="max-w-[85%] min-w-0">
+        <div className="mb-1 flex items-center gap-2">
           <span className="font-semibold text-sm">{senderName}</span>
-          {isInternal && (
-            <Badge variant="secondary" className="text-[10px] h-4 gap-1 px-1.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-              <Lock className="h-2.5 w-2.5" />
-              Internal note
-            </Badge>
-          )}
-          {msg.channel && (
-            <span className="flex items-center gap-1 text-xs text-muted-foreground">
-              {CHANNEL_ICONS[msg.channel]}
+          {msg.senderEmail && <span className="text-xs text-muted-foreground/70">&lt;{msg.senderEmail}&gt;</span>}
+          {msg.channel && <span className="text-muted-foreground/60">{CHANNEL_ICONS[msg.channel]}</span>}
+          <span className="text-xs text-muted-foreground/70">{stamp}</span>
+        </div>
+        <div className="rounded-2xl rounded-tl-sm bg-muted/60 border border-border/60 px-4 py-3">
+          {msg.content?.startsWith("<")
+            ? <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: msg.content }} />
+            : <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>}
+          <AttachmentChips docs={docs ?? []} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Sidebar cards ────────────────────────────────────────────────────────────
+
+function ContactCard({ ticket }: { ticket: any }) {
+  const contact = ticket.contact;
+  if (!contact) {
+    return (
+      <Card>
+        <CardContent className="px-3 py-3">
+          <p className="text-muted-foreground text-xs italic">Nessun contatto collegato</p>
+        </CardContent>
+      </Card>
+    );
+  }
+  const name = contact.name ?? (`${contact.firstName ?? ""} ${contact.lastName ?? ""}`.trim() || "—");
+  return (
+    <Card>
+      <CardHeader className="pb-2 pt-3 px-3">
+        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+          <User className="h-3.5 w-3.5" /> Cliente
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-3 pb-3 space-y-2.5">
+        <div className="flex items-center gap-2.5">
+          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-xs font-bold ${avatarColor(name)}`}>
+            {initials(name)}
+          </div>
+          <div className="min-w-0">
+            <p className="font-semibold text-sm truncate">{name}</p>
+            {contact.email && <p className="text-sm text-muted-foreground truncate">{contact.email}</p>}
+          </div>
+        </div>
+        {contact.phone && (
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <Phone className="h-3.5 w-3.5 shrink-0" />{contact.phone}
+          </div>
+        )}
+        {ticket.company && (
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground border-t pt-2">
+            <Building2 className="h-3.5 w-3.5 shrink-0" />
+            <span className="font-medium text-foreground">{ticket.company.name}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function PropertiesCard({
+  ticket, onStatusChange, onPriorityChange, onReassign,
+}: {
+  ticket: any;
+  onStatusChange: (s: string) => void;
+  onPriorityChange: (p: string) => void;
+  onReassign: () => void;
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-2 pt-3 px-3">
+        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          Proprietà
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-3 pb-3 space-y-3">
+        {/* Status pills */}
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Stato</p>
+          <div className="flex flex-wrap gap-1">
+            {STATUS_OPTIONS.map((opt) => (
+              <button key={opt.value} type="button" onClick={() => onStatusChange(opt.value)}
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition-all ${
+                  ticket.status === opt.value
+                    ? `${opt.color} ring-1 ring-inset ring-current/30`
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                }`}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Priority */}
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Priorità</p>
+          <div className="flex gap-1">
+            {PRIORITY_OPTIONS.map((opt) => (
+              <button key={opt.value} type="button" onClick={() => onPriorityChange(opt.value)}
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition-all ${
+                  (ticket.priority ?? "normal") === opt.value
+                    ? `bg-muted ${opt.color} ring-1 ring-inset ring-current/20`
+                    : "bg-muted/50 text-muted-foreground hover:bg-muted"
+                }`}>
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Assignee */}
+        <div>
+          <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Assegnato a</p>
+          <button type="button" onClick={onReassign}
+            className="group flex w-full items-center gap-2 rounded-lg border border-dashed border-border/60 px-2.5 py-1.5 transition-colors hover:border-primary/40 hover:bg-primary/5">
+            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted">
+              <User className="h-3.5 w-3.5 text-muted-foreground" />
+            </div>
+            <span className="truncate text-sm font-medium">{ticket.assignee?.name ?? "Non assegnato"}</span>
+            <MoreHorizontal className="ml-auto h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+          </button>
+        </div>
+
+        {/* SLA tier + severity */}
+        {(ticket.sla || ticket.severity) && (
+          <div className="flex flex-wrap gap-1.5 border-t pt-2.5">
+            {ticket.sla && <Badge variant="outline" className="text-xs">{ticket.sla.name}</Badge>}
+            {ticket.severity && ticket.severity !== "normal" && (
+              <Badge variant="outline" className="text-xs capitalize">Severity: {ticket.severity}</Badge>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function SLACard({ ticket, slaFirstTarget, slaResTarget }: { ticket: any; slaFirstTarget: Date | null; slaResTarget: Date | null }) {
+  if (!ticket.sla && !ticket.firstResponseAt && !ticket.resolvedAt) return null;
+  return (
+    <Card>
+      <CardHeader className="pb-2 pt-3 px-3">
+        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+          <Clock className="h-3.5 w-3.5" /> SLA
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-3 pb-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Prima risposta</span>
+          {ticket.firstResponseAt
+            ? <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">✓ {new Date(ticket.firstResponseAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</span>
+            : <SLATimer targetDate={slaFirstTarget} />}
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Risoluzione</span>
+          {ticket.resolvedAt
+            ? <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">✓ {new Date(ticket.resolvedAt).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}</span>
+            : <SLATimer targetDate={slaResTarget} />}
+        </div>
+        {ticket.closedAt && (
+          <div className="flex items-center justify-between border-t pt-2">
+            <span className="text-sm text-muted-foreground">Chiuso</span>
+            <span className="font-mono text-sm">{new Date(ticket.closedAt).toLocaleDateString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function AttachmentsCard({ docs }: { docs: any[] }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2 pt-3 px-3">
+        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+          <Paperclip className="h-3.5 w-3.5" />
+          Allegati
+          {docs.length > 0 && (
+            <span className="rounded-full bg-muted px-1.5 py-0.5 font-normal normal-case tracking-normal text-[10px] text-muted-foreground">
+              {docs.length}
             </span>
           )}
-          <span className="text-xs text-muted-foreground">{timeStr}</span>
-        </div>
-        {msg.content?.startsWith("<") ? (
-          <div
-            className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
-            // Content comes from authenticated agents only — no untrusted input
-            dangerouslySetInnerHTML={{ __html: msg.content }}
-          />
-        ) : (
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">
-            {msg.content}
-          </p>
-        )}
-      </div>
-    </div>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="px-3 pb-3 space-y-1">
+        {docs.length === 0
+          ? <p className="py-0.5 text-sm text-muted-foreground italic">Nessun allegato</p>
+          : docs.map((doc) => {
+            const isPdf = doc.mimeType === "application/pdf";
+            return (
+              <a key={doc.id} href={`/api/documents/${doc.id}${isPdf ? "?view=1" : ""}`}
+                target={isPdf ? "_blank" : undefined} download={!isPdf ? doc.name : undefined}
+                rel="noopener noreferrer"
+                className="group flex items-center gap-2 rounded-md p-1.5 transition-colors hover:bg-muted/50">
+                <FileText className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium leading-snug group-hover:text-primary">{doc.name}</p>
+                  {doc.size != null && <p className="text-xs text-muted-foreground">{formatBytes(doc.size)}</p>}
+                </div>
+                <ExternalLink className="h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </a>
+            );
+          })}
+      </CardContent>
+    </Card>
   );
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const router = useRouter();
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const [ticket, setTicket] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
@@ -235,78 +619,61 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   const [macros, setMacros] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [presence, setPresence] = useState<any[]>([]);
+  const [ticketDocs, setTicketDocs] = useState<Record<string, any>>({});
 
-  // Reply form
   const [replyContent, setReplyContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
   const [sending, setSending] = useState(false);
 
-  // Dialogs
   const [reassignOpen, setReassignOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedAssignee, setSelectedAssignee] = useState<string>("__none__");
   const [reassigning, setReassigning] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const loadTicket = async () => {
+  const scrollToBottom = useCallback(() => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    });
+  }, []);
+
+  const loadTicket = useCallback(async () => {
     try {
-      const data = await getTicketById(id);
+      const [data, docsRes] = await Promise.all([
+        getTicketById(id),
+        fetch(`/api/documents?entityType=ticket&entityId=${id}`).then((r) => r.json()).catch(() => ({ documents: [] })),
+      ]);
       if (data) {
         setTicket(data);
-        const sorted = [...(data.messages ?? [])].sort(
-          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
-        setMessages(sorted);
-        const sortedLogs = [...(data.auditLogs ?? [])].sort(
-          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-        setAuditLogs(sortedLogs);
+        setMessages([...(data.messages ?? [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
+        setAuditLogs([...(data.auditLogs ?? [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
         setSelectedAssignee(encodeAssignee(data.assigneeId, null));
       }
-    } catch (error) {
-      console.error("Failed to load ticket:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadTicket();
-    getMacros().then(setMacros).catch(() => {});
+      const docsById: Record<string, any> = {};
+      for (const doc of docsRes.documents ?? []) docsById[doc.id] = doc;
+      setTicketDocs(docsById);
+    } catch (e) { console.error("Failed to load ticket:", e); }
+    finally { setLoading(false); }
   }, [id]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  // Presence: announce self as "viewing", poll others every 15s
+  useEffect(() => { loadTicket(); getMacros().then(setMacros).catch(console.error); }, [id, loadTicket]);
+  useEffect(() => { if (!loading) scrollToBottom(); }, [loading, scrollToBottom]);
   useEffect(() => {
     const announce = (action: "viewing" | "typing") =>
-      fetch(`/api/tickets/${id}/presence`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }).catch(() => {});
-
-    const poll = () =>
-      fetch(`/api/tickets/${id}/presence`)
-        .then((r) => r.json())
-        .then((data: any[]) => setPresence(data))
-        .catch(() => {});
-
-    announce("viewing");
-    poll();
-    const interval = setInterval(() => { announce("viewing"); poll(); }, 15_000);
-    return () => clearInterval(interval);
+      fetch(`/api/tickets/${id}/presence`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }).catch(console.error);
+    const poll = () => fetch(`/api/tickets/${id}/presence`).then((r) => r.json()).then((d: unknown[]) => setPresence(d)).catch(console.error);
+    announce("viewing"); poll();
+    const t = setInterval(() => { announce("viewing"); poll(); }, 15_000);
+    return () => clearInterval(t);
   }, [id]);
 
   const isReplyEmpty = !replyContent.trim() || replyContent === "<p></p>";
 
-  const handleSendReply = async () => {
+  const handleSendReply = useCallback(async () => {
     if (isReplyEmpty) return;
     setSending(true);
     try {
-      const result = await addTicketMessageAction(id, {
-        content: replyContent,
-        channel: ticket?.channel ?? "email",
-        isPublic: !isInternal,
-      });
+      const result = await addTicketMessageAction(id, { content: replyContent, channel: ticket?.channel ?? "email", isPublic: !isInternal });
       if (result?.linkedFromClosed) {
         toast.info(`Ticket chiuso — nuovo ticket ${result.newTicketNumber} creato`);
         router.push(`/dashboard/support/tickets/${result.newTicketId}`);
@@ -314,97 +681,87 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       }
       setReplyContent("<p></p>");
       await loadTicket();
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to send reply");
-    } finally {
-      setSending(false);
-    }
-  };
+      scrollToBottom();
+    } catch (err: any) { toast.error(err.message ?? "Invio fallito"); }
+    finally { setSending(false); }
+  }, [id, isInternal, isReplyEmpty, loadTicket, replyContent, router, scrollToBottom, ticket?.channel]);
 
-  const handleStatusChange = async (status: string) => {
+  const handleStatusChange = useCallback(async (status: string) => {
     try {
-      await updateTicketAction(id, { status: status as "new" | "open" | "in_progress" | "waiting" | "on_hold" | "resolved" | "closed" });
-      setTicket((prev: any) => ({ ...prev, status }));
-      toast.success("Status updated");
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to update status");
-    }
-  };
+      await updateTicketAction(id, { status: status as any });
+      setTicket((p: any) => ({ ...p, status }));
+      toast.success("Stato aggiornato");
+    } catch (err: any) { toast.error(err.message ?? "Errore"); }
+  }, [id]);
 
-  const handlePriorityChange = async (priority: string) => {
+  const handlePriorityChange = useCallback(async (priority: string) => {
     try {
-      await updateTicketAction(id, { priority: priority as "low" | "normal" | "high" | "urgent" });
-      setTicket((prev: any) => ({ ...prev, priority }));
-      toast.success("Priority updated");
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to update priority");
-    }
-  };
+      await updateTicketAction(id, { priority: priority as any });
+      setTicket((p: any) => ({ ...p, priority }));
+      toast.success("Priorità aggiornata");
+    } catch (err: any) { toast.error(err.message ?? "Errore"); }
+  }, [id]);
 
-  const handleEscalate = async () => {
+  const handleEscalate = useCallback(async () => {
     try {
       const result = await escalateTicketAction(id);
-      if (result.alreadyMaxPriority) {
-        toast.info("Ticket is already at maximum priority (Urgent)");
-        return;
-      }
-      setTicket((prev: any) => ({ ...prev, priority: result.newPriority }));
-      toast.success(`Priority escalated to ${result.newPriority}`);
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to escalate ticket");
-    }
-  };
+      if (result.alreadyMaxPriority) { toast.info("Priorità già al massimo (Urgente)"); return; }
+      setTicket((p: any) => ({ ...p, priority: result.newPriority }));
+      toast.success(`Priorità escalata a ${result.newPriority}`);
+    } catch (err: any) { toast.error(err.message ?? "Errore"); }
+  }, [id]);
 
-  const handleReassign = async () => {
+  const handleReassign = useCallback(async () => {
     setReassigning(true);
     try {
       const { ownerId } = decodeAssignee(selectedAssignee);
       await reassignTicketAction(id, ownerId);
       await loadTicket();
       setReassignOpen(false);
-      toast.success(ownerId ? "Ticket reassigned" : "Assignee removed");
-    } catch (err: any) {
-      toast.error(err.message ?? "Failed to reassign ticket");
-    } finally {
-      setReassigning(false);
-    }
-  };
+      toast.success(ownerId ? "Ticket riassegnato" : "Assegnatario rimosso");
+    } catch (err: any) { toast.error(err.message ?? "Errore"); }
+    finally { setReassigning(false); }
+  }, [id, loadTicket, selectedAssignee]);
 
-  const handleDelete = async () => {
+  const handleDelete = useCallback(async () => {
     setDeleting(true);
     try {
       await deleteTicketAction(id);
-      toast.success("Ticket deleted");
+      toast.success("Ticket eliminato");
       router.push("/dashboard/support/tickets");
     } catch (err: any) {
-      toast.error(err.message ?? "Failed to delete ticket");
-      setDeleting(false);
-      setDeleteOpen(false);
+      toast.error(err.message ?? "Errore");
+      setDeleting(false); setDeleteOpen(false);
     }
-  };
+  }, [id, router]);
 
-  // SLA targets
-  const slaFirstResponseTarget = ticket?.sla && !ticket.firstResponseAt
-    ? new Date(new Date(ticket.createdAt).getTime() + ticket.sla.firstResponseTimeMinutes * 60_000)
-    : null;
-  const slaResolutionTarget = ticket?.sla && !ticket.resolvedAt
-    ? new Date(new Date(ticket.createdAt).getTime() + ticket.sla.resolutionTimeMinutes * 60_000)
-    : null;
+  const slaFirstTarget = ticket?.sla && !ticket.firstResponseAt
+    ? new Date(new Date(ticket.createdAt).getTime() + ticket.sla.firstResponseTimeMinutes * 60_000) : null;
+  const slaResTarget = ticket?.sla && !ticket.resolvedAt
+    ? new Date(new Date(ticket.createdAt).getTime() + ticket.sla.resolutionTimeMinutes * 60_000) : null;
 
-  // Loading skeleton
+  // Build chronological timeline merging messages + audit events
+  const timeline = [
+    ...messages.map((m) => ({ type: "message" as const, ts: new Date(m.createdAt).getTime(), data: m })),
+    ...auditLogs.map((a) => ({ type: "audit" as const, ts: new Date(a.createdAt).getTime(), data: a })),
+  ].sort((a, b) => a.ts - b.ts);
+
+  // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="space-y-6 animate-pulse">
-        <div className="h-5 w-32 bg-muted rounded" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="h-28 bg-muted rounded-xl" />
-            <div className="h-96 bg-muted rounded-xl" />
+      <div className="flex flex-col gap-0 animate-pulse p-6">
+        <div className="h-4 w-28 rounded bg-muted mb-6" />
+        <div className="h-7 w-96 rounded bg-muted mb-3" />
+        <div className="h-4 w-64 rounded bg-muted mb-6" />
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          <div className="lg:col-span-2 space-y-3">
+            <div className="h-80 rounded-xl bg-muted" />
+            <div className="h-40 rounded-xl bg-muted" />
           </div>
-          <div className="space-y-4">
-            <div className="h-52 bg-muted rounded-xl" />
-            <div className="h-40 bg-muted rounded-xl" />
-            <div className="h-32 bg-muted rounded-xl" />
+          <div className="space-y-3">
+            <div className="h-28 rounded-xl bg-muted" />
+            <div className="h-48 rounded-xl bg-muted" />
+            <div className="h-24 rounded-xl bg-muted" />
           </div>
         </div>
       </div>
@@ -413,495 +770,240 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
   if (!ticket) {
     return (
-      <div className="text-center py-20">
-        <MessageSquare className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-        <p className="text-muted-foreground mb-4">Ticket not found</p>
-        <Button asChild>
-          <Link href="/dashboard/support/tickets">Back to Tickets</Link>
-        </Button>
+      <div className="py-24 text-center">
+        <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
+        <p className="mb-4 text-muted-foreground">Ticket non trovato</p>
+        <Button asChild variant="outline"><Link href="/dashboard/support/tickets">← Torna ai ticket</Link></Button>
       </div>
     );
   }
 
-  const createdAt = new Date(ticket.createdAt).toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const typingUsers = presence.filter((p) => p.action === "typing");
 
   return (
     <>
-      <div className="p-6 space-y-5">
-        {/* Back nav */}
-        <Link
-          href="/dashboard/support/tickets"
-          className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          All Tickets
-        </Link>
+      {/* Cancel parent vertical padding only, fill viewport below the 3rem app header */}
+      <div className="-my-4 md:-my-6 flex flex-col overflow-hidden" style={{ height: "calc(100vh - 3rem)" }}>
 
-        {/* Page header */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <span className="font-mono text-xs font-semibold text-muted-foreground">
-              {ticket.ticketNumber}
-            </span>
-            <h1 className="text-2xl font-bold tracking-tight mt-1 leading-tight">
-              {ticket.subject}
-            </h1>
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <TicketStatusBadge status={ticket.status} />
-              <TicketPriorityBadge priority={ticket.priority} />
-              <Badge variant="outline" className="flex items-center gap-1 text-xs">
-                {CHANNEL_ICONS[ticket.channel]}
-                <span className="capitalize">{ticket.channel}</span>
-              </Badge>
-              {ticket.severity && ticket.severity !== "normal" && (
-                <Badge variant="outline" className="text-xs capitalize">
-                  Severity: {ticket.severity}
-                </Badge>
-              )}
-              {ticket.tags?.map((tag: string) => (
-                <Badge key={tag} variant="secondary" className="text-xs">
-                  {tag}
-                </Badge>
-              ))}
+        {/* ── Header ──────────────────────────────────────────────────────── */}
+        <div className="shrink-0 border-b bg-background px-6 pb-4 pt-5">
+          {/* Breadcrumb + actions */}
+          <div className="mb-3 flex items-center justify-between gap-4">
+            <Link href="/dashboard/support/tickets"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+              <ArrowLeft className="h-3.5 w-3.5" /> Tutti i ticket
+            </Link>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs font-semibold text-muted-foreground">{ticket.ticketNumber}</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-8 gap-1">
+                    Azioni <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-44">
+                  <DropdownMenuItem onClick={handleEscalate} className="gap-2">
+                    <TrendingUp className="h-4 w-4 text-orange-500" /> Escala priorità
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setReassignOpen(true)} className="gap-2">
+                    <UserCheck className="h-4 w-4 text-blue-500" /> Riassegna
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="gap-2 text-destructive focus:text-destructive">
+                    <Trash2 className="h-4 w-4" /> Elimina ticket
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-              <Clock className="h-3.5 w-3.5" />
-              Opened {createdAt}
-            </p>
           </div>
 
-          {/* Actions dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-1.5 shrink-0">
-                Actions
-                <ChevronDown className="h-3.5 w-3.5" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem onClick={handleEscalate} className="gap-2">
-                <TrendingUp className="h-4 w-4 text-orange-500" />
-                Escalate Priority
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setReassignOpen(true)} className="gap-2">
-                <UserCheck className="h-4 w-4 text-blue-500" />
-                Reassign
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => setDeleteOpen(true)}
-                className="gap-2 text-destructive focus:text-destructive"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete Ticket
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Title */}
+          <h1 className="font-bold text-2xl leading-tight tracking-tight mb-2">{ticket.subject}</h1>
+
+          {/* Meta row */}
+          <div className="flex flex-wrap items-center gap-2">
+            <TicketStatusBadge status={ticket.status} />
+            <TicketPriorityBadge priority={ticket.priority} />
+            <Badge variant="outline" className="h-5 gap-1 text-xs">
+              {CHANNEL_ICONS[ticket.channel]}
+              <span className="capitalize">{ticket.channel}</span>
+            </Badge>
+            {ticket.severity && ticket.severity !== "normal" && (
+              <Badge variant="outline" className="h-5 text-xs capitalize">Severity: {ticket.severity}</Badge>
+            )}
+            {ticket.tags?.map((tag: string) => (
+              <Badge key={tag} variant="secondary" className="h-5 text-xs">{tag}</Badge>
+            ))}
+            <span className="flex items-center gap-1 text-xs text-muted-foreground ml-1">
+              <Clock className="h-3.5 w-3.5" />
+              {new Date(ticket.createdAt).toLocaleString("it-IT", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+            </span>
+          </div>
         </div>
 
-        {/* Main grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* ── Left: Conversation ─────────────────────────────────────── */}
-          <div className="lg:col-span-2 flex flex-col gap-5">
-            <Card className="flex flex-col">
-              <CardHeader className="pb-3 border-b">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-muted-foreground" />
-                  Conversation
-                  <Badge variant="secondary" className="ml-auto text-xs">
-                    {messages.length} {messages.length === 1 ? "message" : "messages"}
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
+        {/* ── Body grid ───────────────────────────────────────────────────── */}
+        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_300px]">
 
-              <CardContent className="p-4 flex-1">
-                {/* Presence banner */}
-                {presence.filter((p) => p.action === "typing").length > 0 && (
-                  <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 rounded-lg px-3 py-2 mb-3">
-                    <span className="flex gap-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-bounce" style={{ animationDelay: "300ms" }} />
-                    </span>
-                    {presence.filter((p) => p.action === "typing").map((p: any) => p.userName).join(", ")} sta scrivendo una risposta…
-                  </div>
-                )}
-                {/* Messages list */}
-                <div className="space-y-4 max-h-[480px] overflow-y-auto pr-1 mb-4">
-                  {messages.length === 0 ? (
-                    <div className="text-center py-12">
-                      <MessageSquare className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
-                      <p className="text-sm text-muted-foreground">
-                        No messages yet. Send the first reply below.
-                      </p>
-                    </div>
-                  ) : (
-                    messages.map((msg, i) => <MessageBubble key={msg.id ?? i} msg={msg} />)
+          {/* ── Left: Conversation ──────────────────────────────────────── */}
+          <div className="flex flex-col min-h-0 border-r">
+
+            {/* Typing presence banner */}
+            {typingUsers.length > 0 && (
+              <div className="flex items-center gap-2 border-b bg-amber-50/80 px-6 py-2 text-xs text-amber-700 dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-400">
+                <span className="flex gap-0.5">
+                  {[0, 150, 300].map((d) => (
+                    <span key={d} className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500" style={{ animationDelay: `${d}ms` }} />
+                  ))}
+                </span>
+                {typingUsers.map((p: any) => p.userName).join(", ")} sta scrivendo…
+              </div>
+            )}
+
+            {/* Timeline */}
+            <div ref={scrollRef}
+              className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
+              {timeline.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <MessageSquare className="mb-3 h-10 w-10 text-muted-foreground/20" />
+                  <p className="text-sm text-muted-foreground">Nessun messaggio ancora.</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">Invia la prima risposta qui sotto.</p>
+                </div>
+              ) : (
+                timeline.map((item, i) => {
+                  if (item.type === "audit") {
+                    return <AuditEvent key={`audit-${item.data.id}-${i}`} entry={item.data} />;
+                  }
+                  const msg = item.data;
+                  const isAgent = !!msg.sender;
+                  const msgDocs = (msg.attachmentIds ?? []).map((docId: string) => ticketDocs[docId]).filter(Boolean);
+                  return <MessageBubble key={msg.id ?? i} msg={msg} docs={msgDocs} isAgent={isAgent} />;
+                })
+              )}
+            </div>
+
+            {/* ── Reply area ──────────────────────────────────────────── */}
+            <div className={`shrink-0 border-t p-4 space-y-3 ${isInternal ? "bg-amber-50/40 dark:bg-amber-950/10" : "bg-background"}`}>
+
+              {/* Public / Internal toggle */}
+              <div className="flex items-center gap-1 w-fit rounded-lg border bg-muted/40 p-0.5">
+                {[
+                  { val: false, icon: Send, label: "Risposta pubblica" },
+                  { val: true, icon: Lock, label: "Nota interna" },
+                ].map(({ val, icon: Icon, label }) => (
+                  <button key={String(val)} type="button" onClick={() => setIsInternal(val)}
+                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-all ${
+                      isInternal === val
+                        ? val ? "bg-amber-100 text-amber-700 shadow-sm dark:bg-amber-900/40 dark:text-amber-300"
+                               : "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}>
+                    <Icon className="h-3 w-3" />{label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Editor */}
+              <div onKeyDown={(e) => { if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); handleSendReply(); } }}>
+                <RichTextEditor value={replyContent}
+                  onChange={(html) => {
+                    setReplyContent(html);
+                    fetch(`/api/tickets/${id}/presence`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "typing" }) }).catch(() => {});
+                  }}
+                  placeholder={isInternal ? "Scrivi una nota interna (visibile solo al team)…" : "Scrivi una risposta al cliente…"}
+                  className={isInternal ? "border-amber-300 dark:border-amber-700" : ""}
+                  macroVariables />
+              </div>
+
+              {/* Footer */}
+              <div className="flex items-center justify-between">
+                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                  {isInternal
+                    ? <><Shield className="h-3 w-3" /> Visibile solo agli agenti</>
+                    : <>Ctrl+Enter per inviare</>}
+                </p>
+                <div className="flex items-center gap-2">
+                  {macros.length > 0 && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                          <Zap className="h-3.5 w-3.5" /> Macro
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="max-h-60 w-52 overflow-y-auto">
+                        {macros.map((macro: any) => (
+                          <DropdownMenuItem key={macro.id} className="flex flex-col items-start gap-0.5 py-2"
+                            onClick={() => {
+                              setReplyContent(macro.body
+                                .replace(/\{ticket\.number\}/g, ticket?.ticketNumber ?? "")
+                                .replace(/\{contact\.firstName\}/g, ticket?.contact?.firstName ?? ticket?.contact?.name?.split(" ")[0] ?? "")
+                                .replace(/\{agent\.name\}/g, ""));
+                              setIsInternal(!macro.isPublic);
+                            }}>
+                            <span className="font-medium text-sm">{macro.name}</span>
+                            {macro.description && <span className="w-full truncate text-xs text-muted-foreground">{macro.description}</span>}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
-                  <div ref={messagesEndRef} />
+                  <Button variant="ghost" size="sm" className="h-8" onClick={() => setReplyContent("<p></p>")} disabled={isReplyEmpty}>
+                    Pulisci
+                  </Button>
+                  <Button size="sm" className="h-8 gap-1.5" onClick={handleSendReply} disabled={isReplyEmpty || sending}>
+                    <Send className="h-3.5 w-3.5" />
+                    {sending ? "Invio…" : isInternal ? "Aggiungi nota" : "Invia risposta"}
+                  </Button>
                 </div>
-
-                {/* Reply form */}
-                <div className="border-t pt-4 space-y-3">
-                  {/* Toggle: Public / Internal */}
-                  <div className="flex items-center gap-1 rounded-lg border p-0.5 bg-muted/40 w-fit">
-                    <button
-                      type="button"
-                      onClick={() => setIsInternal(false)}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                        !isInternal
-                          ? "bg-background shadow-sm text-foreground"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <Send className="h-3 w-3" />
-                      Public Reply
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsInternal(true)}
-                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                        isInternal
-                          ? "bg-amber-100 shadow-sm text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
-                          : "text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      <Lock className="h-3 w-3" />
-                      Internal Note
-                    </button>
-                  </div>
-
-                  <RichTextEditor
-                    value={replyContent}
-                    onChange={(html) => {
-                      setReplyContent(html);
-                      fetch(`/api/tickets/${id}/presence`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "typing" }) }).catch(() => {});
-                    }}
-                    placeholder={
-                      isInternal
-                        ? "Write an internal note (only visible to your team)..."
-                        : "Type your reply to the customer..."
-                    }
-                    className={isInternal ? "border-amber-300 dark:border-amber-700" : ""}
-                    macroVariables
-                  />
-
-                  <div className="flex items-center justify-between">
-                    <p className="text-xs text-muted-foreground">
-                      {isInternal ? (
-                        <span className="flex items-center gap-1">
-                          <Shield className="h-3 w-3" />
-                          Visible only to agents
-                        </span>
-                      ) : (
-                        <span>Ctrl+Enter to send</span>
-                      )}
-                    </p>
-                    <div className="flex gap-2">
-                      {macros.length > 0 && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="gap-1.5">
-                              <Zap className="h-3.5 w-3.5" />
-                              Macros
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56 max-h-64 overflow-y-auto">
-                            {macros.map((macro: any) => (
-                              <DropdownMenuItem
-                                key={macro.id}
-                                className="flex flex-col items-start gap-0.5 py-2"
-                                onClick={() => {
-                                  const resolved = macro.body
-                                    .replace(/\{ticket\.number\}/g, ticket?.ticketNumber ?? "")
-                                    .replace(/\{contact\.firstName\}/g, ticket?.contact?.firstName ?? ticket?.contact?.name?.split(" ")[0] ?? "")
-                                    .replace(/\{agent\.name\}/g, "");
-                                  setReplyContent(resolved);
-                                  setIsInternal(!macro.isPublic);
-                                }}
-                              >
-                                <span className="font-medium text-xs">{macro.name}</span>
-                                {macro.description && (
-                                  <span className="text-muted-foreground text-[10px] truncate w-full">
-                                    {macro.description}
-                                  </span>
-                                )}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setReplyContent("<p></p>")}
-                        disabled={isReplyEmpty}
-                      >
-                        Clear
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={handleSendReply}
-                        disabled={isReplyEmpty || sending}
-                      >
-                        <Send className="h-3.5 w-3.5" />
-                        {sending ? "Sending…" : isInternal ? "Add Note" : "Send Reply"}
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
 
-          {/* ── Right: Sidebar ─────────────────────────────────────────── */}
-          <div className="space-y-4">
-            {/* Properties */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Properties</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1.5">Status</p>
-                  <Select value={ticket.status} onValueChange={handleStatusChange}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {STATUS_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1.5">Priority</p>
-                  <Select value={ticket.priority ?? "normal"} onValueChange={handlePriorityChange}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PRIORITY_OPTIONS.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value} className="text-xs">
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {ticket.severity && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">Severity</p>
-                    <Badge variant="outline" className="text-xs capitalize">
-                      {ticket.severity}
-                    </Badge>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1.5">Assigned to</p>
-                  <button
-                    type="button"
-                    onClick={() => setReassignOpen(true)}
-                    className="flex items-center gap-2 w-full text-left group"
-                  >
-                    <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                      <User className="h-3.5 w-3.5 text-primary" />
-                    </div>
-                    <span className="text-xs font-medium group-hover:text-primary transition-colors truncate">
-                      {ticket.assignee?.name ?? "Unassigned"}
-                    </span>
-                    <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 ml-auto" />
-                  </button>
-                </div>
-
-                {ticket.sla && (
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-1">SLA Tier</p>
-                    <Badge variant="outline" className="text-xs">
-                      {ticket.sla.name}
-                    </Badge>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Customer */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm">Customer</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                {ticket.contact ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/60 to-primary flex items-center justify-center text-primary-foreground text-xs font-bold flex-shrink-0">
-                        {(ticket.contact.name ?? ticket.contact.firstName ?? "?")
-                          .split(" ")
-                          .map((n: string) => n[0])
-                          .join("")
-                          .toUpperCase()
-                          .slice(0, 2)}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-sm truncate">
-                          {ticket.contact.name ??
-                            `${ticket.contact.firstName ?? ""} ${ticket.contact.lastName ?? ""}`.trim()}
-                        </p>
-                        {ticket.contact.email && (
-                          <p className="text-xs text-muted-foreground truncate">{ticket.contact.email}</p>
-                        )}
-                      </div>
-                    </div>
-                    {ticket.contact.phone && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Phone className="h-3.5 w-3.5 flex-shrink-0" />
-                        {ticket.contact.phone}
-                      </div>
-                    )}
-                    {ticket.company && (
-                      <div className="text-xs text-muted-foreground border-t pt-2">
-                        Company:{" "}
-                        <span className="font-medium text-foreground">{ticket.company.name}</span>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <p className="text-xs text-muted-foreground italic">No contact linked</p>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* SLA Tracking */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                  SLA Tracking
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">First Response</span>
-                  {ticket.firstResponseAt ? (
-                    <span className="font-semibold text-green-600 dark:text-green-400">
-                      ✓ {new Date(ticket.firstResponseAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  ) : slaFirstResponseTarget ? (
-                    <SLATimer targetDate={slaFirstResponseTarget} />
-                  ) : (
-                    <span className="text-muted-foreground">Pending</span>
-                  )}
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Resolution</span>
-                  {ticket.resolvedAt ? (
-                    <span className="font-semibold text-green-600 dark:text-green-400">
-                      ✓ {new Date(ticket.resolvedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  ) : slaResolutionTarget ? (
-                    <SLATimer targetDate={slaResolutionTarget} />
-                  ) : (
-                    <span className="text-muted-foreground">Pending</span>
-                  )}
-                </div>
-
-                {ticket.closedAt && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Closed</span>
-                    <span className="font-mono font-semibold">
-                      {new Date(ticket.closedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Activity Log */}
-            {auditLogs.length > 0 && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-sm flex items-center gap-1.5">
-                    <Activity className="h-3.5 w-3.5 text-muted-foreground" />
-                    Activity Log
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {auditLogs.slice(0, 20).map((entry: any) => (
-                    <AuditLogEntry key={entry.id} entry={entry} />
-                  ))}
-                  {auditLogs.length > 20 && (
-                    <p className="text-xs text-muted-foreground text-center pt-1">
-                      +{auditLogs.length - 20} more entries
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+          {/* ── Right: Sidebar ──────────────────────────────────────────── */}
+          <div className="space-y-3 overflow-y-auto p-4">
+            <ContactCard ticket={ticket} />
+            <PropertiesCard ticket={ticket} onStatusChange={handleStatusChange} onPriorityChange={handlePriorityChange} onReassign={() => setReassignOpen(true)} />
+            <SLACard ticket={ticket} slaFirstTarget={slaFirstTarget} slaResTarget={slaResTarget} />
+            <LinkedTasksCard ticketId={id} currentUserId={ticket?.ownerId ?? undefined} />
+            <AttachmentsCard docs={Object.values(ticketDocs)} />
           </div>
         </div>
       </div>
 
-      {/* ── Reassign Dialog ──────────────────────────────────────────── */}
+      {/* ── Reassign dialog ─────────────────────────────────────────────── */}
       <Dialog open={reassignOpen} onOpenChange={setReassignOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5 text-blue-500" />
-              Reassign Ticket
+              <UserCheck className="h-5 w-5 text-blue-500" /> Riassegna ticket
             </DialogTitle>
-            <DialogDescription>
-              Select an agent to handle this ticket.
-            </DialogDescription>
+            <DialogDescription>Seleziona un agente per gestire questo ticket.</DialogDescription>
           </DialogHeader>
-
           <AssigneeSelect value={selectedAssignee} onChange={setSelectedAssignee} />
-
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReassignOpen(false)}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setReassignOpen(false)}>Annulla</Button>
             <Button onClick={handleReassign} disabled={reassigning}>
-              {reassigning ? "Reassigning…" : "Reassign"}
+              {reassigning ? "Riassegno…" : "Riassegna"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* ── Delete Confirmation Dialog ───────────────────────────────── */}
+      {/* ── Delete dialog ───────────────────────────────────────────────── */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="h-5 w-5" />
-              Delete Ticket
+              <Trash2 className="h-5 w-5" /> Elimina ticket
             </DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete{" "}
-              <span className="font-semibold text-foreground">{ticket.ticketNumber}</span>?
-              This will permanently remove the ticket and all its messages.
+              Sei sicuro di voler eliminare <span className="font-semibold text-foreground">{ticket.ticketNumber}</span>?
+              Questa azione rimuoverà permanentemente il ticket e tutti i suoi messaggi.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>Annulla</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting ? "Deleting…" : "Delete Ticket"}
+              {deleting ? "Eliminazione…" : "Elimina"}
             </Button>
           </DialogFooter>
         </DialogContent>

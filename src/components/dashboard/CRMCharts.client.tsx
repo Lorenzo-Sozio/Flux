@@ -1,6 +1,8 @@
 // @ts-nocheck
 'use client';
 
+import { useTranslations } from "next-intl";
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   BarChart,
@@ -24,13 +26,14 @@ interface Props {
 }
 
 export default function CRMCharts({ dealDistribution, leadsBySource }: Props) {
+  const t = useTranslations("crm");
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* Pipeline Chart */}
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Deals by Stage</CardTitle>
-          <CardDescription>Number of active opportunities per pipeline stage</CardDescription>
+          <CardTitle>{t("dealsByStage")}</CardTitle>
+          <CardDescription>{t("dealsByStageDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
@@ -51,12 +54,12 @@ export default function CRMCharts({ dealDistribution, leadsBySource }: Props) {
       {/* Lead Source Chart */}
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle>Leads by Source</CardTitle>
-          <CardDescription>Acquisition channel effectiveness</CardDescription>
+          <CardTitle>{t("leadsBySource")}</CardTitle>
+          <CardDescription>{t("leadsBySourceDesc")}</CardDescription>
         </CardHeader>
         <CardContent className="h-[300px] flex flex-col justify-center">
           {(!leadsBySource || leadsBySource.length === 0) ? (
-            <p className="text-center text-muted-foreground italic">No lead source data available</p>
+            <p className="text-center text-muted-foreground italic">{t("noLeadSourceData")}</p>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>

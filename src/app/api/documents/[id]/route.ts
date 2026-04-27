@@ -43,7 +43,9 @@ export async function GET(
   }
 
   // ── Ownership check ──────────────────────────────────────────────────────────
-  if (doc.ownerId !== session.user.id) {
+  // ownerId is null for system-created documents (e.g. inbound email attachments).
+  // Those are accessible to any authenticated CRM user; user-uploaded docs require ownership.
+  if (doc.ownerId !== null && doc.ownerId !== session.user.id) {
     return new NextResponse("Forbidden", { status: 403 });
   }
 
