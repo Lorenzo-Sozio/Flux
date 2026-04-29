@@ -7,9 +7,9 @@
  */
 
 import { NextRequest } from "next/server";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { campaignLogs, emailSuppressions } from "@/db/schema";
+import { campaignLogs, contacts, emailSuppressions, leads } from "@/db/schema";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe-token";
 
 export async function GET(req: NextRequest) {
@@ -34,11 +34,25 @@ export async function GET(req: NextRequest) {
       .values({ email: email.toLowerCase(), reason: "unsubscribe" })
       .onConflictDoNothing();
 
-    // Update campaign log
-    await db
+    // Update campaign log and resolve the lead/contact FK
+    const [log] = await db
       .update(campaignLogs)
       .set({ status: "unsubscribed" })
-      .where(eq(campaignLogs.id, logId));
+      .where(eq(campaignLogs.id, logId))
+      .returning({ leadId: campaignLogs.leadId, contactId: campaignLogs.contactId });
+
+    // Sync marketingConsent on the originating record so the CRM reflects reality
+    if (log?.leadId) {
+      await db
+        .update(leads)
+        .set({ marketingConsent: false })
+        .where(eq(leads.id, log.leadId));
+    } else if (log?.contactId) {
+      await db
+        .update(contacts)
+        .set({ marketingConsent: false })
+        .where(eq(contacts.id, log.contactId));
+    }
   } catch {
     // Ignore DB errors — still show success to the user
   }

@@ -137,8 +137,9 @@ export function SendEmailModal({
       });
       toast.success("Email sent successfully!");
       handleOpen(false);
-    } catch {
-      toast.error("Failed to send email.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to send email.";
+      toast.error(msg);
     } finally {
       setIsSending(false);
     }

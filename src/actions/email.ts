@@ -3,6 +3,7 @@
 import { db } from "@/db";
 import { activities } from "@/db/schema";
 import { revalidatePath } from "next/cache";
+import { sendEmail } from "@/lib/email-provider";
 
 export async function sendEmailAction({
   to,
@@ -19,15 +20,15 @@ export async function sendEmailAction({
   contactId?: string;
   ownerId?: string;
 }) {
-  // SIMULATION: In a real app, integrate with Resend, SendGrid, or AWS SES here
-  console.log(`Sending email to ${to}...`);
-  console.log(`Subject: ${subject}`);
-  console.log(`Body: ${body}`);
+  const result = await sendEmail({ to, subject, html: body });
 
-  // Log as activity
+  if (!result.success) {
+    throw new Error(result.error ?? "Failed to send email.");
+  }
+
   await db.insert(activities).values({
     type: "email",
-    content: `Sent Email: ${subject}\n\n${body.substring(0, 200)}${body.length > 200 ? '...' : ''}`,
+    content: `Sent Email: ${subject}\n\n${body.substring(0, 200)}${body.length > 200 ? "..." : ""}`,
     leadId,
     contactId,
     ownerId,
