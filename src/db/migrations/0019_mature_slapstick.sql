@@ -1,0 +1,1 @@
+ALTER TABLE "task" ADD COLUMN "all_day" boolean DEFAULT true NOT NULL;

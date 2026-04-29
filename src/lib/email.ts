@@ -14,6 +14,27 @@ function sanitizeHeader(value: string): string {
   return value.replace(/[\r\n\t]/g, " ").trim();
 }
 
+/** Escape user-supplied strings before embedding in HTML email bodies. */
+function esc(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Allow only http/https URLs in href attributes; falls back to "#". */
+function safeHref(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.protocol === "https:" || u.protocol === "http:") return url;
+  } catch {
+    /* invalid URL — fall through */
+  }
+  return "#";
+}
+
 // ─── Password Reset ───────────────────────────────────────────────────────────
 
 export async function sendPasswordResetEmail(
@@ -103,12 +124,7 @@ export async function sendVerificationEmail(email: string, token: string) {
 
 // ─── Call / Meeting Invite ────────────────────────────────────────────────────
 
-export async function sendCallInviteEmail(
-  to: string,
-  contactName: string,
-  description: string,
-  scheduledAt: Date,
-) {
+export async function sendCallInviteEmail(to: string, contactName: string, description: string, scheduledAt: Date) {
   if (!process.env.RESEND_API_KEY && !process.env.SMTP_HOST) {
     console.log("[DEV] Call invite email to:", to);
     return;
@@ -193,6 +209,157 @@ export async function sendActivityReminderEmail(
         </a>
       </div>`,
   });
+}
+
+// ─── Appointment Invite / Update / Cancellation ───────────────────────────────
+
+export interface AppointmentEmailData {
+  title: string;
+  description?: string | null;
+  startAt: Date;
+  endAt: Date;
+  location?: string | null;
+  locationUrl?: string | null;
+  conferenceLink?: string | null;
+  organizerName: string;
+  icsContent: string; // pre-generated ICS string
+  method: "REQUEST" | "CANCEL";
+}
+
+export async function sendAppointmentInviteEmail(
+  to: { email: string; name: string },
+  data: AppointmentEmailData,
+  rsvpLinks?: { accept: string; decline: string; tentative: string },
+): Promise<{ success: boolean; error?: string }> {
+  const safe = (s: string) => sanitizeHeader(s);
+
+  const startStr = data.startAt.toLocaleString("it-IT", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const endStr = data.endAt.toLocaleString("it-IT", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const durationMs = data.endAt.getTime() - data.startAt.getTime();
+  const durationMin = Math.round(durationMs / 60_000);
+  const durationLabel =
+    durationMin < 60
+      ? `${durationMin} min`
+      : `${Math.floor(durationMin / 60)}h${durationMin % 60 ? ` ${durationMin % 60}min` : ""}`;
+
+  const isCancel = data.method === "CANCEL";
+  const subject = isCancel ? safe(`Cancelled: ${data.title}`) : safe(`Invitation: ${data.title}`);
+
+  const locationRow =
+    (data.conferenceLink ?? data.locationUrl ?? data.location)
+      ? `<tr>
+        <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap;border-radius:4px 0 0 4px">Luogo</td>
+        <td style="padding:8px 12px;border:1px solid #e5e7eb">
+          ${
+            data.conferenceLink
+              ? `<a href="${safeHref(data.conferenceLink)}" style="color:#2563eb">Collegamento video</a>`
+              : data.locationUrl
+                ? `<a href="${safeHref(data.locationUrl)}" style="color:#2563eb">${esc(data.locationUrl)}</a>`
+                : esc(data.location ?? "")
+          }
+        </td>
+      </tr>`
+      : "";
+
+  const rsvpSection =
+    !isCancel && rsvpLinks
+      ? `<div style="margin:24px 0">
+        <p style="font-size:14px;color:#374151;margin-bottom:12px">Conferma la tua partecipazione:</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a href="${rsvpLinks.accept}"
+             style="display:inline-block;padding:10px 20px;background:#16a34a;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px">
+            ✓ Accetta
+          </a>
+          <a href="${rsvpLinks.tentative}"
+             style="display:inline-block;padding:10px 20px;background:#d97706;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px">
+            ? Forse
+          </a>
+          <a href="${rsvpLinks.decline}"
+             style="display:inline-block;padding:10px 20px;background:#dc2626;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;font-size:13px">
+            ✗ Rifiuta
+          </a>
+        </div>
+      </div>`
+      : "";
+
+  const html = isCancel
+    ? `<div style="font-family:sans-serif;max-width:560px;margin:0 auto">
+        <div style="background:#dc2626;color:#fff;padding:16px 24px;border-radius:8px 8px 0 0">
+          <h2 style="margin:0;font-size:18px">Appuntamento annullato</h2>
+        </div>
+        <div style="border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px">
+          <p>Salve ${esc(to.name)},</p>
+          <p>L'appuntamento <strong>${esc(data.title)}</strong> è stato annullato da ${esc(data.organizerName)}.</p>
+          <table style="border-collapse:collapse;width:100%;margin:16px 0">
+            <tr>
+              <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap;border-radius:4px 0 0 4px">Data</td>
+              <td style="padding:8px 12px;border:1px solid #e5e7eb">${startStr}</td>
+            </tr>
+          </table>
+          <p style="color:#6b7280;font-size:13px">L'evento è stato rimosso dal tuo calendario.</p>
+        </div>
+      </div>`
+    : `<div style="font-family:sans-serif;max-width:560px;margin:0 auto">
+        <div style="background:#2563eb;color:#fff;padding:16px 24px;border-radius:8px 8px 0 0">
+          <h2 style="margin:0;font-size:18px">Invito: ${esc(data.title)}</h2>
+        </div>
+        <div style="border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px">
+          <p>Salve ${esc(to.name)},</p>
+          <p>${esc(data.organizerName)} ti ha invitato a un appuntamento.</p>
+          <table style="border-collapse:collapse;width:100%;margin:16px 0">
+            <tr>
+              <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap;border-radius:4px 0 0 4px">Inizio</td>
+              <td style="padding:8px 12px;border:1px solid #e5e7eb">${startStr}</td>
+            </tr>
+            <tr>
+              <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">Fine</td>
+              <td style="padding:8px 12px;border:1px solid #e5e7eb">${endStr} (${durationLabel})</td>
+            </tr>
+            ${locationRow}
+            ${
+              data.description
+                ? `<tr>
+              <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">Note</td>
+              <td style="padding:8px 12px;border:1px solid #e5e7eb;white-space:pre-wrap">${esc(data.description)}</td>
+            </tr>`
+                : ""
+            }
+          </table>
+          ${rsvpSection}
+          <p style="color:#6b7280;font-size:12px;margin-top:24px">
+            Il file .ics allegato ti permette di aggiungere l'evento al tuo calendario.
+          </p>
+        </div>
+      </div>`;
+
+  const icsMethod = isCancel ? "CANCEL" : "REQUEST";
+  const result = await sendEmail({
+    to: safe(to.email),
+    subject,
+    html,
+    attachments: [
+      {
+        filename: "appuntamento.ics",
+        content: data.icsContent,
+        contentType: `text/calendar; method=${icsMethod}; charset=utf-8`,
+      },
+    ],
+  });
+
+  if (!result.success) {
+    console.error("[EMAIL] Appointment invite failed to", to.email, result.error);
+  }
+  return result;
 }
 
 // ─── Task Due Reminder ────────────────────────────────────────────────────────

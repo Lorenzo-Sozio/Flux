@@ -540,7 +540,36 @@
     },
     "priorityLow": "Bassa",
     "priorityNormal": "Normale",
-    "priorityHigh": "Alta"
+    "priorityHigh": "Alta",
+    "priorityCritical": "Critico",
+    "priorityBlocker": "Bloccante",
+    "allDay": "Tutto il giorno",
+    "startDateLabel": "Inizio",
+    "endDateLabel": "Fine",
+    "addDescription": "Descrizione",
+    "hideDescription": "Nascondi",
+    "taskCreated": "Task creato",
+    "taskCreateFailed": "Impossibile creare il task",
+    "startLabel": "Inizio:",
+    "fieldMobile": "Cellulare",
+    "fieldRating": "Valutazione",
+    "fieldScore": "Punteggio",
+    "fieldNotes": "Note",
+    "fieldOwner": "Responsabile",
+    "fieldTags": "Tag",
+    "sectionContactInfo": "Informazioni di Contatto",
+    "sectionQualification": "Qualificazione",
+    "sectionCompanyInfo": "Azienda e Ruolo",
+    "sectionAddress": "Indirizzo",
+    "convertedStatus": "Convertito",
+    "fieldDepartment": "Reparto",
+    "fieldLinkedIn": "LinkedIn",
+    "sectionCrmInfo": "CRM e Punteggio",
+    "fieldType": "Tipo",
+    "fieldEmployees": "Dipendenti",
+    "fieldRevenue": "Fatturato Annuale",
+    "fieldDescription": "Descrizione",
+    "fieldSdiCode": "Codice SDI"
   },
   "pipeline": {
     "title": "Pipeline",
@@ -957,7 +986,9 @@
       "price": "Prezzo",
       "stock": "Scorte",
       "category": "Categoria",
-      "status": "Stato"
+      "status": "Stato",
+      "description": "Descrizione",
+      "active": "Attivo"
     },
     "form": {
       "namePlaceholder": "Nome prodotto…",
@@ -974,16 +1005,6 @@
     "active": "Attivo",
     "inactive": "Inattivo",
     "searchPlaceholder": "Cerca per nome o SKU…",
-    "columns": {
-      "name": "Nome",
-      "sku": "SKU",
-      "price": "Prezzo",
-      "stock": "Scorte",
-      "category": "Categoria",
-      "status": "Stato",
-      "description": "Descrizione",
-      "active": "Attivo"
-    },
     "dialog": {
       "editTitle": "Modifica Prodotto",
       "newTitle": "Nuovo Prodotto",
@@ -1596,10 +1617,32 @@
       "viewer": "Visualizzatore"
     },
     "rolePerms": {
-      "owner": ["Tutti i permessi admin", "Trasferisci proprietà workspace", "Elimina workspace", "Gestisci fatturazione"],
-      "admin": ["Tutti i permessi utente", "Invita e gestisci utenti", "Assegna ruoli", "Configura impostazioni e campi personalizzati", "Gestisci webhook e automazione"],
-      "user": ["Tutti i permessi visualizzatore", "Crea e modifica record", "Elimina record", "Invia email e preventivi", "Gestisci attività e pipeline"],
-      "viewer": ["Visualizza contatti, aziende, lead", "Visualizza pipeline e trattative", "Visualizza preventivi e ordini", "Visualizza report e analisi"]
+      "owner": [
+        "Tutti i permessi admin",
+        "Trasferisci proprietà workspace",
+        "Elimina workspace",
+        "Gestisci fatturazione"
+      ],
+      "admin": [
+        "Tutti i permessi utente",
+        "Invita e gestisci utenti",
+        "Assegna ruoli",
+        "Configura impostazioni e campi personalizzati",
+        "Gestisci webhook e automazione"
+      ],
+      "user": [
+        "Tutti i permessi visualizzatore",
+        "Crea e modifica record",
+        "Elimina record",
+        "Invia email e preventivi",
+        "Gestisci attività e pipeline"
+      ],
+      "viewer": [
+        "Visualizza contatti, aziende, lead",
+        "Visualizza pipeline e trattative",
+        "Visualizza preventivi e ordini",
+        "Visualizza report e analisi"
+      ]
     },
     "roleUpdated": "Ruolo aggiornato",
     "roleUpdateFailed": "Impossibile aggiornare il ruolo",
@@ -2005,7 +2048,13 @@
       "titleRequired": "Il titolo è obbligatorio.",
       "dateRequired": "Data e ora sono obbligatorie.",
       "createError": "Creazione evento fallita."
-    }
+    },
+    "typeAppointment": "Appuntamento",
+    "filterAll": "Tutti",
+    "filterMine": "I miei",
+    "filterGroup": "Il mio gruppo",
+    "allDay": "Tutto il giorno",
+    "noEventsThisDay": "Nessun evento programmato per questo giorno"
   },
   "chat": {
     "title": "Chat",
@@ -2212,5 +2261,60 @@
     "backToDashboard": "Torna alla Dashboard",
     "comingSoon": "Prossimamente",
     "comingSoonDescription": "Questa funzionalità è in arrivo."
+  },
+  "appointment": {
+    "title": "Appuntamenti",
+    "new": "Nuovo appuntamento",
+    "edit": "Modifica appuntamento",
+    "cancel": "Annulla appuntamento",
+    "cancelConfirm": "Sei sicuro di voler annullare questo appuntamento? Tutti i partecipanti saranno notificati.",
+    "createSuccess": "Appuntamento creato. Inviti inviati.",
+    "updateSuccess": "Appuntamento aggiornato. Partecipanti notificati.",
+    "cancelSuccess": "Appuntamento annullato. Partecipanti notificati.",
+    "deleteSuccess": "Appuntamento eliminato.",
+    "errorCreate": "Errore nella creazione dell'appuntamento.",
+    "errorUpdate": "Errore nell'aggiornamento dell'appuntamento.",
+    "titleRequired": "Il titolo è obbligatorio.",
+    "dateRequired": "Data e ora sono obbligatorie.",
+    "endBeforeStart": "La data di fine deve essere dopo quella di inizio.",
+    "conflictWarning": "Possibile sovrapposizione con:",
+    "fields": {
+      "titleLabel": "Titolo",
+      "titlePlaceholder": "Riunione con cliente…",
+      "startLabel": "Inizio",
+      "endLabel": "Fine",
+      "locationLabel": "Luogo (opzionale)",
+      "locationPlaceholder": "Indirizzo fisico o URL…",
+      "conferenceLabel": "Videoconferenza",
+      "conferenceNone": "Nessuna",
+      "conferenceJitsi": "Genera link Jitsi",
+      "conferenceCustom": "Link personalizzato",
+      "conferenceJitsiHint": "Un link Jitsi Meet verrà generato automaticamente.",
+      "notesLabel": "Note / Descrizione",
+      "notesPlaceholder": "Agenda, argomenti da trattare…",
+      "reminderLabel": "Promemoria",
+      "reminderNone": "Nessun promemoria",
+      "reminder15": "15 minuti prima",
+      "reminder30": "30 minuti prima",
+      "reminder60": "1 ora prima",
+      "reminder120": "2 ore prima",
+      "reminder1440": "1 giorno prima",
+      "participantsLabel": "Partecipanti",
+      "participantsSearch": "Cerca",
+      "participantsManual": "Inserimento manuale",
+      "participantsSearchPlaceholder": "Nome, email…",
+      "participantsNamePlaceholder": "Nome",
+      "participantsEmailPlaceholder": "Email",
+      "participantsNone": "Nessun partecipante aggiunto.",
+      "participantsInternal": "interno"
+    },
+    "rsvp": {
+      "accepted": "Accettato",
+      "declined": "Rifiutato",
+      "pending": "In attesa",
+      "tentative": "Forse"
+    },
+    "submit": "Crea e invia inviti",
+    "cancel2": "Annulla"
   }
 }

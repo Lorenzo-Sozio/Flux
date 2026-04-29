@@ -51,6 +51,7 @@ type Task = {
   description: string | null;
   dueDate: Date | null;
   startDate?: Date | null;
+  allDay?: boolean;
   status: string;
   priority: string;
   depth: number;

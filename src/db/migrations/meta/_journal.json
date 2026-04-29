@@ -127,6 +127,20 @@
       "when": 1777145368875,
       "tag": "0017_fuzzy_mulholland_black",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1777320094419,
+      "tag": "0018_new_wallow",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1777386891516,
+      "tag": "0019_mature_slapstick",
+      "breakpoints": true
     }
   ]
 }

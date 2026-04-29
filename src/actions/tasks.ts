@@ -27,6 +27,7 @@ export async function createTask(data: {
   description?: string;
   dueDate?: Date;
   startDate?: Date;
+  allDay?: boolean;
   status?: string;
   priority?: string;
   ownerId?: string;
@@ -172,8 +173,17 @@ async function getTasksGeneric(where: { leadId?: string; contactId?: string; com
       title: tasks.title,
       description: tasks.description,
       dueDate: tasks.dueDate,
+      startDate: tasks.startDate,
+      allDay: tasks.allDay,
       status: tasks.status,
       priority: tasks.priority,
+      depth: tasks.depth,
+      progressPct: tasks.progressPct,
+      parentId: tasks.parentId,
+      estimatedHours: tasks.estimatedHours,
+      actualHours: tasks.actualHours,
+      ownerId: tasks.ownerId,
+      assigneeId: tasks.assigneeId,
       createdAt: tasks.createdAt,
       completedAt: tasks.completedAt,
       ownerName: creator.name,
@@ -306,6 +316,7 @@ export async function getAllTasks(userId: string, role: string) {
       description: tasks.description,
       dueDate: tasks.dueDate,
       startDate: tasks.startDate,
+      allDay: tasks.allDay,
       status: tasks.status,
       priority: tasks.priority,
       depth: tasks.depth,

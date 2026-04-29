@@ -19,14 +19,21 @@ export interface EmailConfig {
   fromName: string;
 }
 
+export interface EmailAttachment {
+  filename: string;
+  content: string; // UTF-8 text content
+  contentType: string; // e.g. 'text/calendar; method=REQUEST'
+}
+
 export interface SendOptions {
   to: string;
   subject: string;
   html: string;
   replyTo?: string;
   fromOverride?: string;
-  inReplyTo?: string;  // Message-ID of the message being replied to
+  inReplyTo?: string; // Message-ID of the message being replied to
   references?: string; // Space-separated chain of Message-IDs for thread history
+  attachments?: EmailAttachment[];
 }
 
 export interface SendResult {
@@ -62,7 +69,7 @@ export async function getEmailConfig(): Promise<EmailConfig> {
     provider: (process.env.EMAIL_PROVIDER as "resend" | "smtp") ?? "resend",
     resendApiKey: process.env.RESEND_API_KEY,
     smtpHost: process.env.SMTP_HOST,
-    smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587,
+    smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587,
     smtpUser: process.env.SMTP_USER,
     smtpPassword: process.env.SMTP_PASSWORD,
     smtpSecure: process.env.SMTP_SECURE === "true",
@@ -89,7 +96,11 @@ async function sendViaResend(options: SendOptions, config: EmailConfig): Promise
 
   if (!apiKey) {
     console.warn("[EMAIL] Resend API key not configured. Email not sent to:", options.to);
-    return { success: false, error: "Resend API key not configured. Set RESEND_API_KEY in your environment or configure an email provider in Settings → Email." };
+    return {
+      success: false,
+      error:
+        "Resend API key not configured. Set RESEND_API_KEY in your environment or configure an email provider in Settings → Email.",
+    };
   }
 
   try {
@@ -99,7 +110,12 @@ async function sendViaResend(options: SendOptions, config: EmailConfig): Promise
 
     const threadHeaders: Record<string, string> = {};
     if (options.inReplyTo) threadHeaders["In-Reply-To"] = options.inReplyTo;
-    if (options.references) threadHeaders["References"] = options.references;
+    if (options.references) threadHeaders.References = options.references;
+
+    const resendAttachments = options.attachments?.map((a) => ({
+      filename: a.filename,
+      content: Buffer.from(a.content, "utf-8"),
+    }));
 
     const { data, error } = await resend.emails.send({
       from,
@@ -108,6 +124,7 @@ async function sendViaResend(options: SendOptions, config: EmailConfig): Promise
       html: options.html,
       ...(options.replyTo ? { replyTo: options.replyTo } : {}),
       ...(Object.keys(threadHeaders).length ? { headers: threadHeaders } : {}),
+      ...(resendAttachments?.length ? { attachments: resendAttachments } : {}),
     });
 
     if (error) return { success: false, error: error.message };
@@ -130,12 +147,16 @@ async function sendViaSMTP(options: SendOptions, config: EmailConfig): Promise<S
       host: config.smtpHost,
       port: config.smtpPort ?? 587,
       secure: config.smtpSecure ?? false,
-      ...(config.smtpUser
-        ? { auth: { user: config.smtpUser, pass: config.smtpPassword ?? "" } }
-        : {}),
+      ...(config.smtpUser ? { auth: { user: config.smtpUser, pass: config.smtpPassword ?? "" } } : {}),
     });
 
     const from = options.fromOverride ?? `"${config.fromName}" <${config.fromEmail}>`;
+    const smtpAttachments = options.attachments?.map((a) => ({
+      filename: a.filename,
+      content: a.content,
+      contentType: a.contentType,
+    }));
+
     const info = await transporter.sendMail({
       from,
       to: options.to,
@@ -144,6 +165,7 @@ async function sendViaSMTP(options: SendOptions, config: EmailConfig): Promise<S
       ...(options.replyTo ? { replyTo: options.replyTo } : {}),
       ...(options.inReplyTo ? { inReplyTo: options.inReplyTo } : {}),
       ...(options.references ? { references: options.references } : {}),
+      ...(smtpAttachments?.length ? { attachments: smtpAttachments } : {}),
     });
 
     return { success: true, messageId: info.messageId };
@@ -163,9 +185,7 @@ export async function testEmailConfig(config: EmailConfig, testTo: string): Prom
         host: config.smtpHost ?? "",
         port: config.smtpPort ?? 587,
         secure: config.smtpSecure ?? false,
-        ...(config.smtpUser
-          ? { auth: { user: config.smtpUser, pass: config.smtpPassword ?? "" } }
-          : {}),
+        ...(config.smtpUser ? { auth: { user: config.smtpUser, pass: config.smtpPassword ?? "" } } : {}),
       });
       await transporter.verify();
     } catch (err: any) {
@@ -183,6 +203,6 @@ export async function testEmailConfig(config: EmailConfig, testTo: string): Prom
         <p style="color:#6b7280;font-size:13px">Sent from Flux CRM</p>
       </div>`,
     },
-    config
+    config,
   );
 }

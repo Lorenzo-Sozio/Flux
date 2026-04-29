@@ -540,7 +540,36 @@
     },
     "priorityLow": "Low",
     "priorityNormal": "Normal",
-    "priorityHigh": "High"
+    "priorityHigh": "High",
+    "priorityCritical": "Critical",
+    "priorityBlocker": "Blocker",
+    "allDay": "All day",
+    "startDateLabel": "Start",
+    "endDateLabel": "End",
+    "addDescription": "Description",
+    "hideDescription": "Hide",
+    "taskCreated": "Task created",
+    "taskCreateFailed": "Failed to create task",
+    "startLabel": "Start:",
+    "fieldMobile": "Mobile",
+    "fieldRating": "Rating",
+    "fieldScore": "Score",
+    "fieldNotes": "Notes",
+    "fieldOwner": "Owner",
+    "fieldTags": "Tags",
+    "sectionContactInfo": "Contact Info",
+    "sectionQualification": "Qualification",
+    "sectionCompanyInfo": "Company & Role",
+    "sectionAddress": "Address",
+    "convertedStatus": "Converted",
+    "fieldDepartment": "Department",
+    "fieldLinkedIn": "LinkedIn",
+    "sectionCrmInfo": "CRM & Scoring",
+    "fieldType": "Type",
+    "fieldEmployees": "Employees",
+    "fieldRevenue": "Annual Revenue",
+    "fieldDescription": "Description",
+    "fieldSdiCode": "SDI Code"
   },
   "pipeline": {
     "title": "Pipeline",
@@ -957,7 +986,9 @@
       "price": "Price",
       "stock": "Stock",
       "category": "Category",
-      "status": "Status"
+      "status": "Status",
+      "description": "Description",
+      "active": "Active"
     },
     "form": {
       "namePlaceholder": "Product name…",
@@ -974,16 +1005,6 @@
     "active": "Active",
     "inactive": "Inactive",
     "searchPlaceholder": "Search by name or SKU…",
-    "columns": {
-      "name": "Name",
-      "sku": "SKU",
-      "price": "Price",
-      "stock": "Stock",
-      "category": "Category",
-      "status": "Status",
-      "description": "Description",
-      "active": "Active"
-    },
     "dialog": {
       "editTitle": "Edit Product",
       "newTitle": "New Product",
@@ -1597,9 +1618,26 @@
     },
     "rolePerms": {
       "owner": ["All admin permissions", "Transfer workspace ownership", "Delete workspace", "Manage billing"],
-      "admin": ["All user permissions", "Invite and manage users", "Assign roles", "Configure settings & custom fields", "Manage webhooks and automation"],
-      "user": ["All viewer permissions", "Create and edit records", "Delete records", "Send emails and quotes", "Manage tasks and pipeline"],
-      "viewer": ["View contacts, companies, leads", "View pipeline and deals", "View quotes and orders", "View reports and analytics"]
+      "admin": [
+        "All user permissions",
+        "Invite and manage users",
+        "Assign roles",
+        "Configure settings & custom fields",
+        "Manage webhooks and automation"
+      ],
+      "user": [
+        "All viewer permissions",
+        "Create and edit records",
+        "Delete records",
+        "Send emails and quotes",
+        "Manage tasks and pipeline"
+      ],
+      "viewer": [
+        "View contacts, companies, leads",
+        "View pipeline and deals",
+        "View quotes and orders",
+        "View reports and analytics"
+      ]
     },
     "roleUpdated": "Role updated",
     "roleUpdateFailed": "Failed to update role",
@@ -2005,7 +2043,13 @@
       "titleRequired": "Title is required.",
       "dateRequired": "Date and time are required.",
       "createError": "Failed to create event."
-    }
+    },
+    "typeAppointment": "Appointment",
+    "filterAll": "All",
+    "filterMine": "Mine",
+    "filterGroup": "My group",
+    "allDay": "All day",
+    "noEventsThisDay": "No events scheduled for this day"
   },
   "chat": {
     "title": "Chat",
@@ -2212,5 +2256,60 @@
     "backToDashboard": "Back to Dashboard",
     "comingSoon": "Coming Soon",
     "comingSoonDescription": "This feature is coming soon."
+  },
+  "appointment": {
+    "title": "Appointments",
+    "new": "New Appointment",
+    "edit": "Edit Appointment",
+    "cancel": "Cancel Appointment",
+    "cancelConfirm": "Are you sure you want to cancel this appointment? All participants will be notified.",
+    "createSuccess": "Appointment created. Invitations sent.",
+    "updateSuccess": "Appointment updated. Participants notified.",
+    "cancelSuccess": "Appointment cancelled. Participants notified.",
+    "deleteSuccess": "Appointment deleted.",
+    "errorCreate": "Failed to create appointment.",
+    "errorUpdate": "Failed to update appointment.",
+    "titleRequired": "Title is required.",
+    "dateRequired": "Date and time are required.",
+    "endBeforeStart": "End time must be after start time.",
+    "conflictWarning": "Possible overlap with:",
+    "fields": {
+      "titleLabel": "Title",
+      "titlePlaceholder": "Meeting with client…",
+      "startLabel": "Start",
+      "endLabel": "End",
+      "locationLabel": "Location (optional)",
+      "locationPlaceholder": "Physical address or URL…",
+      "conferenceLabel": "Video Conference",
+      "conferenceNone": "None",
+      "conferenceJitsi": "Generate Jitsi Link",
+      "conferenceCustom": "Custom Link",
+      "conferenceJitsiHint": "A Jitsi Meet link will be generated automatically.",
+      "notesLabel": "Notes / Description",
+      "notesPlaceholder": "Agenda, topics to discuss…",
+      "reminderLabel": "Reminder",
+      "reminderNone": "No reminder",
+      "reminder15": "15 minutes before",
+      "reminder30": "30 minutes before",
+      "reminder60": "1 hour before",
+      "reminder120": "2 hours before",
+      "reminder1440": "1 day before",
+      "participantsLabel": "Participants",
+      "participantsSearch": "Search",
+      "participantsManual": "Manual entry",
+      "participantsSearchPlaceholder": "Name, email…",
+      "participantsNamePlaceholder": "Name",
+      "participantsEmailPlaceholder": "Email",
+      "participantsNone": "No participants added.",
+      "participantsInternal": "internal"
+    },
+    "rsvp": {
+      "accepted": "Accepted",
+      "declined": "Declined",
+      "pending": "Pending",
+      "tentative": "Maybe"
+    },
+    "submit": "Create & Send Invitations",
+    "cancel2": "Cancel"
   }
 }

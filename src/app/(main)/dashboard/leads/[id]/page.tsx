@@ -5,18 +5,41 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { getActivitiesByLead, createActivity } from "@/actions/activities";
-import { getTasksByLead, createTask, updateTaskStatus, getAllUsers } from "@/actions/tasks";
+import { getTasksByLead, updateTaskStatus, getAllUsers } from "@/actions/tasks";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { DocumentPanel } from "@/components/crm/document-panel";
+import { QuickTaskForm } from "@/components/crm/quick-task-form";
 import { RecordVisit } from "@/components/crm/record-visit";
 import { revalidatePath } from "next/cache";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ConvertLeadButton } from "./_components/convert-lead-button";
-import { CalendarIcon, UserIcon, UserCheckIcon, ClockIcon, CheckCircle2Icon, PencilIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  CalendarIcon,
+  UserIcon,
+  UserCheckIcon,
+  ClockIcon,
+  CheckCircle2Icon,
+  PencilIcon,
+  MailIcon,
+  PhoneIcon,
+  SmartphoneIcon,
+  GlobeIcon,
+  BuildingIcon,
+  BriefcaseIcon,
+  MapPinIcon,
+  TagIcon,
+  FlameIcon,
+  ThermometerIcon,
+  SnowflakeIcon,
+  StarIcon,
+  StickyNoteIcon,
+  PhoneCallIcon,
+} from "lucide-react";
 import { LeadModal } from "@/app/(main)/dashboard/leads/_components/lead-modal";
 import { ActivityModal } from "@/components/crm/activity-modal";
 import { TaskModal } from "@/components/crm/task-modal";
@@ -25,11 +48,61 @@ import { SendEmailModal } from "@/components/crm/send-email-modal";
 import { getEmailTemplates } from "@/actions/marketing";
 import { getTranslations } from "next-intl/server";
 
-export default async function LeadDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+const STATUS_STYLES: Record<string, string> = {
+  new: "border-blue-400 text-blue-600 dark:border-blue-500 dark:text-blue-400",
+  contacting: "border-purple-400 text-purple-600 dark:border-purple-500 dark:text-purple-400",
+  engaged: "border-amber-400 text-amber-600 dark:border-amber-500 dark:text-amber-400",
+  qualified: "border-green-400 text-green-600 dark:border-green-500 dark:text-green-400",
+  unqualified: "border-gray-400 text-gray-500 dark:border-gray-600 dark:text-gray-400",
+};
+
+const ACTIVITY_ICONS: Record<string, LucideIcon> = {
+  note: StickyNoteIcon,
+  call: PhoneCallIcon,
+  meeting: CalendarIcon,
+  email: MailIcon,
+};
+
+const ACTIVITY_COLORS: Record<string, string> = {
+  note: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
+  call: "bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400",
+  meeting: "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400",
+  email: "bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400",
+};
+
+function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-0.5">
+      <p className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">{label}</p>
+      <div className="text-sm font-medium">{children}</div>
+    </div>
+  );
+}
+
+function RatingBadge({ rating, label }: { rating: string; label: string }) {
+  if (rating === "hot")
+    return (
+      <Badge className="gap-1 bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800">
+        <FlameIcon className="w-3 h-3" />
+        {label}
+      </Badge>
+    );
+  if (rating === "warm")
+    return (
+      <Badge className="gap-1 bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
+        <ThermometerIcon className="w-3 h-3" />
+        {label}
+      </Badge>
+    );
+  return (
+    <Badge className="gap-1 bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
+      <SnowflakeIcon className="w-3 h-3" />
+      {label}
+    </Badge>
+  );
+}
+
+export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: leadId } = await params;
   const session = await auth();
   const userId = session?.user?.id;
@@ -39,17 +112,15 @@ export default async function LeadDetailPage({
 
   try {
     [lead, templates] = await Promise.all([
-      db.select().from(leads).where(eq(leads.id, leadId)).then(rows => rows[0]),
-      getEmailTemplates().catch(() => [])
+      db.select().from(leads).where(eq(leads.id, leadId)).then((rows) => rows[0]),
+      getEmailTemplates().catch(() => []),
     ]);
   } catch (error) {
     console.error("Error loading lead:", error);
     return notFound();
   }
 
-  if (!lead) {
-    return notFound();
-  }
+  if (!lead) return notFound();
 
   const [leadActivities, leadTasks, allUsers, customFieldDefs, customFieldVals, t, tD] = await Promise.all([
     getActivitiesByLead(leadId),
@@ -61,41 +132,18 @@ export default async function LeadDetailPage({
     getTranslations("entityDetail"),
   ]);
 
+  const ownerName = allUsers.find((u) => u.id === lead.ownerId)?.name ?? null;
+  const fullName = [lead.firstName, lead.lastName].filter(Boolean).join(" ");
+  const initials = [lead.firstName?.[0], lead.lastName?.[0]].filter(Boolean).join("").toUpperCase();
+  const hasAddressInfo = !!(lead.street || lead.city || lead.state || lead.zipCode || lead.country);
+  const hasCompanyInfo = !!(lead.companyName || lead.jobTitle || lead.industry);
+
   async function handleAddActivity(formData: FormData) {
     "use server";
     const content = formData.get("content") as string;
     const type = formData.get("type") as string;
     if (content) {
-      await createActivity({
-        type: type || "note",
-        content,
-        leadId,
-        ownerId: userId,
-        date: new Date(),
-      });
-      revalidatePath(`/dashboard/leads/${leadId}`);
-    }
-  }
-
-  async function handleAddTask(formData: FormData) {
-    "use server";
-    const title = formData.get("title") as string;
-    const description = formData.get("description") as string;
-    const priority = formData.get("priority") as string;
-    const dueDateStr = formData.get("dueDate") as string;
-    const assigneeId = formData.get("assigneeId") as string;
-
-    if (title) {
-      await createTask({
-        title,
-        description,
-        status: "todo",
-        priority: priority || "normal",
-        dueDate: dueDateStr ? new Date(dueDateStr) : undefined,
-        leadId,
-        ownerId: userId,
-        assigneeId: assigneeId || userId,
-      });
+      await createActivity({ type: type || "note", content, leadId, ownerId: userId, date: new Date() });
       revalidatePath(`/dashboard/leads/${leadId}`);
     }
   }
@@ -107,222 +155,431 @@ export default async function LeadDetailPage({
   }
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 p-6">
-      <RecordVisit
-        type="lead"
-        name={[lead.firstName, lead.lastName].filter(Boolean).join(" ") || "Lead"}
-        href={`/dashboard/leads/${leadId}`}
-      />
-      {/* Left side: Lead Details */}
-      <div className="w-full md:w-1/3 flex flex-col gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>{t("leadDetails")}</CardTitle>
-            <div className="flex items-center gap-1">
+    <div className="flex flex-col gap-6 p-6">
+      <RecordVisit type="lead" name={fullName || "Lead"} href={`/dashboard/leads/${leadId}`} />
+
+      {/* ── Hero ── */}
+      <Card>
+        <CardContent className="pt-6 pb-5">
+          <div className="flex flex-col sm:flex-row items-start gap-4">
+            <div className="flex-shrink-0 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center font-bold text-xl text-primary select-none">
+              {initials || <UserIcon className="w-7 h-7" />}
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-bold leading-tight">{fullName}</h1>
+                {lead.isConverted && (
+                  <Badge className="gap-1 bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800">
+                    <CheckCircle2Icon className="w-3 h-3" />
+                    {tD("convertedStatus")}
+                  </Badge>
+                )}
+              </div>
+              {(lead.jobTitle || lead.companyName) && (
+                <p className="text-muted-foreground text-sm mt-0.5">
+                  {[lead.jobTitle, lead.companyName].filter(Boolean).join(" · ")}
+                </p>
+              )}
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <Badge variant="outline" className={`capitalize ${STATUS_STYLES[lead.status] ?? ""}`}>
+                  {lead.status}
+                </Badge>
+                {lead.rating && (
+                  <RatingBadge
+                    rating={lead.rating}
+                    label={t(`ratings.${lead.rating}` as "ratings.hot" | "ratings.warm" | "ratings.cold")}
+                  />
+                )}
+                {lead.leadScore != null && (
+                  <Badge variant="secondary" className="gap-1">
+                    <StarIcon className="w-3 h-3" />
+                    {tD("fieldScore")}: {lead.leadScore}
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
               <LeadModal lead={lead}>
-                <Button variant="ghost" size="icon" title={t("editLead")}>
-                  <PencilIcon className="h-4 w-4" />
+                <Button variant="outline" size="sm">
+                  <PencilIcon className="w-4 h-4 mr-1.5" />
+                  {t("editLead")}
                 </Button>
               </LeadModal>
               <SendEmailModal entity={lead} templates={templates} ownerId={userId} />
               {!lead.isConverted && <ConvertLeadButton leadId={lead.id} />}
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-sm text-muted-foreground">{tD("fieldName")}</p>
-              <p className="font-medium">{lead.firstName} {lead.lastName}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">{tD("fieldStatus")}</p>
-              <Badge variant="outline" className="capitalize">{lead.status}</Badge>
-            </div>
-            {lead.email && (
-              <div>
-                <p className="text-sm text-muted-foreground">{tD("fieldEmail")}</p>
-                <p>{lead.email}</p>
-              </div>
-            )}
-            {lead.phone && (
-              <div>
-                <p className="text-sm text-muted-foreground">{tD("fieldPhone")}</p>
-                <p>{lead.phone}</p>
-              </div>
-            )}
-            {lead.companyName && (
-              <div>
-                <p className="text-sm text-muted-foreground">{tD("fieldCompany")}</p>
-                <p>{lead.companyName}</p>
-              </div>
-            )}
-            {lead.jobTitle && (
-              <div>
-                <p className="text-sm text-muted-foreground">{tD("fieldJobTitle")}</p>
-                <p>{lead.jobTitle}</p>
-              </div>
-            )}
-            {lead.source && (
-              <div>
-                <p className="text-sm text-muted-foreground">{tD("fieldSource")}</p>
-                <p className="capitalize">{lead.source}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        <CustomFieldsPanel
-          entityType="lead"
-          entityId={leadId}
-          definitions={customFieldDefs}
-          values={customFieldVals}
-        />
-
-        <DocumentPanel entityType="lead" entityId={leadId} />
-      </div>
-
-      {/* Right side: Timeline & Tasks */}
-      <div className="w-full md:w-2/3 flex flex-col gap-6">
-
-        {/* Notes / Activities */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{tD("timelineTitle")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form action={handleAddActivity} className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/20">
-              <Textarea
-                name="content"
-                placeholder={tD("activityPlaceholder")}
-                required
-                className="bg-background"
-              />
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground">{tD("typeLabel")}</p>
-                  <select name="type" className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm transition-colors">
-                    <option value="note">{tD("activityTypes.note")}</option>
-                    <option value="call">{tD("activityTypes.call")}</option>
-                    <option value="meeting">{tD("activityTypes.meeting")}</option>
-                    <option value="email">{tD("activityTypes.email")}</option>
-                  </select>
-                </div>
-                <Button type="submit" size="sm">{tD("logActivity")}</Button>
-              </div>
-            </form>
-
-            <div className="space-y-4 mt-6">
-              {leadActivities.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{tD("noActivities")}</p>
-              ) : (
-                leadActivities.map(activity => (
-                  <div key={activity.id} className="border-l-2 border-primary/30 pl-4 py-2 relative">
-                    <div className="absolute w-2 h-2 bg-primary rounded-full -left-[5px] top-4" />
-                    <div className="flex justify-between items-start">
-                       <p className="text-xs font-semibold flex items-center gap-1 text-primary">
-                        <UserIcon className="w-3 h-3" />
-                        {activity.ownerName || tD("system")}
-                      </p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-[10px] text-muted-foreground">
-                          <FormattedDate date={activity.date || activity.createdAt} />
-                        </p>
-                        <ActivityModal mode="edit" activity={activity} revalidatePathStr={`/dashboard/leads/${leadId}`} />
-                      </div>
-                    </div>
-                    <p className="text-sm mt-1">{activity.content}</p>
-                    <Badge variant="secondary" className="text-[10px] mt-2 h-4 px-1">{activity.type}</Badge>
-                  </div>
-                ))
+      {/* ── 3-column body ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        {/* Sidebar */}
+        <div className="flex flex-col gap-6">
+          {/* Contact Info */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">{tD("sectionContactInfo")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {lead.email && (
+                <InfoRow label={tD("fieldEmail")}>
+                  <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 text-primary hover:underline break-all">
+                    <MailIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    {lead.email}
+                  </a>
+                </InfoRow>
               )}
-            </div>
-          </CardContent>
-        </Card>
+              {lead.phone && (
+                <InfoRow label={tD("fieldPhone")}>
+                  <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-primary hover:underline">
+                    <PhoneIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    {lead.phone}
+                  </a>
+                </InfoRow>
+              )}
+              {lead.mobile && (
+                <InfoRow label={tD("fieldMobile")}>
+                  <a href={`tel:${lead.mobile}`} className="flex items-center gap-1.5 text-primary hover:underline">
+                    <SmartphoneIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    {lead.mobile}
+                  </a>
+                </InfoRow>
+              )}
+              {lead.website && (
+                <InfoRow label={tD("fieldWebsite")}>
+                  <a
+                    href={lead.website}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-primary hover:underline truncate"
+                  >
+                    <GlobeIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    {lead.website.replace(/^https?:\/\//, "")}
+                  </a>
+                </InfoRow>
+              )}
+              {!lead.email && !lead.phone && !lead.mobile && !lead.website && (
+                <p className="text-sm text-muted-foreground italic">{tD("notApplicable")}</p>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Tasks */}
-        <Card>
-          <CardHeader>
-            <CardTitle>{tD("tasksNextStepsTitle")}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <form action={handleAddTask} className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/20">
-              <Input name="title" placeholder={tD("taskTitlePlaceholder")} required />
-              <Textarea name="description" placeholder={tD("taskDescPlaceholder")} className="h-20" />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">{tD("priorityLabel")}</p>
-                  <select name="priority" defaultValue="normal" className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors">
-                    <option value="low">{tD("priorityLow")}</option>
-                    <option value="normal">{tD("priorityNormal")}</option>
-                    <option value="high">{tD("priorityHigh")}</option>
-                  </select>
+          {/* Qualification */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">{tD("sectionQualification")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <InfoRow label={tD("fieldStatus")}>
+                <Badge variant="outline" className={`capitalize ${STATUS_STYLES[lead.status] ?? ""}`}>
+                  {lead.status}
+                </Badge>
+              </InfoRow>
+              {lead.rating && (
+                <InfoRow label={tD("fieldRating")}>
+                  <RatingBadge
+                    rating={lead.rating}
+                    label={t(`ratings.${lead.rating}` as "ratings.hot" | "ratings.warm" | "ratings.cold")}
+                  />
+                </InfoRow>
+              )}
+              {lead.leadScore != null && (
+                <InfoRow label={tD("fieldScore")}>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Progress value={lead.leadScore} className="h-2 flex-1" />
+                    <span className="text-sm font-semibold tabular-nums w-8 text-right">{lead.leadScore}</span>
+                  </div>
+                </InfoRow>
+              )}
+              {lead.source && (
+                <InfoRow label={tD("fieldSource")}>
+                  <span className="capitalize">{lead.source}</span>
+                </InfoRow>
+              )}
+              {ownerName && (
+                <InfoRow label={tD("fieldOwner")}>
+                  <span className="flex items-center gap-1.5">
+                    <UserIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                    {ownerName}
+                  </span>
+                </InfoRow>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Company & Role */}
+          {hasCompanyInfo && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{tD("sectionCompanyInfo")}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {lead.companyName && (
+                  <InfoRow label={tD("fieldCompany")}>
+                    <span className="flex items-center gap-1.5">
+                      <BuildingIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                      {lead.companyName}
+                    </span>
+                  </InfoRow>
+                )}
+                {lead.jobTitle && (
+                  <InfoRow label={tD("fieldJobTitle")}>
+                    <span className="flex items-center gap-1.5">
+                      <BriefcaseIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                      {lead.jobTitle}
+                    </span>
+                  </InfoRow>
+                )}
+                {lead.industry && (
+                  <InfoRow label={tD("fieldIndustry")}>
+                    {lead.industry}
+                  </InfoRow>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Address */}
+          {hasAddressInfo && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <MapPinIcon className="w-4 h-4 text-muted-foreground" />
+                  {tD("sectionAddress")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <address className="not-italic text-sm space-y-0.5 text-foreground/80">
+                  {lead.street && <p>{lead.street}</p>}
+                  {(lead.city || lead.state || lead.zipCode) && (
+                    <p>{[lead.city, lead.state, lead.zipCode].filter(Boolean).join(", ")}</p>
+                  )}
+                  {lead.country && <p>{lead.country}</p>}
+                </address>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Tags */}
+          {lead.tags && lead.tags.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TagIcon className="w-4 h-4 text-muted-foreground" />
+                  {tD("fieldTags")}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-wrap gap-1.5">
+                  {lead.tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
                 </div>
-                <div>
-                  <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">{tD("dueDateLabel")}</p>
-                  <Input name="dueDate" type="datetime-local" className="h-9" />
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase font-bold mb-1 ml-1 text-muted-foreground">{tD("assignToLabel")}</p>
-                  <select name="assigneeId" className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors">
-                    <option value="">{tD("myself")}</option>
-                    {allUsers.filter(u => u.id !== userId).map(u => (
-                      <option key={u.id} value={u.id}>{u.name || tD("unnamedUser")}</option>
-                    ))}
-                  </select>
-                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Marketing Consent */}
+          <Card className="bg-muted/30">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+                  {tD("marketingLabel")}
+                </span>
+                <Badge variant={lead.marketingConsent ? "default" : "outline"} className="text-[10px]">
+                  {lead.marketingConsent ? tD("marketingAgreed") : tD("marketingNoConsent")}
+                </Badge>
               </div>
-              <Button type="submit" size="sm" className="mt-2">{tD("createTask")}</Button>
-            </form>
+              {lead.marketingConsent && lead.consentDate && (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  <FormattedDate date={lead.consentDate} />
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-            <div className="space-y-3 mt-4">
-              {leadTasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground">{tD("noTasks")}</p>
-              ) : (
-                leadTasks.map(task => (
-                  <div key={task.id} className={`flex flex-col gap-2 border p-3 rounded-md transition-all ${task.status === "done" ? "opacity-60 bg-muted/30" : "bg-card shadow-sm"}`}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        <div className="mt-1 h-4 w-4 rounded-full border border-primary flex items-center justify-center">
-                          {task.status === "done" && <div className="w-2 h-2 bg-primary rounded-full" />}
-                        </div>
-                        <div>
-                          <p className={`font-medium text-sm ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>{task.title}</p>
-                          {task.description && <p className="text-xs text-muted-foreground mt-1">{task.description}</p>}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <Badge variant={task.priority === "high" ? "destructive" : task.priority === "low" ? "secondary" : "default"} className="text-[10px] uppercase">
-                          {task.priority}
-                        </Badge>
-                        <TaskModal task={task} users={allUsers} revalidatePathStr={`/dashboard/leads/${leadId}`} />
-                      </div>
-                    </div>
+          {/* Notes */}
+          {lead.notes && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">{tD("fieldNotes")}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-foreground/80 whitespace-pre-wrap">{lead.notes}</p>
+              </CardContent>
+            </Card>
+          )}
 
-                    <div className="flex flex-col gap-1.5 mt-2 pt-2 border-t border-dashed">
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <ClockIcon className="w-3 h-3 text-blue-500" />
-                          {tD("createdLabel")} <FormattedDate date={task.createdAt} />
-                        </span>
-                        {task.status === "done" && task.completedAt && (
-                          <span className="flex items-center gap-1 font-medium text-green-600">
-                            <CheckCircle2Icon className="w-3 h-3" />
-                            {tD("completedLabel")} <FormattedDate date={task.completedAt} />
-                          </span>
-                        )}
-                        {task.dueDate && (
-                          <span className={`flex items-center gap-1 font-semibold ${task.status !== "done" && new Date(task.dueDate) < new Date() ? "text-destructive" : "text-foreground/70"}`}>
-                            <CalendarIcon className="w-3 h-3" />
-                            {tD("dueLabel")} <FormattedDate date={task.dueDate} />
-                          </span>
-                        )}
+          <CustomFieldsPanel
+            entityType="lead"
+            entityId={leadId}
+            definitions={customFieldDefs}
+            values={customFieldVals}
+          />
+
+          <DocumentPanel entityType="lead" entityId={leadId} />
+        </div>
+
+        {/* ── Main: Timeline + Tasks ── */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
+          {/* Timeline */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{tD("timelineTitle")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <form action={handleAddActivity} className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/20">
+                <Textarea name="content" placeholder={tD("activityPlaceholder")} required className="bg-background" />
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground">{tD("typeLabel")}</p>
+                    <select name="type" className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm">
+                      <option value="note">{tD("activityTypes.note")}</option>
+                      <option value="call">{tD("activityTypes.call")}</option>
+                      <option value="meeting">{tD("activityTypes.meeting")}</option>
+                      <option value="email">{tD("activityTypes.email")}</option>
+                    </select>
+                  </div>
+                  <Button type="submit" size="sm">
+                    {tD("logActivity")}
+                  </Button>
+                </div>
+              </form>
+
+              <div className="space-y-3 mt-2">
+                {leadActivities.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-6 text-center">{tD("noActivities")}</p>
+                ) : (
+                  leadActivities.map((activity) => {
+                    const ActivityIcon = ACTIVITY_ICONS[activity.type] ?? StickyNoteIcon;
+                    const iconClass = ACTIVITY_COLORS[activity.type] ?? ACTIVITY_COLORS.note;
+                    return (
+                      <div key={activity.id} className="flex gap-3">
+                        <div
+                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}
+                        >
+                          <ActivityIcon className="w-4 h-4" />
+                        </div>
+                        <div className="flex-1 min-w-0 border rounded-lg p-3 bg-card">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs font-semibold text-primary flex items-center gap-1">
+                              <UserIcon className="w-3 h-3" />
+                              {activity.ownerName || tD("system")}
+                            </p>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <p className="text-[10px] text-muted-foreground">
+                                <FormattedDate date={activity.date || activity.createdAt} />
+                              </p>
+                              <ActivityModal
+                                mode="edit"
+                                activity={activity}
+                                revalidatePathStr={`/dashboard/leads/${leadId}`}
+                              />
+                            </div>
+                          </div>
+                          <p className="text-sm mt-1.5">{activity.content}</p>
+                          <Badge variant="secondary" className="text-[10px] mt-2 h-4 px-1 capitalize">
+                            {activity.type}
+                          </Badge>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 text-[10px]">
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Tasks */}
+          <Card>
+            <CardHeader>
+              <CardTitle>{tD("tasksNextStepsTitle")}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <QuickTaskForm entityType="lead" entityId={leadId} userId={userId ?? ""} />
+
+              <div className="space-y-3 mt-2">
+                {leadTasks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-6 text-center">{tD("noTasks")}</p>
+                ) : (
+                  leadTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className={`border rounded-lg p-4 transition-all ${task.status === "done" ? "opacity-60 bg-muted/20" : "bg-card shadow-sm"}`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div
+                            className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                              task.status === "done" ? "border-primary bg-primary" : "border-muted-foreground"
+                            }`}
+                          >
+                            {task.status === "done" && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                          </div>
+                          <div className="min-w-0">
+                            <p
+                              className={`font-medium text-sm leading-tight ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}
+                            >
+                              {task.title}
+                            </p>
+                            {task.description && (
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{task.description}</p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <Badge
+                            variant={
+                              task.priority === "blocker" || task.priority === "high"
+                                ? "destructive"
+                                : task.priority === "low"
+                                  ? "secondary"
+                                  : "default"
+                            }
+                            className={`text-[10px] uppercase ${task.priority === "critical" ? "border-orange-400 text-orange-600 dark:text-orange-400" : ""}`}
+                          >
+                            {task.priority}
+                          </Badge>
+                          <TaskModal task={task} users={allUsers} revalidatePathStr={`/dashboard/leads/${leadId}`} />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-dashed">
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
                           <span className="flex items-center gap-1">
-                            <UserIcon className="w-3 h-3" />
-                            {tD("byLabel")} {task.ownerName || tD("system")}
+                            <ClockIcon className="w-3 h-3" />
+                            {tD("createdLabel")} <FormattedDate date={task.createdAt} />
                           </span>
-                          <span className="flex items-center gap-1 font-medium text-primary/80">
+                          {task.status === "done" && task.completedAt && (
+                            <span className="flex items-center gap-1 text-green-600 font-medium">
+                              <CheckCircle2Icon className="w-3 h-3" />
+                              {tD("completedLabel")} <FormattedDate date={task.completedAt} />
+                            </span>
+                          )}
+                          {task.startDate && (
+                            <span className="flex items-center gap-1">
+                              <CalendarIcon className="w-3 h-3" />
+                              {tD("startLabel")} <FormattedDate date={task.startDate} includeTime={!task.allDay} />
+                            </span>
+                          )}
+                          {task.dueDate && (
+                            <span
+                              className={`flex items-center gap-1 font-semibold ${
+                                task.status !== "done" && new Date(task.dueDate) < new Date()
+                                  ? "text-destructive"
+                                  : ""
+                              }`}
+                            >
+                              <CalendarIcon className="w-3 h-3" />
+                              {tD("dueLabel")} <FormattedDate date={task.dueDate} includeTime={!task.allDay} />
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
                             <UserCheckIcon className="w-3 h-3" />
                             {tD("toLabel")} {task.assigneeName || tD("myself")}
                           </span>
@@ -334,12 +591,12 @@ export default async function LeadDetailPage({
                         </form>
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );

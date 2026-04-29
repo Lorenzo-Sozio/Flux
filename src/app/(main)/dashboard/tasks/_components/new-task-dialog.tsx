@@ -8,6 +8,7 @@ import { it } from "date-fns/locale";
 import {
   AlertCircle,
   Building2,
+  CalendarDays,
   CalendarIcon,
   Check,
   CheckSquare,
@@ -244,56 +245,73 @@ function DatePicker({
   value,
   onChange,
   placeholder,
+  timeValue,
+  onTimeChange,
+  showTime = false,
 }: {
   value: string | undefined;
   onChange: (v: string | undefined) => void;
   placeholder: string;
+  timeValue?: string;
+  onTimeChange?: (v: string) => void;
+  showTime?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const selected = value ? new Date(value) : undefined;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex h-9 w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs",
-            "transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-            !selected && "text-muted-foreground",
-          )}
-        >
-          <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span className="flex-1 text-left">
-            {selected ? format(selected, "d MMM yyyy", { locale: it }) : placeholder}
-          </span>
-          {selected && (
+    <div className="flex gap-1.5">
+      <div className="relative flex flex-1 items-center">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange(undefined);
-              }}
-              className="rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className={cn(
+                "flex h-9 w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs",
+                "transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                selected ? "pr-7" : "",
+                !selected && "text-muted-foreground",
+              )}
             >
-              <X className="h-3.5 w-3.5" />
+              <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="flex-1 text-left">
+                {selected ? format(selected, "d MMM yyyy", { locale: it }) : placeholder}
+              </span>
             </button>
-          )}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={selected}
-          onSelect={(date) => {
-            onChange(date ? format(date, "yyyy-MM-dd") : undefined);
-            setOpen(false);
-          }}
-          locale={it}
-          captionLayout="dropdown"
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={selected}
+              onSelect={(date) => {
+                onChange(date ? format(date, "yyyy-MM-dd") : undefined);
+                setOpen(false);
+              }}
+              locale={it}
+              captionLayout="dropdown"
+            />
+          </PopoverContent>
+        </Popover>
+        {selected && (
+          <button
+            type="button"
+            onClick={() => onChange(undefined)}
+            aria-label="Cancella data"
+            className="absolute right-1.5 rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {showTime && (
+        <input
+          type="time"
+          value={timeValue ?? "09:00"}
+          onChange={(e) => onTimeChange?.(e.target.value)}
+          className="h-9 w-[90px] shrink-0 rounded-md border border-input bg-transparent px-2 text-sm tabular-nums shadow-xs transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
-      </PopoverContent>
-    </Popover>
+      )}
+    </div>
   );
 }
 
@@ -352,6 +370,9 @@ export function NewTaskDialog({
 }: Props) {
   const t = useTranslations("tasks");
   const [open, setOpen] = useState(false);
+  const [allDay, setAllDay] = useState(true);
+  const [startTime, setStartTime] = useState("09:00");
+  const [dueTime, setDueTime] = useState("18:00");
   const [entityType, setEntityType] = useState<EntityType>(defaultTicketId ? "ticket" : "contact");
   const [subtasks, setSubtasks] = useState<SubtaskDraft[]>([]);
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -447,8 +468,9 @@ export function NewTaskDialog({
         description: data.description || undefined,
         status: data.status,
         priority: data.priority,
-        startDate: data.startDate ? new Date(data.startDate) : undefined,
-        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+        allDay,
+        startDate: data.startDate ? new Date(`${data.startDate}T${allDay ? "00:00" : startTime}`) : undefined,
+        dueDate: data.dueDate ? new Date(`${data.dueDate}T${allDay ? "00:00" : dueTime}`) : undefined,
         ownerId: currentUserId,
         assigneeId: data.assigneeId && data.assigneeId !== "_none" ? data.assigneeId : undefined,
         estimatedHours: data.estimatedHours != null ? String(data.estimatedHours) : undefined,
@@ -511,6 +533,9 @@ export function NewTaskDialog({
           setSubtasks([]);
           setExpandedIds(new Set());
           setEntityType(defaultTicketId ? "ticket" : "contact");
+          setAllDay(true);
+          setStartTime("09:00");
+          setDueTime("18:00");
         }
       }}
     >
@@ -559,7 +584,7 @@ export function NewTaskDialog({
                   <ListChecks className="h-3.5 w-3.5" />
                   {t("dialog.tabs.subtasks")}
                   {subtasks.length > 0 && (
-                    <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-medium text-primary-foreground text-[10px]">
+                    <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-medium text-[10px] text-primary-foreground">
                       {subtasks.length}
                     </span>
                   )}
@@ -651,13 +676,36 @@ export function NewTaskDialog({
                   </F>
                 </div>
 
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAllDay((v) => !v)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs transition-colors",
+                      allDay
+                        ? "border-primary/30 bg-primary/10 text-primary"
+                        : "border-input bg-transparent text-muted-foreground hover:bg-accent/50",
+                    )}
+                  >
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    Tutto il giorno
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <F label={t("dialog.startDate")}>
                     <Controller
                       control={control}
                       name="startDate"
                       render={({ field }) => (
-                        <DatePicker value={field.value} onChange={field.onChange} placeholder={t("dialog.startDate")} />
+                        <DatePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder={t("dialog.startDate")}
+                          showTime={!allDay}
+                          timeValue={startTime}
+                          onTimeChange={setStartTime}
+                        />
                       )}
                     />
                   </F>
@@ -666,7 +714,14 @@ export function NewTaskDialog({
                       control={control}
                       name="dueDate"
                       render={({ field }) => (
-                        <DatePicker value={field.value} onChange={field.onChange} placeholder={t("dialog.dueDate")} />
+                        <DatePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder={t("dialog.dueDate")}
+                          showTime={!allDay}
+                          timeValue={dueTime}
+                          onTimeChange={setDueTime}
+                        />
                       )}
                     />
                   </F>

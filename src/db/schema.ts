@@ -324,6 +324,7 @@ export const tasks = pgTable("task", {
   description: text("description"),
   dueDate: timestamp("due_date", { mode: "date" }),
   startDate: timestamp("start_date", { mode: "date" }),
+  allDay: boolean("all_day").default(true).notNull(),
   status: text("status").default("todo").notNull(), // todo, in_progress, done
   priority: text("priority").default("normal").notNull(), // low, normal, high, critical, blocker
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
@@ -1138,4 +1139,68 @@ export const dmConversationMembersRelations = relations(dmConversationMembers, (
 export const dmMessagesRelations = relations(dmMessages, ({ one }) => ({
   conversation: one(dmConversations, { fields: [dmMessages.conversationId], references: [dmConversations.id] }),
   sender: one(users, { fields: [dmMessages.senderId], references: [users.id] }),
+}));
+
+// ─── Appointments ─────────────────────────────────────────────────────────────
+
+export const appointments = pgTable("appointment", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  title: text("title").notNull(),
+  description: text("description"),
+  startAt: timestamp("start_at", { mode: "date" }).notNull(),
+  endAt: timestamp("end_at", { mode: "date" }).notNull(),
+  timezone: text("timezone").default("UTC").notNull(),
+  location: text("location"),
+  locationUrl: text("location_url"),
+  conferenceType: text("conference_type"), // 'jitsi' | 'zoom' | 'teams' | 'custom'
+  conferenceLink: text("conference_link"),
+  status: text("status").default("scheduled").notNull(), // scheduled, cancelled, completed
+  icalUid: text("ical_uid").notNull().unique(),
+  sequence: integer("sequence").default(0).notNull(),
+  organizerId: text("organizer_id").references(() => users.id, { onDelete: "set null" }),
+  contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  dealId: text("deal_id").references(() => deals.id, { onDelete: "set null" }),
+  companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+  leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
+  reminderMinutes: integer("reminder_minutes"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const appointmentAttendees = pgTable("appointment_attendee", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  appointmentId: text("appointment_id")
+    .notNull()
+    .references(() => appointments.id, { onDelete: "cascade" }),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+  contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  email: text("email").notNull(),
+  name: text("name").notNull(),
+  role: text("role").default("required").notNull(), // organizer, required, optional
+  status: text("status").default("pending").notNull(), // pending, accepted, declined, tentative
+  responseAt: timestamp("response_at", { mode: "date" }),
+  responseToken: text("response_token").unique(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const appointmentsRelations = relations(appointments, ({ one, many }) => ({
+  organizer: one(users, { fields: [appointments.organizerId], references: [users.id] }),
+  contact: one(contacts, { fields: [appointments.contactId], references: [contacts.id] }),
+  deal: one(deals, { fields: [appointments.dealId], references: [deals.id] }),
+  company: one(companies, { fields: [appointments.companyId], references: [companies.id] }),
+  lead: one(leads, { fields: [appointments.leadId], references: [leads.id] }),
+  attendees: many(appointmentAttendees),
+}));
+
+export const appointmentAttendeesRelations = relations(appointmentAttendees, ({ one }) => ({
+  appointment: one(appointments, {
+    fields: [appointmentAttendees.appointmentId],
+    references: [appointments.id],
+  }),
+  user: one(users, { fields: [appointmentAttendees.userId], references: [users.id] }),
+  contact: one(contacts, { fields: [appointmentAttendees.contactId], references: [contacts.id] }),
 }));

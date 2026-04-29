@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { it } from "date-fns/locale";
 import {
   AlertCircle,
+  CalendarDays,
   CalendarIcon,
   CheckCircle2,
   CheckSquare,
@@ -121,6 +122,22 @@ function toDateStr(date: Date | string | null | undefined): string | undefined {
   return format(new Date(date), "yyyy-MM-dd");
 }
 
+function extractTimeStr(date: Date | string | null | undefined, fallback = "09:00"): string {
+  if (!date) return fallback;
+  const d = new Date(date);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// Migration 0019 set allDay=true for all pre-existing tasks regardless of stored times.
+// Infer the real state: if either date has a non-midnight time, it's not all-day.
+function inferAllDay(allDayFlag: boolean | null | undefined, startDate: unknown, dueDate: unknown): boolean {
+  if (allDayFlag === false) return false;
+  const s = extractTimeStr(startDate as Date | string | null | undefined, "00:00");
+  const d = extractTimeStr(dueDate as Date | string | null | undefined, "00:00");
+  if (s !== "00:00" || d !== "00:00") return false;
+  return allDayFlag ?? true;
+}
+
 function F({
   label,
   error,
@@ -152,56 +169,73 @@ function DatePicker({
   value,
   onChange,
   placeholder,
+  timeValue,
+  onTimeChange,
+  showTime = false,
 }: {
   value: string | undefined;
   onChange: (v: string | undefined) => void;
   placeholder: string;
+  timeValue?: string;
+  onTimeChange?: (v: string) => void;
+  showTime?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const selected = value ? new Date(value) : undefined;
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex h-9 w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs",
-            "transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
-            !selected && "text-muted-foreground",
-          )}
-        >
-          <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <span className="flex-1 text-left">
-            {selected ? format(selected, "d MMM yyyy", { locale: it }) : placeholder}
-          </span>
-          {selected && (
+    <div className="flex gap-1.5">
+      <div className="relative flex flex-1 items-center">
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange(undefined);
-              }}
-              className="rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className={cn(
+                "flex h-9 w-full items-center gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs",
+                "transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                selected ? "pr-7" : "",
+                !selected && "text-muted-foreground",
+              )}
             >
-              <X className="h-3.5 w-3.5" />
+              <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="flex-1 text-left">
+                {selected ? format(selected, "d MMM yyyy", { locale: it }) : placeholder}
+              </span>
             </button>
-          )}
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar
-          mode="single"
-          selected={selected}
-          onSelect={(date) => {
-            onChange(date ? format(date, "yyyy-MM-dd") : undefined);
-            setOpen(false);
-          }}
-          locale={it}
-          captionLayout="dropdown"
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={selected}
+              onSelect={(date) => {
+                onChange(date ? format(date, "yyyy-MM-dd") : undefined);
+                setOpen(false);
+              }}
+              locale={it}
+              captionLayout="dropdown"
+            />
+          </PopoverContent>
+        </Popover>
+        {selected && (
+          <button
+            type="button"
+            onClick={() => onChange(undefined)}
+            aria-label="Cancella data"
+            className="absolute right-1.5 rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+      {showTime && (
+        <input
+          type="time"
+          value={timeValue ?? "09:00"}
+          onChange={(e) => onTimeChange?.(e.target.value)}
+          className="h-9 w-[90px] shrink-0 rounded-md border border-input bg-transparent px-2 text-sm tabular-nums shadow-xs transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
         />
-      </PopoverContent>
-    </Popover>
+      )}
+    </div>
   );
 }
 
@@ -226,6 +260,9 @@ export function TaskModal({
 }) {
   const [open, setOpen] = useState(defaultOpen ?? false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [allDay, setAllDay] = useState<boolean>(() => inferAllDay(task.allDay, task.startDate, task.dueDate));
+  const [startTime, setStartTime] = useState<string>(() => extractTimeStr(task.startDate, "09:00"));
+  const [dueTime, setDueTime] = useState<string>(() => extractTimeStr(task.dueDate, "18:00"));
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [subtasksOpen, setSubtasksOpen] = useState(true);
   const [addingSubtask, setAddingSubtask] = useState(false);
@@ -283,6 +320,9 @@ export function TaskModal({
       estimatedHours: task.estimatedHours ? String(task.estimatedHours) : "",
     });
     setActualHours(task.actualHours ?? null);
+    setAllDay(inferAllDay(task.allDay, task.startDate, task.dueDate));
+    setStartTime(extractTimeStr(task.startDate, "09:00"));
+    setDueTime(extractTimeStr(task.dueDate, "18:00"));
     getSubtasks(task.id).then(setSubtasks).catch(console.error);
     getDependencies(task.id)
       .then((d) => setDepPredecessors(d.predecessors))
@@ -304,8 +344,9 @@ export function TaskModal({
           description: data.description,
           status: data.status,
           priority: data.priority,
-          startDate: data.startDate ? new Date(data.startDate) : null,
-          dueDate: data.dueDate ? new Date(data.dueDate) : null,
+          allDay,
+          startDate: data.startDate ? new Date(`${data.startDate}T${allDay ? "00:00" : startTime}`) : null,
+          dueDate: data.dueDate ? new Date(`${data.dueDate}T${allDay ? "00:00" : dueTime}`) : null,
           assigneeId: ownerId ?? null,
           estimatedHours: estHours !== null ? String(estHours) : null,
           // biome-ignore lint/suspicious/noExplicitAny: Drizzle partial insert type
@@ -488,13 +529,36 @@ export function TaskModal({
                   </F>
                 </div>
 
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAllDay((v) => !v)}
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs transition-colors",
+                      allDay
+                        ? "border-primary/30 bg-primary/10 text-primary"
+                        : "border-input bg-transparent text-muted-foreground hover:bg-accent/50",
+                    )}
+                  >
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    Tutto il giorno
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <F label="Data inizio">
                     <Controller
                       control={control}
                       name="startDate"
                       render={({ field }) => (
-                        <DatePicker value={field.value} onChange={field.onChange} placeholder="Seleziona data" />
+                        <DatePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Seleziona data"
+                          showTime={!allDay}
+                          timeValue={startTime}
+                          onTimeChange={setStartTime}
+                        />
                       )}
                     />
                   </F>
@@ -503,7 +567,14 @@ export function TaskModal({
                       control={control}
                       name="dueDate"
                       render={({ field }) => (
-                        <DatePicker value={field.value} onChange={field.onChange} placeholder="Seleziona data" />
+                        <DatePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Seleziona data"
+                          showTime={!allDay}
+                          timeValue={dueTime}
+                          onTimeChange={setDueTime}
+                        />
                       )}
                     />
                   </F>

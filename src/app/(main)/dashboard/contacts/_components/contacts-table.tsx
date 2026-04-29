@@ -141,7 +141,7 @@ export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) 
             <TableHead>{t("jobTitle")}</TableHead>
             <TableHead>{tc("address")}</TableHead>
             <TableHead>{tc("status")}</TableHead>
-            <TableHead>{t("score")}</TableHead>
+            <TableHead>{t("columns.score")}</TableHead>
             <TableHead>{t("columns.assignedTo")}</TableHead>
             {canEdit && <TableHead className="w-[100px] text-right">{t("columns.actions")}</TableHead>}
           </TableRow>
