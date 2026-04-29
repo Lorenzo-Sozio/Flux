@@ -118,6 +118,37 @@ export function CompanyModal({ company, children }: { company?: any; children: R
 
   const { register, control, handleSubmit, formState: { errors, isSubmitting } } = form;
 
+  useEffect(() => {
+    if (open && company) {
+      form.reset({
+        name:          company.name          || "",
+        type:          company.type          || "prospect",
+        status:        company.status        || "active",
+        industry:      company.industry      || "",
+        employeeCount: company.employeeCount ?? null,
+        annualRevenue: company.annualRevenue ?? null,
+        website:       company.website       || "",
+        mainPhone:     company.mainPhone     || "",
+        mainEmail:     company.mainEmail     || "",
+        linkedinUrl:   company.linkedinUrl   || "",
+        description:   company.description   || "",
+        source:        company.source        || "",
+        leadScore:     company.leadScore     ?? null,
+        ownerId:       company.ownerId       || null,
+        groupId:       company.groupId       || null,
+        assigneeValue: encodeAssignee(company.ownerId, company.groupId),
+        tags:          company.tags          ? company.tags.join(", ") : "",
+        street:        company.street        || "",
+        city:          company.city          || "",
+        state:         company.state         || "",
+        zipCode:       company.zipCode       || "",
+        country:       company.country       || "",
+        vatNumber:     company.vatNumber     || "",
+        sdiCode:       company.sdiCode       || "",
+      });
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const e = errors;
   const tabErrors = {
     info:    !!(e.name || e.type || e.status || e.industry || e.employeeCount || e.annualRevenue || e.website || e.mainPhone || e.mainEmail || e.linkedinUrl),

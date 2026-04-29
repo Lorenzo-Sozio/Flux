@@ -132,6 +132,36 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
 
   const { register, control, handleSubmit, formState: { errors, isSubmitting } } = form;
 
+  useEffect(() => {
+    if (open && contact) {
+      form.reset({
+        firstName:        contact.firstName        || "",
+        lastName:         contact.lastName         || "",
+        email:            contact.email            || "",
+        phone:            contact.phone            || "",
+        mobile:           contact.mobile           || "",
+        jobTitle:         contact.jobTitle         || "",
+        department:       contact.department       || "",
+        linkedinUrl:      contact.linkedinUrl      || "",
+        companyId:        contact.companyId        || null,
+        ownerId:          contact.ownerId          || null,
+        groupId:          contact.groupId          || null,
+        assigneeValue:    encodeAssignee(contact.ownerId, contact.groupId),
+        status:           contact.status           || "active",
+        source:           contact.source           || "",
+        leadScore:        contact.leadScore        ?? null,
+        tags:             contact.tags             ? contact.tags.join(", ") : "",
+        marketingConsent: contact.marketingConsent || false,
+        notes:            contact.notes            || "",
+        street:           contact.street           || "",
+        city:             contact.city             || "",
+        state:            contact.state            || "",
+        zipCode:          contact.zipCode          || "",
+        country:          contact.country          || "",
+      });
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const e = errors;
   const tabErrors = {
     info:    !!(e.firstName || e.lastName || e.email || e.phone || e.mobile || e.jobTitle || e.department || e.linkedinUrl),

@@ -119,6 +119,37 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
 
   const { register, control, handleSubmit, formState: { errors, isSubmitting } } = form;
 
+  useEffect(() => {
+    if (open && lead) {
+      form.reset({
+        firstName:        lead.firstName        || "",
+        lastName:         lead.lastName         || "",
+        email:            lead.email            || "",
+        phone:            lead.phone            || "",
+        mobile:           lead.mobile           || "",
+        jobTitle:         lead.jobTitle         || "",
+        companyName:      lead.companyName      || "",
+        industry:         lead.industry         || "",
+        website:          lead.website          || "",
+        ownerId:          lead.ownerId          || null,
+        groupId:          lead.groupId          || null,
+        assigneeValue:    encodeAssignee(lead.ownerId, lead.groupId),
+        status:           lead.status           || "new",
+        source:           lead.source           || "",
+        rating:           lead.rating           || "",
+        leadScore:        lead.leadScore        ?? null,
+        tags:             lead.tags             ? lead.tags.join(", ") : "",
+        marketingConsent: lead.marketingConsent || false,
+        notes:            lead.notes            || "",
+        street:           lead.street           || "",
+        city:             lead.city             || "",
+        state:            lead.state            || "",
+        zipCode:          lead.zipCode          || "",
+        country:          lead.country          || "",
+      });
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const e = errors;
   const tabErrors = {
     info:    !!(e.firstName || e.lastName || e.email || e.phone || e.mobile || e.jobTitle || e.companyName || e.industry || e.website),
