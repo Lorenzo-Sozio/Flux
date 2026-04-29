@@ -95,7 +95,7 @@ export function SendEmailModal({
   const handleTemplateSelect = (templateId: string) => {
     const template = safeTemplates.find((t) => t.id === templateId);
     if (!template) return;
-    form.setValue("subject", template.subject || "");
+    form.setValue("subject", resolvePlaceholders(template.subject || ""));
     setBody(resolvePlaceholders(template.body || ""));
     setTemplateKey((k) => k + 1);
     setMode("preview");
@@ -129,8 +129,8 @@ export function SendEmailModal({
       setIsSending(true);
       await sendEmailAction({
         to: entity.email,
-        subject: data.subject,
-        body: finalBody,
+        subject: resolvePlaceholders(data.subject),
+        body: resolvePlaceholders(finalBody),
         leadId: entity.companyName ? entity.id : undefined,
         contactId: entity.firstName && !entity.companyName ? entity.id : undefined,
         ownerId,
