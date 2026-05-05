@@ -87,7 +87,18 @@
       "PowerShell(Select-String -Pattern \"IColumn|header\" \"c:\\\\React\\\\Flux\\\\node_modules\\\\@svar-ui\\\\grid-store\\\\dist\\\\types\\\\index.d.ts\" | Select-Object -First 20 | ForEach-Object { $_.Line })",
       "Bash(node -e \"const g = require\\('@svar-ui/gantt-store'\\); console.log\\(Object.keys\\(g\\)\\)\")",
       "Bash(grep -o \"add-task.\\\\{0,200\\\\}\" \"c:\\\\React\\\\Flux\\\\node_modules\\\\@svar-ui\\\\gantt-store\\\\dist\\\\index.js\")",
-      "Bash(grep -o \"template.\\\\{0,300\\\\}add-task\\\\|add-task.\\\\{0,300\\\\}template\" \"c:\\\\React\\\\Flux\\\\node_modules\\\\@svar-ui\\\\gantt-store\\\\dist\\\\index.js\")"
+      "Bash(grep -o \"template.\\\\{0,300\\\\}add-task\\\\|add-task.\\\\{0,300\\\\}template\" \"c:\\\\React\\\\Flux\\\\node_modules\\\\@svar-ui\\\\gantt-store\\\\dist\\\\index.js\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\dashboard\\\\leads\\\\\" -Recurse -File | Select-Object FullName)",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\React\\\\Flux\\\\src\" -Recurse | Where-Object {$_.Name -match \"lead|crm|pipeline\"} | Select-Object FullName)",
+      "PowerShell(find \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\dashboard\" -type d -name \"leads\" -o -name \"contacts\" -o -name \"companies\")",
+      "PowerShell(head -10)",
+      "Bash(Select-String -Pattern \"crm\\\\.ts|leads.*page|convert-lead|schema\\\\.ts\")",
+      "Bash(Select-Object -First 30)",
+      "PowerShell(npx tsc --noEmit --skipLibCheck 2>&1)",
+      "PowerShell(npx biome check --no-errors-on-unmatched src/db/schema.ts src/actions/crm.ts \"src/app/\\(main\\)/dashboard/leads/[id]/_components/convert-lead-button.tsx\" \"src/app/\\(main\\)/dashboard/leads/[id]/page.tsx\" 2>&1)",
+      "PowerShell(npx biome check --write --no-errors-on-unmatched src/db/schema.ts src/actions/crm.ts \"src/app/\\(main\\)/dashboard/leads/[id]/_components/convert-lead-button.tsx\" \"src/app/\\(main\\)/dashboard/leads/[id]/page.tsx\" 2>&1)",
+      "PowerShell(npx biome check --write --no-errors-on-unmatched \"src/app/\\(main\\)/dashboard/leads/[id]/page.tsx\" 2>&1)",
+      "PowerShell(npx biome check --no-errors-on-unmatched \"src/app/\\(main\\)/dashboard/leads/[id]/page.tsx\" 2>&1 | Select-String -Pattern \"lint/\" | Where-Object { $_ -notmatch \"FIXABLE\" } | Select-Object -First 10)"
     ]
   }
 }

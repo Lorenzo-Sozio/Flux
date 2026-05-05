@@ -1,52 +1,55 @@
-import { auth } from "@/auth";
-import { db } from "@/db";
-import { leads } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { notFound } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { getActivitiesByLead, createActivity } from "@/actions/activities";
-import { getTasksByLead, updateTaskStatus, getAllUsers } from "@/actions/tasks";
-import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
-import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
-import { DocumentPanel } from "@/components/crm/document-panel";
-import { QuickTaskForm } from "@/components/crm/quick-task-form";
-import { RecordVisit } from "@/components/crm/record-visit";
 import { revalidatePath } from "next/cache";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { ConvertLeadButton } from "./_components/convert-lead-button";
+import { notFound } from "next/navigation";
+
+import { eq } from "drizzle-orm";
 import type { LucideIcon } from "lucide-react";
 import {
+  BriefcaseIcon,
+  BuildingIcon,
   CalendarIcon,
-  UserIcon,
-  UserCheckIcon,
-  ClockIcon,
   CheckCircle2Icon,
-  PencilIcon,
+  ClockIcon,
+  FlameIcon,
+  GlobeIcon,
   MailIcon,
+  MapPinIcon,
+  PencilIcon,
+  PhoneCallIcon,
   PhoneIcon,
   SmartphoneIcon,
-  GlobeIcon,
-  BuildingIcon,
-  BriefcaseIcon,
-  MapPinIcon,
-  TagIcon,
-  FlameIcon,
-  ThermometerIcon,
   SnowflakeIcon,
   StarIcon,
   StickyNoteIcon,
-  PhoneCallIcon,
+  TagIcon,
+  ThermometerIcon,
+  UserCheckIcon,
+  UserIcon,
 } from "lucide-react";
-import { LeadModal } from "@/app/(main)/dashboard/leads/_components/lead-modal";
-import { ActivityModal } from "@/components/crm/activity-modal";
-import { TaskModal } from "@/components/crm/task-modal";
-import { FormattedDate } from "@/components/crm/formatted-date";
-import { SendEmailModal } from "@/components/crm/send-email-modal";
-import { getEmailTemplates } from "@/actions/marketing";
 import { getTranslations } from "next-intl/server";
+
+import { createActivity, getActivitiesByLead } from "@/actions/activities";
+import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
+import { getEmailTemplates } from "@/actions/marketing";
+import { getAllUsers, getTasksByLead, updateTaskStatus } from "@/actions/tasks";
+import { LeadModal } from "@/app/(main)/dashboard/leads/_components/lead-modal";
+import { auth } from "@/auth";
+import { ActivityModal } from "@/components/crm/activity-modal";
+import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
+import { DocumentPanel } from "@/components/crm/document-panel";
+import { FormattedDate } from "@/components/crm/formatted-date";
+import { QuickTaskForm } from "@/components/crm/quick-task-form";
+import { RecordVisit } from "@/components/crm/record-visit";
+import { SendEmailModal } from "@/components/crm/send-email-modal";
+import { TaskModal } from "@/components/crm/task-modal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import { db } from "@/db";
+import { companies, contacts, deals, leads } from "@/db/schema";
+
+import { ConvertLeadButton } from "./_components/convert-lead-button";
 
 const STATUS_STYLES: Record<string, string> = {
   new: "border-blue-400 text-blue-600 dark:border-blue-500 dark:text-blue-400",
@@ -112,7 +115,11 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   try {
     [lead, templates] = await Promise.all([
-      db.select().from(leads).where(eq(leads.id, leadId)).then((rows) => rows[0]),
+      db
+        .select()
+        .from(leads)
+        .where(eq(leads.id, leadId))
+        .then((rows) => rows[0]),
       getEmailTemplates().catch(() => []),
     ]);
   } catch (error) {
@@ -121,6 +128,33 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   }
 
   if (!lead) return notFound();
+
+  // Fetch converted entities for the traceability card (only when already converted)
+  const [convertedContact, convertedCompany, convertedDeal] = lead.isConverted
+    ? await Promise.all([
+        lead.convertedToContactId
+          ? db
+              .select({ firstName: contacts.firstName, lastName: contacts.lastName })
+              .from(contacts)
+              .where(eq(contacts.id, lead.convertedToContactId))
+              .then((r) => r[0] ?? null)
+          : Promise.resolve(null),
+        lead.convertedToCompanyId
+          ? db
+              .select({ name: companies.name })
+              .from(companies)
+              .where(eq(companies.id, lead.convertedToCompanyId))
+              .then((r) => r[0] ?? null)
+          : Promise.resolve(null),
+        lead.convertedToDealId
+          ? db
+              .select({ name: deals.name })
+              .from(deals)
+              .where(eq(deals.id, lead.convertedToDealId))
+              .then((r) => r[0] ?? null)
+          : Promise.resolve(null),
+      ])
+    : [null, null, null];
 
   const [leadActivities, leadTasks, allUsers, customFieldDefs, customFieldVals, t, tD] = await Promise.all([
     getActivitiesByLead(leadId),
@@ -208,7 +242,15 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </Button>
               </LeadModal>
               <SendEmailModal entity={lead} templates={templates} ownerId={userId} />
-              {!lead.isConverted && <ConvertLeadButton leadId={lead.id} />}
+              {!lead.isConverted && (
+                <ConvertLeadButton
+                  leadId={lead.id}
+                  leadName={fullName}
+                  companyName={lead.companyName}
+                  activityCount={leadActivities.length}
+                  taskCount={leadTasks.length}
+                />
+              )}
             </div>
           </div>
         </CardContent>
@@ -226,7 +268,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <CardContent className="space-y-4">
               {lead.email && (
                 <InfoRow label={tD("fieldEmail")}>
-                  <a href={`mailto:${lead.email}`} className="flex items-center gap-1.5 text-primary hover:underline break-all">
+                  <a
+                    href={`mailto:${lead.email}`}
+                    className="flex items-center gap-1.5 text-primary hover:underline break-all"
+                  >
                     <MailIcon className="w-3.5 h-3.5 flex-shrink-0" />
                     {lead.email}
                   </a>
@@ -333,11 +378,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     </span>
                   </InfoRow>
                 )}
-                {lead.industry && (
-                  <InfoRow label={tD("fieldIndustry")}>
-                    {lead.industry}
-                  </InfoRow>
-                )}
+                {lead.industry && <InfoRow label={tD("fieldIndustry")}>{lead.industry}</InfoRow>}
               </CardContent>
             </Card>
           )}
@@ -423,6 +464,52 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           />
 
           <DocumentPanel entityType="lead" entityId={leadId} />
+
+          {/* Converted-to traceability card */}
+          {lead.isConverted && (convertedContact || convertedCompany || convertedDeal) && (
+            <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2Icon className="w-4 h-4" />
+                  Convertito in
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {convertedContact && (
+                  <a
+                    href={`/dashboard/contacts?contactId=${lead.convertedToContactId}`}
+                    className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                  >
+                    <UserIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    {convertedContact.firstName} {convertedContact.lastName}
+                  </a>
+                )}
+                {convertedCompany && (
+                  <a
+                    href={`/dashboard/companies/${lead.convertedToCompanyId}`}
+                    className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                  >
+                    <BuildingIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    {convertedCompany.name}
+                  </a>
+                )}
+                {convertedDeal && (
+                  <a
+                    href={`/dashboard/pipeline?dealId=${lead.convertedToDealId}`}
+                    className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                  >
+                    <BriefcaseIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    {convertedDeal.name}
+                  </a>
+                )}
+                {lead.convertedAt && (
+                  <p className="text-[10px] text-muted-foreground pt-1 border-t">
+                    Convertito il <FormattedDate date={lead.convertedAt} />
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* ── Main: Timeline + Tasks ── */}
@@ -438,7 +525,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground">{tD("typeLabel")}</p>
-                    <select name="type" className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm">
+                    <select
+                      name="type"
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm"
+                    >
                       <option value="note">{tD("activityTypes.note")}</option>
                       <option value="call">{tD("activityTypes.call")}</option>
                       <option value="meeting">{tD("activityTypes.meeting")}</option>
@@ -570,9 +660,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                           {task.dueDate && (
                             <span
                               className={`flex items-center gap-1 font-semibold ${
-                                task.status !== "done" && new Date(task.dueDate) < new Date()
-                                  ? "text-destructive"
-                                  : ""
+                                task.status !== "done" && new Date(task.dueDate) < new Date() ? "text-destructive" : ""
                               }`}
                             >
                               <CalendarIcon className="w-3 h-3" />
@@ -584,7 +672,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                             {tD("toLabel")} {task.assigneeName || tD("myself")}
                           </span>
                         </div>
-                        <form action={async () => { "use server"; await toggleTask(task.id, task.status); }}>
+                        <form
+                          action={async () => {
+                            "use server";
+                            await toggleTask(task.id, task.status);
+                          }}
+                        >
                           <Button variant="outline" size="sm" className="h-6 px-2 text-[10px] bg-background">
                             {task.status === "done" ? tD("undo") : tD("markDone")}
                           </Button>

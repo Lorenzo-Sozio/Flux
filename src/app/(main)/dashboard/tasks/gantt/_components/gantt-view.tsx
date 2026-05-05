@@ -6,13 +6,11 @@ import dynamic from "next/dynamic";
 
 import { defaultColumns } from "@svar-ui/gantt-store";
 import type { IApi, IScaleConfig, TMethodsConfig } from "@svar-ui/react-gantt";
-import { PencilIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { addDependency, getTaskById, propagateSuccessors, removeDependency, updateTask } from "@/actions/tasks";
 import { TaskModal } from "@/components/crm/task-modal";
-import { Button } from "@/components/ui/button";
 import type { SvarLink, SvarTask } from "@/stores/gantt-store";
 import { useGanttStore } from "@/stores/gantt-store";
 
@@ -123,7 +121,6 @@ export function GanttView({ viewMode, viewDate, users }: Props) {
   const tempToReal = useRef<Map<string, string>>(new Map());
 
   // ─── Task detail modal ──────────────────────────────────────────────────────
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   // biome-ignore lint/suspicious/noExplicitAny: mirrors TaskModal task prop type
   const [modalTask, setModalTask] = useState<any | null>(null);
@@ -141,11 +138,6 @@ export function GanttView({ viewMode, viewDate, users }: Props) {
     (api: IApi) => {
       api.intercept("add-task", () => false);
       api.intercept("delete-task", () => false);
-
-      // Single-click: track selected task to enable the toolbar button
-      api.on("select-task", (ev: TMethodsConfig["select-task"]) => {
-        setSelectedTaskId(ev.id ? String(ev.id) : null);
-      });
 
       // Double-click on task bar or row opens our modal instead of SVAR's built-in editor
       api.intercept("show-editor", (ev: TMethodsConfig["show-editor"]) => {
@@ -284,19 +276,6 @@ export function GanttView({ viewMode, viewDate, users }: Props) {
           init={handleInit}
         />
       </div>
-
-      {/* "Open details" button — floats top-right, visible when a task is selected */}
-      {selectedTaskId && (
-        <Button
-          size="sm"
-          variant="secondary"
-          className="absolute top-2 right-2 z-10 h-7 gap-1.5 px-2.5 text-xs shadow-sm"
-          onClick={() => openTask(selectedTaskId)}
-        >
-          <PencilIcon className="h-3 w-3" />
-          {t("openDetails")}
-        </Button>
-      )}
 
       {/* Task detail modal — key ensures fresh mount per task */}
       {modalTask && openTaskId === modalTask.id && (

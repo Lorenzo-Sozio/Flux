@@ -113,6 +113,7 @@ export const companies = pgTable("company", {
   vatNumber: text("vat_number"),
   sdiCode: text("sdi_code"),
   tags: text("tags").array(),
+  sourceLeadId: text("source_lead_id"), // FK set via migration → lead.id (set null)
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -145,7 +146,11 @@ export const leads = pgTable("lead", {
   marketingConsent: boolean("marketing_consent").default(false),
   consentDate: timestamp("consent_date", { mode: "date" }),
   tags: text("tags").array(),
-  isConverted: boolean("is_converted").default(false).notNull(), // Added this line
+  isConverted: boolean("is_converted").default(false).notNull(),
+  convertedAt: timestamp("converted_at", { mode: "date" }),
+  convertedToContactId: text("converted_to_contact_id"), // FK set via migration → contact.id (set null)
+  convertedToCompanyId: text("converted_to_company_id"), // FK set via migration → company.id (set null)
+  convertedToDealId: text("converted_to_deal_id"), // FK set via migration → deal.id (set null)
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -177,6 +182,7 @@ export const contacts = pgTable("contact", {
   marketingConsent: boolean("marketing_consent").default(false),
   consentDate: timestamp("consent_date", { mode: "date" }),
   tags: text("tags").array(),
+  sourceLeadId: text("source_lead_id"), // FK set via migration → lead.id (set null)
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
