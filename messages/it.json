@@ -826,11 +826,21 @@
       "legendTodo": "Da fare",
       "progressLabel": "% completato",
       "listHeader": "Attività",
+      "colStart": "Inizio",
+      "colDuration": "Durata",
+      "openDetails": "Dettagli",
       "tooltipStart": "Inizio",
       "tooltipEnd": "Fine",
       "tooltipProgress": "Avanzamento",
       "tooltipAssignee": "Assegnato a",
-      "tooltipPriority": "Priorità"
+      "tooltipPriority": "Priorità",
+      "workloadToggle": "Workload",
+      "workloadPanelTitle": "Carico del Team",
+      "workloadNextDays": "{n} giorni lavorativi",
+      "workloadNoData": "Nessun assegnatario con date in questo periodo.",
+      "workloadViewFull": "Vista workload completa →",
+      "addLinkError": "Errore nel salvataggio della dipendenza.",
+      "deleteLinkError": "Errore nell'eliminazione della dipendenza."
     },
     "workload": {
       "title": "Carico di Lavoro",

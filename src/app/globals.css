@@ -229,6 +229,38 @@ html {
   overscroll-behavior: none;
 }
 
+/* ── SVAR Gantt: dark-mode variable overrides ─────────────────────────────── */
+/* The gantt wrapper applies wx-willow-theme (light). When .dark is active on
+   the html element, override the key --wx-* vars with Willow-dark values.    */
+.dark .wx-willow-theme {
+  color-scheme: dark;
+  --wx-background: #2a2b2d;
+  --wx-background-alt: #384047;
+  --wx-background-hover: #20262b;
+  --wx-color-font: rgba(255, 255, 255, 0.9);
+  --wx-color-font-alt: #9fa1ae;
+  --wx-color-font-disabled: #9fa1ae;
+  --wx-color-primary: #7a67eb;
+  --wx-color-primary-selected: rgba(122, 103, 235, 0.3);
+  --wx-color-disabled: #384047;
+  --wx-color-link: var(--wx-color-primary);
+  --wx-border: 1px solid #384047;
+  --wx-gantt-border: var(--wx-border);
+  --wx-gantt-border-color: #384047;
+  --wx-gantt-select-color: #384047;
+  --wx-gantt-holiday-background: #303539;
+  --wx-gantt-holiday-color: #878994;
+  --wx-gantt-task-color: #37a9ef;
+  --wx-gantt-task-fill-color: #098cdc;
+  --wx-gantt-task-border-color: #098cdc;
+  --wx-gantt-task-font-color: rgba(255, 255, 255, 0.9);
+  --wx-gantt-link-color: #9fa1ae;
+  --wx-gantt-link-marker-background: #384047;
+  --wx-gantt-link-marker-color: #9fa1ae;
+  --wx-grid-body-row-border: var(--wx-border);
+  --wx-timescale-border: var(--wx-border);
+}
+
 .disable-transitions * {
   transition: none !important;
 }

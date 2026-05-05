@@ -11,9 +11,15 @@ export default async function WorkloadPage() {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const endDate = new Date(today.getTime() + 27 * 86400000); // 4 weeks
 
-  const matrix = await getWorkloadMatrix(today, endDate);
+  // Snap to Monday of current week
+  const dow = today.getDay();
+  const monday = new Date(today.getTime() + (dow === 0 ? -6 : 1 - dow) * 86400000);
 
-  return <WorkloadClient matrix={matrix} startDate={today} endDate={endDate} />;
+  // Default: 2 weeks (current + next)
+  const endDate = new Date(monday.getTime() + 13 * 86400000);
+
+  const matrix = await getWorkloadMatrix(monday, endDate);
+
+  return <WorkloadClient matrix={matrix} startDate={monday} endDate={endDate} />;
 }

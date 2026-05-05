@@ -63,7 +63,31 @@
       "Bash(grep -v \"^$\\\\|infos\\\\|warnings\\\\|Checked\\\\|check ━\")",
       "Bash(grep -v \"^$\")",
       "Bash(npx @biomejs/biome check src/components/crm/quick-task-form.tsx src/app/\"\\(main\\)\"/dashboard/leads/\"[id]\"/page.tsx src/app/\"\\(main\\)\"/dashboard/contacts/\"[id]\"/page.tsx src/app/\"\\(main\\)\"/dashboard/companies/\"[id]\"/page.tsx)",
-      "Bash(npx @biomejs/biome check --write src/components/crm/quick-task-form.tsx)"
+      "Bash(npx @biomejs/biome check --write src/components/crm/quick-task-form.tsx)",
+      "Bash(curl -s http://localhost:3000/dashboard/tasks/workload)",
+      "Bash(node -e \"const p = require\\('./node_modules/gantt-task-react/package.json'\\); console.log\\(p.version\\)\")",
+      "Bash(python -c \"import json,sys; p=json.load\\(sys.stdin\\); deps={**p.get\\('dependencies',{}\\), **p.get\\('devDependencies',{}\\)}; [print\\(k,v\\) for k,v in sorted\\(deps.items\\(\\)\\)]\")",
+      "Bash(npm show *)",
+      "WebFetch(domain:docs.svar.dev)",
+      "WebSearch",
+      "WebFetch(domain:svar.dev)",
+      "WebFetch(domain:github.com)",
+      "Bash(npm ls *)",
+      "Bash(npm uninstall *)",
+      "Bash(grep -E \"\\\\.css$|index\")",
+      "Bash(node -e \"const d=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const p=JSON.parse\\(d\\); console.log\\(JSON.stringify\\({main:p.main,module:p.module,exports:p.exports,peerDependencies:p.peerDependencies,dependencies:p.dependencies},null,2\\)\\)\")",
+      "Bash(node -e \"const l=require\\('c:/React/Flux/node_modules/lucide-react'\\); console.log\\(Object.keys\\(l\\).filter\\(k=>k.toLowerCase\\(\\).includes\\('panel'\\)\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(json.dumps\\({k:d.get\\(k\\) for k in ['main','module','exports','peerDependencies','version']}, indent=2\\)\\)\")",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\(d.get\\('main'\\), d.get\\('exports'\\)\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/react/package.json'\\).version\\)\")",
+      "Bash(node -e \"const { defaultColumns } = require\\('@svar-ui/gantt-store'\\); console.log\\(JSON.stringify\\(defaultColumns, null, 2\\)\\)\")",
+      "Bash(Get-ChildItem \"c:\\\\React\\\\Flux\\\\node_modules\\\\@svar-ui\\\\react-gantt\\\\dist\\\\\" | Select-Object Name)",
+      "Bash(node -e \"const { defaultColumns } = require\\('@svar-ui/gantt-store'\\); console.log\\(JSON.stringify\\(defaultColumns[3], null, 2\\)\\)\")",
+      "PowerShell(Select-String -Pattern \"IColumn|header\" \"c:\\\\React\\\\Flux\\\\node_modules\\\\@svar-ui\\\\grid-store\\\\dist\\\\types\\\\index.d.ts\" | Select-Object -First 20 | ForEach-Object { $_.Line })",
+      "Bash(node -e \"const g = require\\('@svar-ui/gantt-store'\\); console.log\\(Object.keys\\(g\\)\\)\")",
+      "Bash(grep -o \"add-task.\\\\{0,200\\\\}\" \"c:\\\\React\\\\Flux\\\\node_modules\\\\@svar-ui\\\\gantt-store\\\\dist\\\\index.js\")",
+      "Bash(grep -o \"template.\\\\{0,300\\\\}add-task\\\\|add-task.\\\\{0,300\\\\}template\" \"c:\\\\React\\\\Flux\\\\node_modules\\\\@svar-ui\\\\gantt-store\\\\dist\\\\index.js\")"
     ]
   }
 }

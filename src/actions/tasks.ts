@@ -576,8 +576,13 @@ export async function addDependency(predecessorId: string, successorId: string, 
     .where(eq(taskDependencies.successorId, successorId));
   if (Number(count[0].c) >= 10) throw new Error("Max 10 dependencies per task.");
 
-  await db.insert(taskDependencies).values({ predecessorId, successorId, type, lagDays });
+  const [dep] = await db
+    .insert(taskDependencies)
+    .values({ predecessorId, successorId, type, lagDays })
+    .returning({ id: taskDependencies.id });
   revalidatePath("/dashboard/tasks");
+  revalidatePath("/dashboard/tasks/gantt");
+  return dep.id;
 }
 
 export async function removeDependency(dependencyId: string) {
@@ -681,8 +686,39 @@ export async function propagateSuccessors(taskId: string, deltaDays: number): Pr
   return count;
 }
 
+export async function getTaskById(id: string) {
+  const ownerAlias = alias(users, "owner");
+  const assigneeAlias = alias(users, "assignee");
+  const [task] = await db
+    .select({
+      id: tasks.id,
+      title: tasks.title,
+      description: tasks.description,
+      dueDate: tasks.dueDate,
+      startDate: tasks.startDate,
+      allDay: tasks.allDay,
+      status: tasks.status,
+      priority: tasks.priority,
+      depth: tasks.depth,
+      progressPct: tasks.progressPct,
+      parentId: tasks.parentId,
+      estimatedHours: tasks.estimatedHours,
+      actualHours: tasks.actualHours,
+      ownerId: tasks.ownerId,
+      assigneeId: tasks.assigneeId,
+      ownerName: ownerAlias.name,
+      assigneeName: assigneeAlias.name,
+    })
+    .from(tasks)
+    .leftJoin(ownerAlias, eq(tasks.ownerId, ownerAlias.id))
+    .leftJoin(assigneeAlias, eq(tasks.assigneeId, assigneeAlias.id))
+    .where(eq(tasks.id, id))
+    .limit(1);
+  return task ?? null;
+}
+
 export async function getAllTasksForGantt() {
-  return await db
+  const rows = await db
     .select({
       id: tasks.id,
       title: tasks.title,
@@ -695,8 +731,15 @@ export async function getAllTasksForGantt() {
       depth: tasks.depth,
       assigneeId: tasks.assigneeId,
       assigneeName: users.name,
+      estimatedHoursRaw: tasks.estimatedHours,
     })
     .from(tasks)
     .leftJoin(users, eq(tasks.assigneeId, users.id))
     .orderBy(tasks.createdAt);
+
+  return rows.map((r) => ({
+    ...r,
+    estimatedHours: r.estimatedHoursRaw !== null ? Number(r.estimatedHoursRaw) : null,
+    estimatedHoursRaw: undefined,
+  }));
 }

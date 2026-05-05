@@ -826,11 +826,21 @@
       "legendTodo": "To do",
       "progressLabel": "% complete",
       "listHeader": "Task",
+      "colStart": "Start",
+      "colDuration": "Duration",
+      "openDetails": "Details",
       "tooltipStart": "Start",
       "tooltipEnd": "End",
       "tooltipProgress": "Progress",
       "tooltipAssignee": "Assigned to",
-      "tooltipPriority": "Priority"
+      "tooltipPriority": "Priority",
+      "workloadToggle": "Workload",
+      "workloadPanelTitle": "Team Workload",
+      "workloadNextDays": "{n} working days",
+      "workloadNoData": "No assignees with dates in this period.",
+      "workloadViewFull": "Full workload view →",
+      "addLinkError": "Failed to save dependency.",
+      "deleteLinkError": "Failed to delete dependency."
     },
     "workload": {
       "title": "Workload",
