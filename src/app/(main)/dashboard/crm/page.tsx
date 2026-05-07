@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { and, desc, eq, gte, inArray, lte, notInArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lte, notInArray, sql, sum } from "drizzle-orm";
 import {
   AlertCircle,
   ArrowRight,
@@ -31,9 +31,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { db } from "@/db";
-import { activities, companies, contacts, deals, leads, tasks, tickets } from "@/db/schema";
+import { activities, companies, contacts, deals, leads, salesTargets, tasks, tickets } from "@/db/schema";
 
 import { type AgendaItem, AgendaWidget } from "./_components/agenda-widget";
+import { MonthTargetCard } from "./_components/month-target-card";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -81,6 +82,8 @@ export default async function CRMPage() {
   const isPrivileged = role === "admin" || role === "owner";
 
   const now = new Date();
+  const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
   const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
   // Limit overdue look-back to 30 days so stale tasks don't flood the agenda
@@ -95,7 +98,7 @@ export default async function CRMPage() {
       ))`
     : undefined;
 
-  const [stats, rawLeads, topDeals, recentActivities, myTasks, todayActivities, todayAppointments, myTickets] =
+  const [stats, rawLeads, topDeals, recentActivities, myTasks, todayActivities, todayAppointments, myTickets, myTarget, wonThisMonth] =
     await Promise.all([
       getDashboardStats(),
       getLeads(),
@@ -210,6 +213,23 @@ export default async function CRMPage() {
             .orderBy(desc(tickets.updatedAt))
             .limit(8)
         : Promise.resolve([]),
+
+      // Current month target for this user
+      userId
+        ? db.select({ targetAmount: salesTargets.targetAmount, currency: salesTargets.currency })
+            .from(salesTargets)
+            .where(and(eq(salesTargets.userId, userId), eq(salesTargets.period, currentPeriod)))
+            .limit(1)
+            .then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
+
+      // Won deals this month for this user
+      userId
+        ? db.select({ total: sum(deals.amount) })
+            .from(deals)
+            .where(and(eq(deals.status, "won"), eq(deals.ownerId, userId), gte(deals.updatedAt, monthStart)))
+            .then((rows) => parseFloat(rows[0]?.total ?? "0"))
+        : Promise.resolve(0 as number),
     ]);
 
   // ── Build agenda items ───────────────────────────────────────────────────────
@@ -492,6 +512,9 @@ export default async function CRMPage() {
           </Card>
         </Link>
       </div>
+
+      {/* ── Target mensile ───────────────────────────────────────────── */}
+      {(myTarget || wonThisMonth > 0) && <MonthTargetCard myTarget={myTarget} wonThisMonth={wonThisMonth} monthLabel={now.toLocaleDateString("it-IT", { month: "long", year: "numeric" })} />}
 
       {/* ── Charts ───────────────────────────────────────────────────── */}
       <CRMCharts dealDistribution={stats.dealDistribution} leadsBySource={stats.leadsBySource} />

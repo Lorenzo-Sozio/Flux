@@ -1,18 +1,20 @@
 "use server";
 
-import { db } from "@/db";
-import { companies, contacts, deals, pipelineStages, users } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { dispatchWebhook } from "@/actions/webhooks";
+
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+
 import { createNotificationAction } from "@/actions/auth";
-import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
+import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
+import { db } from "@/db";
+import { activities, companies, contacts, deals, pipelineStages, salesTargets, users } from "@/db/schema";
+import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
 
 export async function getPipelineData() {
   let stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
-  
+
   // Seed default stages if pipeline is completely empty
   if (stages.length === 0) {
     await db.insert(pipelineStages).values([
@@ -26,14 +28,14 @@ export async function getPipelineData() {
   }
 
   const allDeals = await db.select().from(deals);
-  
+
   return { stages, deals: allDeals };
 }
 
 export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
   await requireWriteAccess();
   if (!data.name || !data.stageId) throw new Error("Name and Stage are required.");
-  
+
   const payload = {
     ...data,
     amount: data.amount ? String(data.amount) : "0",
@@ -41,18 +43,28 @@ export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
     status: data.status || "open",
   };
 
-  const [newDeal] = await db.insert(deals).values(payload as any).returning();
+  const [newDeal] = await db
+    .insert(deals)
+    .values(payload as any)
+    .returning();
   revalidatePath("/dashboard/pipeline");
-  dispatchWebhook("deal.created", { id: newDeal.id, name: newDeal.name, amount: newDeal.amount, stageId: newDeal.stageId }).catch(() => {});
+  dispatchWebhook("deal.created", {
+    id: newDeal.id,
+    name: newDeal.name,
+    amount: newDeal.amount,
+    stageId: newDeal.stageId,
+  }).catch(() => {});
 
   // Run automation rules after response is sent (zero-latency)
-  after(() => runAutomations({
-    entityType: "deal",
-    entityId:   newDeal.id,
-    event:      "onCreate",
-    oldData:    {},
-    newData:    newDeal as Record<string, unknown>,
-  }));
+  after(() =>
+    runAutomations({
+      entityType: "deal",
+      entityId: newDeal.id,
+      event: "onCreate",
+      oldData: {},
+      newData: newDeal as Record<string, unknown>,
+    }),
+  );
 
   return newDeal;
 }
@@ -88,13 +100,16 @@ export async function updateDealStage(dealId: string, newStageId: string) {
 
   revalidatePath("/dashboard/pipeline");
 
-  after(() => runAutomations({
-    entityType: "deal",
-    entityId:   updatedDeal.id,
-    event:      "onUpdate",
-    oldData:    (oldDeal ?? {}) as Record<string, unknown>,
-    newData:    updatedDeal as Record<string, unknown>,
-  }));
+  after(async () => {
+    await refreshDealHealthScore(updatedDeal.id);
+    runAutomations({
+      entityType: "deal",
+      entityId: updatedDeal.id,
+      event: "onUpdate",
+      oldData: (oldDeal ?? {}) as Record<string, unknown>,
+      newData: updatedDeal as Record<string, unknown>,
+    });
+  });
 
   return updatedDeal;
 }
@@ -119,21 +134,32 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
 
   // Fire webhook + notification on deal won/lost
   if (data.status === "won") {
-    dispatchWebhook("deal.won", { id: updatedDeal.id, name: updatedDeal.name, amount: updatedDeal.amount }).catch(() => {});
+    dispatchWebhook("deal.won", { id: updatedDeal.id, name: updatedDeal.name, amount: updatedDeal.amount }).catch(
+      () => {},
+    );
     if (updatedDeal.ownerId) {
-      createNotificationAction({ userId: updatedDeal.ownerId, type: "deal_won", title: "Deal won! 🏆", message: `"${updatedDeal.name}" has been marked as won.`, link: `/dashboard/pipeline` }).catch(() => {});
+      createNotificationAction({
+        userId: updatedDeal.ownerId,
+        type: "deal_won",
+        title: "Deal won! 🏆",
+        message: `"${updatedDeal.name}" has been marked as won.`,
+        link: `/dashboard/pipeline`,
+      }).catch(() => {});
     }
   } else if (data.status === "lost") {
     dispatchWebhook("deal.lost", { id: updatedDeal.id, name: updatedDeal.name }).catch(() => {});
   }
 
-  after(() => runAutomations({
-    entityType: "deal",
-    entityId:   updatedDeal.id,
-    event:      "onUpdate",
-    oldData:    (oldDeal ?? {}) as Record<string, unknown>,
-    newData:    updatedDeal as Record<string, unknown>,
-  }));
+  after(async () => {
+    await refreshDealHealthScore(updatedDeal.id);
+    runAutomations({
+      entityType: "deal",
+      entityId: updatedDeal.id,
+      event: "onUpdate",
+      oldData: (oldDeal ?? {}) as Record<string, unknown>,
+      newData: updatedDeal as Record<string, unknown>,
+    });
+  });
 
   return updatedDeal;
 }
@@ -172,15 +198,23 @@ export async function getPipelineReport() {
     const totalValue = stageDeals.reduce((sum, d) => sum + Number(d.amount ?? 0), 0);
     const weightedValue = stageDeals.reduce(
       (sum, d) => sum + Number(d.amount ?? 0) * ((d.probability ?? stage.defaultProbability ?? 0) / 100),
-      0
+      0,
     );
     const avgDaysInStage = stageDeals.length
       ? Math.round(
           stageDeals.reduce((sum, d) => sum + (now - new Date(d.createdAt).getTime()) / 86_400_000, 0) /
-            stageDeals.length
+            stageDeals.length,
         )
       : 0;
-    return { id: stage.id, name: stage.name, color: stage.color, dealCount: stageDeals.length, totalValue, weightedValue, avgDaysInStage };
+    return {
+      id: stage.id,
+      name: stage.name,
+      color: stage.color,
+      dealCount: stageDeals.length,
+      totalValue,
+      weightedValue,
+      avgDaysInStage,
+    };
   });
 
   const wonDeals = allDeals.filter((d) => d.status === "won");
@@ -193,7 +227,15 @@ export async function getPipelineReport() {
       ? ((wonDeals.length / (wonDeals.length + lostDeals.length)) * 100).toFixed(1)
       : "0";
 
-  return { stageReport, totalWonValue, totalPipeline, winRate, wonCount: wonDeals.length, lostCount: lostDeals.length, openCount: openDeals.length };
+  return {
+    stageReport,
+    totalWonValue,
+    totalPipeline,
+    winRate,
+    wonCount: wonDeals.length,
+    lostCount: lostDeals.length,
+    openCount: openDeals.length,
+  };
 }
 
 // ── Pipeline Stage Management ────────────────────────────────────────────────
@@ -202,11 +244,7 @@ export async function getPipelineStages() {
   return db.select().from(pipelineStages).orderBy(pipelineStages.order);
 }
 
-export async function createPipelineStage(data: {
-  name: string;
-  color?: string;
-  defaultProbability?: number;
-}) {
+export async function createPipelineStage(data: { name: string; color?: string; defaultProbability?: number }) {
   await requireAdminAccess();
   const stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
   const maxOrder = stages.length > 0 ? Math.max(...stages.map((s) => s.order)) : 0;
@@ -250,4 +288,160 @@ export async function deletePipelineStage(id: string) {
 
 export async function getDealsForSelect() {
   return db.select({ id: deals.id, name: deals.name }).from(deals).orderBy(deals.name);
+}
+
+// ── Deal Health Score ─────────────────────────────────────────────────────────
+
+function computeHealthScore(
+  deal: {
+    probability: number | null;
+    expectedCloseDate: Date | null;
+    updatedAt: Date;
+  },
+  recentActivityCount: number,
+): number {
+  let score = 100;
+  const now = new Date();
+  const daysSinceUpdated = (now.getTime() - new Date(deal.updatedAt).getTime()) / 86_400_000;
+
+  // Overdue close date
+  if (deal.expectedCloseDate && new Date(deal.expectedCloseDate) < now) score -= 35;
+
+  // Stale deal (no update + no recent activity)
+  if (recentActivityCount === 0) {
+    if (daysSinceUpdated > 14) score -= 35;
+    else if (daysSinceUpdated > 7) score -= 20;
+  }
+
+  // Stuck in stage (use updatedAt as proxy)
+  if (daysSinceUpdated > 60) score -= 25;
+  else if (daysSinceUpdated > 30) score -= 12;
+
+  // Low probability
+  if ((deal.probability ?? 0) < 20) score -= 15;
+
+  return Math.max(0, Math.min(100, score));
+}
+
+async function refreshDealHealthScore(dealId: string) {
+  const [deal] = await db
+    .select({ status: deals.status, probability: deals.probability, expectedCloseDate: deals.expectedCloseDate, updatedAt: deals.updatedAt })
+    .from(deals)
+    .where(eq(deals.id, dealId));
+  if (!deal || deal.status !== "open") return;
+
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
+  const recentActivities = await db
+    .select({ id: activities.id })
+    .from(activities)
+    .where(and(eq(activities.dealId, dealId), gte(activities.createdAt, sevenDaysAgo)))
+    .limit(1);
+
+  const score = computeHealthScore(deal, recentActivities.length);
+  await db.update(deals).set({ healthScore: score }).where(eq(deals.id, dealId));
+}
+
+// ── Forecast ──────────────────────────────────────────────────────────────────
+
+export async function getForecastData() {
+  const openDeals = await db
+    .select({
+      id: deals.id,
+      name: deals.name,
+      amount: deals.amount,
+      currency: deals.currency,
+      probability: deals.probability,
+      expectedCloseDate: deals.expectedCloseDate,
+      ownerId: deals.ownerId,
+      ownerName: users.name,
+      stageId: deals.stageId,
+      stageName: pipelineStages.name,
+    })
+    .from(deals)
+    .leftJoin(users, eq(deals.ownerId, users.id))
+    .leftJoin(pipelineStages, eq(deals.stageId, pipelineStages.id))
+    .where(eq(deals.status, "open"));
+
+  // Build monthly buckets for the next 6 months
+  const now = new Date();
+  const periodKeys: string[] = [];
+  const months: {
+    label: string;
+    year: number;
+    month: number;
+    period: string;
+    committed: number;
+    bestCase: number;
+    pipeline: number;
+    target: number;
+  }[] = [];
+
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
+    const period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    periodKeys.push(period);
+    months.push({
+      label: d.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+      year: d.getFullYear(),
+      month: d.getMonth(),
+      period,
+      committed: 0,
+      bestCase: 0,
+      pipeline: 0,
+      target: 0,
+    });
+  }
+
+  // Fetch monthly targets for this period range
+  const targetRows = await db
+    .select({ period: salesTargets.period, targetAmount: salesTargets.targetAmount })
+    .from(salesTargets)
+    .where(inArray(salesTargets.period, periodKeys));
+
+  for (const tr of targetRows) {
+    const bucket = months.find((m) => m.period === tr.period);
+    if (bucket) bucket.target += parseFloat(tr.targetAmount ?? "0");
+  }
+
+  // Single pass: bucket by month and build owner map simultaneously
+  const ownerMap = new Map<string, { name: string; weighted: number; dealCount: number }>();
+  for (const deal of openDeals) {
+    const amt = Number(deal.amount ?? 0);
+    const prob = deal.probability ?? 0;
+    const weighted = (amt * prob) / 100;
+
+    let bucket = months[months.length - 1];
+    if (deal.expectedCloseDate) {
+      const cd = new Date(deal.expectedCloseDate);
+      const found = months.find((m) => m.year === cd.getFullYear() && m.month === cd.getMonth());
+      if (found) bucket = found;
+    }
+    bucket.pipeline += weighted;
+    if (prob >= 50) bucket.bestCase += weighted;
+    if (prob >= 80) bucket.committed += weighted;
+
+    if (deal.ownerId) {
+      const existing = ownerMap.get(deal.ownerId);
+      if (existing) {
+        existing.weighted += weighted;
+        existing.dealCount += 1;
+      } else {
+        ownerMap.set(deal.ownerId, { name: deal.ownerName ?? "Unassigned", weighted, dealCount: 1 });
+      }
+    }
+  }
+
+  const currency = openDeals[0]?.currency ?? "EUR";
+  // months[0] is always the current month (loop starts at i=0)
+  const currentMonthTarget = months[0]?.target ?? 0;
+
+  return {
+    months,
+    byOwner: [...ownerMap.values()].sort((a, b) => b.weighted - a.weighted),
+    currency,
+    totalWeighted: months.reduce((s, m) => s + m.pipeline, 0),
+    committed: months.reduce((s, m) => s + m.committed, 0),
+    bestCase: months.reduce((s, m) => s + m.bestCase, 0),
+    currentMonthTarget,
+  };
 }

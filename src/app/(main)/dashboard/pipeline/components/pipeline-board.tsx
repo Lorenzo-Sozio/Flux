@@ -1,22 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+
 import Link from "next/link";
+
+import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
+import { BarChart2, CalendarIcon, CoinsIcon, PencilIcon, PlusIcon, Settings2, TrendingUp } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+
 import { updateDealStage } from "@/actions/pipeline";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { DealModal } from "@/components/crm/deal-modal";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PlusIcon, CoinsIcon, PencilIcon, BarChart2, Settings2 } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type Deal = {
   id: string;
   name: string;
   amount: string | null;
   currency: string;
+  probability: number | null;
   expectedCloseDate: Date | null;
+  healthScore: number | null;
   stageId: string | null;
   companyId: string | null;
   contactId: string | null;
@@ -78,7 +83,7 @@ export function PipelineBoard({
     newDeals.splice(dealIndex, 1); // remove from old position
     // We don't have true sorting logic for deals yet, just simple filtering
     // So we just update the stageId
-    setDeals(deals.map(d => d.id === draggableId ? deal : d));
+    setDeals(deals.map((d) => (d.id === draggableId ? deal : d)));
 
     try {
       await updateDealStage(deal.id, destination.droppableId);
@@ -99,6 +104,11 @@ export function PipelineBoard({
         </div>
 
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/dashboard/pipeline/forecast">
+              <TrendingUp className="mr-2 h-4 w-4" /> Forecast
+            </Link>
+          </Button>
           <Button variant="outline" size="sm" asChild>
             <Link href="/dashboard/pipeline/report">
               <BarChart2 className="mr-2 h-4 w-4" /> {t("report")}
@@ -127,10 +137,16 @@ export function PipelineBoard({
             const totalAmount = stageDeals.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
 
             return (
-              <div key={stage.id} className="flex-1 min-w-0 flex flex-col bg-muted/30 rounded-xl border h-full overflow-hidden shadow-sm">
+              <div
+                key={stage.id}
+                className="flex-1 min-w-0 flex flex-col bg-muted/30 rounded-xl border h-full overflow-hidden shadow-sm"
+              >
                 <div className="p-4 border-b bg-background/50 backdrop-blur-sm flex flex-col gap-1 shrink-0">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-sm tracking-tight truncate uppercase" style={{ color: stage.color || "inherit" }}>
+                    <h3
+                      className="font-bold text-sm tracking-tight truncate uppercase"
+                      style={{ color: stage.color || "inherit" }}
+                    >
                       {stage.name}
                     </h3>
                     <Badge variant="secondary" className="rounded-full h-5 text-[10px]">
@@ -148,8 +164,9 @@ export function PipelineBoard({
                     <div
                       {...provided.droppableProps}
                       ref={provided.innerRef}
-                      className={`flex-1 overflow-y-auto p-3 flex flex-col gap-3 transition-colors ${snapshot.isDraggingOver ? "bg-primary/5" : "bg-transparent"
-                        }`}
+                      className={`flex-1 overflow-y-auto p-3 flex flex-col gap-3 transition-colors ${
+                        snapshot.isDraggingOver ? "bg-primary/5" : "bg-transparent"
+                      }`}
                     >
                       {stageDeals.map((deal, index) => (
                         <Draggable key={deal.id} draggableId={deal.id} index={index}>
@@ -161,8 +178,14 @@ export function PipelineBoard({
                               style={{ ...provided.draggableProps.style }}
                               className="group"
                             >
-                              <Card className={`relative transition-all border-l-4 ${snapshot.isDragging ? "shadow-xl ring-2 ring-primary/20 rotate-1 scale-[1.02]" : "hover:shadow-md"
-                                }`} style={{ borderLeftColor: stage.color || '#3b82f6' }}>
+                              <Card
+                                className={`relative transition-all border-l-4 ${
+                                  snapshot.isDragging
+                                    ? "shadow-xl ring-2 ring-primary/20 rotate-1 scale-[1.02]"
+                                    : "hover:shadow-md"
+                                }`}
+                                style={{ borderLeftColor: stage.color || "#3b82f6" }}
+                              >
                                 <CardHeader className="p-3 pb-1">
                                   <div className="flex justify-between items-start gap-2">
                                     <CardTitle className="text-sm font-bold leading-tight">
@@ -174,27 +197,68 @@ export function PipelineBoard({
                                         {deal.name}
                                       </Link>
                                     </CardTitle>
-                                    {canEdit && (
-                                      <DealModal deal={deal} stages={initialStages} companies={companies} contacts={contacts}>
-                                        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity" title={t("editDealTitle")}>
-                                          <PencilIcon className="h-3 w-3" />
-                                        </Button>
-                                      </DealModal>
-                                    )}
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      {/* Health score dot */}
+                                      {deal.status === "open" && (
+                                        <span
+                                          title={`Health: ${deal.healthScore ?? 0}/100`}
+                                          className={`h-2 w-2 rounded-full shrink-0 ${
+                                            (deal.healthScore ?? 0) >= 70
+                                              ? "bg-green-500"
+                                              : (deal.healthScore ?? 0) >= 40
+                                                ? "bg-amber-400"
+                                                : "bg-red-500"
+                                          }`}
+                                        />
+                                      )}
+                                      {canEdit && (
+                                        <DealModal
+                                          deal={deal}
+                                          stages={initialStages}
+                                          companies={companies}
+                                          contacts={contacts}
+                                        >
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title={t("editDealTitle")}
+                                          >
+                                            <PencilIcon className="h-3 w-3" />
+                                          </Button>
+                                        </DealModal>
+                                      )}
+                                    </div>
                                   </div>
                                 </CardHeader>
-                                <CardContent className="p-3 pt-0 flex flex-col gap-2">
+                                <CardContent className="p-3 pt-0 flex flex-col gap-1.5">
                                   <div className="flex items-center justify-between mt-1">
                                     <p className="text-[11px] font-bold text-foreground/80">
                                       {deal.currency} {Number(deal.amount || 0).toLocaleString()}
                                     </p>
-                                    <Badge variant="outline" className="text-[9px] h-4 uppercase">
-                                      {deal.status}
-                                    </Badge>
+                                    {(deal.probability ?? 0) > 0 && (
+                                      <span className="text-[9px] font-medium text-muted-foreground">
+                                        {deal.probability}%
+                                      </span>
+                                    )}
                                   </div>
-                                  <div className="flex items-center gap-1 text-[9px] text-muted-foreground italic">
-                                    {deal.createdAt && t("created", { date: new Date(deal.createdAt).toLocaleDateString(undefined) })}
-                                  </div>
+                                  {deal.expectedCloseDate && (
+                                    <div className="flex items-center gap-1 text-[9px] text-muted-foreground">
+                                      <CalendarIcon className="h-2.5 w-2.5" />
+                                      <span
+                                        className={
+                                          new Date(deal.expectedCloseDate) < new Date()
+                                            ? "text-red-500 font-medium"
+                                            : ""
+                                        }
+                                      >
+                                        {new Date(deal.expectedCloseDate).toLocaleDateString(undefined, {
+                                          month: "short",
+                                          day: "numeric",
+                                        })}
+                                      </span>
+                                    </div>
+                                  )}
                                 </CardContent>
                               </Card>
                             </div>

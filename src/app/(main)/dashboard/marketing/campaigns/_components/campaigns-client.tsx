@@ -35,9 +35,12 @@ import {
   Eye,
   Loader2,
   Plus,
+  CalendarClock,
+  XCircle,
 } from "lucide-react";
+import { format } from "date-fns";
 import { toast } from "sonner";
-import { deleteMarketingCampaign, duplicateCampaignAction } from "@/actions/marketing";
+import { deleteMarketingCampaign, duplicateCampaignAction, cancelScheduledCampaignAction } from "@/actions/marketing";
 import { CampaignModal } from "@/components/crm/campaign-modal";
 import { LaunchDialog } from "./launch-dialog";
 
@@ -54,6 +57,7 @@ interface Campaign {
   description: string | null;
   status: string;
   templateId: string | null;
+  scheduledAt: Date | null;
   createdAt: Date;
   stats: {
     total: number;
@@ -71,9 +75,10 @@ interface Props {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  draft:     { label: "Draft",     className: "border-slate-300 text-slate-600" },
-  active:    { label: "Active",    className: "border-green-300 text-green-700 bg-green-50" },
-  completed: { label: "Completed", className: "border-blue-300 text-blue-700 bg-blue-50" },
+  draft:     { label: "Draft",      className: "border-slate-300 text-slate-600" },
+  scheduled: { label: "Scheduled",  className: "border-orange-300 text-orange-700 bg-orange-50" },
+  active:    { label: "Active",     className: "border-green-300 text-green-700 bg-green-50" },
+  completed: { label: "Completed",  className: "border-blue-300 text-blue-700 bg-blue-50" },
 };
 
 export function CampaignsClient({ campaigns: initial, templates }: Props) {
@@ -106,6 +111,18 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
         router.refresh();
       } catch {
         toast.error("Failed to duplicate campaign");
+      }
+    });
+  }
+
+  function handleCancelSchedule(campaign: Campaign) {
+    startTransition(async () => {
+      try {
+        await cancelScheduledCampaignAction(campaign.id);
+        toast.success("Schedule cancelled — campaign returned to Draft");
+        router.refresh();
+      } catch {
+        toast.error("Failed to cancel schedule");
       }
     });
   }
@@ -179,6 +196,12 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
                     {templateName}
                   </p>
                 )}
+                {c.status === "scheduled" && c.scheduledAt && (
+                  <p className="text-xs text-orange-600 flex items-center gap-1 mt-1">
+                    <CalendarClock className="h-3 w-3" />
+                    {format(new Date(c.scheduledAt), "MMM d, yyyy 'at' HH:mm")}
+                  </p>
+                )}
               </CardHeader>
 
               {/* Stats row */}
@@ -213,20 +236,35 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <CampaignModal
-                    templates={templates}
-                    campaign={{ id: c.id, name: c.name, description: c.description ?? undefined, status: c.status, templateId: c.templateId ?? undefined }}
-                    onSuccess={() => router.refresh()}
-                  />
-                  <Button
-                    size="sm"
-                    className="flex-1 gap-2"
-                    disabled={c.status === "completed" || isPending}
-                    onClick={() => setLaunchTarget(c)}
-                  >
-                    <Send className="h-3.5 w-3.5" />
-                    {c.status === "active" ? "Re-launch" : "Launch"}
-                  </Button>
+                  {c.status === "scheduled" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1 gap-2 border-orange-300 text-orange-700 hover:bg-orange-50"
+                      disabled={isPending}
+                      onClick={() => handleCancelSchedule(c)}
+                    >
+                      <XCircle className="h-3.5 w-3.5" />
+                      Cancel Schedule
+                    </Button>
+                  ) : (
+                    <>
+                      <CampaignModal
+                        templates={templates}
+                        campaign={{ id: c.id, name: c.name, description: c.description ?? undefined, status: c.status, templateId: c.templateId ?? undefined }}
+                        onSuccess={() => router.refresh()}
+                      />
+                      <Button
+                        size="sm"
+                        className="flex-1 gap-2"
+                        disabled={c.status === "completed" || isPending}
+                        onClick={() => setLaunchTarget(c)}
+                      >
+                        <Send className="h-3.5 w-3.5" />
+                        {c.status === "active" ? "Re-launch" : "Launch"}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </CardContent>
             </Card>

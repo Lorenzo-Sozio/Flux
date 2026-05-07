@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -59,6 +59,9 @@ type Product = {
   description: string | null;
   sku: string | null;
   price: string;
+  taxPercent: string | null;
+  unit: string | null;
+  category: string | null;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -71,6 +74,9 @@ const formSchema = z.object({
   description: z.string().optional(),
   sku:         z.string().optional(),
   price:       z.coerce.number().min(0, "Must be ≥ 0"),
+  taxPercent:  z.coerce.number().min(0).max(100).default(0),
+  unit:        z.string().optional().nullable(),
+  category:    z.string().optional().nullable(),
   isActive:    z.boolean().default(true),
 });
 type FormValues = z.infer<typeof formSchema>;
@@ -99,20 +105,25 @@ function ProductDialog({
       description: product?.description ?? "",
       sku:         product?.sku ?? "",
       price:       product ? Number(product.price) : 0,
+      taxPercent:  product ? Number(product.taxPercent ?? 0) : 0,
+      unit:        product?.unit ?? "",
+      category:    product?.category ?? "",
       isActive:    product?.isActive ?? true,
     },
   });
 
-  // Reset when product changes
-  useState(() => {
+  useEffect(() => {
     form.reset({
       name:        product?.name ?? "",
       description: product?.description ?? "",
       sku:         product?.sku ?? "",
       price:       product ? Number(product.price) : 0,
+      taxPercent:  product ? Number(product.taxPercent ?? 0) : 0,
+      unit:        product?.unit ?? "",
+      category:    product?.category ?? "",
       isActive:    product?.isActive ?? true,
     });
-  });
+  }, [product]);
 
   const onSubmit = async (data: FormValues) => {
     setSubmitting(true);
@@ -181,6 +192,31 @@ function ProductDialog({
               </div>
             </div>
 
+            {/* Category + Tax % */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>{t("category")} <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span></Label>
+                <Input {...form.register("category")} placeholder={t("form.categoryPlaceholder")} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("taxRate")} % <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span></Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  {...form.register("taxPercent")}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/* Unit */}
+            <div className="space-y-1.5">
+              <Label>{t("dialog.unitLabel")} <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span></Label>
+              <Input {...form.register("unit")} placeholder={t("form.unitPlaceholder")} />
+            </div>
+
             {/* Description */}
             <div className="space-y-1.5">
               <Label>{t("dialog.descriptionLabel")} <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span></Label>
@@ -244,7 +280,7 @@ export function ProductsClient({ products: initial }: Props) {
   // Filtered list
   const filtered = products.filter((p) => {
     const q = search.toLowerCase();
-    const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q);
+    const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q) || (p.category ?? "").toLowerCase().includes(q);
     const matchFilter =
       filter === "all" ? true :
       filter === "active" ? p.isActive :
@@ -354,8 +390,9 @@ export function ProductsClient({ products: initial }: Props) {
             <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
               <th className="px-4 py-2.5 text-left font-medium">{t("columns.name")}</th>
               <th className="px-4 py-2.5 text-left font-medium hidden sm:table-cell">{t("columns.sku")}</th>
+              <th className="px-4 py-2.5 text-left font-medium hidden lg:table-cell">{t("category")}</th>
               <th className="px-4 py-2.5 text-left font-medium">{t("columns.price")}</th>
-              <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">{t("columns.description")}</th>
+              <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">{t("taxRate")} %</th>
               <th className="px-4 py-2.5 text-center font-medium">{t("columns.active")}</th>
               <th className="w-20 px-4 py-2.5" />
             </tr>
@@ -363,7 +400,7 @@ export function ProductsClient({ products: initial }: Props) {
           <tbody className="divide-y">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-14 text-center">
+                <td colSpan={7} className="py-14 text-center">
                   <Package className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-muted-foreground text-sm">
                     {search || filter !== "all" ? t("noMatchSearch") : t("noProductsYet")}
@@ -385,13 +422,23 @@ export function ProductsClient({ products: initial }: Props) {
                       <span className="text-muted-foreground/40">—</span>
                     )}
                   </td>
+                  <td className="px-4 py-3 hidden lg:table-cell">
+                    {product.category ? (
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{product.category}</span>
+                    ) : (
+                      <span className="text-muted-foreground/40">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
-                    <span className="font-semibold tabular-nums">{formatPrice(product.price)}</span>
+                    <div>
+                      <span className="font-semibold tabular-nums">{formatPrice(product.price)}</span>
+                      {product.unit && <span className="text-xs text-muted-foreground ml-1">/ {product.unit}</span>}
+                    </div>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
-                    <p className="text-xs text-muted-foreground truncate max-w-[240px]">
-                      {product.description ?? <span className="text-muted-foreground/40">—</span>}
-                    </p>
+                    <span className="text-sm tabular-nums">
+                      {parseFloat(product.taxPercent ?? "0") > 0 ? `${parseFloat(product.taxPercent ?? "0")}%` : <span className="text-muted-foreground/40">—</span>}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-center">
                     <button

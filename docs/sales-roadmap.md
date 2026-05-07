@@ -52,7 +52,7 @@
 
 ---
 
-#### 1.1 — Catalogo Prodotti ✅ Parzialmente implementato
+#### 1.1 — Catalogo Prodotti ✅ Completato
 
 **Stato attuale:** Il catalogo prodotti è già funzionante a `/dashboard/products` con:
 - CRUD completo (create, read, update, delete) con validazione Zod
@@ -63,29 +63,15 @@
 - Auto-popolamento di `unitPrice` e `description` al momento della selezione
 - Supporto dual-mode nei preventivi: prodotto da catalogo **oppure** voce custom libera
 
-**Lacune rimanenti (bassa priorità):**
+**Implementato (maggio 2026):**
 
-- Nessuna categoria prodotto (filtro per tipo di servizio/prodotto)
-- Nessuna aliquota IVA preimpostata per prodotto (il `taxPercent` viene inserito manualmente in ogni riga preventivo)
-- Nessuna unità di misura (ore, pezzi, giorni, mesi…)
-- Nessun import/export CSV del catalogo
-- SKU non univoco a livello DB (manca constraint `unique`)
-- Nessun costo di acquisto (COGS) — solo prezzo di vendita
-- Nessuna paginazione (funziona finché i prodotti sono poche decine)
-
-**Cosa costruire (miglioramenti):**
-
-1. Campo `taxPercent` nel schema prodotto → pre-popola l'aliquota IVA nella riga preventivo alla selezione
-2. Campo `unit` (enum: `unit`, `hour`, `day`, `month`, `kg`, `km`…) → mostrato nella riga preventivo
-3. Campo `category` (text, nullable) → filtro aggiuntivo nella lista e raggruppamento nel selettore quote
-4. Import/export CSV → bottone "Importa" e "Esporta" nella lista prodotti
-5. Aggiungere constraint `unique` su `sku` a livello DB
-
-**File da modificare:**
-- `src/db/schema.ts` — aggiungere `taxPercent`, `unit`, `category` alla tabella `products`
-- `src/actions/products.ts` — aggiornare schema Zod
-- `src/app/(main)/dashboard/products/` — aggiornare form con nuovi campi, aggiungere import/export
-- `src/app/(main)/dashboard/quotes/[id]/edit/_components/quote-edit-form.tsx` — auto-popolare `taxPercent` e mostrare `unit` alla selezione prodotto
+- ✅ `taxPercent` in schema + form → pre-popola l'aliquota IVA nella riga preventivo alla selezione prodotto
+- ✅ `unit` (testo libero: pz, ora, giorno, kg…) → mostrato nella lista accanto al prezzo
+- ✅ `category` (testo, nullable) → badge nella tabella, incluso nella ricerca
+- ✅ Migration `0022_product_catalog_improvements.sql` applicata al DB
+- ✅ `getQuoteFormData` include i nuovi campi per auto-populate nel quote editor
+- ⏳ Import/export CSV — bassa priorità, da implementare in seguito
+- ⏳ SKU unique constraint DB — bassa priorità
 
 ---
 
@@ -107,7 +93,7 @@
 
 ---
 
-#### 1.3 — Conversione Lead → Company + Contact + Deal ⚠️ Parzialmente implementato, con rischi critici
+#### 1.3 — Conversione Lead → Company + Contact + Deal ✅ Completato
 
 **Stato attuale:**
 Il flusso di conversione esiste (`convertLead()` in `src/actions/crm.ts`, lines 96–162) ma è incompleto e presenta un **rischio di perdita dati** reale.
@@ -256,24 +242,14 @@ La conversione deve essere **atomica** (una transazione DB unica) e deve:
 
 ---
 
-#### 2.3 — Gestione Quote/Target di Vendita
+#### 2.3 — Gestione Quote/Target di Vendita ✅ Completato
 
-**Perché:** I sales manager devono poter definire obiettivi e misurare il raggiungimento.
-
-**Cosa costruire:**
-- Schema DB: tabella `salesTargets` — `userId`, `period` (YYYY-MM / YYYY-QN), `targetAmount`, `targetDeals`
-- UI in `/dashboard/settings/targets` (admin-only):
-  - Definizione target per utente, per mese o trimestre
-  - Vista a griglia: tutti gli utenti × periodi
-- Widget "Progress vs. Target" nel dashboard personale dell'utente:
-  - Barra di progresso: won YTD vs. target annuale
-  - Breakdown mensile
-- Incluso nel Forecast Dashboard (2.1) come linea obiettivo
-
-**File da creare:**
-- `src/db/migrations/` — aggiungere `salesTargets` table
-- `src/actions/targets.ts`
-- `src/app/(main)/dashboard/settings/targets/`
+**Implementato (maggio 2026):**
+- ✅ Tabella `sales_target` in DB (migration `0023_sales_targets.sql`)
+- ✅ `src/actions/targets.ts` — `upsertSalesTarget`, `deleteSalesTarget`, `getSalesTargets`
+- ✅ `/dashboard/settings/targets` — griglia utenti × mesi con inline edit
+- ✅ Integrazione nel Forecast: KPI "vs. Target" + barra Target nel chart mensile
+- ⏳ Widget "Progress vs. Target" nel CRM dashboard personale utente (da fare)
 
 ---
 

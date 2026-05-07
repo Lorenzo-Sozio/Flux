@@ -14,6 +14,9 @@ const productSchema = z.object({
   description: z.string().optional(),
   sku:         z.string().optional(),
   price:       z.coerce.number().min(0, "Price must be ≥ 0"),
+  taxPercent:  z.coerce.number().min(0).max(100).default(0),
+  unit:        z.string().optional().nullable(),
+  category:    z.string().optional().nullable(),
   isActive:    z.boolean().default(true),
 });
 
@@ -47,6 +50,9 @@ export async function createProduct(data: z.infer<typeof productSchema>) {
       description: validated.description,
       sku:         validated.sku,
       price:       String(validated.price),
+      taxPercent:  String(validated.taxPercent),
+      unit:        validated.unit ?? null,
+      category:    validated.category ?? null,
       isActive:    validated.isActive,
     })
     .returning();
@@ -60,8 +66,9 @@ export async function updateProduct(id: string, data: Partial<z.infer<typeof pro
     .update(products)
     .set({
       ...data,
-      price:     data.price !== undefined ? String(data.price) : undefined,
-      updatedAt: new Date(),
+      price:      data.price !== undefined ? String(data.price) : undefined,
+      taxPercent: data.taxPercent !== undefined ? String(data.taxPercent) : undefined,
+      updatedAt:  new Date(),
     })
     .where(eq(products.id, id))
     .returning();

@@ -1,62 +1,82 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  BuildingIcon,
+  EyeIcon,
+  GitMerge,
+  Loader2Icon,
+  MapPinIcon,
+  PencilIcon,
+  ReceiptIcon,
+  TagIcon,
+  TrashIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { toast } from "sonner";
-import { Loader2Icon, PencilIcon, TrashIcon, EyeIcon, BuildingIcon, TagIcon, MapPinIcon, ReceiptIcon } from "lucide-react";
-import Link from "next/link";
+import { z } from "zod";
 
-import { createCompany, deleteCompany, updateCompany } from "@/actions/crm";
-import { AssigneeSelect, encodeAssignee, decodeAssignee } from "@/components/crm/assignee-select";
+import { checkCompanyDuplicates, createCompany, deleteCompany, updateCompany } from "@/actions/crm";
+import { MergeCompaniesModal } from "./merge-companies-modal";
+import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 const companySchema = z.object({
-  name:          z.string().min(1, "Company name is required"),
-  type:          z.string().default("prospect"),
-  status:        z.string().default("active"),
-  ownerId:       z.string().optional().nullable(),
-  groupId:       z.string().optional().nullable(),
+  name: z.string().min(1, "Company name is required"),
+  type: z.string().default("prospect"),
+  status: z.string().default("active"),
+  ownerId: z.string().optional().nullable(),
+  groupId: z.string().optional().nullable(),
   assigneeValue: z.string().optional(),
-  industry:      z.string().optional(),
+  industry: z.string().optional(),
   employeeCount: z.coerce.number().optional().nullable(),
   annualRevenue: z.coerce.number().optional().nullable(),
-  website:       z.string().optional(),
-  mainPhone:     z.string().optional(),
-  mainEmail:     z.string().email("Invalid email").optional().or(z.literal("")),
-  linkedinUrl:   z.string().optional(),
-  description:   z.string().optional(),
-  source:        z.string().optional(),
-  leadScore:     z.coerce.number().optional().nullable(),
-  tags:          z.string().optional(),
-  street:        z.string().optional(),
-  city:          z.string().optional(),
-  state:         z.string().optional(),
-  zipCode:       z.string().optional(),
-  country:       z.string().optional(),
-  vatNumber:     z.string().optional(),
-  sdiCode:       z.string().optional(),
+  website: z.string().optional(),
+  mainPhone: z.string().optional(),
+  mainEmail: z.string().email("Invalid email").optional().or(z.literal("")),
+  linkedinUrl: z.string().optional(),
+  description: z.string().optional(),
+  source: z.string().optional(),
+  leadScore: z.coerce.number().optional().nullable(),
+  tags: z.string().optional(),
+  street: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+  country: z.string().optional(),
+  vatNumber: z.string().optional(),
+  sdiCode: z.string().optional(),
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
 function F({
-  label, error, required, children,
+  label,
+  error,
+  required,
+  children,
 }: {
-  label: string; error?: string; required?: boolean; children: React.ReactNode;
+  label: string;
+  error?: string;
+  required?: boolean;
+  children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        {label}{required && <span className="ml-0.5 text-destructive">*</span>}
+        {label}
+        {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -68,6 +88,9 @@ export function CompanyModal({ company, children }: { company?: any; children: R
   const t = useTranslations("companies");
   const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
+  const [duplicates, setDuplicates] = useState<Awaited<ReturnType<typeof checkCompanyDuplicates>>>([]);
+  const [pendingPayload, setPendingPayload] = useState<Record<string, unknown> | null>(null);
+  const [mergeTargetId, setMergeTargetId] = useState<string | null>(null);
   const isEditing = !!company;
   const searchParams = useSearchParams();
 
@@ -76,91 +99,105 @@ export function CompanyModal({ company, children }: { company?: any; children: R
   }, [isEditing, searchParams]);
 
   const sourceOptions = [
-    { value: "website",        label: tc("sources.website") },
-    { value: "referral",       label: tc("sources.referral") },
-    { value: "linkedin",       label: tc("sources.linkedin") },
-    { value: "cold_outreach",  label: tc("sources.cold_outreach") },
-    { value: "trade_show",     label: tc("sources.trade_show") },
-    { value: "advertisement",  label: tc("sources.advertisement") },
+    { value: "website", label: tc("sources.website") },
+    { value: "referral", label: tc("sources.referral") },
+    { value: "linkedin", label: tc("sources.linkedin") },
+    { value: "cold_outreach", label: tc("sources.cold_outreach") },
+    { value: "trade_show", label: tc("sources.trade_show") },
+    { value: "advertisement", label: tc("sources.advertisement") },
     { value: "email_campaign", label: tc("sources.email_campaign") },
-    { value: "other",          label: tc("sources.other") },
+    { value: "other", label: tc("sources.other") },
   ];
 
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
     defaultValues: {
-      name:          company?.name          || "",
-      type:          company?.type          || "prospect",
-      status:        company?.status        || "active",
-      industry:      company?.industry      || "",
+      name: company?.name || "",
+      type: company?.type || "prospect",
+      status: company?.status || "active",
+      industry: company?.industry || "",
       employeeCount: company?.employeeCount ?? null,
       annualRevenue: company?.annualRevenue ?? null,
-      website:       company?.website       || "",
-      mainPhone:     company?.mainPhone     || "",
-      mainEmail:     company?.mainEmail     || "",
-      linkedinUrl:   company?.linkedinUrl   || "",
-      description:   company?.description   || "",
-      source:        company?.source        || "",
-      leadScore:     company?.leadScore     ?? null,
-      ownerId:       company?.ownerId       || null,
-      groupId:       company?.groupId       || null,
+      website: company?.website || "",
+      mainPhone: company?.mainPhone || "",
+      mainEmail: company?.mainEmail || "",
+      linkedinUrl: company?.linkedinUrl || "",
+      description: company?.description || "",
+      source: company?.source || "",
+      leadScore: company?.leadScore ?? null,
+      ownerId: company?.ownerId || null,
+      groupId: company?.groupId || null,
       assigneeValue: encodeAssignee(company?.ownerId, company?.groupId),
-      tags:          company?.tags          ? company.tags.join(", ") : "",
-      street:        company?.street        || "",
-      city:          company?.city          || "",
-      state:         company?.state         || "",
-      zipCode:       company?.zipCode       || "",
-      country:       company?.country       || "",
-      vatNumber:     company?.vatNumber     || "",
-      sdiCode:       company?.sdiCode       || "",
+      tags: company?.tags ? company.tags.join(", ") : "",
+      street: company?.street || "",
+      city: company?.city || "",
+      state: company?.state || "",
+      zipCode: company?.zipCode || "",
+      country: company?.country || "",
+      vatNumber: company?.vatNumber || "",
+      sdiCode: company?.sdiCode || "",
     },
   });
 
-  const { register, control, handleSubmit, formState: { errors, isSubmitting } } = form;
+  const {
+    register,
+    control,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = form;
 
   useEffect(() => {
     if (open && company) {
       form.reset({
-        name:          company.name          || "",
-        type:          company.type          || "prospect",
-        status:        company.status        || "active",
-        industry:      company.industry      || "",
+        name: company.name || "",
+        type: company.type || "prospect",
+        status: company.status || "active",
+        industry: company.industry || "",
         employeeCount: company.employeeCount ?? null,
         annualRevenue: company.annualRevenue ?? null,
-        website:       company.website       || "",
-        mainPhone:     company.mainPhone     || "",
-        mainEmail:     company.mainEmail     || "",
-        linkedinUrl:   company.linkedinUrl   || "",
-        description:   company.description   || "",
-        source:        company.source        || "",
-        leadScore:     company.leadScore     ?? null,
-        ownerId:       company.ownerId       || null,
-        groupId:       company.groupId       || null,
+        website: company.website || "",
+        mainPhone: company.mainPhone || "",
+        mainEmail: company.mainEmail || "",
+        linkedinUrl: company.linkedinUrl || "",
+        description: company.description || "",
+        source: company.source || "",
+        leadScore: company.leadScore ?? null,
+        ownerId: company.ownerId || null,
+        groupId: company.groupId || null,
         assigneeValue: encodeAssignee(company.ownerId, company.groupId),
-        tags:          company.tags          ? company.tags.join(", ") : "",
-        street:        company.street        || "",
-        city:          company.city          || "",
-        state:         company.state         || "",
-        zipCode:       company.zipCode       || "",
-        country:       company.country       || "",
-        vatNumber:     company.vatNumber     || "",
-        sdiCode:       company.sdiCode       || "",
+        tags: company.tags ? company.tags.join(", ") : "",
+        street: company.street || "",
+        city: company.city || "",
+        state: company.state || "",
+        zipCode: company.zipCode || "",
+        country: company.country || "",
+        vatNumber: company.vatNumber || "",
+        sdiCode: company.sdiCode || "",
       });
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const e = errors;
   const tabErrors = {
-    info:    !!(e.name || e.type || e.status || e.industry || e.employeeCount || e.annualRevenue || e.website || e.mainPhone || e.mainEmail || e.linkedinUrl),
-    crm:     !!(e.source || e.leadScore || e.tags),
+    info: !!(
+      e.name ||
+      e.type ||
+      e.status ||
+      e.industry ||
+      e.employeeCount ||
+      e.annualRevenue ||
+      e.website ||
+      e.mainPhone ||
+      e.mainEmail ||
+      e.linkedinUrl
+    ),
+    crm: !!(e.source || e.leadScore || e.tags),
     address: !!(e.street || e.city || e.state || e.zipCode || e.country),
     billing: !!(e.vatNumber || e.sdiCode),
   };
 
-  const onSubmit = async (data: CompanyFormValues) => {
+  const saveCompany = async (payload: Record<string, unknown>) => {
     try {
-      const { ownerId, groupId } = decodeAssignee(data.assigneeValue);
-      const payload = { ...data, ownerId, groupId, assigneeValue: undefined };
       if (isEditing) {
         await updateCompany(company.id, payload);
         toast.success(t("updateSuccess"));
@@ -169,24 +206,54 @@ export function CompanyModal({ company, children }: { company?: any; children: R
         toast.success(t("createSuccess"));
       }
       setOpen(false);
+      setDuplicates([]);
+      setPendingPayload(null);
       form.reset();
     } catch {
       toast.error(t("form.saveFailed"));
     }
   };
 
+  const onSubmit = async (data: CompanyFormValues) => {
+    const { ownerId, groupId } = decodeAssignee(data.assigneeValue);
+    const payload = { ...data, ownerId, groupId, assigneeValue: undefined };
+
+    const found = await checkCompanyDuplicates({
+      name: data.name,
+      website: data.website,
+      mainEmail: data.mainEmail,
+      excludeId: company?.id,
+    });
+    if (found.length > 0) {
+      setDuplicates(found);
+      setPendingPayload(payload);
+      return;
+    }
+
+    await saveCompany(payload);
+  };
+
   const TabDot = ({ has }: { has: boolean }) =>
     has ? <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-destructive" /> : null;
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) form.reset(); }}>
+    <>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) {
+          form.reset();
+          setDuplicates([]);
+          setPendingPayload(null);
+        }
+      }}
+    >
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="text-lg">
-            {isEditing
-              ? t("form.editTitle", { name: company.name })
-              : t("form.newTitle")}
+            {isEditing ? t("form.editTitle", { name: company.name }) : t("form.newTitle")}
           </DialogTitle>
         </DialogHeader>
 
@@ -195,19 +262,23 @@ export function CompanyModal({ company, children }: { company?: any; children: R
             <Tabs defaultValue="info">
               <TabsList className="w-full mb-5">
                 <TabsTrigger value="info" className="relative flex-1 gap-1.5">
-                  <BuildingIcon className="h-3.5 w-3.5" />{t("form.tabs.info")}
+                  <BuildingIcon className="h-3.5 w-3.5" />
+                  {t("form.tabs.info")}
                   <TabDot has={tabErrors.info} />
                 </TabsTrigger>
                 <TabsTrigger value="crm" className="relative flex-1 gap-1.5">
-                  <TagIcon className="h-3.5 w-3.5" />{t("form.tabs.crm")}
+                  <TagIcon className="h-3.5 w-3.5" />
+                  {t("form.tabs.crm")}
                   <TabDot has={tabErrors.crm} />
                 </TabsTrigger>
                 <TabsTrigger value="address" className="relative flex-1 gap-1.5">
-                  <MapPinIcon className="h-3.5 w-3.5" />{t("form.tabs.address")}
+                  <MapPinIcon className="h-3.5 w-3.5" />
+                  {t("form.tabs.address")}
                   <TabDot has={tabErrors.address} />
                 </TabsTrigger>
                 <TabsTrigger value="billing" className="relative flex-1 gap-1.5">
-                  <ReceiptIcon className="h-3.5 w-3.5" />{t("form.tabs.billing")}
+                  <ReceiptIcon className="h-3.5 w-3.5" />
+                  {t("form.tabs.billing")}
                   <TabDot has={tabErrors.billing} />
                 </TabsTrigger>
               </TabsList>
@@ -220,28 +291,40 @@ export function CompanyModal({ company, children }: { company?: any; children: R
                   </F>
                 </div>
                 <F label={t("form.type")} error={e.type?.message}>
-                  <Controller control={control} name="type" render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger><SelectValue placeholder={t("form.selectType")} /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="prospect">{t("types.prospect")}</SelectItem>
-                        <SelectItem value="customer">{t("types.customer")}</SelectItem>
-                        <SelectItem value="partner">{t("types.partner")}</SelectItem>
-                        <SelectItem value="vendor">{t("types.vendor")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )} />
+                  <Controller
+                    control={control}
+                    name="type"
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("form.selectType")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="prospect">{t("types.prospect")}</SelectItem>
+                          <SelectItem value="customer">{t("types.customer")}</SelectItem>
+                          <SelectItem value="partner">{t("types.partner")}</SelectItem>
+                          <SelectItem value="vendor">{t("types.vendor")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </F>
                 <F label={t("form.status")} error={e.status?.message}>
-                  <Controller control={control} name="status" render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">{t("statuses.active")}</SelectItem>
-                        <SelectItem value="inactive">{t("statuses.inactive")}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )} />
+                  <Controller
+                    control={control}
+                    name="status"
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">{t("statuses.active")}</SelectItem>
+                          <SelectItem value="inactive">{t("statuses.inactive")}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </F>
                 <F label={t("industry")} error={e.industry?.message}>
                   <Input {...register("industry")} placeholder="Technology" />
@@ -266,7 +349,11 @@ export function CompanyModal({ company, children }: { company?: any; children: R
                 </F>
                 <div className="col-span-2">
                   <F label={tc("description")} error={e.description?.message}>
-                    <Textarea {...register("description")} placeholder="Brief description of the company…" className="min-h-[80px] resize-y" />
+                    <Textarea
+                      {...register("description")}
+                      placeholder="Brief description of the company…"
+                      className="min-h-[80px] resize-y"
+                    />
                   </F>
                 </div>
               </TabsContent>
@@ -275,22 +362,32 @@ export function CompanyModal({ company, children }: { company?: any; children: R
               <TabsContent value="crm" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
                 <div className="col-span-2">
                   <F label={t("form.assignedTo")}>
-                    <Controller control={control} name="assigneeValue" render={({ field }) => (
-                      <AssigneeSelect value={field.value ?? null} onChange={field.onChange} />
-                    )} />
+                    <Controller
+                      control={control}
+                      name="assigneeValue"
+                      render={({ field }) => <AssigneeSelect value={field.value ?? null} onChange={field.onChange} />}
+                    />
                   </F>
                 </div>
                 <F label={t("form.source")} error={e.source?.message}>
-                  <Controller control={control} name="source" render={({ field }) => (
-                    <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                      <SelectTrigger><SelectValue placeholder={t("form.selectSource")} /></SelectTrigger>
-                      <SelectContent>
-                        {sourceOptions.map((o) => (
-                          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )} />
+                  <Controller
+                    control={control}
+                    name="source"
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t("form.selectSource")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {sourceOptions.map((o) => (
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </F>
                 <F label={t("form.leadScore")} error={e.leadScore?.message}>
                   <Input {...register("leadScore")} type="number" min={0} max={100} placeholder="0" />
@@ -333,14 +430,70 @@ export function CompanyModal({ company, children }: { company?: any; children: R
                 </F>
                 <div className="col-span-2 rounded-md border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
                   <p className="font-medium text-foreground mb-1">Italian e-invoicing</p>
-                  <p>The <strong>SDI Code</strong> (Codice Destinatario) is the 7-character code used for electronic invoice routing via the Sistema di Interscambio.</p>
+                  <p>
+                    The <strong>SDI Code</strong> (Codice Destinatario) is the 7-character code used for electronic
+                    invoice routing via the Sistema di Interscambio.
+                  </p>
                 </div>
               </TabsContent>
             </Tabs>
           </div>
 
+          {duplicates.length > 0 && pendingPayload && (
+            <div className="px-6 py-4 border-t bg-amber-50 dark:bg-amber-950/30">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
+                Similar companies already exist:
+              </p>
+              <ul className="mb-3 space-y-1.5">
+                {duplicates.map((d) => (
+                  <li key={d.id} className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+                    <Link
+                      href={`/dashboard/companies/${d.id}`}
+                      className="underline underline-offset-2 hover:text-amber-900"
+                      target="_blank"
+                    >
+                      {d.name}
+                    </Link>
+                    {d.mainEmail && <span className="text-xs opacity-70">{d.mainEmail}</span>}
+                    {d.website && <span className="text-xs opacity-70">{d.website}</span>}
+                    {isEditing && company && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-xs ml-auto border-amber-400 text-amber-700 hover:bg-amber-100"
+                        onClick={() => setMergeTargetId(d.id)}
+                      >
+                        <GitMerge className="h-3 w-3 mr-1" />
+                        Merge
+                      </Button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setDuplicates([]);
+                    setPendingPayload(null);
+                  }}
+                >
+                  Go back
+                </Button>
+                <Button type="button" size="sm" onClick={() => saveCompany(pendingPayload)}>
+                  Save anyway
+                </Button>
+              </div>
+            </div>
+          )}
+
           <DialogFooter className="px-6 py-4 border-t bg-muted/30">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>{tc("cancel")}</Button>
+            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+              {tc("cancel")}
+            </Button>
             <Button type="submit" disabled={isSubmitting} className="min-w-[100px]">
               {isSubmitting && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
               {isEditing ? t("form.saveChanges") : t("form.createCompany")}
@@ -349,6 +502,16 @@ export function CompanyModal({ company, children }: { company?: any; children: R
         </form>
       </DialogContent>
     </Dialog>
+
+    {isEditing && company && mergeTargetId && (
+      <MergeCompaniesModal
+        keepId={company.id}
+        mergeId={mergeTargetId}
+        open={true}
+        onOpenChange={(v) => { if (!v) setMergeTargetId(null); }}
+      />
+    )}
+    </>
   );
 }
 
@@ -368,7 +531,13 @@ export function DeleteCompanyButton({ id }: { id: string }) {
     }
   };
   return (
-    <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive/90" onClick={handleDelete} disabled={isDeleting}>
+    <Button
+      variant="ghost"
+      size="icon"
+      className="text-destructive hover:text-destructive/90"
+      onClick={handleDelete}
+      disabled={isDeleting}
+    >
       {isDeleting ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <TrashIcon className="h-4 w-4" />}
     </Button>
   );
@@ -378,10 +547,14 @@ export function CompanyActions({ company }: { company: any }) {
   return (
     <div className="flex items-center gap-2 justify-end">
       <Link href={`/dashboard/companies/${company.id}`}>
-        <Button variant="ghost" size="icon"><EyeIcon className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon">
+          <EyeIcon className="h-4 w-4" />
+        </Button>
       </Link>
       <CompanyModal company={company}>
-        <Button variant="ghost" size="icon"><PencilIcon className="h-4 w-4" /></Button>
+        <Button variant="ghost" size="icon">
+          <PencilIcon className="h-4 w-4" />
+        </Button>
       </CompanyModal>
       <DeleteCompanyButton id={company.id} />
     </div>

@@ -98,7 +98,32 @@
       "PowerShell(npx biome check --no-errors-on-unmatched src/db/schema.ts src/actions/crm.ts \"src/app/\\(main\\)/dashboard/leads/[id]/_components/convert-lead-button.tsx\" \"src/app/\\(main\\)/dashboard/leads/[id]/page.tsx\" 2>&1)",
       "PowerShell(npx biome check --write --no-errors-on-unmatched src/db/schema.ts src/actions/crm.ts \"src/app/\\(main\\)/dashboard/leads/[id]/_components/convert-lead-button.tsx\" \"src/app/\\(main\\)/dashboard/leads/[id]/page.tsx\" 2>&1)",
       "PowerShell(npx biome check --write --no-errors-on-unmatched \"src/app/\\(main\\)/dashboard/leads/[id]/page.tsx\" 2>&1)",
-      "PowerShell(npx biome check --no-errors-on-unmatched \"src/app/\\(main\\)/dashboard/leads/[id]/page.tsx\" 2>&1 | Select-String -Pattern \"lint/\" | Where-Object { $_ -notmatch \"FIXABLE\" } | Select-Object -First 10)"
+      "PowerShell(npx biome check --no-errors-on-unmatched \"src/app/\\(main\\)/dashboard/leads/[id]/page.tsx\" 2>&1 | Select-String -Pattern \"lint/\" | Where-Object { $_ -notmatch \"FIXABLE\" } | Select-Object -First 10)",
+      "PowerShell(npm install @react-pdf/renderer 2>&1)",
+      "PowerShell(npm list @react-pdf/renderer 2>&1)",
+      "Bash(Remove-Item \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\api\\\\quotes\\\\[id]\\\\pdf\\\\route.ts\")",
+      "Bash(rm \"c:/React/Flux/src/app/api/quotes/[id]/pdf/route.ts\")",
+      "PowerShell(npx tsc --noEmit 2>&1)",
+      "Bash(Get-Content \"c:\\\\React\\\\Flux\\\\src\\\\db\\\\schema.ts\")",
+      "Bash(Measure-Object -Line)",
+      "Bash(Select-Object -ExpandProperty Lines)",
+      "PowerShell(\\(Get-Content \"c:\\\\React\\\\Flux\\\\src\\\\db\\\\schema.ts\"\\).Count)",
+      "Bash(Get-ChildItem \"C:\\\\React\\\\Flux\\\\src\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(node -e \"require\\('date-fns'\\)\")",
+      "Bash(dir \"src\\\\app\\\\api\\\\quotes\\\\[id]\\\\pdf\")",
+      "Bash(dir \"src\\\\components\\\\pdf\")",
+      "Bash(mkdir -p \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\dashboard\\\\pipeline\\\\[id]\\\\_components\" 2>/dev/null; echo \"done\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\dashboard\\\\analytics\\\\funnel\" -Filter \"*.tsx\")",
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\)\\); console.log\\('en.json OK'\\)\")",
+      "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/React/Flux/messages/it.json','utf8'\\)\\); console.log\\('it.json OK'\\)\")",
+      "Bash(node -e \"const f=require\\('fs'\\).readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\); const lines=f.split\\('\\\\n'\\); console.log\\('Total lines:', lines.length\\); console.log\\('Last 5:', lines.slice\\(-5\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"const f=require\\('fs'\\).readFileSync\\('c:/React/Flux/messages/it.json','utf8'\\); const lines=f.split\\('\\\\n'\\); console.log\\('Last 5:', lines.slice\\(-5\\).join\\('\\\\n'\\)\\)\")"
+    ],
+    "additionalDirectories": [
+      "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",
+      "c:\\React\\Flux\\src\\app\\(main)\\dashboard\\pipeline\\[id]\\_components"
     ]
   }
 }

@@ -1,6 +1,7 @@
-import { desc, eq } from "drizzle-orm";
 import { headers } from "next/headers";
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+
+import { desc, eq } from "drizzle-orm";
 
 import { db } from "@/db";
 import { quoteActivities, quoteItems, quotes } from "@/db/schema";

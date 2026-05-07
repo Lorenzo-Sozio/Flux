@@ -1,39 +1,50 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+
 import { format } from "date-fns";
 import {
-  Mail,
-  Printer,
-  Eye,
-  Check,
-  X,
-  Clock,
-  Calendar,
+  AlertTriangle,
   Building2,
-  User,
-  Link2,
-  Pencil,
+  Calendar,
+  Check,
+  CheckCircle2,
+  Clock,
+  DollarSign,
+  Download,
+  Eye,
   FileText,
   Hash,
-  DollarSign,
+  Link2,
+  Mail,
+  Pencil,
+  Printer,
+  ShieldCheck,
+  User,
+  X,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import { updateQuoteAction, getQuoteById } from "@/actions/quotes";
+
+import { type getQuoteById, approveQuoteAction, rejectQuoteAction, requestApprovalAction, updateQuoteAction } from "@/actions/quotes";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+
+import { QUOTE_STATUS_CONFIG } from "@/lib/quote-status";
 import { SendQuoteEmailDialog } from "./send-quote-email-dialog";
 
 type Quote = Awaited<ReturnType<typeof getQuoteById>>;
@@ -42,28 +53,23 @@ interface QuoteDetailProps {
   quote: Quote;
   autoOpenSend?: boolean;
   onStatusChange?: (newStatus: string) => void;
+  userRole?: string;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  draft:     { label: "Draft",     className: "border-slate-300 text-slate-600" },
-  sent:      { label: "Sent",      className: "border-blue-300 text-blue-600 bg-blue-50" },
-  viewed:    { label: "Viewed",    className: "border-violet-300 text-violet-600 bg-violet-50" },
-  accepted:  { label: "Accepted",  className: "border-green-300 text-green-600 bg-green-50" },
-  declined:  { label: "Declined",  className: "border-red-300 text-red-600 bg-red-50" },
-  expired:   { label: "Expired",   className: "border-amber-300 text-amber-600 bg-amber-50" },
-  converted: { label: "Converted", className: "border-teal-300 text-teal-600 bg-teal-50" },
-};
 
 const ACTIVITY_LABELS: Record<string, string> = {
-  created:       "Quote created",
-  sent:          "Quote sent",
-  viewed:        "Quote viewed",
-  opened_email:  "Email opened",
+  created: "Quote created",
+  sent: "Quote sent",
+  viewed: "Quote viewed",
+  opened_email: "Email opened",
   clicked_email: "Link clicked",
-  accepted:      "Quote accepted",
-  declined:      "Quote declined",
-  reminded:      "Reminder sent",
-  updated:       "Quote updated",
+  accepted: "Quote accepted",
+  declined: "Quote declined",
+  reminded: "Reminder sent",
+  updated: "Quote updated",
+  approval_requested: "Approvazione richiesta",
+  approved: "Preventivo approvato",
+  rejected: "Preventivo rifiutato",
 };
 
 function fmt(amount: string | null, currency: string) {
@@ -73,10 +79,27 @@ function fmt(amount: string | null, currency: string) {
   })}`;
 }
 
-export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange }: QuoteDetailProps) {
+export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userRole = "user" }: QuoteDetailProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [rejectNote, setRejectNote] = useState("");
+
+  const isPrivileged = userRole === "admin" || userRole === "owner";
+
+  async function runAction(action: () => Promise<void>, successMsg: string, errorMsg: string) {
+    setIsLoading(true);
+    try {
+      await action();
+      toast.success(successMsg);
+      router.refresh();
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : errorMsg);
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (autoOpenSend && quote.status === "draft") {
@@ -84,31 +107,40 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange }: Quo
     }
   }, [autoOpenSend, quote.status]);
 
-  const statusCfg = STATUS_CONFIG[quote.status] ?? STATUS_CONFIG.draft;
-  const contactName = quote.contact
-    ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim()
-    : null;
+  const statusCfg = QUOTE_STATUS_CONFIG[quote.status] ?? QUOTE_STATUS_CONFIG.draft;
+  const contactName = quote.contact ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim() : null;
 
   async function handleStatusChange(newStatus: string) {
-    setIsLoading(true);
-    try {
-      await updateQuoteAction(quote.id, { status: newStatus as "accepted" | "declined" });
-      toast.success(`Quote marked as ${newStatus}`);
-      onStatusChange?.(newStatus);
-      router.refresh();
-    } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to update status");
-    } finally {
-      setIsLoading(false);
-    }
+    await runAction(
+      async () => {
+        await updateQuoteAction(quote.id, { status: newStatus as "accepted" | "declined" });
+        onStatusChange?.(newStatus);
+      },
+      `Quote marked as ${newStatus}`,
+      "Failed to update status",
+    );
+  }
+
+  const handleRequestApproval = () =>
+    runAction(
+      () => requestApprovalAction(quote.id),
+      "Approvazione richiesta con successo.",
+      "Errore nell'invio della richiesta.",
+    );
+
+  const handleApprove = () =>
+    runAction(() => approveQuoteAction(quote.id), "Preventivo approvato.", "Errore nell'approvazione.");
+
+  async function handleReject() {
+    await runAction(() => rejectQuoteAction(quote.id, rejectNote), "Preventivo rifiutato.", "Errore nel rifiuto.");
+    setShowRejectDialog(false);
+    setRejectNote("");
   }
 
   return (
     <div className="flex flex-col md:flex-row gap-6">
-
       {/* Left column: Quote info + actions */}
       <div className="w-full md:w-1/3 flex flex-col gap-6">
-
         {/* Quote Details card */}
         <Card>
           <CardHeader className="flex flex-row items-start justify-between pb-3">
@@ -215,6 +247,47 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange }: Quo
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
+            {quote.status === "draft" && !isPrivileged && (
+              <Button
+                variant="outline"
+                className="w-full justify-start border-orange-300 text-orange-700 hover:bg-orange-50"
+                onClick={handleRequestApproval}
+                disabled={isLoading}
+              >
+                <ShieldCheck className="mr-2 h-4 w-4" />
+                Richiedi Approvazione
+              </Button>
+            )}
+
+            {quote.status === "pending_approval" && isPrivileged && (
+              <>
+                <Button
+                  className="w-full justify-start bg-green-600 hover:bg-green-700"
+                  onClick={handleApprove}
+                  disabled={isLoading}
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Approva Preventivo
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start border-red-300 text-red-700 hover:bg-red-50"
+                  onClick={() => setShowRejectDialog(true)}
+                  disabled={isLoading}
+                >
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Rifiuta con nota
+                </Button>
+              </>
+            )}
+
+            {quote.status === "pending_approval" && !isPrivileged && (
+              <div className="rounded-md bg-orange-50 border border-orange-200 px-3 py-2.5 text-xs text-orange-700 flex items-start gap-2">
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                <span>In attesa di approvazione da un amministratore.</span>
+              </div>
+            )}
+
             {quote.status === "draft" && (
               <Button className="w-full justify-start" onClick={() => setShowEmailDialog(true)}>
                 <Mail className="mr-2 h-4 w-4" />
@@ -222,16 +295,22 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange }: Quo
               </Button>
             )}
 
-            {(quote.status === "draft" || quote.status === "sent" || quote.status === "viewed") && (
-              <Button
-                variant="outline"
-                className="w-full justify-start"
-                onClick={() => window.open(`/api/quotes/${quote.id}`, "_blank")}
-              >
-                <Printer className="mr-2 h-4 w-4" />
-                Print / Download
-              </Button>
-            )}
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => window.open(`/api/quotes/${quote.id}`, "_blank")}
+            >
+              <Printer className="mr-2 h-4 w-4" />
+              Print / Preview
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full justify-start"
+              onClick={() => window.open(`/api/quotes/${quote.id}/pdf`, "_blank")}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download PDF
+            </Button>
 
             {quote.publicToken && (
               <Button
@@ -239,9 +318,7 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange }: Quo
                 className="w-full justify-start"
                 onClick={() => {
                   const url = `${window.location.origin}/q/${quote.publicToken}`;
-                  navigator.clipboard.writeText(url).then(() =>
-                    toast.success("Public link copied to clipboard")
-                  );
+                  navigator.clipboard.writeText(url).then(() => toast.success("Public link copied to clipboard"));
                 }}
               >
                 <Link2 className="mr-2 h-4 w-4" />
@@ -273,6 +350,19 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange }: Quo
             )}
           </CardContent>
         </Card>
+
+        {/* Approval note banner */}
+        {quote.status === "draft" && quote.approvalNote && (
+          <Card className="border-orange-200 bg-orange-50">
+            <CardContent className="flex items-start gap-2 p-4">
+              <AlertTriangle className="h-4 w-4 text-orange-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-orange-800">Preventivo rifiutato</p>
+                <p className="text-xs text-orange-700 mt-0.5">{quote.approvalNote}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Status timeline card */}
         {(quote.sentAt || quote.viewedAt || quote.acceptedAt || quote.declinedAt) && (
@@ -364,9 +454,7 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange }: Quo
                       <TableCell>
                         <div className="font-medium text-sm">{item.description}</div>
                         {item.product && (
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            {item.product.name}
-                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5">{item.product.name}</div>
                         )}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{item.quantity}</TableCell>
@@ -405,33 +493,25 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange }: Quo
                   {parseFloat(quote.discountAmount ?? "0") > 0 && (
                     <div className="flex justify-between text-sm text-amber-600">
                       <span>Discount ({quote.discountPercent}%)</span>
-                      <span className="font-medium tabular-nums">
-                        −{fmt(quote.discountAmount, quote.currency)}
-                      </span>
+                      <span className="font-medium tabular-nums">−{fmt(quote.discountAmount, quote.currency)}</span>
                     </div>
                   )}
                   {parseFloat(quote.taxAmount ?? "0") > 0 && (
                     <div className="flex justify-between text-sm text-slate-600">
                       <span>Tax ({quote.taxPercent}%)</span>
-                      <span className="font-medium tabular-nums">
-                        +{fmt(quote.taxAmount, quote.currency)}
-                      </span>
+                      <span className="font-medium tabular-nums">+{fmt(quote.taxAmount, quote.currency)}</span>
                     </div>
                   )}
                   <Separator />
                   <div className="flex justify-between">
                     <span className="font-semibold">Total</span>
-                    <span className="text-lg font-bold tabular-nums">
-                      {fmt(quote.totalAmount, quote.currency)}
-                    </span>
+                    <span className="text-lg font-bold tabular-nums">{fmt(quote.totalAmount, quote.currency)}</span>
                   </div>
                 </div>
 
                 {quote.notes && (
                   <div className="pt-4 border-t">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                      Notes
-                    </p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Notes</p>
                     <p className="text-sm whitespace-pre-wrap">{quote.notes}</p>
                   </div>
                 )}
@@ -490,6 +570,35 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange }: Quo
           router.refresh();
         }}
       />
+
+      {/* Reject Dialog */}
+      <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rifiuta preventivo</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">
+              Il preventivo tornerà in stato bozza. Aggiungi una nota per il venditore (opzionale).
+            </p>
+            <Textarea
+              placeholder="Motivo del rifiuto..."
+              value={rejectNote}
+              onChange={(e) => setRejectNote(e.target.value)}
+              rows={3}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setShowRejectDialog(false)} disabled={isLoading}>
+              Annulla
+            </Button>
+            <Button variant="destructive" onClick={handleReject} disabled={isLoading}>
+              <XCircle className="mr-2 h-4 w-4" />
+              Conferma rifiuto
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

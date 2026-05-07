@@ -1,32 +1,18 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
 import { requireWriteAccess } from "@/lib/auth-guard";
 import { db } from "@/db";
 import {
   campaignLogs,
   contacts,
-  emailJobs,
   emailSuppressions,
   emailTemplates,
   leads,
   marketingCampaigns,
 } from "@/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
-
-const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Wrap every external link in the HTML with the click-tracking redirect. */
-function wrapLinksForTracking(html: string, logId: string): string {
-  return html.replace(/href="(https?:\/\/[^"]+)"/gi, (match, url: string) => {
-    if (url.includes("/api/track/") || url.includes("/api/unsubscribe")) return match;
-    const tracked = `${APP_URL}/api/track/click?log=${encodeURIComponent(logId)}&url=${encodeURIComponent(url)}`;
-    return `href="${tracked}"`;
-  });
-}
+import { and, eq } from "drizzle-orm";
+import { executeCampaignSend } from "@/lib/campaign-send";
 
 // ─── Email Templates ──────────────────────────────────────────────────────────
 
@@ -88,125 +74,15 @@ export async function deleteMarketingCampaign(id: string) {
   revalidatePath("/dashboard/marketing/campaigns");
 }
 
-// ─── Campaign Send (queue-based) ──────────────────────────────────────────────
+// ─── Campaign Send ────────────────────────────────────────────────────────────
 
-/**
- * Enqueues all eligible recipients into the email_job table.
- * Actual sending is done asynchronously by /api/cron/email-worker.
- *
- * Per-recipient pipeline:
- *   1. Create campaign_log (status: queued)
- *   2. Personalise HTML variables
- *   3. Inject signed unsubscribe link
- *   4. Wrap external links with click-tracking redirect
- *   5. Append open-tracking pixel
- *   6. Insert email_job (fully rendered HTML)
- */
 export async function sendCampaignAction(data: {
   campaignId: string;
   recipientType: "contacts" | "leads";
   recipientIds?: string[];
 }) {
   await requireWriteAccess();
-  const { campaignId, recipientType, recipientIds } = data;
-
-  const [campaign] = await db
-    .select()
-    .from(marketingCampaigns)
-    .where(eq(marketingCampaigns.id, campaignId));
-
-  if (!campaign?.templateId) return { error: "Campaign or template not found." };
-
-  const [template] = await db
-    .select()
-    .from(emailTemplates)
-    .where(eq(emailTemplates.id, campaign.templateId));
-
-  if (!template) return { error: "Email template not found." };
-
-  // Load suppression list
-  const suppressions = await db.select({ email: emailSuppressions.email }).from(emailSuppressions);
-  const suppressedEmails = new Set(suppressions.map((s) => s.email.toLowerCase()));
-
-  // Fetch eligible recipients
-  type Recipient = { id: string; email: string | null; firstName: string; lastName: string };
-  let recipients: Recipient[] = [];
-
-  if (recipientType === "contacts") {
-    const filter = recipientIds?.length
-      ? and(eq(contacts.marketingConsent, true), inArray(contacts.id, recipientIds))
-      : eq(contacts.marketingConsent, true);
-    recipients = await db
-      .select({ id: contacts.id, email: contacts.email, firstName: contacts.firstName, lastName: contacts.lastName })
-      .from(contacts)
-      .where(filter);
-  } else {
-    const filter = recipientIds?.length
-      ? and(eq(leads.marketingConsent, true), eq(leads.isConverted, false), inArray(leads.id, recipientIds))
-      : and(eq(leads.marketingConsent, true), eq(leads.isConverted, false));
-    recipients = await db
-      .select({ id: leads.id, email: leads.email, firstName: leads.firstName, lastName: leads.lastName })
-      .from(leads)
-      .where(filter);
-  }
-
-  let queued = 0;
-  let skipped = 0;
-
-  for (const recipient of recipients) {
-    if (!recipient.email) { skipped++; continue; }
-    if (suppressedEmails.has(recipient.email.toLowerCase())) { skipped++; continue; }
-
-    // 1. Create campaign log with status "queued"
-    const [log] = await db
-      .insert(campaignLogs)
-      .values({
-        campaignId,
-        [recipientType === "contacts" ? "contactId" : "leadId"]: recipient.id,
-        status: "queued",
-        sentAt: new Date(),
-      })
-      .returning();
-
-    // 2. Personalise
-    let html = template.body
-      .replace(/\{\{nome\}\}/gi, recipient.firstName ?? "")
-      .replace(/\{\{cognome\}\}/gi, recipient.lastName ?? "")
-      .replace(/\{\{email\}\}/gi, recipient.email)
-      .replace(/\{\{contatto\.nome\}\}/gi, recipient.firstName ?? "")
-      .replace(/\{\{contatto\.cognome\}\}/gi, recipient.lastName ?? "");
-
-    // 3. Signed unsubscribe link
-    const unsubToken = generateUnsubscribeToken(recipient.email, log.id);
-    html = html.replace(/\{\{link_unsubscribe\}\}/gi, `${APP_URL}/api/unsubscribe?token=${unsubToken}`);
-
-    // 4. Wrap external links for click tracking
-    html = wrapLinksForTracking(html, log.id);
-
-    // 5. Open-tracking pixel
-    html = `${html}\n<img src="${APP_URL}/api/track/open?log=${encodeURIComponent(log.id)}" width="1" height="1" alt="" style="display:none" />`;
-
-    // 6. Enqueue
-    await db.insert(emailJobs).values({
-      campaignId,
-      campaignLogId: log.id,
-      toEmail: recipient.email,
-      subject: template.subject,
-      htmlBody: html,
-      status: "pending",
-      scheduledAt: new Date(),
-    });
-
-    queued++;
-  }
-
-  await db
-    .update(marketingCampaigns)
-    .set({ status: "active", updatedAt: new Date() })
-    .where(eq(marketingCampaigns.id, campaignId));
-
-  revalidatePath("/dashboard/marketing/campaigns");
-  return { success: true, queued, skipped, total: recipients.length };
+  return executeCampaignSend(data);
 }
 
 // ─── Campaign Report ──────────────────────────────────────────────────────────
@@ -291,6 +167,8 @@ export async function getCampaignsWithStats() {
     const clicked = logs.filter((l) => l.status === "clicked").length;
     return {
       ...c,
+      scheduledAt: c.scheduledAt ?? null,
+      recipientType: c.recipientType ?? null,
       stats: {
         total: logs.length,
         sent,
@@ -328,6 +206,32 @@ export async function getEligibleRecipientCounts() {
   ).length;
 
   return { contacts: eligibleContacts, leads: eligibleLeads };
+}
+
+// ─── Schedule / Cancel schedule ──────────────────────────────────────────────
+
+export async function scheduleCampaignAction(data: {
+  campaignId: string;
+  recipientType: "contacts" | "leads";
+  scheduledAt: Date;
+}) {
+  await requireWriteAccess();
+  const { campaignId, recipientType, scheduledAt } = data;
+  if (scheduledAt <= new Date()) throw new Error("Scheduled time must be in the future");
+  await db
+    .update(marketingCampaigns)
+    .set({ status: "scheduled", scheduledAt, recipientType, updatedAt: new Date() })
+    .where(eq(marketingCampaigns.id, campaignId));
+  revalidatePath("/dashboard/marketing/campaigns");
+}
+
+export async function cancelScheduledCampaignAction(campaignId: string) {
+  await requireWriteAccess();
+  await db
+    .update(marketingCampaigns)
+    .set({ status: "draft", scheduledAt: null, recipientType: null, updatedAt: new Date() })
+    .where(eq(marketingCampaigns.id, campaignId));
+  revalidatePath("/dashboard/marketing/campaigns");
 }
 
 // ─── Duplicate a campaign ─────────────────────────────────────────────────────

@@ -5,6 +5,7 @@ import { getDealById, updateDeal, getPipelineData } from "@/actions/pipeline";
 import { getActivitiesByDeal, createActivity } from "@/actions/activities";
 import { getTasksByDeal, createTask, updateTaskStatus, getAllUsers } from "@/actions/tasks";
 import { getQuotesByDeal } from "@/actions/quotes";
+import { getDealComments } from "@/actions/deal-comments";
 import { getCompanies, getContacts } from "@/actions/crm";
 import { revalidatePath } from "next/cache";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,7 @@ import { DocumentPanel } from "@/components/crm/document-panel";
 import { RecordVisit } from "@/components/crm/record-visit";
 import { CreateQuoteButton } from "@/components/crm/create-quote-button";
 import { DealEditButton } from "@/components/crm/deal-edit-button";
+import { CommentsThread } from "./_components/comments-thread";
 import { db } from "@/db";
 import { products } from "@/db/schema";
 import { getTranslations } from "next-intl/server";
@@ -31,8 +33,9 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   const { id: dealId } = await params;
   const session = await auth();
   const userId = session?.user?.id;
+  const userRole = session?.user?.role ?? "user";
 
-  const [row, { stages }, activitiesList, tasksList, allUsers, quotesList, productsList, companiesList, contactsList, t, tD] = await Promise.all([
+  const [row, { stages }, activitiesList, tasksList, allUsers, quotesList, productsList, companiesList, contactsList, commentsList, t, tD] = await Promise.all([
     getDealById(dealId),
     getPipelineData(),
     getActivitiesByDeal(dealId),
@@ -42,6 +45,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     db.query.products.findMany(),
     getCompanies(),
     getContacts(),
+    getDealComments(dealId),
     getTranslations("pipeline"),
     getTranslations("entityDetail"),
   ]);
@@ -337,6 +341,21 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Comments */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Comments</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CommentsThread
+              dealId={dealId}
+              initialComments={commentsList}
+              currentUserId={userId ?? ""}
+              currentUserRole={userRole}
+            />
           </CardContent>
         </Card>
       </div>

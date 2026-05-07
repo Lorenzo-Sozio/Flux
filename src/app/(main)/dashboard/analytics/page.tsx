@@ -1,3 +1,9 @@
+import Link from "next/link";
+
+import { GitMerge } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+
 import { ActionsManagerQueue } from "./_components/analytics-actions-manager-queue";
 import { ActionsRiskLedger } from "./_components/analytics-actions-risk-ledger";
 import { DriversCoverageTriage } from "./_components/analytics-drivers-coverage-triage";
@@ -7,6 +13,14 @@ import { AnalyticsOverview } from "./_components/analytics-overview";
 export default function Page() {
   return (
     <div className="p-6 flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <div />
+        <Button variant="outline" size="sm" asChild>
+          <Link href="/dashboard/analytics/funnel">
+            <GitMerge className="mr-2 h-4 w-4" /> Sales Funnel
+          </Link>
+        </Button>
+      </div>
       <AnalyticsOverview />
 
       <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">

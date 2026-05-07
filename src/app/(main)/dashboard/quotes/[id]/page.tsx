@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
+import { auth } from "@/auth";
 import { getQuoteById } from "@/actions/quotes";
 import { QuoteDetail } from "@/components/crm/quote-detail";
 
@@ -12,6 +13,8 @@ interface Props {
 export default async function QuoteDetailPage({ params, searchParams }: Props) {
   const { id } = await params;
   const { send } = await searchParams;
+  const session = await auth();
+  const userRole = session?.user?.role ?? "user";
 
   let quote: Awaited<ReturnType<typeof getQuoteById>>;
   try {
@@ -31,7 +34,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
           Back to Quotes
         </Link>
       </div>
-      <QuoteDetail quote={quote} autoOpenSend={send === "1"} />
+      <QuoteDetail quote={quote} autoOpenSend={send === "1"} userRole={userRole} />
     </div>
   );
 }

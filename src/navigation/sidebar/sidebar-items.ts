@@ -11,17 +11,20 @@ import {
   Fingerprint,
   GanttChartSquare,
   Gauge,
+  GitMerge,
   Kanban,
   type LucideIcon,
   Mail,
   MailOpen,
   MessageCircle,
   MessageSquare,
+  Wand2,
   Package,
   Settings,
   Settings2,
   ShoppingCart,
   Target,
+  TrendingUp,
   Users,
   Users2,
   Webhook,
@@ -59,7 +62,6 @@ export const sidebarItems: NavGroup[] = [
     labelKey: "crm",
     items: [
       { titleKey: "dashboard", url: "/dashboard/crm", icon: ChartBar },
-      { titleKey: "pipeline", url: "/dashboard/pipeline", icon: Kanban },
       { titleKey: "calendar", url: "/dashboard/calendar", icon: Calendar },
       {
         titleKey: "tasks",
@@ -84,6 +86,9 @@ export const sidebarItems: NavGroup[] = [
       { titleKey: "quotes", url: "/dashboard/quotes", icon: FileText, isNew: true },
       { titleKey: "products", url: "/dashboard/products", icon: Package, isNew: true },
       { titleKey: "orders", url: "/dashboard/orders", icon: ShoppingCart, isNew: true },
+      { titleKey: "pipeline", url: "/dashboard/pipeline", icon: Kanban },
+      { titleKey: "salesTargets", url: "/dashboard/settings/targets", icon: TrendingUp, isNew: true },
+      { titleKey: "salesFunnel", url: "/dashboard/analytics/funnel", icon: GitMerge, isNew: true },
     ],
   },
   {
@@ -112,7 +117,15 @@ export const sidebarItems: NavGroup[] = [
     labelKey: "administration",
     items: [
       { titleKey: "users", url: "/dashboard/users", icon: Users, isNew: true },
-      { titleKey: "reports", url: "/dashboard/reports", icon: BarChart3, isNew: true },
+      {
+        titleKey: "reports",
+        url: "/dashboard/reports",
+        icon: BarChart3,
+        isNew: true,
+        subItems: [
+          { titleKey: "reportBuilder", url: "/dashboard/reports/builder", icon: Wand2 },
+        ],
+      },
       {
         titleKey: "settings",
         url: "/dashboard/settings",
@@ -125,11 +138,15 @@ export const sidebarItems: NavGroup[] = [
       },
     ],
   },
-  {
+  /*{
     id: 6,
     labelKey: "dashboardTemplates",
     items: [
-      { titleKey: "analytics", url: "/dashboard/analytics", icon: Gauge },
+      {
+        titleKey: "analytics",
+        url: "/dashboard/analytics",
+        icon: Gauge,
+      },
       {
         titleKey: "authPages",
         url: "/auth",
@@ -143,5 +160,5 @@ export const sidebarItems: NavGroup[] = [
         ],
       },
     ],
-  },
+  },*/
 ];

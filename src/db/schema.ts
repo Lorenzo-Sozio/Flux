@@ -1,4 +1,4 @@
-import { boolean, integer, numeric, pgTable, primaryKey, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, numeric, pgTable, primaryKey, text, timestamp, unique } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
 export const users = pgTable("user", {
@@ -211,6 +211,9 @@ export const products = pgTable("product", {
   description: text("description"),
   sku: text("sku"),
   price: numeric("price", { precision: 12, scale: 2 }).notNull(),
+  taxPercent: numeric("tax_percent", { precision: 5, scale: 2 }).default("0"),
+  unit: text("unit"),
+  category: text("category"),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
@@ -276,6 +279,7 @@ export const deals = pgTable("deal", {
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
   status: text("status").default("open").notNull(), // open, won, lost
+  healthScore: integer("health_score").default(0),
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
@@ -417,9 +421,11 @@ export const marketingCampaigns = pgTable("marketing_campaign", {
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   description: text("description"),
-  status: text("status").default("draft").notNull(), // draft, active, completed
+  status: text("status").default("draft").notNull(), // draft, scheduled, active, completed
   templateId: text("template_id").references(() => emailTemplates.id, { onDelete: "set null" }),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  scheduledAt: timestamp("scheduled_at", { mode: "date" }),
+  recipientType: text("recipient_type"), // contacts | leads — stored when scheduling
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -714,7 +720,10 @@ export const quotes = pgTable("quote", {
     .references(() => companies.id, { onDelete: "cascade" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
-  status: text("status").default("draft").notNull(), // draft, sent, viewed, accepted, declined, expired, converted
+  status: text("status").default("draft").notNull(), // draft, pending_approval, sent, viewed, accepted, declined, expired, converted
+  approvalNote: text("approval_note"),
+  approvedById: text("approved_by_id").references(() => users.id, { onDelete: "set null" }),
+  approvedAt: timestamp("approved_at", { mode: "date" }),
   subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull(),
   discountAmount: numeric("discount_amount", { precision: 12, scale: 2 }).default("0"),
   discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }).default("0"),
@@ -1209,4 +1218,77 @@ export const appointmentAttendeesRelations = relations(appointmentAttendees, ({ 
   }),
   user: one(users, { fields: [appointmentAttendees.userId], references: [users.id] }),
   contact: one(contacts, { fields: [appointmentAttendees.contactId], references: [contacts.id] }),
+}));
+
+// ── Sales Targets ─────────────────────────────────────────────────────────────
+
+export const salesTargets = pgTable(
+  "sales_target",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    period: text("period").notNull(), // "2026-05" | "2026-Q2" | "2026"
+    periodType: text("period_type").notNull().default("month"), // month | quarter | year
+    targetAmount: numeric("target_amount", { precision: 12, scale: 2 }).notNull(),
+    targetDeals: integer("target_deals"),
+    currency: text("currency").default("EUR").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [unique("sales_target_user_period_unique").on(t.userId, t.period)],
+);
+
+export const salesTargetsRelations = relations(salesTargets, ({ one }) => ({
+  user: one(users, { fields: [salesTargets.userId], references: [users.id] }),
+}));
+
+// ── Deal Comments ─────────────────────────────────────────────────────────────
+
+export const dealComments = pgTable("deal_comment", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  dealId: text("deal_id")
+    .notNull()
+    .references(() => deals.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  parentId: text("parent_id"), // FK added via migration → deal_comment.id (set null)
+  editedAt: timestamp("edited_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const dealCommentsRelations = relations(dealComments, ({ one, many }) => ({
+  deal: one(deals, { fields: [dealComments.dealId], references: [deals.id] }),
+  user: one(users, { fields: [dealComments.userId], references: [users.id] }),
+  parent: one(dealComments, {
+    fields: [dealComments.parentId],
+    references: [dealComments.id],
+    relationName: "replies",
+  }),
+  replies: many(dealComments, { relationName: "replies" }),
+}));
+
+// ── Saved Reports ──────────────────────────────────────────────────────────────
+
+export const savedReports = pgTable("saved_report", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  config: text("config").notNull(), // JSON-serialised ReportConfig
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  isPublic: boolean("is_public").default(false).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const savedReportsRelations = relations(savedReports, ({ one }) => ({
+  owner: one(users, { fields: [savedReports.ownerId], references: [users.id] }),
 }));

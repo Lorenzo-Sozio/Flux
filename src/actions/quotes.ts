@@ -2,8 +2,10 @@
 
 import { auth } from "@/auth";
 import { db } from "@/db";
-import { quotes, quoteItems, quoteActivities, deals, companies, products } from "@/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { quotes, quoteItems, quoteActivities, deals, companies, products, users } from "@/db/schema";
+import { eq, desc, and, inArray } from "drizzle-orm";
+import { createNotificationAction, createNotificationsBatch } from "@/actions/auth";
+import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
 import { z } from "zod";
 import { sendEmail } from "@/lib/email-provider";
 import crypto from "crypto";
@@ -485,6 +487,96 @@ export async function getAllQuotes(filters?: { status?: string; searchTerm?: str
   }
 }
 
+// ── Approval Workflow ──────────────────────────────────────────────────────────
+
+export async function requestApprovalAction(quoteId: string) {
+  const session = await requireWriteAccess();
+
+  const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
+  if (!quote) throw new Error("Quote not found");
+  if (quote.status !== "draft") throw new Error("Only draft quotes can be submitted for approval");
+  if (session.user.id !== quote.ownerId && session.user.role !== "admin" && session.user.role !== "owner") {
+    throw new Error("Unauthorized");
+  }
+
+  const admins = await db.select({ id: users.id }).from(users).where(inArray(users.role, ["admin", "owner"]));
+
+  await Promise.all([
+    db.update(quotes).set({ status: "pending_approval", updatedAt: new Date() }).where(eq(quotes.id, quoteId)),
+    logQuoteActivity(quoteId, "approval_requested", session.user.id),
+    createNotificationsBatch(
+      admins
+        .filter((u) => u.id !== session.user.id)
+        .map((u) => ({
+          userId: u.id,
+          type: "quote_approval_requested",
+          title: "Approvazione preventivo richiesta",
+          message: `Il preventivo ${quote.quoteNumber} richiede la tua approvazione.`,
+          link: `/dashboard/quotes/${quoteId}`,
+        })),
+    ),
+  ]);
+
+  revalidatePath("/dashboard/quotes");
+  revalidatePath(`/dashboard/quotes/${quoteId}`);
+}
+
+export async function approveQuoteAction(quoteId: string) {
+  const session = await requireAdminAccess();
+
+  const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
+  if (!quote) throw new Error("Quote not found");
+  if (quote.status !== "pending_approval") throw new Error("Quote is not pending approval");
+
+  await Promise.all([
+    db.update(quotes)
+      .set({ status: "draft", approvedById: session.user.id, approvedAt: new Date(), approvalNote: null, updatedAt: new Date() })
+      .where(eq(quotes.id, quoteId)),
+    logQuoteActivity(quoteId, "approved", session.user.id),
+  ]);
+
+  if (quote.ownerId && quote.ownerId !== session.user.id) {
+    await createNotificationAction({
+      userId: quote.ownerId,
+      type: "quote_approved",
+      title: "Preventivo approvato",
+      message: `Il preventivo ${quote.quoteNumber} è stato approvato. Puoi ora inviarlo al cliente.`,
+      link: `/dashboard/quotes/${quoteId}`,
+    });
+  }
+
+  revalidatePath("/dashboard/quotes");
+  revalidatePath(`/dashboard/quotes/${quoteId}`);
+}
+
+export async function rejectQuoteAction(quoteId: string, note: string) {
+  const session = await requireAdminAccess();
+
+  const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
+  if (!quote) throw new Error("Quote not found");
+  if (quote.status !== "pending_approval") throw new Error("Quote is not pending approval");
+
+  await Promise.all([
+    db.update(quotes)
+      .set({ status: "draft", approvalNote: note || null, updatedAt: new Date() })
+      .where(eq(quotes.id, quoteId)),
+    logQuoteActivity(quoteId, "rejected", session.user.id),
+  ]);
+
+  if (quote.ownerId && quote.ownerId !== session.user.id) {
+    await createNotificationAction({
+      userId: quote.ownerId,
+      type: "quote_rejected",
+      title: "Preventivo rifiutato",
+      message: `Il preventivo ${quote.quoteNumber} è stato rifiutato.${note ? ` Nota: ${note}` : ""}`,
+      link: `/dashboard/quotes/${quoteId}`,
+    });
+  }
+
+  revalidatePath("/dashboard/quotes");
+  revalidatePath(`/dashboard/quotes/${quoteId}`);
+}
+
 /** Lightweight list of deals + companies + products for the quote creation form. */
 export async function getQuoteFormData() {
   const session = await auth();
@@ -496,7 +588,11 @@ export async function getQuoteFormData() {
       .from(deals)
       .orderBy(desc(deals.createdAt)),
     db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(companies.name),
-    db.select({ id: products.id, name: products.name, price: products.price }).from(products).orderBy(products.name),
+    db
+      .select({ id: products.id, name: products.name, price: products.price, taxPercent: products.taxPercent, unit: products.unit, category: products.category })
+      .from(products)
+      .where(eq(products.isActive, true))
+      .orderBy(products.name),
   ]);
 
   return { deals: dealList, companies: companyList, products: productList };

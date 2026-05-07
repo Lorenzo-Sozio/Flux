@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, desc, eq, getTableColumns, isNull } from "drizzle-orm";
+import { and, desc, eq, getTableColumns, ilike, isNull, ne, or } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 
 import { createNotificationAction } from "@/actions/auth";
@@ -10,12 +10,15 @@ import { dispatchWebhook } from "@/actions/webhooks";
 import { db } from "@/db";
 import {
   activities,
+  appointments,
+  campaignLogs,
   companies,
   contacts,
   customFieldDefinitions,
   deals,
   leads,
   pipelineStages,
+  quotes,
   tasks,
   tickets,
   users,
@@ -465,4 +468,223 @@ export async function getLeadsForSelect() {
     .select({ id: leads.id, firstName: leads.firstName, lastName: leads.lastName, email: leads.email })
     .from(leads)
     .orderBy(leads.firstName, leads.lastName);
+}
+
+// ── Duplicate detection ───────────────────────────────────────────────────────
+
+export async function checkLeadDuplicates(params: {
+  email?: string | null;
+  phone?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  excludeId?: string;
+}) {
+  const { email, phone, firstName, lastName, excludeId } = params;
+  const conditions = [];
+  if (email?.trim()) conditions.push(ilike(leads.email, email.trim()));
+  if (phone?.trim()) conditions.push(ilike(leads.phone, phone.trim()));
+  if (firstName?.trim() && lastName?.trim()) {
+    conditions.push(and(ilike(leads.firstName, firstName.trim()), ilike(leads.lastName, lastName.trim())));
+  }
+  if (!conditions.length) return [];
+
+  const base = or(...conditions)!;
+  const where = excludeId ? and(base, ne(leads.id, excludeId)) : base;
+
+  return db
+    .select({
+      id: leads.id,
+      firstName: leads.firstName,
+      lastName: leads.lastName,
+      email: leads.email,
+      phone: leads.phone,
+    })
+    .from(leads)
+    .where(where)
+    .limit(5);
+}
+
+export async function checkContactDuplicates(params: {
+  email?: string | null;
+  phone?: string | null;
+  firstName?: string | null;
+  lastName?: string | null;
+  excludeId?: string;
+}) {
+  const { email, phone, firstName, lastName, excludeId } = params;
+  const conditions = [];
+  if (email?.trim()) conditions.push(ilike(contacts.email, email.trim()));
+  if (phone?.trim()) conditions.push(ilike(contacts.phone, phone.trim()));
+  if (firstName?.trim() && lastName?.trim()) {
+    conditions.push(and(ilike(contacts.firstName, firstName.trim()), ilike(contacts.lastName, lastName.trim())));
+  }
+  if (!conditions.length) return [];
+
+  const base = or(...conditions)!;
+  const where = excludeId ? and(base, ne(contacts.id, excludeId)) : base;
+
+  return db
+    .select({
+      id: contacts.id,
+      firstName: contacts.firstName,
+      lastName: contacts.lastName,
+      email: contacts.email,
+      phone: contacts.phone,
+    })
+    .from(contacts)
+    .where(where)
+    .limit(5);
+}
+
+export async function checkCompanyDuplicates(params: {
+  name?: string | null;
+  website?: string | null;
+  mainEmail?: string | null;
+  excludeId?: string;
+}) {
+  const { name, website, mainEmail, excludeId } = params;
+  const conditions = [];
+  if (name?.trim()) conditions.push(ilike(companies.name, name.trim()));
+  if (website?.trim()) conditions.push(ilike(companies.website, website.trim()));
+  if (mainEmail?.trim()) conditions.push(ilike(companies.mainEmail, mainEmail.trim()));
+  if (!conditions.length) return [];
+
+  const base = or(...conditions)!;
+  const where = excludeId ? and(base, ne(companies.id, excludeId)) : base;
+
+  return db
+    .select({
+      id: companies.id,
+      name: companies.name,
+      mainEmail: companies.mainEmail,
+      website: companies.website,
+    })
+    .from(companies)
+    .where(where)
+    .limit(5);
+}
+
+// ── Merge helpers ─────────────────────────────────────────────────────────────
+
+export async function getLeadForMerge(id: string) {
+  await requireWriteAccess();
+  return db.query.leads.findFirst({ where: eq(leads.id, id) });
+}
+
+type LeadMergeFields = {
+  email?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
+  jobTitle?: string | null;
+  companyName?: string | null;
+  industry?: string | null;
+  website?: string | null;
+  notes?: string | null;
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  country?: string | null;
+  source?: string | null;
+  ownerId?: string | null;
+};
+
+export async function mergeLeads(keepId: string, mergeId: string, fields: LeadMergeFields) {
+  await requireWriteAccess();
+  await db.transaction(async (tx) => {
+    await tx.update(leads).set({ ...fields, updatedAt: new Date() }).where(eq(leads.id, keepId));
+    await Promise.all([
+      tx.update(activities).set({ leadId: keepId }).where(eq(activities.leadId, mergeId)),
+      tx.update(tasks).set({ leadId: keepId }).where(eq(tasks.leadId, mergeId)),
+      tx.update(campaignLogs).set({ leadId: keepId }).where(eq(campaignLogs.leadId, mergeId)),
+      tx.update(tickets).set({ leadId: keepId }).where(eq(tickets.leadId, mergeId)),
+      tx.update(appointments).set({ leadId: keepId }).where(eq(appointments.leadId, mergeId)),
+    ]);
+    await tx.delete(leads).where(eq(leads.id, mergeId));
+  });
+  revalidatePath("/dashboard/leads");
+}
+
+export async function getContactForMerge(id: string) {
+  await requireWriteAccess();
+  return db.query.contacts.findFirst({
+    where: eq(contacts.id, id),
+    with: { company: { columns: { id: true, name: true } } },
+  });
+}
+
+export async function getCompanyForMerge(id: string) {
+  await requireWriteAccess();
+  return db.query.companies.findFirst({ where: eq(companies.id, id) });
+}
+
+type ContactMergeFields = {
+  email?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
+  jobTitle?: string | null;
+  department?: string | null;
+  linkedinUrl?: string | null;
+  notes?: string | null;
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  country?: string | null;
+  source?: string | null;
+  companyId?: string | null;
+  ownerId?: string | null;
+};
+
+export async function mergeContacts(keepId: string, mergeId: string, fields: ContactMergeFields) {
+  await requireWriteAccess();
+  await db.transaction(async (tx) => {
+    await tx.update(contacts).set({ ...fields, updatedAt: new Date() }).where(eq(contacts.id, keepId));
+    await Promise.all([
+      tx.update(activities).set({ contactId: keepId }).where(eq(activities.contactId, mergeId)),
+      tx.update(tasks).set({ contactId: keepId }).where(eq(tasks.contactId, mergeId)),
+      tx.update(deals).set({ contactId: keepId }).where(eq(deals.contactId, mergeId)),
+      tx.update(quotes).set({ contactId: keepId }).where(eq(quotes.contactId, mergeId)),
+      tx.update(tickets).set({ contactId: keepId }).where(eq(tickets.contactId, mergeId)),
+      tx.update(appointments).set({ contactId: keepId }).where(eq(appointments.contactId, mergeId)),
+    ]);
+    await tx.delete(contacts).where(eq(contacts.id, mergeId));
+  });
+  revalidatePath("/dashboard/contacts");
+}
+
+type CompanyMergeFields = {
+  mainEmail?: string | null;
+  mainPhone?: string | null;
+  website?: string | null;
+  description?: string | null;
+  industry?: string | null;
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zipCode?: string | null;
+  country?: string | null;
+  vatNumber?: string | null;
+  sdiCode?: string | null;
+  linkedinUrl?: string | null;
+  source?: string | null;
+  ownerId?: string | null;
+};
+
+export async function mergeCompanies(keepId: string, mergeId: string, fields: CompanyMergeFields) {
+  await requireWriteAccess();
+  await db.transaction(async (tx) => {
+    await tx.update(companies).set({ ...fields, updatedAt: new Date() }).where(eq(companies.id, keepId));
+    await Promise.all([
+      tx.update(contacts).set({ companyId: keepId }).where(eq(contacts.companyId, mergeId)),
+      tx.update(activities).set({ companyId: keepId }).where(eq(activities.companyId, mergeId)),
+      tx.update(tasks).set({ companyId: keepId }).where(eq(tasks.companyId, mergeId)),
+      tx.update(deals).set({ companyId: keepId }).where(eq(deals.companyId, mergeId)),
+      tx.update(quotes).set({ companyId: keepId }).where(eq(quotes.companyId, mergeId)),
+      tx.update(tickets).set({ companyId: keepId }).where(eq(tickets.companyId, mergeId)),
+      tx.update(appointments).set({ companyId: keepId }).where(eq(appointments.companyId, mergeId)),
+    ]);
+    await tx.delete(companies).where(eq(companies.id, mergeId));
+  });
+  revalidatePath("/dashboard/companies");
 }

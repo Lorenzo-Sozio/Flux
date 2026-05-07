@@ -54,21 +54,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { getAllQuotes, deleteQuoteAction } from "@/actions/quotes";
+import { QUOTE_STATUS_CONFIG } from "@/lib/quote-status";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
 
 type Quote = Awaited<ReturnType<typeof getAllQuotes>>[number];
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  draft:     { label: "Draft",     className: "border-slate-300 text-slate-600" },
-  sent:      { label: "Sent",      className: "border-blue-300 text-blue-600 bg-blue-50" },
-  viewed:    { label: "Viewed",    className: "border-violet-300 text-violet-600 bg-violet-50" },
-  accepted:  { label: "Accepted",  className: "border-green-300 text-green-600 bg-green-50" },
-  declined:  { label: "Declined",  className: "border-red-300 text-red-600 bg-red-50" },
-  expired:   { label: "Expired",   className: "border-amber-300 text-amber-600 bg-amber-50" },
-  converted: { label: "Converted", className: "border-teal-300 text-teal-600 bg-teal-50" },
-};
 
 export default function QuotesPage() {
   const t = useTranslations("quotes");
@@ -245,6 +237,7 @@ export default function QuotesPage() {
                 <SelectContent>
                   <SelectItem value="all">{tc("all")}</SelectItem>
                   <SelectItem value="draft">{t("statuses.draft")}</SelectItem>
+                  <SelectItem value="pending_approval">{t("statuses.pending_approval")}</SelectItem>
                   <SelectItem value="sent">{t("statuses.sent")}</SelectItem>
                   <SelectItem value="viewed">{tc("view")}</SelectItem>
                   <SelectItem value="accepted">{t("statuses.accepted")}</SelectItem>
@@ -298,7 +291,7 @@ export default function QuotesPage() {
                 </TableHeader>
                 <TableBody>
                   {filteredQuotes.map((quote) => {
-                    const statusCfg = STATUS_CONFIG[quote.status] ?? STATUS_CONFIG.draft;
+                    const statusCfg = QUOTE_STATUS_CONFIG[quote.status] ?? QUOTE_STATUS_CONFIG.draft;
                     const contactName = quote.contact
                       ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim()
                       : null;

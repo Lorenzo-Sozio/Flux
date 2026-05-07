@@ -110,6 +110,7 @@ export function QuoteEditForm({ quote, formData }: Props) {
     if (product) {
       form.setValue(`items.${index}.productId`, product.id);
       form.setValue(`items.${index}.unitPrice`, parseFloat(product.price ?? "0") || 0);
+      form.setValue(`items.${index}.taxPercent`, parseFloat(product.taxPercent ?? "0") || 0);
       if (!form.getValues(`items.${index}.description`)) {
         form.setValue(`items.${index}.description`, product.name);
       }

@@ -291,6 +291,13 @@ export async function createNotificationAction(data: {
   await db.insert(notifications).values(data);
 }
 
+export async function createNotificationsBatch(
+  rows: { userId: string; type: string; title: string; message?: string; link?: string }[],
+) {
+  if (rows.length === 0) return;
+  await db.insert(notifications).values(rows);
+}
+
 // ─── Change Own Password ──────────────────────────────────────────────────────
 export async function changePasswordAction(data: {
   currentPassword: string;
