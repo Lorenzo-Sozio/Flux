@@ -22,15 +22,16 @@ import {
   StickyNoteIcon,
   TagIcon,
   ThermometerIcon,
+  Trash2Icon,
   UserCheckIcon,
   UserIcon,
 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
-import { createActivity, getActivitiesByLead } from "@/actions/activities";
+import { createActivity, deleteActivity, getActivitiesByLead } from "@/actions/activities";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { getEmailTemplates } from "@/actions/marketing";
-import { getAllUsers, getTasksByLead, updateTaskStatus } from "@/actions/tasks";
+import { deleteTask, getAllUsers, getTasksByLead, updateTaskStatus } from "@/actions/tasks";
 import { LeadModal } from "@/app/(main)/dashboard/leads/_components/lead-modal";
 import { auth } from "@/auth";
 import { ActivityModal } from "@/components/crm/activity-modal";
@@ -570,6 +571,20 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                                 activity={activity}
                                 revalidatePathStr={`/dashboard/leads/${leadId}`}
                               />
+                              <form
+                                action={async () => {
+                                  "use server";
+                                  await deleteActivity(activity.id, `/dashboard/leads/${leadId}`);
+                                }}
+                              >
+                                <button
+                                  type="submit"
+                                  className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2Icon className="w-3.5 h-3.5" />
+                                </button>
+                              </form>
                             </div>
                           </div>
                           <p className="text-sm mt-1.5">{activity.content}</p>
@@ -636,6 +651,20 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                             {task.priority}
                           </Badge>
                           <TaskModal task={task} users={allUsers} revalidatePathStr={`/dashboard/leads/${leadId}`} />
+                          <form
+                            action={async () => {
+                              "use server";
+                              await deleteTask(task.id, `/dashboard/leads/${leadId}`);
+                            }}
+                          >
+                            <button
+                              type="submit"
+                              className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2Icon className="w-3.5 h-3.5" />
+                            </button>
+                          </form>
                         </div>
                       </div>
 

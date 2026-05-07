@@ -1,44 +1,47 @@
-import { auth } from "@/auth";
-import { db } from "@/db";
-import { companies } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { notFound } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { getActivitiesByCompany, createActivity } from "@/actions/activities";
-import { getTasksByCompany, updateTaskStatus, getAllUsers } from "@/actions/tasks";
-import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { revalidatePath } from "next/cache";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { notFound } from "next/navigation";
+
+import { eq } from "drizzle-orm";
 import type { LucideIcon } from "lucide-react";
 import {
-  CalendarIcon,
-  UserIcon,
-  UserCheckIcon,
-  ClockIcon,
-  CheckCircle2Icon,
-  PencilIcon,
-  MailIcon,
-  PhoneIcon,
-  GlobeIcon,
   BuildingIcon,
+  CalendarIcon,
+  CheckCircle2Icon,
+  ClockIcon,
+  GlobeIcon,
+  MailIcon,
   MapPinIcon,
-  TagIcon,
-  UsersIcon,
-  StickyNoteIcon,
+  PencilIcon,
   PhoneCallIcon,
+  PhoneIcon,
   ReceiptIcon,
+  StickyNoteIcon,
+  TagIcon,
+  Trash2Icon,
+  UserCheckIcon,
+  UserIcon,
+  UsersIcon,
 } from "lucide-react";
-import { DocumentPanel } from "@/components/crm/document-panel";
+import { getTranslations } from "next-intl/server";
+
+import { createActivity, deleteActivity, getActivitiesByCompany } from "@/actions/activities";
+import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
+import { deleteTask, getAllUsers, getTasksByCompany, updateTaskStatus } from "@/actions/tasks";
+import { CompanyModal } from "@/app/(main)/dashboard/companies/_components/company-modal";
+import { auth } from "@/auth";
+import { ActivityModal } from "@/components/crm/activity-modal";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
+import { DocumentPanel } from "@/components/crm/document-panel";
+import { FormattedDate } from "@/components/crm/formatted-date";
 import { QuickTaskForm } from "@/components/crm/quick-task-form";
 import { RecordVisit } from "@/components/crm/record-visit";
-import { CompanyModal } from "@/app/(main)/dashboard/companies/_components/company-modal";
-import { ActivityModal } from "@/components/crm/activity-modal";
 import { TaskModal } from "@/components/crm/task-modal";
-import { FormattedDate } from "@/components/crm/formatted-date";
-import { getTranslations } from "next-intl/server";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { db } from "@/db";
+import { companies } from "@/db/schema";
 
 const TYPE_STYLES: Record<string, string> = {
   customer: "border-green-400 text-green-600 dark:border-green-500 dark:text-green-400",
@@ -135,7 +138,14 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                     {company.type}
                   </Badge>
                 )}
-                <Badge variant="outline" className={company.status === "active" ? "border-green-400 text-green-600 dark:border-green-500 dark:text-green-400" : "border-gray-400 text-gray-500"}>
+                <Badge
+                  variant="outline"
+                  className={
+                    company.status === "active"
+                      ? "border-green-400 text-green-600 dark:border-green-500 dark:text-green-400"
+                      : "border-gray-400 text-gray-500"
+                  }
+                >
                   {company.status}
                 </Badge>
                 {company.employeeCount != null && (
@@ -172,7 +182,10 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               <CardContent className="space-y-4">
                 {company.mainEmail && (
                   <InfoRow label={tD("fieldEmail")}>
-                    <a href={`mailto:${company.mainEmail}`} className="flex items-center gap-1.5 text-primary hover:underline break-all">
+                    <a
+                      href={`mailto:${company.mainEmail}`}
+                      className="flex items-center gap-1.5 text-primary hover:underline break-all"
+                    >
                       <MailIcon className="w-3.5 h-3.5 flex-shrink-0" />
                       {company.mainEmail}
                     </a>
@@ -180,7 +193,10 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                 )}
                 {company.mainPhone && (
                   <InfoRow label={tD("fieldPhone")}>
-                    <a href={`tel:${company.mainPhone}`} className="flex items-center gap-1.5 text-primary hover:underline">
+                    <a
+                      href={`tel:${company.mainPhone}`}
+                      className="flex items-center gap-1.5 text-primary hover:underline"
+                    >
                       <PhoneIcon className="w-3.5 h-3.5 flex-shrink-0" />
                       {company.mainPhone}
                     </a>
@@ -219,9 +235,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                   </Badge>
                 </InfoRow>
               )}
-              {company.industry && (
-                <InfoRow label={tD("fieldIndustry")}>{company.industry}</InfoRow>
-              )}
+              {company.industry && <InfoRow label={tD("fieldIndustry")}>{company.industry}</InfoRow>}
               {company.source && (
                 <InfoRow label={tD("fieldSource")}>
                   <span className="capitalize">{company.source}</span>
@@ -237,7 +251,11 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
               )}
               {company.annualRevenue && (
                 <InfoRow label={tD("fieldRevenue")}>
-                  {Number(company.annualRevenue).toLocaleString(undefined, { style: "currency", currency: "EUR", maximumFractionDigits: 0 })}
+                  {Number(company.annualRevenue).toLocaleString(undefined, {
+                    style: "currency",
+                    currency: "EUR",
+                    maximumFractionDigits: 0,
+                  })}
                 </InfoRow>
               )}
               {ownerName && (
@@ -352,7 +370,10 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground">{tD("typeLabel")}</p>
-                    <select name="type" className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm">
+                    <select
+                      name="type"
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm"
+                    >
                       <option value="note">{tD("activityTypes.note")}</option>
                       <option value="call">{tD("activityTypes.call")}</option>
                       <option value="meeting">{tD("activityTypes.meeting")}</option>
@@ -374,7 +395,9 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                     const iconClass = ACTIVITY_COLORS[activity.type] ?? ACTIVITY_COLORS.note;
                     return (
                       <div key={activity.id} className="flex gap-3">
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}>
+                        <div
+                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}
+                        >
                           <ActivityIcon className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0 border rounded-lg p-3 bg-card">
@@ -392,6 +415,20 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                                 activity={activity}
                                 revalidatePathStr={`/dashboard/companies/${companyId}`}
                               />
+                              <form
+                                action={async () => {
+                                  "use server";
+                                  await deleteActivity(activity.id, `/dashboard/companies/${companyId}`);
+                                }}
+                              >
+                                <button
+                                  type="submit"
+                                  className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2Icon className="w-3.5 h-3.5" />
+                                </button>
+                              </form>
                             </div>
                           </div>
                           <p className="text-sm mt-1.5">{activity.content}</p>
@@ -434,7 +471,9 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                             {task.status === "done" && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
                           </div>
                           <div className="min-w-0">
-                            <p className={`font-medium text-sm leading-tight ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>
+                            <p
+                              className={`font-medium text-sm leading-tight ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}
+                            >
                               {task.title}
                             </p>
                             {task.description && (
@@ -455,7 +494,25 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                           >
                             {task.priority}
                           </Badge>
-                          <TaskModal task={task} users={allUsers} revalidatePathStr={`/dashboard/companies/${companyId}`} />
+                          <TaskModal
+                            task={task}
+                            users={allUsers}
+                            revalidatePathStr={`/dashboard/companies/${companyId}`}
+                          />
+                          <form
+                            action={async () => {
+                              "use server";
+                              await deleteTask(task.id, `/dashboard/companies/${companyId}`);
+                            }}
+                          >
+                            <button
+                              type="submit"
+                              className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2Icon className="w-3.5 h-3.5" />
+                            </button>
+                          </form>
                         </div>
                       </div>
 
@@ -492,7 +549,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                             {tD("toLabel")} {task.assigneeName || tD("myself")}
                           </span>
                         </div>
-                        <form action={async () => { "use server"; await toggleTask(task.id, task.status); }}>
+                        <form
+                          action={async () => {
+                            "use server";
+                            await toggleTask(task.id, task.status);
+                          }}
+                        >
                           <Button variant="outline" size="sm" className="h-6 px-2 text-[10px] bg-background">
                             {task.status === "done" ? tD("undo") : tD("markDone")}
                           </Button>

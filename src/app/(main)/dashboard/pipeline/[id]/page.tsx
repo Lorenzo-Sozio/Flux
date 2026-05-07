@@ -1,33 +1,43 @@
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { auth } from "@/auth";
-import { getDealById, updateDeal, getPipelineData } from "@/actions/pipeline";
-import { getActivitiesByDeal, createActivity } from "@/actions/activities";
-import { getTasksByDeal, createTask, updateTaskStatus, getAllUsers } from "@/actions/tasks";
-import { getQuotesByDeal } from "@/actions/quotes";
-import { getDealComments } from "@/actions/deal-comments";
-import { getCompanies, getContacts } from "@/actions/crm";
 import { revalidatePath } from "next/cache";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
 import {
-  KanbanIcon, BuildingIcon, UserIcon, CalendarIcon,
-  TrendingUpIcon, CheckCircle2Icon, ClockIcon, CircleIcon,
+  BuildingIcon,
+  CalendarIcon,
+  CheckCircle2Icon,
   ChevronLeftIcon,
+  CircleIcon,
+  ClockIcon,
+  KanbanIcon,
+  Trash2Icon,
+  TrendingUpIcon,
+  UserIcon,
 } from "lucide-react";
-import { FormattedDate } from "@/components/crm/formatted-date";
+import { getTranslations } from "next-intl/server";
+
+import { createActivity, deleteActivity, getActivitiesByDeal } from "@/actions/activities";
+import { getCompanies, getContacts } from "@/actions/crm";
+import { getDealComments } from "@/actions/deal-comments";
+import { getDealById, getPipelineData, updateDeal } from "@/actions/pipeline";
+import { getQuotesByDeal } from "@/actions/quotes";
+import { createTask, deleteTask, getAllUsers, getTasksByDeal, updateTaskStatus } from "@/actions/tasks";
+import { auth } from "@/auth";
 import { ActivityModal } from "@/components/crm/activity-modal";
-import { TaskModal } from "@/components/crm/task-modal";
-import { DocumentPanel } from "@/components/crm/document-panel";
-import { RecordVisit } from "@/components/crm/record-visit";
 import { CreateQuoteButton } from "@/components/crm/create-quote-button";
 import { DealEditButton } from "@/components/crm/deal-edit-button";
-import { CommentsThread } from "./_components/comments-thread";
+import { DocumentPanel } from "@/components/crm/document-panel";
+import { FormattedDate } from "@/components/crm/formatted-date";
+import { RecordVisit } from "@/components/crm/record-visit";
+import { TaskModal } from "@/components/crm/task-modal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { db } from "@/db";
 import { products } from "@/db/schema";
-import { getTranslations } from "next-intl/server";
+
+import { CommentsThread } from "./_components/comments-thread";
 
 export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: dealId } = await params;
@@ -35,7 +45,20 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   const userId = session?.user?.id;
   const userRole = session?.user?.role ?? "user";
 
-  const [row, { stages }, activitiesList, tasksList, allUsers, quotesList, productsList, companiesList, contactsList, commentsList, t, tD] = await Promise.all([
+  const [
+    row,
+    { stages },
+    activitiesList,
+    tasksList,
+    allUsers,
+    quotesList,
+    productsList,
+    companiesList,
+    contactsList,
+    commentsList,
+    t,
+    tD,
+  ] = await Promise.all([
     getDealById(dealId),
     getPipelineData(),
     getActivitiesByDeal(dealId),
@@ -71,7 +94,13 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     const dueDate = formData.get("dueDate") as string;
     const priority = formData.get("priority") as string;
     if (title) {
-      await createTask({ title, dueDate: dueDate ? new Date(dueDate) : undefined, priority: priority || "normal", ownerId: userId, dealId });
+      await createTask({
+        title,
+        dueDate: dueDate ? new Date(dueDate) : undefined,
+        priority: priority || "normal",
+        ownerId: userId,
+        dealId,
+      });
       revalidatePath(`/dashboard/pipeline/${dealId}`);
     }
   }
@@ -88,13 +117,15 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   const revalidatePath_ = `/dashboard/pipeline/${dealId}`;
   const statusColors: Record<string, string> = {
     open: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-    won:  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
+    won: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300",
     lost: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
   };
 
   const activityIcons: Record<string, string> = { note: "📝", call: "📞", meeting: "👥", email: "📧" };
   const priorityColors: Record<string, string> = {
-    high: "text-red-500", normal: "text-yellow-500", low: "text-slate-400",
+    high: "text-red-500",
+    normal: "text-yellow-500",
+    low: "text-slate-400",
   };
 
   return (
@@ -103,10 +134,12 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
 
       {/* ── Left sidebar ──────────────────────────────────────────────────── */}
       <div className="w-full md:w-1/3 flex flex-col gap-5">
-
         {/* Back + title */}
         <div>
-          <Link href="/dashboard/pipeline" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3">
+          <Link
+            href="/dashboard/pipeline"
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3"
+          >
             <ChevronLeftIcon className="h-4 w-4" />
             {t("backToPipeline")}
           </Link>
@@ -118,12 +151,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                   <Badge className={statusColors[deal.status] ?? ""} variant="outline">
                     {deal.status}
                   </Badge>
-                  <DealEditButton
-                    deal={deal}
-                    stages={stages}
-                    companies={companiesList}
-                    contacts={contactsList}
-                  />
+                  <DealEditButton deal={deal} stages={stages} companies={companiesList} contacts={contactsList} />
                 </div>
               </div>
             </CardHeader>
@@ -144,7 +172,9 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 <span className="text-muted-foreground">{t("fieldValue")}</span>
                 <span className="font-semibold text-base">
                   {deal.amount
-                    ? new Intl.NumberFormat("it-IT", { style: "currency", currency: deal.currency || "EUR" }).format(Number(deal.amount))
+                    ? new Intl.NumberFormat("it-IT", { style: "currency", currency: deal.currency || "EUR" }).format(
+                        Number(deal.amount),
+                      )
                     : "—"}
                   {deal.probability != null && (
                     <span className="ml-1.5 text-xs font-normal text-muted-foreground">({deal.probability}%)</span>
@@ -157,9 +187,13 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 <div className="flex items-center gap-2">
                   <BuildingIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground">{t("fieldCompany")}</span>
-                  {deal.companyId
-                    ? <Link href={`/dashboard/companies/${deal.companyId}`} className="font-medium hover:underline">{companyName}</Link>
-                    : <span className="font-medium">{companyName}</span>}
+                  {deal.companyId ? (
+                    <Link href={`/dashboard/companies/${deal.companyId}`} className="font-medium hover:underline">
+                      {companyName}
+                    </Link>
+                  ) : (
+                    <span className="font-medium">{companyName}</span>
+                  )}
                 </div>
               )}
 
@@ -168,9 +202,15 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 <div className="flex items-center gap-2">
                   <UserIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                   <span className="text-muted-foreground">{t("fieldContact")}</span>
-                  {deal.contactId
-                    ? <Link href={`/dashboard/contacts/${deal.contactId}`} className="font-medium hover:underline">{contactFirstName} {contactLastName}</Link>
-                    : <span className="font-medium">{contactFirstName} {contactLastName}</span>}
+                  {deal.contactId ? (
+                    <Link href={`/dashboard/contacts/${deal.contactId}`} className="font-medium hover:underline">
+                      {contactFirstName} {contactLastName}
+                    </Link>
+                  ) : (
+                    <span className="font-medium">
+                      {contactFirstName} {contactLastName}
+                    </span>
+                  )}
                 </div>
               )}
 
@@ -180,7 +220,11 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 <span className="text-muted-foreground">{t("fieldExpectedClose")}</span>
                 <span className="font-medium">
                   {deal.expectedCloseDate
-                    ? new Date(deal.expectedCloseDate).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })
+                    ? new Date(deal.expectedCloseDate).toLocaleDateString(undefined, {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })
                     : "—"}
                 </span>
               </div>
@@ -220,7 +264,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               dealId={dealId}
               companyId={deal.companyId || ""}
               contactId={deal.contactId || ""}
-              products={productsList.map(p => ({ id: p.id, name: p.name, price: p.price?.toString() || "0" }))}
+              products={productsList.map((p) => ({ id: p.id, name: p.name, price: p.price?.toString() || "0" }))}
             />
           </CardHeader>
           <CardContent>
@@ -237,7 +281,9 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{quote.status}</Badge>
-                        <span className="font-semibold text-sm">{quote.currency} {parseFloat(quote.totalAmount).toFixed(2)}</span>
+                        <span className="font-semibold text-sm">
+                          {quote.currency} {parseFloat(quote.totalAmount).toFixed(2)}
+                        </span>
                       </div>
                     </div>
                   </Link>
@@ -250,12 +296,17 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col gap-5">
-
         {/* Activities */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-base">{t("activityTimeline")}</CardTitle>
-            <ActivityModal mode="create" entityType="deal" entityId={dealId} ownerId={userId} revalidatePathStr={revalidatePath_} />
+            <ActivityModal
+              mode="create"
+              entityType="deal"
+              entityId={dealId}
+              ownerId={userId}
+              revalidatePathStr={revalidatePath_}
+            />
           </CardHeader>
           <CardContent className="space-y-1">
             {/* Quick log form */}
@@ -266,8 +317,14 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 <option value="meeting">{tD("activityTypes.meeting")}</option>
                 <option value="email">{tD("activityTypes.email")}</option>
               </select>
-              <Textarea name="content" placeholder={t("logActivityPlaceholder")} className="min-h-[36px] h-9 resize-none py-1.5 text-sm flex-1" />
-              <Button type="submit" size="sm" variant="outline">{t("logBtn")}</Button>
+              <Textarea
+                name="content"
+                placeholder={t("logActivityPlaceholder")}
+                className="min-h-[36px] h-9 resize-none py-1.5 text-sm flex-1"
+              />
+              <Button type="submit" size="sm" variant="outline">
+                {t("logBtn")}
+              </Button>
             </form>
 
             {activitiesList.length === 0 ? (
@@ -285,6 +342,20 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                       </p>
                     </div>
                     <ActivityModal mode="edit" activity={act} revalidatePathStr={revalidatePath_} />
+                    <form
+                      action={async () => {
+                        "use server";
+                        await deleteActivity(act.id, revalidatePath_);
+                      }}
+                    >
+                      <button
+                        type="submit"
+                        className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                        title="Delete"
+                      >
+                        <Trash2Icon className="w-3.5 h-3.5" />
+                      </button>
+                    </form>
                   </div>
                 ))}
               </div>
@@ -296,19 +367,31 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-base">{tD("tasksNextStepsTitle")}</CardTitle>
-            <span className="text-xs text-muted-foreground">{t("openTasksCount", { count: tasksList.filter((tk) => tk.status !== "done").length })}</span>
+            <span className="text-xs text-muted-foreground">
+              {t("openTasksCount", { count: tasksList.filter((tk) => tk.status !== "done").length })}
+            </span>
           </CardHeader>
           <CardContent className="space-y-1">
             {/* Quick add task */}
             <form action={handleAddTask} className="flex gap-2 pb-4 border-b">
-              <input name="title" placeholder={t("newTaskPlaceholder")} className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm" />
+              <input
+                name="title"
+                placeholder={t("newTaskPlaceholder")}
+                className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
+              />
               <select name="priority" className="h-9 rounded-md border border-input bg-background px-2 text-sm">
                 <option value="normal">{tD("priorityNormal")}</option>
                 <option value="high">{tD("priorityHigh")}</option>
                 <option value="low">{tD("priorityLow")}</option>
               </select>
-              <input name="dueDate" type="date" className="h-9 rounded-md border border-input bg-background px-2 text-sm" />
-              <Button type="submit" size="sm" variant="outline">{t("addBtn")}</Button>
+              <input
+                name="dueDate"
+                type="date"
+                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+              />
+              <Button type="submit" size="sm" variant="outline">
+                {t("addBtn")}
+              </Button>
             </form>
 
             {tasksList.length === 0 ? (
@@ -321,9 +404,11 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                       <input type="hidden" name="taskId" value={task.id} />
                       <input type="hidden" name="status" value={task.status} />
                       <button type="submit" className="shrink-0 text-muted-foreground hover:text-primary">
-                        {task.status === "done"
-                          ? <CheckCircle2Icon className="h-4 w-4 text-emerald-500" />
-                          : <CircleIcon className="h-4 w-4" />}
+                        {task.status === "done" ? (
+                          <CheckCircle2Icon className="h-4 w-4 text-emerald-500" />
+                        ) : (
+                          <CircleIcon className="h-4 w-4" />
+                        )}
                       </button>
                     </form>
                     <div className="flex-1 min-w-0">
@@ -337,6 +422,20 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                     </div>
                     <span className={`text-xs shrink-0 ${priorityColors[task.priority] ?? ""}`}>{task.priority}</span>
                     <TaskModal task={task} users={allUsers} revalidatePathStr={revalidatePath_} />
+                    <form
+                      action={async () => {
+                        "use server";
+                        await deleteTask(task.id, revalidatePath_);
+                      }}
+                    >
+                      <button
+                        type="submit"
+                        className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                        title="Delete"
+                      >
+                        <Trash2Icon className="w-3.5 h-3.5" />
+                      </button>
+                    </form>
                   </div>
                 ))}
               </div>

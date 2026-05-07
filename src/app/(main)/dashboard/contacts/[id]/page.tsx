@@ -1,50 +1,53 @@
-import { auth } from "@/auth";
-import { db } from "@/db";
-import { contacts, companies } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { notFound } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { getActivitiesByContact, createActivity } from "@/actions/activities";
-import { getTasksByContact, updateTaskStatus, getAllUsers } from "@/actions/tasks";
-import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { revalidatePath } from "next/cache";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { eq } from "drizzle-orm";
 import type { LucideIcon } from "lucide-react";
 import {
+  BriefcaseIcon,
+  BuildingIcon,
   CalendarIcon,
-  UserIcon,
-  UserCheckIcon,
-  ClockIcon,
   CheckCircle2Icon,
-  PencilIcon,
+  ClockIcon,
+  GlobeIcon,
+  LinkedinIcon,
   MailIcon,
+  MapPinIcon,
+  PencilIcon,
+  PhoneCallIcon,
   PhoneIcon,
   SmartphoneIcon,
-  GlobeIcon,
-  BuildingIcon,
-  BriefcaseIcon,
-  MapPinIcon,
-  TagIcon,
-  LinkedinIcon,
-  StickyNoteIcon,
-  PhoneCallIcon,
   StarIcon,
+  StickyNoteIcon,
+  TagIcon,
+  Trash2Icon,
+  UserCheckIcon,
+  UserIcon,
 } from "lucide-react";
-import Link from "next/link";
+import { getTranslations } from "next-intl/server";
+
+import { createActivity, deleteActivity, getActivitiesByContact } from "@/actions/activities";
+import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
+import { getEmailTemplates } from "@/actions/marketing";
+import { deleteTask, getAllUsers, getTasksByContact, updateTaskStatus } from "@/actions/tasks";
 import { ContactModal } from "@/app/(main)/dashboard/contacts/_components/contact-modal";
+import { auth } from "@/auth";
 import { ActivityModal } from "@/components/crm/activity-modal";
-import { FormattedDate } from "@/components/crm/formatted-date";
-import { TaskModal } from "@/components/crm/task-modal";
-import { SendEmailModal } from "@/components/crm/send-email-modal";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { DocumentPanel } from "@/components/crm/document-panel";
+import { FormattedDate } from "@/components/crm/formatted-date";
 import { QuickTaskForm } from "@/components/crm/quick-task-form";
 import { RecordVisit } from "@/components/crm/record-visit";
-import { getEmailTemplates } from "@/actions/marketing";
-import { getTranslations } from "next-intl/server";
+import { SendEmailModal } from "@/components/crm/send-email-modal";
+import { TaskModal } from "@/components/crm/task-modal";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
+import { db } from "@/db";
+import { companies, contacts } from "@/db/schema";
 
 const STATUS_STYLES: Record<string, string> = {
   active: "border-green-400 text-green-600 dark:border-green-500 dark:text-green-400",
@@ -190,7 +193,10 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
             <CardContent className="space-y-4">
               {cData.email && (
                 <InfoRow label={tD("fieldEmail")}>
-                  <a href={`mailto:${cData.email}`} className="flex items-center gap-1.5 text-primary hover:underline break-all">
+                  <a
+                    href={`mailto:${cData.email}`}
+                    className="flex items-center gap-1.5 text-primary hover:underline break-all"
+                  >
                     <MailIcon className="w-3.5 h-3.5 flex-shrink-0" />
                     {cData.email}
                   </a>
@@ -225,9 +231,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                   </a>
                 </InfoRow>
               )}
-              {!hasContactInfo && (
-                <p className="text-sm text-muted-foreground italic">{tD("notApplicable")}</p>
-              )}
+              {!hasContactInfo && <p className="text-sm text-muted-foreground italic">{tD("notApplicable")}</p>}
             </CardContent>
           </Card>
 
@@ -258,9 +262,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                   </span>
                 </InfoRow>
               )}
-              {cData.department && (
-                <InfoRow label={tD("fieldDepartment")}>{cData.department}</InfoRow>
-              )}
+              {cData.department && <InfoRow label={tD("fieldDepartment")}>{cData.department}</InfoRow>}
             </CardContent>
           </Card>
 
@@ -395,7 +397,10 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2">
                     <p className="text-[10px] uppercase font-bold text-muted-foreground">{tD("typeLabel")}</p>
-                    <select name="type" className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm">
+                    <select
+                      name="type"
+                      className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm"
+                    >
                       <option value="note">{tD("activityTypes.note")}</option>
                       <option value="call">{tD("activityTypes.call")}</option>
                       <option value="meeting">{tD("activityTypes.meeting")}</option>
@@ -417,7 +422,9 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                     const iconClass = ACTIVITY_COLORS[activity.type] ?? ACTIVITY_COLORS.note;
                     return (
                       <div key={activity.id} className="flex gap-3">
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}>
+                        <div
+                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}
+                        >
                           <ActivityIcon className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0 border rounded-lg p-3 bg-card">
@@ -435,6 +442,20 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                                 activity={activity}
                                 revalidatePathStr={`/dashboard/contacts/${contactId}`}
                               />
+                              <form
+                                action={async () => {
+                                  "use server";
+                                  await deleteActivity(activity.id, `/dashboard/contacts/${contactId}`);
+                                }}
+                              >
+                                <button
+                                  type="submit"
+                                  className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2Icon className="w-3.5 h-3.5" />
+                                </button>
+                              </form>
                             </div>
                           </div>
                           <p className="text-sm mt-1.5">{activity.content}</p>
@@ -477,7 +498,9 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                             {task.status === "done" && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
                           </div>
                           <div className="min-w-0">
-                            <p className={`font-medium text-sm leading-tight ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}>
+                            <p
+                              className={`font-medium text-sm leading-tight ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}
+                            >
                               {task.title}
                             </p>
                             {task.description && (
@@ -498,7 +521,25 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                           >
                             {task.priority}
                           </Badge>
-                          <TaskModal task={task} users={allUsers} revalidatePathStr={`/dashboard/contacts/${contactId}`} />
+                          <TaskModal
+                            task={task}
+                            users={allUsers}
+                            revalidatePathStr={`/dashboard/contacts/${contactId}`}
+                          />
+                          <form
+                            action={async () => {
+                              "use server";
+                              await deleteTask(task.id, `/dashboard/contacts/${contactId}`);
+                            }}
+                          >
+                            <button
+                              type="submit"
+                              className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2Icon className="w-3.5 h-3.5" />
+                            </button>
+                          </form>
                         </div>
                       </div>
 
@@ -535,7 +576,12 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                             {tD("toLabel")} {task.assigneeName || tD("myself")}
                           </span>
                         </div>
-                        <form action={async () => { "use server"; await toggleTask(task.id, task.status); }}>
+                        <form
+                          action={async () => {
+                            "use server";
+                            await toggleTask(task.id, task.status);
+                          }}
+                        >
                           <Button variant="outline" size="sm" className="h-6 px-2 text-[10px] bg-background">
                             {task.status === "done" ? tD("undo") : tD("markDone")}
                           </Button>
