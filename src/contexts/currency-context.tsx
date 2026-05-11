@@ -15,8 +15,8 @@ import {
   CURRENCY_MANUAL_OVERRIDE_KEY,
   CURRENCY_PREFERENCE_KEY,
   LOCALE_TO_CURRENCY,
-  type ExchangeRates,
 } from "@/lib/currency-config";
+import type { ExchangeRates } from "@/lib/exchange-rates";
 import { formatCurrency } from "@/lib/utils";
 
 // Re-export the type from currency-config so consumers can import from here

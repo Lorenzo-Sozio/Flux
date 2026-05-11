@@ -134,7 +134,8 @@
       "Bash(mkdir -p \"c:/React/Flux/src/app/\\(main\\)/admin/tenants/[subdomain]/_components\")",
       "Bash(node --input-type=module)",
       "Bash(Remove-Item -Recurse -Force \"c:\\\\React\\\\Flux\\\\.next\" -ErrorAction SilentlyContinue)",
-      "Bash(Write-Host \"Cache cleared\")"
+      "Bash(Write-Host \"Cache cleared\")",
+      "Bash(git add *)"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",
