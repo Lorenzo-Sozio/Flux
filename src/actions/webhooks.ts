@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { webhookLogs, webhooks } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
@@ -10,6 +10,7 @@ import { requireAdminAccess } from "@/lib/auth-guard";
 // ─── CRUD ────────────────────────────────────────────────────────────────────
 
 export async function getWebhooks() {
+  const db = await getDb();
   return await db.select().from(webhooks).orderBy(webhooks.createdAt);
 }
 
@@ -20,6 +21,7 @@ export async function createWebhook(data: {
   ownerId: string;
 }) {
   await requireAdminAccess();
+  const db = await getDb();
   const secret = crypto.randomBytes(32).toString("hex");
   const [wh] = await db.insert(webhooks).values({ ...data, secret }).returning();
   revalidatePath("/dashboard/settings/webhooks");
@@ -28,6 +30,7 @@ export async function createWebhook(data: {
 
 export async function updateWebhook(id: string, data: Partial<{ name: string; url: string; events: string[]; isActive: boolean }>) {
   await requireAdminAccess();
+  const db = await getDb();
   const [wh] = await db.update(webhooks).set({ ...data, updatedAt: new Date() }).where(eq(webhooks.id, id)).returning();
   revalidatePath("/dashboard/settings/webhooks");
   return wh;
@@ -35,11 +38,13 @@ export async function updateWebhook(id: string, data: Partial<{ name: string; ur
 
 export async function deleteWebhook(id: string) {
   await requireAdminAccess();
+  const db = await getDb();
   await db.delete(webhooks).where(eq(webhooks.id, id));
   revalidatePath("/dashboard/settings/webhooks");
 }
 
 export async function getWebhookLogs(webhookId: string) {
+  const db = await getDb();
   return await db.select().from(webhookLogs).where(eq(webhookLogs.webhookId, webhookId)).limit(50);
 }
 
@@ -53,6 +58,7 @@ export async function getWebhookLogs(webhookId: string) {
  * await dispatchWebhook("contact.created", { id: contact.id, ... });
  */
 export async function dispatchWebhook(event: string, payload: Record<string, unknown>) {
+  const db = await getDb();
   const activeWebhooks = await db
     .select()
     .from(webhooks)

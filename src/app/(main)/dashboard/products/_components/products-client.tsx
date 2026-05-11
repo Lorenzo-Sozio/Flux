@@ -44,6 +44,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 import {
   createProduct,
   updateProduct,
@@ -263,6 +264,7 @@ interface Props {
 
 export function ProductsClient({ products: initial }: Props) {
   const t = useTranslations("products");
+  const { formatAmount } = useCurrency();
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [products, setProducts] = useState(initial);
@@ -331,8 +333,7 @@ export function ProductsClient({ products: initial }: Props) {
     }
   };
 
-  const formatPrice = (price: string) =>
-    new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" }).format(Number(price));
+  const formatPrice = (price: string) => formatAmount(Number(price));
 
   return (
     <div className="p-6 space-y-5">

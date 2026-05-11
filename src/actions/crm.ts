@@ -6,8 +6,9 @@ import { and, desc, eq, getTableColumns, ilike, isNull, ne, or } from "drizzle-o
 import { getTranslations } from "next-intl/server";
 
 import { createNotificationAction } from "@/actions/auth";
+import { syncZipToCity } from "@/actions/geo";
 import { dispatchWebhook } from "@/actions/webhooks";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import {
   activities,
   appointments,
@@ -16,6 +17,8 @@ import {
   contacts,
   customFieldDefinitions,
   deals,
+  geoCities,
+  geoCountries,
   leads,
   pipelineStages,
   quotes,
@@ -37,11 +40,13 @@ import { computeLeadScore } from "@/lib/lead-score";
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export async function getAllUsers() {
+  const db = await getDb();
   return db.select({ id: users.id, name: users.name, email: users.email }).from(users).orderBy(users.name);
 }
 
 // LEADS
 export async function getLeads(encodedFilter?: string | null) {
+  const db = await getDb();
   const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
   const base = db
     .select({ ...getTableColumns(leads), ownerName: users.name })
@@ -59,6 +64,7 @@ export async function getLeads(encodedFilter?: string | null) {
 
 // CONTACTS
 export async function getContacts(encodedFilter?: string | null) {
+  const db = await getDb();
   const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
   const base = db
     .select({ ...getTableColumns(contacts), ownerName: users.name })
@@ -76,8 +82,11 @@ export async function getContacts(encodedFilter?: string | null) {
 
 export async function createLead(data: any) {
   await requireWriteAccess();
+  const db = await getDb();
   const payload = {
     ...data,
+    countryId: data.countryId || null,
+    cityId: data.cityId || null,
     marketingConsent: data.marketingConsent ?? false,
     consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
     tags: Array.isArray(data.tags)
@@ -91,6 +100,7 @@ export async function createLead(data: any) {
     leadScore: computeLeadScore(data),
   };
   const [newLead] = await db.insert(leads).values(payload).returning();
+  syncZipToCity(newLead.cityId, newLead.zipCode);
   revalidatePath("/dashboard/leads");
   dispatchWebhook("lead.created", {
     id: newLead.id,
@@ -103,6 +113,7 @@ export async function createLead(data: any) {
 
 export async function updateLead(id: string, data: any) {
   await requireWriteAccess();
+  const db = await getDb();
   // Notify new assignee if ownerId changed
   if (data.ownerId) {
     const [cur] = await db
@@ -121,6 +132,8 @@ export async function updateLead(id: string, data: any) {
   }
   const payload = {
     ...data,
+    countryId: data.countryId || null,
+    cityId: data.cityId || null,
     marketingConsent: data.marketingConsent ?? false,
     consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
     tags: Array.isArray(data.tags)
@@ -134,18 +147,21 @@ export async function updateLead(id: string, data: any) {
     leadScore: computeLeadScore(data),
   };
   const [updatedLead] = await db.update(leads).set(payload).where(eq(leads.id, id)).returning();
+  syncZipToCity(updatedLead.cityId, updatedLead.zipCode);
   revalidatePath("/dashboard/leads");
   return updatedLead;
 }
 
 export async function deleteLead(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(leads).where(eq(leads.id, id));
   revalidatePath("/dashboard/leads");
 }
 
 export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   await requireWriteAccess();
+  const db = await getDb();
 
   const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
   if (!lead) throw new Error("Lead not found");
@@ -184,6 +200,8 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
             state: lead.state ?? undefined,
             zipCode: lead.zipCode ?? undefined,
             country: lead.country ?? undefined,
+            countryId: lead.countryId ?? undefined,
+            cityId: lead.cityId ?? undefined,
             source: lead.source ?? undefined,
             ownerId: lead.ownerId,
             sourceLeadId: lead.id,
@@ -208,6 +226,8 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
         state: lead.state ?? undefined,
         zipCode: lead.zipCode ?? undefined,
         country: lead.country ?? undefined,
+        countryId: lead.countryId ?? undefined,
+        cityId: lead.cityId ?? undefined,
         source: lead.source ?? undefined,
         notes: lead.notes ?? undefined,
         ownerId: lead.ownerId,
@@ -279,6 +299,8 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
 
   if (!result) throw new Error("Conversion transaction failed");
 
+  syncZipToCity(lead.cityId, lead.zipCode);
+
   dispatchWebhook("lead.converted", {
     leadId,
     contactId: result.contactId,
@@ -296,8 +318,11 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
 
 export async function createContact(data: any) {
   await requireWriteAccess();
+  const db = await getDb();
   const payload = {
     ...data,
+    countryId: data.countryId || null,
+    cityId: data.cityId || null,
     marketingConsent: data.marketingConsent ?? false,
     consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
     tags: Array.isArray(data.tags)
@@ -311,6 +336,7 @@ export async function createContact(data: any) {
     leadScore: computeLeadScore(data),
   };
   const [newContact] = await db.insert(contacts).values(payload).returning();
+  syncZipToCity(newContact.cityId, newContact.zipCode);
   revalidatePath("/dashboard/contacts");
   dispatchWebhook("contact.created", {
     id: newContact.id,
@@ -323,6 +349,7 @@ export async function createContact(data: any) {
 
 export async function updateContact(id: string, data: any) {
   await requireWriteAccess();
+  const db = await getDb();
   // Notify new assignee if ownerId changed
   if (data.ownerId) {
     const [cur] = await db
@@ -341,6 +368,8 @@ export async function updateContact(id: string, data: any) {
   }
   const payload = {
     ...data,
+    countryId: data.countryId || null,
+    cityId: data.cityId || null,
     marketingConsent: data.marketingConsent ?? false,
     consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
     tags: Array.isArray(data.tags)
@@ -354,6 +383,7 @@ export async function updateContact(id: string, data: any) {
     leadScore: computeLeadScore(data),
   };
   const [updatedContact] = await db.update(contacts).set(payload).where(eq(contacts.id, id)).returning();
+  syncZipToCity(updatedContact.cityId, updatedContact.zipCode);
   revalidatePath("/dashboard/contacts");
   dispatchWebhook("contact.updated", {
     id: updatedContact.id,
@@ -366,6 +396,7 @@ export async function updateContact(id: string, data: any) {
 
 export async function deleteContact(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(contacts).where(eq(contacts.id, id));
   revalidatePath("/dashboard/contacts");
   dispatchWebhook("contact.deleted", { id }).catch(() => {});
@@ -373,6 +404,7 @@ export async function deleteContact(id: string) {
 
 // COMPANIES
 export async function getCompanies(encodedFilter?: string | null) {
+  const db = await getDb();
   const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
   const base = db
     .select({ ...getTableColumns(companies), ownerName: users.name })
@@ -390,8 +422,11 @@ export async function getCompanies(encodedFilter?: string | null) {
 
 export async function createCompany(data: any) {
   await requireWriteAccess();
+  const db = await getDb();
   const payload = {
     ...data,
+    countryId: data.countryId || null,
+    cityId: data.cityId || null,
     vatNumber: data.vatNumber,
     sdiCode: data.sdiCode,
     tags: Array.isArray(data.tags)
@@ -404,12 +439,14 @@ export async function createCompany(data: any) {
         : null,
   };
   const [newCompany] = await db.insert(companies).values(payload).returning();
+  syncZipToCity(newCompany.cityId, newCompany.zipCode);
   revalidatePath("/dashboard/companies");
   return newCompany;
 }
 
 export async function updateCompany(id: string, data: any) {
   await requireWriteAccess();
+  const db = await getDb();
   // Notify new assignee if ownerId changed
   if (data.ownerId) {
     const [cur] = await db
@@ -428,6 +465,8 @@ export async function updateCompany(id: string, data: any) {
   }
   const payload = {
     ...data,
+    countryId: data.countryId || null,
+    cityId: data.cityId || null,
     vatNumber: data.vatNumber,
     sdiCode: data.sdiCode,
     tags: Array.isArray(data.tags)
@@ -440,12 +479,14 @@ export async function updateCompany(id: string, data: any) {
         : null,
   };
   const [updatedCompany] = await db.update(companies).set(payload).where(eq(companies.id, id)).returning();
+  syncZipToCity(updatedCompany.cityId, updatedCompany.zipCode);
   revalidatePath("/dashboard/companies");
   return updatedCompany;
 }
 
 export async function deleteCompany(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(companies).where(eq(companies.id, id));
   revalidatePath("/dashboard/companies");
 }
@@ -453,6 +494,7 @@ export async function deleteCompany(id: string) {
 // ── Lightweight lists for FK select dropdowns ─────────────────────────────────
 
 export async function getContactsForSelect() {
+  const db = await getDb();
   return db
     .select({ id: contacts.id, firstName: contacts.firstName, lastName: contacts.lastName, email: contacts.email })
     .from(contacts)
@@ -460,10 +502,12 @@ export async function getContactsForSelect() {
 }
 
 export async function getCompaniesForSelect() {
+  const db = await getDb();
   return db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(companies.name);
 }
 
 export async function getLeadsForSelect() {
+  const db = await getDb();
   return db
     .select({ id: leads.id, firstName: leads.firstName, lastName: leads.lastName, email: leads.email })
     .from(leads)
@@ -473,12 +517,14 @@ export async function getLeadsForSelect() {
 // ── Duplicate detection ───────────────────────────────────────────────────────
 
 export async function checkLeadDuplicates(params: {
+
   email?: string | null;
   phone?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   excludeId?: string;
 }) {
+  const db = await getDb();
   const { email, phone, firstName, lastName, excludeId } = params;
   const conditions = [];
   if (email?.trim()) conditions.push(ilike(leads.email, email.trim()));
@@ -505,12 +551,14 @@ export async function checkLeadDuplicates(params: {
 }
 
 export async function checkContactDuplicates(params: {
+
   email?: string | null;
   phone?: string | null;
   firstName?: string | null;
   lastName?: string | null;
   excludeId?: string;
 }) {
+  const db = await getDb();
   const { email, phone, firstName, lastName, excludeId } = params;
   const conditions = [];
   if (email?.trim()) conditions.push(ilike(contacts.email, email.trim()));
@@ -537,11 +585,13 @@ export async function checkContactDuplicates(params: {
 }
 
 export async function checkCompanyDuplicates(params: {
+
   name?: string | null;
   website?: string | null;
   mainEmail?: string | null;
   excludeId?: string;
 }) {
+  const db = await getDb();
   const { name, website, mainEmail, excludeId } = params;
   const conditions = [];
   if (name?.trim()) conditions.push(ilike(companies.name, name.trim()));
@@ -568,6 +618,7 @@ export async function checkCompanyDuplicates(params: {
 
 export async function getLeadForMerge(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
   return db.query.leads.findFirst({ where: eq(leads.id, id) });
 }
 
@@ -585,14 +636,20 @@ type LeadMergeFields = {
   state?: string | null;
   zipCode?: string | null;
   country?: string | null;
+  countryId?: string | null;
+  cityId?: string | null;
   source?: string | null;
   ownerId?: string | null;
 };
 
 export async function mergeLeads(keepId: string, mergeId: string, fields: LeadMergeFields) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.transaction(async (tx) => {
-    await tx.update(leads).set({ ...fields, updatedAt: new Date() }).where(eq(leads.id, keepId));
+    await tx
+      .update(leads)
+      .set({ ...fields, updatedAt: new Date() })
+      .where(eq(leads.id, keepId));
     await Promise.all([
       tx.update(activities).set({ leadId: keepId }).where(eq(activities.leadId, mergeId)),
       tx.update(tasks).set({ leadId: keepId }).where(eq(tasks.leadId, mergeId)),
@@ -607,6 +664,7 @@ export async function mergeLeads(keepId: string, mergeId: string, fields: LeadMe
 
 export async function getContactForMerge(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
   return db.query.contacts.findFirst({
     where: eq(contacts.id, id),
     with: { company: { columns: { id: true, name: true } } },
@@ -615,6 +673,7 @@ export async function getContactForMerge(id: string) {
 
 export async function getCompanyForMerge(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
   return db.query.companies.findFirst({ where: eq(companies.id, id) });
 }
 
@@ -631,6 +690,8 @@ type ContactMergeFields = {
   state?: string | null;
   zipCode?: string | null;
   country?: string | null;
+  countryId?: string | null;
+  cityId?: string | null;
   source?: string | null;
   companyId?: string | null;
   ownerId?: string | null;
@@ -638,8 +699,12 @@ type ContactMergeFields = {
 
 export async function mergeContacts(keepId: string, mergeId: string, fields: ContactMergeFields) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.transaction(async (tx) => {
-    await tx.update(contacts).set({ ...fields, updatedAt: new Date() }).where(eq(contacts.id, keepId));
+    await tx
+      .update(contacts)
+      .set({ ...fields, updatedAt: new Date() })
+      .where(eq(contacts.id, keepId));
     await Promise.all([
       tx.update(activities).set({ contactId: keepId }).where(eq(activities.contactId, mergeId)),
       tx.update(tasks).set({ contactId: keepId }).where(eq(tasks.contactId, mergeId)),
@@ -664,6 +729,8 @@ type CompanyMergeFields = {
   state?: string | null;
   zipCode?: string | null;
   country?: string | null;
+  countryId?: string | null;
+  cityId?: string | null;
   vatNumber?: string | null;
   sdiCode?: string | null;
   linkedinUrl?: string | null;
@@ -673,8 +740,12 @@ type CompanyMergeFields = {
 
 export async function mergeCompanies(keepId: string, mergeId: string, fields: CompanyMergeFields) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.transaction(async (tx) => {
-    await tx.update(companies).set({ ...fields, updatedAt: new Date() }).where(eq(companies.id, keepId));
+    await tx
+      .update(companies)
+      .set({ ...fields, updatedAt: new Date() })
+      .where(eq(companies.id, keepId));
     await Promise.all([
       tx.update(contacts).set({ companyId: keepId }).where(eq(contacts.companyId, mergeId)),
       tx.update(activities).set({ companyId: keepId }).where(eq(activities.companyId, mergeId)),

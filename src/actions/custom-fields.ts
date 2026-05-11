@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { customFieldDefinitions, customFieldValues } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
@@ -12,6 +12,7 @@ export type EntityType = "contact" | "lead" | "company" | "deal";
 // ─── Field Definitions ───────────────────────────────────────────────────────
 
 export async function getCustomFieldDefinitions(entityType?: EntityType) {
+  const db = await getDb();
   const query = db.select().from(customFieldDefinitions);
   if (entityType) {
     return query.where(eq(customFieldDefinitions.entityType, entityType));
@@ -29,6 +30,7 @@ export async function createCustomFieldDefinition(data: {
   ownerId?: string;
 }) {
   await requireAdminAccess();
+  const db = await getDb();
   const [field] = await db
     .insert(customFieldDefinitions)
     .values({
@@ -50,6 +52,7 @@ export async function updateCustomFieldDefinition(
   }>
 ) {
   await requireAdminAccess();
+  const db = await getDb();
   const [updated] = await db
     .update(customFieldDefinitions)
     .set({
@@ -65,6 +68,7 @@ export async function updateCustomFieldDefinition(
 
 export async function deleteCustomFieldDefinition(id: string) {
   await requireAdminAccess();
+  const db = await getDb();
   // Cascade deletes values too (FK constraint)
   await db.delete(customFieldDefinitions).where(eq(customFieldDefinitions.id, id));
   revalidatePath("/dashboard/settings/custom-fields");
@@ -73,6 +77,7 @@ export async function deleteCustomFieldDefinition(id: string) {
 // ─── Field Values ────────────────────────────────────────────────────────────
 
 export async function getCustomFieldValues(entityType: EntityType, entityId: string) {
+  const db = await getDb();
   return await db
     .select()
     .from(customFieldValues)
@@ -91,6 +96,7 @@ export async function upsertCustomFieldValue(data: {
   value: string;
 }) {
   await requireWriteAccess();
+  const db = await getDb();
   // Try update first
   const existing = await db
     .select({ id: customFieldValues.id })

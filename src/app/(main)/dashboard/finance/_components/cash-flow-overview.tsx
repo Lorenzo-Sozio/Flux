@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
-import { formatCurrency } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface Props {
   revenueTrend: { month: string; deals: number; orders: number }[];
@@ -13,6 +13,7 @@ interface Props {
 
 export function CashFlowOverview({ revenueTrend }: Props) {
   const t = useTranslations("finance");
+  const { formatAmount } = useCurrency();
 
   const chartConfig = {
     deals: {
@@ -46,14 +47,14 @@ export function CashFlowOverview({ revenueTrend }: Props) {
             <span className="inline-block size-2.5 rounded-sm" style={{ background: "var(--chart-1)" }} />
             <span className="text-muted-foreground text-xs">{t("dealsLabel")}</span>
             <span className="font-medium text-xs tabular-nums">
-              {formatCurrency(totalDeals, { noDecimals: true })}
+              {formatAmount(totalDeals, { noDecimals: true })}
             </span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block size-2.5 rounded-sm" style={{ background: "var(--chart-2)" }} />
             <span className="text-muted-foreground text-xs">{t("ordersLabel")}</span>
             <span className="font-medium text-xs tabular-nums">
-              {formatCurrency(totalOrders, { noDecimals: true })}
+              {formatAmount(totalOrders, { noDecimals: true })}
             </span>
           </div>
         </div>

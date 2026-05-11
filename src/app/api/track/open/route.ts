@@ -4,7 +4,7 @@
  * URL: /api/track/open?log=<campaignLogId>
  */
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { campaignLogs } from "@/db/schema";
 import { and, eq, isNull, notInArray } from "drizzle-orm";
 
@@ -18,6 +18,7 @@ const PIXEL = Buffer.from(
 const PROTECTED_STATUSES = ["opened", "clicked", "unsubscribed", "bounced", "complained"];
 
 export async function GET(req: NextRequest) {
+  const db = await getDb();
   const logId = req.nextUrl.searchParams.get("log");
 
   if (logId) {

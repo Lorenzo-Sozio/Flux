@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { userActivityLogs, users } from "@/db/schema";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { format } from "date-fns";
@@ -32,6 +32,7 @@ const ACTION_LABELS: Record<string, string> = {
 };
 
 export async function GET(req: NextRequest) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

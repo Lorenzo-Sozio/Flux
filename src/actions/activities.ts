@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { activities, contacts, leads, users } from "@/db/schema";
 import { eq, desc, and, gte, lte, or, isNotNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -18,6 +18,7 @@ export async function createActivity(data: {
   dealId?: string;
 }) {
   await requireWriteAccess();
+  const db = await getDb();
   const result = await db.insert(activities).values(data).returning();
   if (data.leadId) revalidatePath(`/dashboard/leads/${data.leadId}`);
   if (data.contactId) revalidatePath(`/dashboard/contacts/${data.contactId}`);
@@ -51,6 +52,7 @@ export async function createActivity(data: {
 }
 
 export async function getActivitiesByLead(leadId: string) {
+  const db = await getDb();
   return await db
     .select({
       id: activities.id,
@@ -67,6 +69,7 @@ export async function getActivitiesByLead(leadId: string) {
 }
 
 export async function getActivitiesByContact(contactId: string) {
+  const db = await getDb();
   return await db
     .select({
       id: activities.id,
@@ -83,6 +86,7 @@ export async function getActivitiesByContact(contactId: string) {
 }
 
 export async function getActivitiesByDeal(dealId: string) {
+  const db = await getDb();
   return await db
     .select({
       id: activities.id,
@@ -99,6 +103,7 @@ export async function getActivitiesByDeal(dealId: string) {
 }
 
 export async function getActivitiesByCompany(companyId: string) {
+  const db = await getDb();
   return await db
     .select({
       id: activities.id,
@@ -116,6 +121,7 @@ export async function getActivitiesByCompany(companyId: string) {
 
 export async function updateActivity(id: string, data: Partial<typeof activities.$inferInsert>, revalidatePathStr?: string) {
   await requireWriteAccess();
+  const db = await getDb();
   const result = await db.update(activities).set(data).where(eq(activities.id, id)).returning();
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
   return result[0];
@@ -123,12 +129,14 @@ export async function updateActivity(id: string, data: Partial<typeof activities
 
 export async function deleteActivity(id: string, revalidatePathStr?: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(activities).where(eq(activities.id, id));
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
 }
 
 // Returns call/meeting activities scheduled for today (for cron day-of reminders)
 export async function getActivitiesDueToday() {
+  const db = await getDb();
   const start = new Date(); start.setHours(0, 0, 0, 0);
   const end   = new Date(); end.setHours(23, 59, 59, 999);
 
@@ -163,6 +171,7 @@ export async function getActivitiesDueToday() {
  *   (date - reminderMinutes) is between now and now+windowMinutes.
  */
 export async function getActivitiesWithPendingReminder(windowMinutes = 2) {
+  const db = await getDb();
   const now   = new Date();
   const ahead = new Date(now.getTime() + windowMinutes * 60_000);
 

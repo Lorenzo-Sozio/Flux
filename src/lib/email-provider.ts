@@ -4,7 +4,7 @@
  * Config is loaded from DB (email_settings table), falling back to env vars.
  */
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { emailSettings } from "@/db/schema";
 
 export interface EmailConfig {
@@ -45,6 +45,7 @@ export interface SendResult {
 // ─── Config loader ────────────────────────────────────────────────────────────
 
 export async function getEmailConfig(): Promise<EmailConfig> {
+  const db = await getDb();
   try {
     const [row] = await db.select().from(emailSettings).limit(1);
     if (row) {

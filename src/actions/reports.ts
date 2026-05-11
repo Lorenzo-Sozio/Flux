@@ -2,7 +2,7 @@
 
 import { and, count, desc, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import {
   campaignLogs,
   contacts,
@@ -55,6 +55,7 @@ function taskDateRange(from?: string, to?: string) {
 
 export async function getReportKPIs(filters: ReportFilters = {}) {
   await requireAdminAccess();
+  const db = await getDb();
   const { from, to, userId } = filters;
 
   const actConditions = [...dateRange(from, to), ...(userId ? [eq(userActivityLogs.userId, userId)] : [])];
@@ -164,6 +165,7 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
 
 export async function getActivityByUser(filters: ReportFilters = {}) {
   await requireAdminAccess();
+  const db = await getDb();
   const { from, to } = filters;
 
   const conditions = dateRange(from, to);
@@ -193,6 +195,7 @@ export async function getActivityByUser(filters: ReportFilters = {}) {
 
 export async function getActivityByAction(filters: ReportFilters = {}) {
   await requireAdminAccess();
+  const db = await getDb();
   const { from, to, userId } = filters;
 
   const conditions = [...dateRange(from, to), ...(userId ? [eq(userActivityLogs.userId, userId)] : [])];
@@ -211,6 +214,7 @@ export async function getActivityByAction(filters: ReportFilters = {}) {
 
 export async function getDailyActivityTrend(filters: ReportFilters = {}) {
   await requireAdminAccess();
+  const db = await getDb();
   const { from, to, userId } = filters;
 
   const conditions = [...dateRange(from, to), ...(userId ? [eq(userActivityLogs.userId, userId)] : [])];
@@ -232,6 +236,7 @@ export async function getDailyActivityTrend(filters: ReportFilters = {}) {
 
 export async function getTaskPerformanceByUser(filters: ReportFilters = {}) {
   await requireAdminAccess();
+  const db = await getDb();
   const { from, to, userId } = filters;
 
   const allUsers = await db.select({ id: users.id, name: users.name, email: users.email }).from(users);
@@ -288,6 +293,7 @@ export async function getTaskPerformanceByUser(filters: ReportFilters = {}) {
 
 export async function getRecentActivityLog(filters: ReportFilters & { limit?: number } = {}) {
   await requireAdminAccess();
+  const db = await getDb();
   const { from, to, userId, limit = 100 } = filters;
 
   const conditions = [...dateRange(from, to), ...(userId ? [eq(userActivityLogs.userId, userId)] : [])];
@@ -321,6 +327,7 @@ export async function getRecentActivityLog(filters: ReportFilters & { limit?: nu
 
 export async function getReportUsers() {
   await requireAdminAccess();
+  const db = await getDb();
   return db
     .select({ id: users.id, name: users.name, email: users.email, role: users.role })
     .from(users)
@@ -331,6 +338,7 @@ export async function getReportUsers() {
 
 export async function getSalesReport(filters: ReportFilters = {}) {
   await requireAdminAccess();
+  const db = await getDb();
   const { from, to } = filters;
 
   const dealConditions = [
@@ -445,6 +453,7 @@ export async function getSalesReport(filters: ReportFilters = {}) {
 
 export async function getCampaignPerformanceSummary(filters: ReportFilters = {}) {
   await requireAdminAccess();
+  const db = await getDb();
   const { from, to } = filters;
 
   const campaigns = await db

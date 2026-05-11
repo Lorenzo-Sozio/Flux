@@ -11,7 +11,7 @@
  */
 
 import cron, { type ScheduledTask } from 'node-cron'
-import { db } from '@/db'
+import { getDb } from '@/lib/tenant-context'
 import { automationRules, deals, leads, contacts, companies, tickets } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import { runAutomations } from './rule-engine'
@@ -39,28 +39,37 @@ class SchedulerService {
   async initialize() {
     console.log('🔄 Initializing scheduled triggers...')
 
-    const rules = await db.select().from(automationRules).where(eq(automationRules.isActive, true))
+    try {
+      const db = await getDb();
+      const rules = await db.select().from(automationRules).where(eq(automationRules.isActive, true))
 
-    for (const rule of rules) {
-      // Cerca trigger di tipo scheduled
-      const triggerOnArray = rule.triggerOn || []
-      for (const trigger of triggerOnArray) {
-        const cronExpr = parseScheduledTrigger(trigger)
-        if (cronExpr) {
-          try {
-            this.registerCronJob({
-              ruleId: rule.id,
-              targetEntity: rule.targetEntity as TargetEntity,
-              cronExpression: cronExpr,
-            })
-          } catch (err) {
-            console.error(`❌ Failed to register scheduled trigger for rule ${rule.id}:`, err)
+      for (const rule of rules) {
+        // Cerca trigger di tipo scheduled
+        const triggerOnArray = rule.triggerOn || []
+        for (const trigger of triggerOnArray) {
+          const cronExpr = parseScheduledTrigger(trigger)
+          if (cronExpr) {
+            try {
+              this.registerCronJob({
+                ruleId: rule.id,
+                targetEntity: rule.targetEntity as TargetEntity,
+                cronExpression: cronExpr,
+              })
+            } catch (err) {
+              console.error(`❌ Failed to register scheduled trigger for rule ${rule.id}:`, err)
+            }
           }
         }
       }
-    }
 
-    console.log(`✅ Scheduled triggers initialized: ${this.jobs.size} cron jobs active`)
+      console.log(`✅ Scheduled triggers initialized: ${this.jobs.size} cron jobs active`)
+    } catch (err) {
+      console.error(
+        '⚠️  Error initializing scheduled triggers (using platformDb):',
+        err instanceof Error ? err.message : String(err)
+      )
+      console.log('ℹ️  Scheduled triggers will initialize when the first request arrives.')
+    }
   }
 
   /**
@@ -141,8 +150,7 @@ class SchedulerService {
 
     const schema = schemaMap[entityType]
 
-    // Query baseline: seleziona top 1000 record
-    // In produzione: implementare paginazione
+    const db = await getDb();
     const records = await db.select().from(schema).limit(1000)
 
     return records as Array<{ id: string; [key: string]: unknown }>

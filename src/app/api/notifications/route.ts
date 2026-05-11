@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { notifications } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 
 /** Lightweight polling endpoint used by NotificationCenter every 60s. */
 export async function GET() {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

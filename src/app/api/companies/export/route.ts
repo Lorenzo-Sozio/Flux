@@ -1,11 +1,12 @@
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { companies } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { unparse } from "papaparse";
 import { NextResponse } from "next/server";
 
 export async function GET() {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

@@ -3,13 +3,14 @@
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { emailSettings } from "@/db/schema";
 import { testEmailConfig, type EmailConfig } from "@/lib/email-provider";
 
 // ─── Load current settings (secrets masked) ───────────────────────────────────
 
 export async function getEmailSettings() {
+  const db = await getDb();
   const [row] = await db.select().from(emailSettings).limit(1);
   if (!row) {
     return {
@@ -35,6 +36,7 @@ export async function getEmailSettings() {
 // ─── Save settings ────────────────────────────────────────────────────────────
 
 export async function saveEmailSettings(data: {
+
   provider: "resend" | "smtp";
   resendApiKey?: string;
   smtpHost?: string;
@@ -45,6 +47,7 @@ export async function saveEmailSettings(data: {
   fromEmail: string;
   fromName: string;
 }) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user) return { error: "Unauthorized" };
 
@@ -82,6 +85,7 @@ export async function saveEmailSettings(data: {
 // ─── Test connection ──────────────────────────────────────────────────────────
 
 export async function testEmailConnection(data: {
+
   provider: "resend" | "smtp";
   resendApiKey?: string;
   smtpHost?: string;
@@ -93,6 +97,7 @@ export async function testEmailConnection(data: {
   fromName: string;
   testTo: string;
 }) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.email) return { error: "Unauthorized" };
 

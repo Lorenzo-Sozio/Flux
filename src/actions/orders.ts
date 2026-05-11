@@ -1,12 +1,13 @@
 "use server";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { orders, orderItems, companies, contacts, products, users } from "@/db/schema";
 import { eq, desc, ilike, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireWriteAccess, requireAdminAccess } from "@/lib/auth-guard";
 import { auth } from "@/auth";
 import { z } from "zod";
+import { getExchangeRates, convertToEur } from "@/lib/exchange-rates";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,6 +27,7 @@ function generateOrderNumber(): string {
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export async function getOrders(search?: string) {
+  const db = await getDb();
   const companyAlias = db.$with("co").as(db.select().from(companies));
   const contactAlias = db.$with("ct").as(db.select().from(contacts));
   const ownerAlias   = db.$with("ow").as(db.select().from(users));
@@ -65,6 +67,7 @@ export async function getOrders(search?: string) {
 }
 
 export async function getOrderById(id: string) {
+  const db = await getDb();
   const [order] = await db
     .select({
       id:          orders.id,
@@ -113,6 +116,7 @@ export async function getOrderById(id: string) {
 // ── Stats for dashboard ───────────────────────────────────────────────────────
 
 export async function getOrderStats() {
+  const db = await getDb();
   const [counts] = await db
     .select({
       total:     sql<number>`count(*)::int`,
@@ -133,6 +137,7 @@ const createSchema = z.object({
   contactId:    z.string().optional(),
   status:       z.enum(["draft", "processing", "completed", "cancelled"]).default("draft"),
   orderDate:    z.string().optional(),
+  currency:     z.string().default("EUR"),
   items: z.array(z.object({
     productId:  z.string().min(1),
     quantity:   z.coerce.number().int().min(1),
@@ -142,8 +147,20 @@ const createSchema = z.object({
 
 export async function createOrder(data: z.infer<typeof createSchema>) {
   await requireWriteAccess();
+  const db = await getDb();
   const session = await auth();
   const validated = createSchema.parse(data);
+
+  const inputCurrency = (validated.currency || "EUR").toUpperCase();
+  let conversionRate = 1;
+  if (inputCurrency !== "EUR") {
+    const { rates } = await getExchangeRates();
+    const rate = rates[inputCurrency.toLowerCase()];
+    if (rate) conversionRate = 1 / rate;
+  }
+
+  // All monetary amounts are stored in EUR
+  const toEur = (amount: number) => amount * conversionRate;
 
   const totalAmount = validated.items.reduce(
     (sum, item) => sum + item.quantity * item.unitPrice,
@@ -158,7 +175,7 @@ export async function createOrder(data: z.infer<typeof createSchema>) {
       contactId:   validated.contactId || null,
       ownerId:     session?.user?.id ?? null,
       status:      validated.status,
-      totalAmount: String(totalAmount),
+      totalAmount: String(toEur(totalAmount)),
       orderDate:   validated.orderDate ? new Date(validated.orderDate) : new Date(),
     })
     .returning();
@@ -168,8 +185,8 @@ export async function createOrder(data: z.infer<typeof createSchema>) {
       orderId:    order.id,
       productId:  item.productId,
       quantity:   item.quantity,
-      unitPrice:  String(item.unitPrice),
-      totalPrice: String(item.quantity * item.unitPrice),
+      unitPrice:  String(toEur(item.unitPrice)),
+      totalPrice: String(toEur(item.quantity * item.unitPrice)),
     })),
   );
 
@@ -179,6 +196,7 @@ export async function createOrder(data: z.infer<typeof createSchema>) {
 
 export async function updateOrderStatus(id: string, status: OrderStatus) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, id));
   revalidatePath("/dashboard/orders");
   revalidatePath(`/dashboard/orders/${id}`);
@@ -189,6 +207,7 @@ export async function addOrderItem(
   item: { productId: string; quantity: number; unitPrice: number },
 ) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.insert(orderItems).values({
     orderId,
     productId:  item.productId,
@@ -206,6 +225,7 @@ export async function addOrderItem(
 
 export async function removeOrderItem(itemId: string, orderId: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(orderItems).where(eq(orderItems.id, itemId));
 
   const allItems = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
@@ -216,6 +236,7 @@ export async function removeOrderItem(itemId: string, orderId: string) {
 
 export async function deleteOrder(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(orders).where(eq(orders.id, id));
   revalidatePath("/dashboard/orders");
 }

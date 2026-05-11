@@ -47,7 +47,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { companies, contacts, deals, leads } from "@/db/schema";
 
 import { ConvertLeadButton } from "./_components/convert-lead-button";
@@ -110,6 +110,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const { id: leadId } = await params;
   const session = await auth();
   const userId = session?.user?.id;
+  const db = await getDb();
 
   let lead;
   let templates: any[] = [];

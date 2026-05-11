@@ -1,16 +1,19 @@
+"use client";
+
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
+import { useTranslations } from "next-intl";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatCurrency } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface Props {
   pipelineByStage: { name: string; color: string; value: number; count: number }[];
 }
 
-export async function IncomeReliability({ pipelineByStage }: Props) {
-  const t = await getTranslations("finance");
+export function IncomeReliability({ pipelineByStage }: Props) {
+  const t = useTranslations("finance");
+  const { formatAmount } = useCurrency();
   const totalValue = pipelineByStage.reduce((sum, s) => sum + s.value, 0);
   const totalCount = pipelineByStage.reduce((sum, s) => sum + s.count, 0);
 
@@ -27,7 +30,7 @@ export async function IncomeReliability({ pipelineByStage }: Props) {
       </CardHeader>
       <CardContent className="pt-0 space-y-4">
         <div className="rounded-lg bg-muted/50 p-3 space-y-0.5">
-          <p className="text-2xl font-bold tabular-nums">{formatCurrency(totalValue, { noDecimals: true })}</p>
+          <p className="text-2xl font-bold tabular-nums">{formatAmount(totalValue, { noDecimals: true })}</p>
           <p className="text-xs text-muted-foreground">{t("openDealsInPipeline", { count: totalCount })}</p>
         </div>
 
@@ -45,7 +48,7 @@ export async function IncomeReliability({ pipelineByStage }: Props) {
                       {stage.name}
                       <span className="text-muted-foreground font-normal">· {stage.count}</span>
                     </span>
-                    <span className="tabular-nums font-medium">{formatCurrency(stage.value, { noDecimals: true })}</span>
+                    <span className="tabular-nums font-medium">{formatAmount(stage.value, { noDecimals: true })}</span>
                   </div>
                   <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
                     <div

@@ -23,8 +23,8 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { checkCompanyDuplicates, createCompany, deleteCompany, updateCompany } from "@/actions/crm";
-import { MergeCompaniesModal } from "./merge-companies-modal";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
+import { GeoAddressFields } from "@/components/crm/geo-address-fields";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -32,6 +32,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+
+import { MergeCompaniesModal } from "./merge-companies-modal";
 
 const companySchema = z.object({
   name: z.string().min(1, "Company name is required"),
@@ -56,6 +58,8 @@ const companySchema = z.object({
   state: z.string().optional(),
   zipCode: z.string().optional(),
   country: z.string().optional(),
+  countryId: z.string().nullable().optional(),
+  cityId: z.string().nullable().optional(),
   vatNumber: z.string().optional(),
   sdiCode: z.string().optional(),
 });
@@ -134,6 +138,8 @@ export function CompanyModal({ company, children }: { company?: any; children: R
       state: company?.state || "",
       zipCode: company?.zipCode || "",
       country: company?.country || "",
+      countryId: company?.countryId ?? null,
+      cityId: company?.cityId ?? null,
       vatNumber: company?.vatNumber || "",
       sdiCode: company?.sdiCode || "",
     },
@@ -143,6 +149,8 @@ export function CompanyModal({ company, children }: { company?: any; children: R
     register,
     control,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors, isSubmitting },
   } = form;
 
@@ -171,6 +179,8 @@ export function CompanyModal({ company, children }: { company?: any; children: R
         state: company.state || "",
         zipCode: company.zipCode || "",
         country: company.country || "",
+        countryId: company.countryId ?? null,
+        cityId: company.cityId ?? null,
         vatNumber: company.vatNumber || "",
         sdiCode: company.sdiCode || "",
       });
@@ -238,279 +248,277 @@ export function CompanyModal({ company, children }: { company?: any; children: R
 
   return (
     <>
-    <Dialog
-      open={open}
-      onOpenChange={(v) => {
-        setOpen(v);
-        if (!v) {
-          form.reset();
-          setDuplicates([]);
-          setPendingPayload(null);
-        }
-      }}
-    >
-      <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle className="text-lg">
-            {isEditing ? t("form.editTitle", { name: company.name }) : t("form.newTitle")}
-          </DialogTitle>
-        </DialogHeader>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) {
+            form.reset();
+            setDuplicates([]);
+            setPendingPayload(null);
+          }
+        }}
+      >
+        <DialogTrigger asChild>{children}</DialogTrigger>
+        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
+          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+            <DialogTitle className="text-lg">
+              {isEditing ? t("form.editTitle", { name: company.name }) : t("form.newTitle")}
+            </DialogTitle>
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
-          <div className="flex-1 overflow-y-auto px-6 py-4">
-            <Tabs defaultValue="info">
-              <TabsList className="w-full mb-5">
-                <TabsTrigger value="info" className="relative flex-1 gap-1.5">
-                  <BuildingIcon className="h-3.5 w-3.5" />
-                  {t("form.tabs.info")}
-                  <TabDot has={tabErrors.info} />
-                </TabsTrigger>
-                <TabsTrigger value="crm" className="relative flex-1 gap-1.5">
-                  <TagIcon className="h-3.5 w-3.5" />
-                  {t("form.tabs.crm")}
-                  <TabDot has={tabErrors.crm} />
-                </TabsTrigger>
-                <TabsTrigger value="address" className="relative flex-1 gap-1.5">
-                  <MapPinIcon className="h-3.5 w-3.5" />
-                  {t("form.tabs.address")}
-                  <TabDot has={tabErrors.address} />
-                </TabsTrigger>
-                <TabsTrigger value="billing" className="relative flex-1 gap-1.5">
-                  <ReceiptIcon className="h-3.5 w-3.5" />
-                  {t("form.tabs.billing")}
-                  <TabDot has={tabErrors.billing} />
-                </TabsTrigger>
-              </TabsList>
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <Tabs defaultValue="info">
+                <TabsList className="w-full mb-5">
+                  <TabsTrigger value="info" className="relative flex-1 gap-1.5">
+                    <BuildingIcon className="h-3.5 w-3.5" />
+                    {t("form.tabs.info")}
+                    <TabDot has={tabErrors.info} />
+                  </TabsTrigger>
+                  <TabsTrigger value="crm" className="relative flex-1 gap-1.5">
+                    <TagIcon className="h-3.5 w-3.5" />
+                    {t("form.tabs.crm")}
+                    <TabDot has={tabErrors.crm} />
+                  </TabsTrigger>
+                  <TabsTrigger value="address" className="relative flex-1 gap-1.5">
+                    <MapPinIcon className="h-3.5 w-3.5" />
+                    {t("form.tabs.address")}
+                    <TabDot has={tabErrors.address} />
+                  </TabsTrigger>
+                  <TabsTrigger value="billing" className="relative flex-1 gap-1.5">
+                    <ReceiptIcon className="h-3.5 w-3.5" />
+                    {t("form.tabs.billing")}
+                    <TabDot has={tabErrors.billing} />
+                  </TabsTrigger>
+                </TabsList>
 
-              {/* ── Info Tab ─────────────────────────────────────────────── */}
-              <TabsContent value="info" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
-                <div className="col-span-2">
-                  <F label={tc("name")} required error={e.name?.message}>
-                    <Input {...register("name")} placeholder="Acme Corp" />
-                  </F>
-                </div>
-                <F label={t("form.type")} error={e.type?.message}>
-                  <Controller
-                    control={control}
-                    name="type"
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("form.selectType")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="prospect">{t("types.prospect")}</SelectItem>
-                          <SelectItem value="customer">{t("types.customer")}</SelectItem>
-                          <SelectItem value="partner">{t("types.partner")}</SelectItem>
-                          <SelectItem value="vendor">{t("types.vendor")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </F>
-                <F label={t("form.status")} error={e.status?.message}>
-                  <Controller
-                    control={control}
-                    name="status"
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="active">{t("statuses.active")}</SelectItem>
-                          <SelectItem value="inactive">{t("statuses.inactive")}</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </F>
-                <F label={t("industry")} error={e.industry?.message}>
-                  <Input {...register("industry")} placeholder="Technology" />
-                </F>
-                <F label={t("form.employeeCount")} error={e.employeeCount?.message}>
-                  <Input {...register("employeeCount")} type="number" min={0} placeholder="0" />
-                </F>
-                <F label={t("form.annualRevenue")} error={e.annualRevenue?.message}>
-                  <Input {...register("annualRevenue")} type="number" min={0} placeholder="0" />
-                </F>
-                <F label={tc("website")} error={e.website?.message}>
-                  <Input {...register("website")} placeholder="https://acme.com" />
-                </F>
-                <F label={tc("phone")} error={e.mainPhone?.message}>
-                  <Input {...register("mainPhone")} type="tel" placeholder="+39 02 1234567" />
-                </F>
-                <F label={tc("email")} error={e.mainEmail?.message}>
-                  <Input {...register("mainEmail")} type="email" placeholder="info@acme.com" />
-                </F>
-                <F label="LinkedIn URL" error={e.linkedinUrl?.message}>
-                  <Input {...register("linkedinUrl")} placeholder="https://linkedin.com/company/…" />
-                </F>
-                <div className="col-span-2">
-                  <F label={tc("description")} error={e.description?.message}>
-                    <Textarea
-                      {...register("description")}
-                      placeholder="Brief description of the company…"
-                      className="min-h-[80px] resize-y"
-                    />
-                  </F>
-                </div>
-              </TabsContent>
-
-              {/* ── CRM Tab ──────────────────────────────────────────────── */}
-              <TabsContent value="crm" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
-                <div className="col-span-2">
-                  <F label={t("form.assignedTo")}>
+                {/* ── Info Tab ─────────────────────────────────────────────── */}
+                <TabsContent value="info" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+                  <div className="col-span-2">
+                    <F label={tc("name")} required error={e.name?.message}>
+                      <Input {...register("name")} placeholder="Acme Corp" />
+                    </F>
+                  </div>
+                  <F label={t("form.type")} error={e.type?.message}>
                     <Controller
                       control={control}
-                      name="assigneeValue"
-                      render={({ field }) => <AssigneeSelect value={field.value ?? null} onChange={field.onChange} />}
+                      name="type"
+                      render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger>
+                            <SelectValue placeholder={t("form.selectType")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="prospect">{t("types.prospect")}</SelectItem>
+                            <SelectItem value="customer">{t("types.customer")}</SelectItem>
+                            <SelectItem value="partner">{t("types.partner")}</SelectItem>
+                            <SelectItem value="vendor">{t("types.vendor")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
                     />
                   </F>
-                </div>
-                <F label={t("form.source")} error={e.source?.message}>
-                  <Controller
+                  <F label={t("form.status")} error={e.status?.message}>
+                    <Controller
+                      control={control}
+                      name="status"
+                      render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="active">{t("statuses.active")}</SelectItem>
+                            <SelectItem value="inactive">{t("statuses.inactive")}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </F>
+                  <F label={t("industry")} error={e.industry?.message}>
+                    <Input {...register("industry")} placeholder="Technology" />
+                  </F>
+                  <F label={t("form.employeeCount")} error={e.employeeCount?.message}>
+                    <Input {...register("employeeCount")} type="number" min={0} placeholder="0" />
+                  </F>
+                  <F label={t("form.annualRevenue")} error={e.annualRevenue?.message}>
+                    <Input {...register("annualRevenue")} type="number" min={0} placeholder="0" />
+                  </F>
+                  <F label={tc("website")} error={e.website?.message}>
+                    <Input {...register("website")} placeholder="https://acme.com" />
+                  </F>
+                  <F label={tc("phone")} error={e.mainPhone?.message}>
+                    <Input {...register("mainPhone")} type="tel" placeholder="+39 02 1234567" />
+                  </F>
+                  <F label={tc("email")} error={e.mainEmail?.message}>
+                    <Input {...register("mainEmail")} type="email" placeholder="info@acme.com" />
+                  </F>
+                  <F label="LinkedIn URL" error={e.linkedinUrl?.message}>
+                    <Input {...register("linkedinUrl")} placeholder="https://linkedin.com/company/…" />
+                  </F>
+                  <div className="col-span-2">
+                    <F label={tc("description")} error={e.description?.message}>
+                      <Textarea
+                        {...register("description")}
+                        placeholder="Brief description of the company…"
+                        className="min-h-[80px] resize-y"
+                      />
+                    </F>
+                  </div>
+                </TabsContent>
+
+                {/* ── CRM Tab ──────────────────────────────────────────────── */}
+                <TabsContent value="crm" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+                  <div className="col-span-2">
+                    <F label={t("form.assignedTo")}>
+                      <Controller
+                        control={control}
+                        name="assigneeValue"
+                        render={({ field }) => <AssigneeSelect value={field.value ?? null} onChange={field.onChange} />}
+                      />
+                    </F>
+                  </div>
+                  <F label={t("form.source")} error={e.source?.message}>
+                    <Controller
+                      control={control}
+                      name="source"
+                      render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value ?? ""}>
+                          <SelectTrigger>
+                            <SelectValue placeholder={t("form.selectSource")} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {sourceOptions.map((o) => (
+                              <SelectItem key={o.value} value={o.value}>
+                                {o.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </F>
+                  <F label={t("form.leadScore")} error={e.leadScore?.message}>
+                    <Input {...register("leadScore")} type="number" min={0} max={100} placeholder="0" />
+                  </F>
+                  <div className="col-span-2">
+                    <F label={t("form.tags")} error={e.tags?.message}>
+                      <Input {...register("tags")} placeholder="tech, enterprise, key-account" />
+                    </F>
+                  </div>
+                </TabsContent>
+
+                {/* ── Address Tab ──────────────────────────────────────────── */}
+                <TabsContent value="address" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+                  <GeoAddressFields
                     control={control}
-                    name="source"
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value ?? ""}>
-                        <SelectTrigger>
-                          <SelectValue placeholder={t("form.selectSource")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {sourceOptions.map((o) => (
-                            <SelectItem key={o.value} value={o.value}>
-                              {o.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
+                    setValue={setValue}
+                    watch={watch}
+                    errors={e}
+                    labels={{
+                      street: tc("street"),
+                      city: tc("city"),
+                      state: tc("state"),
+                      zipCode: tc("zipCode"),
+                      country: tc("country"),
+                    }}
                   />
-                </F>
-                <F label={t("form.leadScore")} error={e.leadScore?.message}>
-                  <Input {...register("leadScore")} type="number" min={0} max={100} placeholder="0" />
-                </F>
-                <div className="col-span-2">
-                  <F label={t("form.tags")} error={e.tags?.message}>
-                    <Input {...register("tags")} placeholder="tech, enterprise, key-account" />
+                </TabsContent>
+
+                {/* ── Billing Tab ──────────────────────────────────────────── */}
+                <TabsContent value="billing" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+                  <F label={t("form.vatNumber")} error={e.vatNumber?.message}>
+                    <Input {...register("vatNumber")} placeholder="IT01234567890" />
                   </F>
-                </div>
-              </TabsContent>
-
-              {/* ── Address Tab ──────────────────────────────────────────── */}
-              <TabsContent value="address" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
-                <div className="col-span-2">
-                  <F label={tc("street")} error={e.street?.message}>
-                    <Input {...register("street")} placeholder="Via Roma 1" />
+                  <F label={t("form.sdiCode")} error={e.sdiCode?.message}>
+                    <Input {...register("sdiCode")} placeholder="XXXXXXX" />
                   </F>
-                </div>
-                <F label={tc("city")} error={e.city?.message}>
-                  <Input {...register("city")} placeholder="Milan" />
-                </F>
-                <F label={tc("state")} error={e.state?.message}>
-                  <Input {...register("state")} placeholder="MI" />
-                </F>
-                <F label={tc("zipCode")} error={e.zipCode?.message}>
-                  <Input {...register("zipCode")} placeholder="20100" />
-                </F>
-                <F label={tc("country")} error={e.country?.message}>
-                  <Input {...register("country")} placeholder="Italy" />
-                </F>
-              </TabsContent>
-
-              {/* ── Billing Tab ──────────────────────────────────────────── */}
-              <TabsContent value="billing" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
-                <F label={t("form.vatNumber")} error={e.vatNumber?.message}>
-                  <Input {...register("vatNumber")} placeholder="IT01234567890" />
-                </F>
-                <F label={t("form.sdiCode")} error={e.sdiCode?.message}>
-                  <Input {...register("sdiCode")} placeholder="XXXXXXX" />
-                </F>
-                <div className="col-span-2 rounded-md border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
-                  <p className="font-medium text-foreground mb-1">Italian e-invoicing</p>
-                  <p>
-                    The <strong>SDI Code</strong> (Codice Destinatario) is the 7-character code used for electronic
-                    invoice routing via the Sistema di Interscambio.
-                  </p>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-
-          {duplicates.length > 0 && pendingPayload && (
-            <div className="px-6 py-4 border-t bg-amber-50 dark:bg-amber-950/30">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
-                Similar companies already exist:
-              </p>
-              <ul className="mb-3 space-y-1.5">
-                {duplicates.map((d) => (
-                  <li key={d.id} className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
-                    <Link
-                      href={`/dashboard/companies/${d.id}`}
-                      className="underline underline-offset-2 hover:text-amber-900"
-                      target="_blank"
-                    >
-                      {d.name}
-                    </Link>
-                    {d.mainEmail && <span className="text-xs opacity-70">{d.mainEmail}</span>}
-                    {d.website && <span className="text-xs opacity-70">{d.website}</span>}
-                    {isEditing && company && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="h-6 px-2 text-xs ml-auto border-amber-400 text-amber-700 hover:bg-amber-100"
-                        onClick={() => setMergeTargetId(d.id)}
-                      >
-                        <GitMerge className="h-3 w-3 mr-1" />
-                        Merge
-                      </Button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setDuplicates([]);
-                    setPendingPayload(null);
-                  }}
-                >
-                  Go back
-                </Button>
-                <Button type="button" size="sm" onClick={() => saveCompany(pendingPayload)}>
-                  Save anyway
-                </Button>
-              </div>
+                  <div className="col-span-2 rounded-md border bg-muted/30 px-4 py-3 text-xs text-muted-foreground">
+                    <p className="font-medium text-foreground mb-1">Italian e-invoicing</p>
+                    <p>
+                      The <strong>SDI Code</strong> (Codice Destinatario) is the 7-character code used for electronic
+                      invoice routing via the Sistema di Interscambio.
+                    </p>
+                  </div>
+                </TabsContent>
+              </Tabs>
             </div>
-          )}
 
-          <DialogFooter className="px-6 py-4 border-t bg-muted/30">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              {tc("cancel")}
-            </Button>
-            <Button type="submit" disabled={isSubmitting} className="min-w-[100px]">
-              {isSubmitting && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? t("form.saveChanges") : t("form.createCompany")}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+            {duplicates.length > 0 && pendingPayload && (
+              <div className="px-6 py-4 border-t bg-amber-50 dark:bg-amber-950/30">
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
+                  Similar companies already exist:
+                </p>
+                <ul className="mb-3 space-y-1.5">
+                  {duplicates.map((d) => (
+                    <li key={d.id} className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+                      <Link
+                        href={`/dashboard/companies/${d.id}`}
+                        className="underline underline-offset-2 hover:text-amber-900"
+                        target="_blank"
+                      >
+                        {d.name}
+                      </Link>
+                      {d.mainEmail && <span className="text-xs opacity-70">{d.mainEmail}</span>}
+                      {d.website && <span className="text-xs opacity-70">{d.website}</span>}
+                      {isEditing && company && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-6 px-2 text-xs ml-auto border-amber-400 text-amber-700 hover:bg-amber-100"
+                          onClick={() => setMergeTargetId(d.id)}
+                        >
+                          <GitMerge className="h-3 w-3 mr-1" />
+                          Merge
+                        </Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setDuplicates([]);
+                      setPendingPayload(null);
+                    }}
+                  >
+                    Go back
+                  </Button>
+                  <Button type="button" size="sm" onClick={() => saveCompany(pendingPayload)}>
+                    Save anyway
+                  </Button>
+                </div>
+              </div>
+            )}
 
-    {isEditing && company && mergeTargetId && (
-      <MergeCompaniesModal
-        keepId={company.id}
-        mergeId={mergeTargetId}
-        open={true}
-        onOpenChange={(v) => { if (!v) setMergeTargetId(null); }}
-      />
-    )}
+            <DialogFooter className="px-6 py-4 border-t bg-muted/30">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                {tc("cancel")}
+              </Button>
+              <Button type="submit" disabled={isSubmitting} className="min-w-[100px]">
+                {isSubmitting && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
+                {isEditing ? t("form.saveChanges") : t("form.createCompany")}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {isEditing && company && mergeTargetId && (
+        <MergeCompaniesModal
+          keepId={company.id}
+          mergeId={mergeTargetId}
+          open={true}
+          onOpenChange={(v) => {
+            if (!v) setMergeTargetId(null);
+          }}
+        />
+      )}
     </>
   );
 }

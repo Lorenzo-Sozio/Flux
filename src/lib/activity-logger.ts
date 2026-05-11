@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { userActivityLogs } from "@/db/schema";
 import { auth } from "@/auth";
 import { headers } from "next/headers";
@@ -45,6 +45,7 @@ export async function logActivity(
       hdrs?.get("x-real-ip") ??
       null;
 
+    const db = await getDb();
     await db.insert(userActivityLogs).values({
       userId,
       action,

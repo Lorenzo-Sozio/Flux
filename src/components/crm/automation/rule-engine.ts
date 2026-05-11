@@ -1,4 +1,4 @@
-import { db } from "@/db"
+import { getDb } from "@/lib/tenant-context";
 import { automationRules, automationLogs } from "@/db/schema"
 import { and, eq } from "drizzle-orm"
 import { z } from "zod"
@@ -157,6 +157,7 @@ function getNestedFieldValue(data: Record<string, unknown>, fieldPath: string): 
  * Designed to run inside `after()` so it never delays the HTTP response.
  */
 export async function runAutomations(context: RuleContext, executionCtx?: ExecutionContext): Promise<void> {
+  const db = await getDb();
   // Se non c'è un execution context, ne creiamo uno nuovo
   const execCtx = executionCtx || createExecutionContext(context.currentUserId)
 
@@ -195,6 +196,7 @@ async function executeRule(
   let actionsExecuted = 0
   let totalRetries    = 0
   let errorMessage: string | undefined
+  const db = await getDb();
 
   try {
     // 1. Loop detection - Check se è sicuro eseguire questa rule

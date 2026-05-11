@@ -11,8 +11,8 @@
  * The scheduler should pass the header: Authorization: Bearer <CRON_SECRET>
  */
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
+import { verifyCronRequest } from "@/lib/cron-auth";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getTasksDueToday } from "@/actions/tasks";
@@ -21,21 +21,10 @@ import { createNotificationAction } from "@/actions/auth";
 import { sendTaskDueEmail, sendActivityReminderEmail } from "@/lib/email";
 
 export async function GET(req: NextRequest) {
-  // Protect with secret so only the scheduler can trigger this (timing-safe)
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const authHeader = req.headers.get("authorization") ?? "";
-    const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-    let authorized = false;
-    try {
-      const a = Buffer.from(provided);
-      const b = Buffer.from(secret);
-      authorized = a.length === b.length && timingSafeEqual(a, b);
-    } catch {}
-    if (!authorized) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const authError = verifyCronRequest(req);
+  if (authError) return authError;
+
+  const db = await getDb();
 
   const dueTasks = await getTasksDueToday();
   let notified = 0;

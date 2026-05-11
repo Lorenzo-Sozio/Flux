@@ -1,6 +1,6 @@
 "use server"
 
-import { db } from "@/db"
+import { getDb } from "@/lib/tenant-context";
 import { userGroups, userGroupMembers, users } from "@/db/schema"
 import { eq, desc, sql } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
@@ -25,6 +25,7 @@ export type UserGroupFormData = z.infer<typeof UserGroupFormSchema>
  */
 export async function getUserGroups() {
   await requireWriteAccess()
+  const db = await getDb();
 
   const groups = await db.select().from(userGroups).orderBy(desc(userGroups.createdAt))
 
@@ -56,6 +57,7 @@ export async function getUserGroups() {
  */
 export async function getGroupsForSelect() {
   await requireWriteAccess()
+  const db = await getDb();
 
   const rows = await db
     .select({
@@ -77,6 +79,7 @@ export async function getGroupsForSelect() {
 
 export async function createUserGroup(data: UserGroupFormData) {
   await requireAdminAccess()
+  const db = await getDb();
 
   const parsed = UserGroupFormSchema.safeParse(data)
   if (!parsed.success) {
@@ -104,6 +107,7 @@ export async function createUserGroup(data: UserGroupFormData) {
 
 export async function updateUserGroup(id: string, data: UserGroupFormData) {
   await requireAdminAccess()
+  const db = await getDb();
 
   const parsed = UserGroupFormSchema.safeParse(data)
   if (!parsed.success) {
@@ -134,6 +138,7 @@ export async function updateUserGroup(id: string, data: UserGroupFormData) {
 
 export async function deleteUserGroup(id: string) {
   await requireAdminAccess()
+  const db = await getDb();
   await db.delete(userGroups).where(eq(userGroups.id, id))
   revalidatePath("/dashboard/users")
   return { success: true }

@@ -1,14 +1,18 @@
-import { auth } from "@/auth";
-import { db } from "@/db";
-import { contacts, companies } from "@/db/schema";
+import { type NextRequest, NextResponse } from "next/server";
+
 import { eq } from "drizzle-orm";
 import Papa from "papaparse";
-import { NextRequest, NextResponse } from "next/server";
+
+import { resolveGeoFromText } from "@/actions/geo";
+import { auth } from "@/auth";
+import { getDb } from "@/lib/tenant-context";
+import { companies, contacts } from "@/db/schema";
 
 // Rate limit: max 3 imports per 10 minutes per user
 const importLimits = new Map<string, { count: number; resetAt: number }>();
 
 export async function POST(req: NextRequest) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -61,10 +65,7 @@ export async function POST(req: NextRequest) {
 
     // Deduplication: check email + phone
     if (email) {
-      const [existing] = await db
-        .select({ id: contacts.id })
-        .from(contacts)
-        .where(eq(contacts.email, email));
+      const [existing] = await db.select({ id: contacts.id }).from(contacts).where(eq(contacts.email, email));
       if (existing) {
         duplicates.push(email);
         skipped++;
@@ -75,10 +76,7 @@ export async function POST(req: NextRequest) {
     // Resolve company
     let companyId: string | undefined;
     if (row.company?.trim()) {
-      const [co] = await db
-        .select({ id: companies.id })
-        .from(companies)
-        .where(eq(companies.name, row.company.trim()));
+      const [co] = await db.select({ id: companies.id }).from(companies).where(eq(companies.name, row.company.trim()));
       if (co) {
         companyId = co.id;
       } else {
@@ -91,6 +89,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const countryText = row.country?.trim() || null;
+    const cityText = row.city?.trim() || null;
+    const { countryId: resolvedCountryId, cityId: resolvedCityId } = await resolveGeoFromText(countryText, cityText);
+
     await db.insert(contacts).values({
       firstName,
       lastName,
@@ -101,16 +103,23 @@ export async function POST(req: NextRequest) {
       department: row.department?.trim() || null,
       linkedinUrl: row.linkedinUrl?.trim() || row.linkedin_url?.trim() || null,
       street: row.street?.trim() || null,
-      city: row.city?.trim() || null,
+      city: cityText,
       state: row.state?.trim() || null,
       zipCode: row.zipCode?.trim() || row.zip_code?.trim() || null,
-      country: row.country?.trim() || null,
+      country: countryText,
+      countryId: resolvedCountryId,
+      cityId: resolvedCityId,
       source: row.source?.trim() || "import",
       notes: row.notes?.trim() || null,
       companyId: companyId ?? null,
       ownerId: session.user!.id,
       marketingConsent: row.marketingConsent === "yes" || row.marketing_consent === "yes",
-      tags: row.tags ? row.tags.split(";").map((t) => t.trim()).filter(Boolean) : [],
+      tags: row.tags
+        ? row.tags
+            .split(";")
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [],
     });
 
     created++;

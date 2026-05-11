@@ -3,7 +3,7 @@
 import { and, asc, avg, count, desc, eq, gt, gte, ilike, isNotNull, isNull, lt, lte, max, min, ne, sql, sum } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { activities, companies, contacts, deals, leads, quotes, savedReports, tasks } from "@/db/schema";
 import { requireAdminAccess } from "@/lib/auth-guard";
 import {
@@ -106,6 +106,7 @@ function buildFilterConditions(colMap: ColMap, fieldDefs: FieldDef[], filters: F
 
 export async function runReport(config: ReportConfig): Promise<ReportResult> {
   await requireAdminAccess();
+  const db = await getDb();
 
   const entityConfig = ENTITY_CONFIGS[config.entity];
   if (!entityConfig) throw new Error("Invalid entity");
@@ -193,12 +194,14 @@ export async function runReport(config: ReportConfig): Promise<ReportResult> {
 
 export async function listSavedReports(): Promise<SavedReport[]> {
   await requireAdminAccess();
+  const db = await getDb();
   const rows = await db.select().from(savedReports).orderBy(desc(savedReports.updatedAt));
   return rows.map((r) => ({ ...r, config: JSON.parse(r.config) as ReportConfig }));
 }
 
 export async function saveReport(name: string, config: ReportConfig): Promise<SavedReport> {
   const session = await requireAdminAccess();
+ const db = await getDb();
   const [row] = await db
     .insert(savedReports)
     .values({ name, config: JSON.stringify(config), ownerId: session.user.id })
@@ -209,6 +212,7 @@ export async function saveReport(name: string, config: ReportConfig): Promise<Sa
 
 export async function updateSavedReport(id: string, name: string, config: ReportConfig): Promise<void> {
   await requireAdminAccess();
+  const db = await getDb();
   await db
     .update(savedReports)
     .set({ name, config: JSON.stringify(config), updatedAt: new Date() })
@@ -218,6 +222,7 @@ export async function updateSavedReport(id: string, name: string, config: Report
 
 export async function deleteSavedReport(id: string): Promise<void> {
   await requireAdminAccess();
+  const db = await getDb();
   await db.delete(savedReports).where(eq(savedReports.id, id));
   revalidatePath("/dashboard/reports/builder");
 }

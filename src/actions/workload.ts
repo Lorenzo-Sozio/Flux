@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { and, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { taskAssignees, taskDependencies, tasks, users } from "@/db/schema";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,6 +53,7 @@ function toDateStr(d: Date) {
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
 export async function getWorkloadMatrix(startDate: Date, endDate: Date): Promise<WorkloadRow[]> {
+  const db = await getDb();
   const taskList = await db
     .select({
       id: tasks.id,
@@ -186,6 +187,7 @@ export async function rescheduleTaskDueDate(
   try {
     const { requireWriteAccess } = await import("@/lib/auth-guard");
     await requireWriteAccess();
+  const db = await getDb();
     await db.update(tasks).set({ dueDate: newDueDate }).where(eq(tasks.id, taskId));
     revalidatePath("/dashboard/tasks/workload");
     revalidatePath("/dashboard/tasks");
@@ -198,6 +200,7 @@ export async function rescheduleTaskDueDate(
 export async function autoScheduleChain(rootTaskId: string): Promise<{ rescheduled: string[]; conflicts: string[] }> {
   const { requireWriteAccess } = await import("@/lib/auth-guard");
   await requireWriteAccess();
+  const db = await getDb();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);

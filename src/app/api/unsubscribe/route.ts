@@ -8,11 +8,12 @@
 
 import { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { campaignLogs, contacts, emailSuppressions, leads } from "@/db/schema";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe-token";
 
 export async function GET(req: NextRequest) {
+  const db = await getDb();
   const token = req.nextUrl.searchParams.get("token");
 
   if (!token) {

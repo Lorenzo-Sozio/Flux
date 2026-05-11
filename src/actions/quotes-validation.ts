@@ -14,6 +14,7 @@ export const CreateQuoteSchema = z.object({
   companyId: z.string().min(1, "Company is required"),
   contactId: z.string().optional(),
   expiresAt: z.string().optional(),
+  currency: z.string().default("EUR"),
   items: z.array(QuoteItemSchema).min(1, "At least one item is required"),
   notes: z.string().optional(),
   discountPercent: z.coerce.number().min(0).max(100).default(0),

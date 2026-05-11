@@ -1,8 +1,10 @@
+"use client";
+
 import Link from "next/link";
 
 import { TrendingUp } from "lucide-react";
 
-import { formatCurrency } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 import { Card, CardContent } from "@/components/ui/card";
 
 type TargetRow = { targetAmount: string; currency: string } | null;
@@ -20,10 +22,9 @@ interface Props {
 }
 
 export function MonthTargetCard({ myTarget, wonThisMonth, monthLabel }: Props) {
+  const { formatAmount } = useCurrency();
   const target = parseFloat(myTarget?.targetAmount ?? "0");
-  const currency = myTarget?.currency ?? "EUR";
   const pct = target > 0 ? Math.min(100, Math.round((wonThisMonth / target) * 100)) : null;
-  const fmt = (n: number) => formatCurrency(n, { currency, maximumFractionDigits: 0 });
   const colors = pct != null ? pctColor(pct) : null;
 
   return (
@@ -42,9 +43,9 @@ export function MonthTargetCard({ myTarget, wonThisMonth, monthLabel }: Props) {
 
           <div className="flex flex-1 flex-col gap-1.5">
             <div className="flex items-center justify-between text-sm">
-              <span className="font-semibold">{fmt(wonThisMonth)}</span>
+              <span className="font-semibold">{formatAmount(wonThisMonth, { noDecimals: true })}</span>
               <span className="text-muted-foreground">
-                {target > 0 ? `su ${fmt(target)}` : "Nessun target impostato"}
+                {target > 0 ? `su ${formatAmount(target, { noDecimals: true })}` : "Nessun target impostato"}
               </span>
             </div>
             {target > 0 && colors && (

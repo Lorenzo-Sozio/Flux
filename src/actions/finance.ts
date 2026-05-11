@@ -2,7 +2,7 @@
 
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { deals, orders, pipelineStages, quotes } from "@/db/schema";
 import { requireAdminAccess } from "@/lib/auth-guard";
 
@@ -57,6 +57,7 @@ function monthEnd(offset = 0): Date {
 
 export async function getFinanceDashboard(): Promise<FinanceDashboardData> {
   await requireAdminAccess();
+  const db = await getDb();
 
   const thisMonthStart = monthStart(0);
   const thisMonthEnd = monthEnd(0);

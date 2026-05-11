@@ -2,7 +2,7 @@
 
 import { and, desc, eq, gte, isNotNull, lt, sql } from "drizzle-orm";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import {
   activities,
   companies,
@@ -17,6 +17,7 @@ import {
 } from "@/db/schema";
 
 export async function getDashboardStats() {
+  const db = await getDb();
   // 1. Total Deal Value
   const dealValueResult = await db
     .select({ total: sql<number>`sum(CAST(${deals.amount} AS NUMERIC))` })
@@ -133,6 +134,7 @@ export async function getDashboardStats() {
 }
 
 export async function getTopDeals(limit = 5) {
+  const db = await getDb();
   const rows = await db
     .select({
       id: deals.id,
@@ -160,6 +162,7 @@ export async function getTopDeals(limit = 5) {
 }
 
 export async function getRecentActivities(limit = 10) {
+  const db = await getDb();
   const rows = await db
     .select({
       id: activities.id,

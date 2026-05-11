@@ -46,7 +46,10 @@ export function LoginForm() {
         return;
       }
 
-      router.push("/dashboard/crm");
+      // On a tenant subdomain → CRM dashboard. On main domain → admin panel.
+      const rootHost = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.split(":")[0] ?? "localhost";
+      const isSubdomain = window.location.hostname !== rootHost && window.location.hostname !== "localhost";
+      router.push(isSubdomain ? "/dashboard/crm" : "/admin/tenants");
       router.refresh();
     } catch {
       toast.error(t("error"));

@@ -1,6 +1,6 @@
 "use server"
 
-import { db } from "@/db"
+import { getDb } from "@/lib/tenant-context";
 import { automationRules, automationLogs, campaignLogs, contacts, leads } from "@/db/schema"
 import { eq, desc, isNull } from "drizzle-orm"
 import { revalidatePath } from "next/cache"
@@ -11,17 +11,20 @@ import { AutomationRuleFormSchema, type AutomationRuleFormData } from "@/compone
 
 export async function getAutomationRules() {
   await requireWriteAccess()
+  const db = await getDb();
   return db.select().from(automationRules).orderBy(desc(automationRules.createdAt))
 }
 
 export async function getAutomationRuleById(id: string) {
   await requireWriteAccess()
+  const db = await getDb();
   const [rule] = await db.select().from(automationRules).where(eq(automationRules.id, id))
   return rule ?? null
 }
 
 export async function getAutomationLogs(ruleId: string, limit = 50) {
   await requireWriteAccess()
+  const db = await getDb();
   return db
     .select()
     .from(automationLogs)
@@ -35,6 +38,7 @@ export async function getAutomationLogs(ruleId: string, limit = 50) {
  */
 export async function getRecentAutomationLogs(limit = 50) {
   await requireWriteAccess()
+  const db = await getDb();
   return db
     .select()
     .from(automationLogs)
@@ -47,6 +51,7 @@ export async function getRecentAutomationLogs(limit = 50) {
  */
 export async function getAutomationEmailLogs(limit = 100) {
   await requireWriteAccess()
+  const db = await getDb();
   const rows = await db
     .select({
       id:         campaignLogs.id,
@@ -81,6 +86,7 @@ export async function getAutomationEmailLogs(limit = 100) {
 
 export async function createAutomationRule(data: AutomationRuleFormData) {
   const session = await requireWriteAccess()
+ const db = await getDb();
 
   // Server-side Zod validation (also validates nested JSON structures)
   const parsed = AutomationRuleFormSchema.safeParse(data)
@@ -110,6 +116,7 @@ export async function createAutomationRule(data: AutomationRuleFormData) {
 
 export async function updateAutomationRule(id: string, data: AutomationRuleFormData) {
   await requireWriteAccess()
+  const db = await getDb();
 
   const parsed = AutomationRuleFormSchema.safeParse(data)
   if (!parsed.success) {
@@ -141,6 +148,7 @@ export async function updateAutomationRule(id: string, data: AutomationRuleFormD
 
 export async function toggleAutomationRuleActive(id: string, isActive: boolean) {
   await requireWriteAccess()
+  const db = await getDb();
   await db
     .update(automationRules)
     .set({ isActive, updatedAt: new Date() })
@@ -153,6 +161,7 @@ export async function toggleAutomationRuleActive(id: string, isActive: boolean) 
 
 export async function deleteAutomationRule(id: string) {
   await requireAdminAccess()
+  const db = await getDb();
   await db.delete(automationRules).where(eq(automationRules.id, id))
   revalidatePath("/dashboard/automation")
   return { success: true }

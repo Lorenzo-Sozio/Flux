@@ -17,7 +17,7 @@ import {
 } from "@/actions/support-validation";
 import { auth } from "@/auth";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import {
   chatChannels,
   chatSessions,
@@ -46,6 +46,7 @@ function generateTicketNumber(): string {
 }
 
 async function calculateSLADeadline(slaId: string | null | undefined): Promise<Date | null> {
+  const db = await getDb();
   if (!slaId) return null;
 
   const sla = await db.query.slas.findFirst({
@@ -60,6 +61,7 @@ async function calculateSLADeadline(slaId: string | null | undefined): Promise<D
 // --- MAIN ACTIONS ---
 
 export async function createTicketAction(data: z.infer<typeof CreateTicketSchema>) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -116,6 +118,7 @@ export async function createTicketAction(data: z.infer<typeof CreateTicketSchema
 }
 
 export async function getTicketById(ticketId: string) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -149,6 +152,7 @@ export async function getTicketById(ticketId: string) {
 }
 
 export async function getTickets(options?: { limit?: number; status?: string }) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -170,6 +174,7 @@ export async function getTickets(options?: { limit?: number; status?: string }) 
 }
 
 export async function getTicketsByStatus(status: string) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -191,6 +196,7 @@ export async function getTicketsByStatus(status: string) {
 }
 
 export async function updateTicketAction(ticketId: string, data: z.infer<typeof UpdateTicketSchema>) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -306,6 +312,7 @@ export async function updateTicketAction(ticketId: string, data: z.infer<typeof 
 }
 
 export async function addTicketMessageAction(ticketId: string, data: z.infer<typeof AddMessageSchema>) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -448,6 +455,7 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
 }
 
 export async function getTicketAuditLog(ticketId: string) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -461,6 +469,7 @@ export async function getTicketAuditLog(ticketId: string) {
 // --- SLA MANAGEMENT ---
 
 export async function getSLAs() {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -471,6 +480,7 @@ export async function getSLAs() {
 }
 
 export async function createSLAAction(data: z.infer<typeof CreateSLASchema>) {
+  const db = await getDb();
   const session = await auth();
   if (session?.user?.role !== "admin") throw new Error("Only admins can create SLAs");
 
@@ -481,6 +491,7 @@ export async function createSLAAction(data: z.infer<typeof CreateSLASchema>) {
 }
 
 export async function updateSLAAction(slaId: string, data: z.infer<typeof UpdateSLASchema>) {
+  const db = await getDb();
   const session = await auth();
   if (session?.user?.role !== "admin") throw new Error("Only admins can update SLAs");
 
@@ -491,6 +502,7 @@ export async function updateSLAAction(slaId: string, data: z.infer<typeof Update
 }
 
 export async function deleteSLAAction(slaId: string) {
+  const db = await getDb();
   const session = await auth();
   if (session?.user?.role !== "admin") throw new Error("Only admins can delete SLAs");
 
@@ -502,12 +514,14 @@ export async function deleteSLAAction(slaId: string) {
 // --- CHAT CHANNELS ---
 
 export async function getChatChannels() {
+  const db = await getDb();
   return db.query.chatChannels.findMany({
     where: eq(chatChannels.isActive, true),
   });
 }
 
 export async function createChatChannelAction(name: string, type: string, config?: Record<string, unknown>) {
+  const db = await getDb();
   const session = await auth();
   if (session?.user?.role !== "admin") throw new Error("Only admins can create chat channels");
 
@@ -522,6 +536,7 @@ export async function createChatChannelAction(name: string, type: string, config
 // --- CHAT SESSIONS ---
 
 export async function startChatSessionAction(channelId: string, visitorEmail?: string, visitorName?: string) {
+  const db = await getDb();
   const [chatSession] = await db
     .insert(chatSessions)
     .values({ channelId, visitorEmail, visitorName, status: "active" })
@@ -531,6 +546,7 @@ export async function startChatSessionAction(channelId: string, visitorEmail?: s
 }
 
 export async function assignChatSessionAction(sessionId: string, agentId: string, ticketId?: string) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -544,6 +560,7 @@ export async function assignChatSessionAction(sessionId: string, agentId: string
 }
 
 export async function endChatSessionAction(sessionId: string) {
+  const db = await getDb();
   const [updated] = await db
     .update(chatSessions)
     .set({ status: "closed", endedAt: new Date() })
@@ -556,6 +573,7 @@ export async function endChatSessionAction(sessionId: string) {
 // --- AGENTS ---
 
 export async function getAgents() {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -565,6 +583,7 @@ export async function getAgents() {
 // --- TICKET MUTATIONS ---
 
 export async function deleteTicketAction(ticketId: string) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -581,6 +600,7 @@ export async function deleteTicketAction(ticketId: string) {
 }
 
 export async function reassignTicketAction(ticketId: string, assigneeId: string | null) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -619,6 +639,7 @@ const PRIORITY_ESCALATION: Record<string, string> = {
 };
 
 export async function escalateTicketAction(ticketId: string) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -657,6 +678,7 @@ export async function escalateTicketAction(ticketId: string) {
 }
 
 export async function updateTicketStatusAction(ticketId: string, status: string) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -702,6 +724,7 @@ export async function updateTicketStatusAction(ticketId: string, status: string)
 // --- MACROS ---
 
 export async function getMacros() {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -712,6 +735,7 @@ export async function getMacros() {
 }
 
 export async function createMacroAction(data: z.infer<typeof CreateMacroSchema>) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -726,6 +750,7 @@ export async function createMacroAction(data: z.infer<typeof CreateMacroSchema>)
 }
 
 export async function updateMacroAction(macroId: string, data: z.infer<typeof UpdateMacroSchema>) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -741,6 +766,7 @@ export async function updateMacroAction(macroId: string, data: z.infer<typeof Up
 }
 
 export async function deleteMacroAction(macroId: string) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
@@ -753,6 +779,7 @@ export async function deleteMacroAction(macroId: string) {
 // --- SELECT HELPERS ---
 
 export async function getTicketsForSelect() {
+  const db = await getDb();
   return db
     .select({ id: tickets.id, ticketNumber: tickets.ticketNumber, subject: tickets.subject })
     .from(tickets)
@@ -763,6 +790,7 @@ export async function getTicketsForSelect() {
 // --- CRON HELPERS ---
 
 export async function autoCloseResolvedTickets() {
+  const db = await getDb();
   const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const now = new Date();
 

@@ -1,6 +1,8 @@
-import { getTranslations } from "next-intl/server";
+"use client";
+
+import { useTranslations } from "next-intl";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 
 interface Props {
   revenueBreakdown: {
@@ -10,8 +12,9 @@ interface Props {
   };
 }
 
-export async function SpendingBreakdown({ revenueBreakdown }: Props) {
-  const t = await getTranslations("finance");
+export function SpendingBreakdown({ revenueBreakdown }: Props) {
+  const t = useTranslations("finance");
+  const { formatAmount } = useCurrency();
   const { dealsRevenue, quotesRevenue, ordersRevenue } = revenueBreakdown;
 
   const sources = [
@@ -44,7 +47,7 @@ export async function SpendingBreakdown({ revenueBreakdown }: Props) {
                       width: `${width}%`,
                       background: `color-mix(in oklch, var(--primary) ${alpha * 100}%, transparent)`,
                     }}
-                    title={`${item.label}: ${formatCurrency(item.amount)}`}
+                    title={`${item.label}: ${formatAmount(item.amount)}`}
                   />
                 );
               })}
@@ -68,7 +71,7 @@ export async function SpendingBreakdown({ revenueBreakdown }: Props) {
                 </div>
                 <div className="flex items-center gap-2 text-sm tabular-nums">
                   <span className="text-muted-foreground">{pct}%</span>
-                  <span className="font-medium">{formatCurrency(item.amount, { noDecimals: true })}</span>
+                  <span className="font-medium">{formatAmount(item.amount, { noDecimals: true })}</span>
                 </div>
               </div>
             );
@@ -78,7 +81,7 @@ export async function SpendingBreakdown({ revenueBreakdown }: Props) {
         {total > 0 && (
           <div className="border-t pt-3 flex justify-between text-sm">
             <span className="text-muted-foreground">{t("total")}</span>
-            <span className="font-semibold">{formatCurrency(total, { noDecimals: true })}</span>
+            <span className="font-semibold">{formatAmount(total, { noDecimals: true })}</span>
           </div>
         )}
       </CardContent>

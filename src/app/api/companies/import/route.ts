@@ -1,13 +1,17 @@
-import { auth } from "@/auth";
-import { db } from "@/db";
-import { companies } from "@/db/schema";
+import { type NextRequest, NextResponse } from "next/server";
+
 import { eq } from "drizzle-orm";
 import Papa from "papaparse";
-import { NextRequest, NextResponse } from "next/server";
+
+import { resolveGeoFromText } from "@/actions/geo";
+import { auth } from "@/auth";
+import { getDb } from "@/lib/tenant-context";
+import { companies } from "@/db/schema";
 
 const importLimits = new Map<string, { count: number; resetAt: number }>();
 
 export async function POST(req: NextRequest) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -46,13 +50,13 @@ export async function POST(req: NextRequest) {
 
   for (const row of data) {
     const name = row.name?.trim();
-    if (!name) { skipped++; continue; }
+    if (!name) {
+      skipped++;
+      continue;
+    }
 
     // Deduplication by exact name
-    const [existing] = await db
-      .select({ id: companies.id })
-      .from(companies)
-      .where(eq(companies.name, name));
+    const [existing] = await db.select({ id: companies.id }).from(companies).where(eq(companies.name, name));
 
     if (existing) {
       duplicates.push(name);
@@ -60,28 +64,39 @@ export async function POST(req: NextRequest) {
       continue;
     }
 
+    const countryText = row.country?.trim() || null;
+    const cityText = row.city?.trim() || null;
+    const { countryId: resolvedCountryId, cityId: resolvedCityId } = await resolveGeoFromText(countryText, cityText);
+
     await db.insert(companies).values({
       name,
-      industry:      row.industry?.trim() || null,
-      website:       row.website?.trim() || null,
-      description:   row.description?.trim() || null,
-      type:          row.type?.trim() || "prospect",
+      industry: row.industry?.trim() || null,
+      website: row.website?.trim() || null,
+      description: row.description?.trim() || null,
+      type: row.type?.trim() || "prospect",
       employeeCount: row.employeeCount ? Number(row.employeeCount) : null,
       annualRevenue: row.annualRevenue?.trim() || null,
-      street:        row.street?.trim() || null,
-      city:          row.city?.trim() || null,
-      state:         row.state?.trim() || null,
-      zipCode:       row.zipCode?.trim() || row.zip_code?.trim() || null,
-      country:       row.country?.trim() || null,
-      mainPhone:     row.mainPhone?.trim() || row.main_phone?.trim() || null,
-      mainEmail:     row.mainEmail?.trim() || row.main_email?.trim() || null,
-      linkedinUrl:   row.linkedinUrl?.trim() || row.linkedin_url?.trim() || null,
-      status:        row.status?.trim() || "active",
-      source:        row.source?.trim() || "import",
-      vatNumber:     row.vatNumber?.trim() || row.vat_number?.trim() || null,
-      sdiCode:       row.sdiCode?.trim() || row.sdi_code?.trim() || null,
-      tags:          row.tags ? row.tags.split(";").map((t) => t.trim()).filter(Boolean) : [],
-      ownerId:       session.user!.id,
+      street: row.street?.trim() || null,
+      city: cityText,
+      state: row.state?.trim() || null,
+      zipCode: row.zipCode?.trim() || row.zip_code?.trim() || null,
+      country: countryText,
+      countryId: resolvedCountryId,
+      cityId: resolvedCityId,
+      mainPhone: row.mainPhone?.trim() || row.main_phone?.trim() || null,
+      mainEmail: row.mainEmail?.trim() || row.main_email?.trim() || null,
+      linkedinUrl: row.linkedinUrl?.trim() || row.linkedin_url?.trim() || null,
+      status: row.status?.trim() || "active",
+      source: row.source?.trim() || "import",
+      vatNumber: row.vatNumber?.trim() || row.vat_number?.trim() || null,
+      sdiCode: row.sdiCode?.trim() || row.sdi_code?.trim() || null,
+      tags: row.tags
+        ? row.tags
+            .split(";")
+            .map((t) => t.trim())
+            .filter(Boolean)
+        : [],
+      ownerId: session.user!.id,
     });
 
     created++;

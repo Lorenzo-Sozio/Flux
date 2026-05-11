@@ -10,27 +10,16 @@ import { type NextRequest, NextResponse } from "next/server";
 import { and, eq, isNotNull, lt } from "drizzle-orm";
 
 import { createNotificationAction } from "@/actions/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { taskDependencies, tasks } from "@/db/schema";
 
-import { timingSafeEqual } from "node:crypto";
-
-function authorized(req: NextRequest): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  const header = req.headers.get("authorization") ?? "";
-  const provided = header.startsWith("Bearer ") ? header.slice(7) : "";
-  try {
-    const a = Buffer.from(provided);
-    const b = Buffer.from(secret);
-    return a.length === b.length && timingSafeEqual(a, b);
-  } catch {
-    return false;
-  }
-}
+import { verifyCronRequest } from "@/lib/cron-auth";
 
 export async function GET(req: NextRequest) {
-  if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const authError = verifyCronRequest(req);
+  if (authError) return authError;
+
+  const db = await getDb();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);

@@ -7,11 +7,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ChartContainer } from "@/components/ui/chart";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 
 import { actionItems, regionSalesData, salesPipelineChartConfig, salesPipelineChartData } from "./crm.config";
 
 export function OperationalCards() {
+  const { formatAmount } = useCurrency();
   const totalSales = regionSalesData.reduce((sum, region) => sum + region.sales, 0);
   return (
     <div className="grid grid-cols-1 gap-4 *:data-[slot=card]:shadow-xs sm:grid-cols-2 xl:grid-cols-3">
@@ -38,7 +40,7 @@ export function OperationalCards() {
         <CardHeader>
           <CardTitle>Sales by Region</CardTitle>
           <CardDescription className="font-medium tabular-nums">
-            {formatCurrency(totalSales, { noDecimals: true })}
+            {formatAmount(totalSales, { noDecimals: true })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -49,7 +51,7 @@ export function OperationalCards() {
                   <span className="font-medium text-sm">{region.region}</span>
                   <div className="flex items-baseline gap-1">
                     <span className="font-semibold text-sm tabular-nums">
-                      {formatCurrency(region.sales, { noDecimals: true })}
+                      {formatAmount(region.sales, { noDecimals: true })}
                     </span>
                     <span
                       className={cn(

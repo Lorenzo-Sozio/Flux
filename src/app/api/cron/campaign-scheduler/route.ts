@@ -3,24 +3,12 @@
 // External: curl -H "Authorization: Bearer $CRON_SECRET" https://your-domain/api/cron/campaign-scheduler
 
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { dispatchDueCampaigns } from "@/lib/campaign-send";
+import { verifyCronRequest } from "@/lib/cron-auth";
 
 export async function GET(req: NextRequest) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const authHeader = req.headers.get("authorization") ?? "";
-    const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-    let authorized = false;
-    try {
-      const a = Buffer.from(provided);
-      const b = Buffer.from(secret);
-      authorized = a.length === b.length && timingSafeEqual(a, b);
-    } catch {}
-    if (!authorized) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const authError = verifyCronRequest(req);
+  if (authError) return authError;
 
   try {
     const results = await dispatchDueCampaigns();

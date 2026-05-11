@@ -4,12 +4,13 @@ import { and, eq, gte, inArray, isNotNull, lte, or } from "drizzle-orm";
 
 import { getAppointmentCalendarEvents } from "@/actions/appointments";
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { activities, companies, contacts, deals, leads, taskAssignees, tasks, userGroupMembers } from "@/db/schema";
 
 export type CalendarFilter = "all" | "mine" | "group";
 
 async function resolveFilterUserIds(filter: CalendarFilter): Promise<string[] | null> {
+  const db = await getDb();
   if (filter === "all") return null;
 
   const session = await auth();
@@ -36,6 +37,7 @@ async function resolveFilterUserIds(filter: CalendarFilter): Promise<string[] | 
 }
 
 export async function getCalendarEvents(filter: CalendarFilter = "all", range?: { start: Date; end: Date }) {
+  const db = await getDb();
   const filterIds = await resolveFilterUserIds(filter);
 
   // Empty set — user not found or group has no members

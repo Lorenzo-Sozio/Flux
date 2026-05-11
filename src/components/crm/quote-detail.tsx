@@ -45,6 +45,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 
 import { QUOTE_STATUS_CONFIG } from "@/lib/quote-status";
+import { useCurrency } from "@/hooks/use-currency";
 import { SendQuoteEmailDialog } from "./send-quote-email-dialog";
 
 type Quote = Awaited<ReturnType<typeof getQuoteById>>;
@@ -72,15 +73,10 @@ const ACTIVITY_LABELS: Record<string, string> = {
   rejected: "Preventivo rifiutato",
 };
 
-function fmt(amount: string | null, currency: string) {
-  return `${currency} ${parseFloat(amount ?? "0").toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
 export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userRole = "user" }: QuoteDetailProps) {
   const router = useRouter();
+  const { formatAmount } = useCurrency();
+  const fmt = (amount: string | null) => formatAmount(parseFloat(amount ?? "0"));
   const [isLoading, setIsLoading] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
@@ -229,11 +225,7 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
               <p className="text-xs text-muted-foreground mb-1">Total Amount</p>
               <p className="text-xl font-bold tabular-nums flex items-center gap-1.5">
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
-                {parseFloat(quote.totalAmount ?? "0").toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
-                <span className="text-sm font-normal text-muted-foreground">{quote.currency}</span>
+                {fmt(quote.totalAmount)}
               </p>
             </div>
           </CardContent>
@@ -459,20 +451,20 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{item.quantity}</TableCell>
                       <TableCell className="text-right text-sm tabular-nums">
-                        {fmt(item.unitPrice, quote.currency)}
+                        {fmt(item.unitPrice)}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums text-amber-600">
                         {parseFloat(item.discountPercent ?? "0") > 0
-                          ? `${item.discountPercent}% (−${fmt(item.discountAmount, quote.currency)})`
+                          ? `${item.discountPercent}% (−${fmt(item.discountAmount)})`
                           : "—"}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums text-slate-600">
                         {parseFloat(item.taxPercent ?? "0") > 0
-                          ? `${item.taxPercent}% (+${fmt(item.taxAmount, quote.currency)})`
+                          ? `${item.taxPercent}% (+${fmt(item.taxAmount)})`
                           : "—"}
                       </TableCell>
                       <TableCell className="text-right text-sm font-semibold tabular-nums">
-                        {fmt(item.totalPrice, quote.currency)}
+                        {fmt(item.totalPrice)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -488,24 +480,24 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
                 <div className="max-w-sm ml-auto space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
-                    <span className="font-medium tabular-nums">{fmt(quote.subtotal, quote.currency)}</span>
+                    <span className="font-medium tabular-nums">{fmt(quote.subtotal)}</span>
                   </div>
                   {parseFloat(quote.discountAmount ?? "0") > 0 && (
                     <div className="flex justify-between text-sm text-amber-600">
                       <span>Discount ({quote.discountPercent}%)</span>
-                      <span className="font-medium tabular-nums">−{fmt(quote.discountAmount, quote.currency)}</span>
+                      <span className="font-medium tabular-nums">−{fmt(quote.discountAmount)}</span>
                     </div>
                   )}
                   {parseFloat(quote.taxAmount ?? "0") > 0 && (
                     <div className="flex justify-between text-sm text-slate-600">
                       <span>Tax ({quote.taxPercent}%)</span>
-                      <span className="font-medium tabular-nums">+{fmt(quote.taxAmount, quote.currency)}</span>
+                      <span className="font-medium tabular-nums">+{fmt(quote.taxAmount)}</span>
                     </div>
                   )}
                   <Separator />
                   <div className="flex justify-between">
                     <span className="font-semibold">Total</span>
-                    <span className="text-lg font-bold tabular-nums">{fmt(quote.totalAmount, quote.currency)}</span>
+                    <span className="text-lg font-bold tabular-nums">{fmt(quote.totalAmount)}</span>
                   </div>
                 </div>
 

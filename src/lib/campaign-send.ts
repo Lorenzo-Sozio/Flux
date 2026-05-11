@@ -4,7 +4,7 @@
 import { and, eq, inArray, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import {
   campaignLogs, contacts, emailJobs, emailSuppressions,
   emailTemplates, leads, marketingCampaigns,
@@ -28,6 +28,7 @@ export async function executeCampaignSend(data: {
   recipientType: "contacts" | "leads";
   recipientIds?: string[];
 }): Promise<{ success: true; queued: number; skipped: number; total: number } | { error: string }> {
+  const db = await getDb();
   const { campaignId, recipientType, recipientIds } = data;
 
   const [campaign] = await db
@@ -120,6 +121,7 @@ export async function executeCampaignSend(data: {
 
 /** Queries due campaigns, marks them as "sending" to prevent re-dispatch, then sends each. */
 export async function dispatchDueCampaigns(): Promise<Array<{ id: string; name: string; result: unknown }>> {
+  const db = await getDb();
   const due = await db
     .select()
     .from(marketingCampaigns)

@@ -42,6 +42,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 import {
   getOrderById,
   addOrderItem,
@@ -63,10 +64,6 @@ const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
   completed:  { label: "Completed",  class: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
   cancelled:  { label: "Cancelled",  class: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
 };
-
-function formatCurrency(v: string | number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(v));
-}
 
 // ── Add item dialog ───────────────────────────────────────────────────────────
 
@@ -170,6 +167,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const { id } = React.use(params);
   const router  = useRouter();
   const [, startTransition] = useTransition();
+  const { formatAmount } = useCurrency();
 
   const [order,    setOrder]    = useState<OrderDetail>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -316,8 +314,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           )}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{item.quantity}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(item.unitPrice)}</td>
-                        <td className="px-4 py-3 text-right tabular-nums font-semibold">{formatCurrency(item.totalPrice)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{formatAmount(Number(item.unitPrice))}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-semibold">{formatAmount(Number(item.totalPrice))}</td>
                         <td className="px-4 py-3">
                           <button
                             type="button"
@@ -332,7 +330,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     <tr className="border-t bg-muted/20">
                       <td colSpan={3} className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Total</td>
                       <td className="px-4 py-3 text-right text-base font-bold tabular-nums">
-                        {formatCurrency(order.totalAmount)}
+                        {formatAmount(Number(order.totalAmount))}
                       </td>
                       <td />
                     </tr>
@@ -370,7 +368,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <DollarSign className="h-3 w-3" /> Total Amount
                 </span>
-                <span className="font-bold tabular-nums">{formatCurrency(order.totalAmount)}</span>
+                <span className="font-bold tabular-nums">{formatAmount(Number(order.totalAmount))}</span>
               </div>
 
               {/* Customer */}

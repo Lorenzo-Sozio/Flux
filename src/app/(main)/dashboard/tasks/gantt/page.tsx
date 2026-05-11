@@ -2,12 +2,13 @@ import { redirect } from "next/navigation";
 
 import { getAllTasksForGantt, getAllUsers } from "@/actions/tasks";
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { taskDependencies } from "@/db/schema";
 
 import { TaskGantt } from "./_components/task-gantt";
 
 export default async function GanttPage() {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 

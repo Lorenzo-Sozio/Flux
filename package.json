@@ -13,7 +13,9 @@
     "prepare": "husky",
     "generate:presets": "ts-node -P tsconfig.scripts.json src/scripts/generate-theme-presets.ts",
     "migrate:automation-logs": "node src/scripts/migrate-automation-logs.mjs",
-    "migrate:condition-expression": "node src/scripts/migrate-condition-expression.mjs"
+    "migrate:condition-expression": "node src/scripts/migrate-condition-expression.mjs",
+    "migrate:tenants": "npx tsx scripts/migrate-all-tenants.ts",
+    "migrate:tenants:dry": "npx tsx scripts/migrate-all-tenants.ts --dry-run"
   },
   "lint-staged": {
     "*.{js,ts,jsx,tsx}": [
@@ -50,6 +52,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "date-fns": "^3.6.0",
+    "drizzle-kit": "^0.31.9",
     "drizzle-orm": "^0.45.1",
     "embla-carousel-react": "^8.6.0",
     "geist": "^1.7.0",
@@ -90,7 +93,6 @@
     "@types/react-dom": "^19.2.3",
     "babel-plugin-react-compiler": "^1.0.0",
     "dotenv": "^17.3.1",
-    "drizzle-kit": "^0.31.9",
     "globals": "^15.15.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.5.2",

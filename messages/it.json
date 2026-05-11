@@ -39,6 +39,8 @@
       "pipelineStages": "Fasi Pipeline",
       "email": "Email",
       "webhooks": "Webhook",
+      "tenants": "Gestione Tenant",
+      "help": "Centro Assistenza",
       "macros": "Macro",
       "analytics": "Analisi",
       "salesFunnel": "Funnel Vendite",
@@ -2481,5 +2483,9 @@
       "fieldCountry": "Paese",
       "fieldNotes": "Note"
     }
+  },
+  "currency": {
+    "switchCurrency": "Cambia valuta",
+    "displayCurrency": "Valuta di visualizzazione"
   }
 }

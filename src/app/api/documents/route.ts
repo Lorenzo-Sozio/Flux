@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { documents } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { unlink } from "fs/promises";
@@ -16,6 +16,7 @@ import { join } from "path";
 const VALID_ENTITY_TYPES = new Set(["contact", "lead", "company", "deal", "ticket"]);
 
 export async function GET(req: NextRequest) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,6 +42,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

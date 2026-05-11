@@ -1,16 +1,17 @@
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { tickets } from "@/db/schema";
 import { and, eq, isNotNull, isNull, lt } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
+import { verifyCronRequest } from "@/lib/cron-auth";
 
 const OPEN_STATUSES = ["new", "open", "in_progress"];
 
 export async function GET(req: Request) {
-  const secret = req.headers.get("authorization");
-  if (secret !== `Bearer ${process.env.CRON_SECRET}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const authError = verifyCronRequest(req);
+  if (authError) return authError;
+
+  const db = await getDb();
 
   const now = new Date();
 

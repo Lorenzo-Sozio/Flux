@@ -1,4 +1,4 @@
-import { db } from "@/db"
+import { getDb } from "@/lib/tenant-context";
 import { tasks, notifications, deals, leads, contacts, companies, tickets, emailTemplates } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { runAutomations } from "../../crm/automation/rule-engine"
@@ -76,6 +76,7 @@ export class ActionDispatcher {
     }
     const entityFk = entityFkMap[context.entityType]
 
+    const db = await getDb();
     await db.insert(tasks).values({
       title,
       description:  description ?? null,
@@ -104,6 +105,7 @@ export class ActionDispatcher {
       userId = owner
     }
 
+    const db = await getDb();
     await db.insert(notifications).values({
       userId,
       type:    "automation",
@@ -123,6 +125,7 @@ export class ActionDispatcher {
     let { subject, body } = action.params
 
     // If a templateId is set, load the template from DB (always uses latest content)
+    const db = await getDb();
     if (templateId) {
       const [tpl] = await db
         .select({ subject: emailTemplates.subject, body: emailTemplates.body })
@@ -198,6 +201,7 @@ export class ActionDispatcher {
     const table = this.entityTable(context.entityType)
     if (!table) throw new Error(`Unknown entity type: ${context.entityType}`)
 
+    const db = await getDb();
     // Fetch old data prima dell'update
     const [oldEntity] = await db
       .select()
@@ -237,6 +241,7 @@ export class ActionDispatcher {
   private async resolveEntityOwner(context: RuleContext): Promise<string | null> {
     const table = this.entityTable(context.entityType)
     if (!table) return null
+    const db = await getDb();
     const [row] = await db
       .select({ ownerId: (table as any).ownerId })
       .from(table as any)

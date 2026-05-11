@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { activities } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { sendEmail } from "@/lib/email-provider";
@@ -20,6 +20,7 @@ export async function sendEmailAction({
   contactId?: string;
   ownerId?: string;
 }) {
+  const db = await getDb();
   const result = await sendEmail({ to, subject, html: body });
 
   if (!result.success) {

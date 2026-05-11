@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { APP_CONFIG } from "@/config/app-config";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { quotes } from "@/db/schema";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -14,6 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
+  const db = await getDb();
 
   const q = await db.query.quotes.findFirst({
     where: eq(quotes.id, id),

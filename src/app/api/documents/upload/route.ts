@@ -14,7 +14,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { documents } from "@/db/schema";
 import { writeFile, mkdir } from "fs/promises";
 import { join, extname } from "path";
@@ -99,6 +99,7 @@ function verifyMagicBytes(buf: Buffer, mimeType: string): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  const db = await getDb();
   // ── Auth ────────────────────────────────────────────────────────────────────
   const session = await auth();
   if (!session?.user?.id) {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Command } from "lucide-react";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { userInvitations } from "@/db/schema";
 import { and, eq, gt } from "drizzle-orm";
 import { AcceptInvitationForm } from "../../_components/accept-invitation-form";
@@ -10,6 +10,7 @@ interface Props {
 }
 
 export default async function AcceptInvitationPage({ searchParams }: Props) {
+  const db = await getDb();
   const { token } = await searchParams;
 
   if (!token) {

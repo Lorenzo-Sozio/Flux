@@ -2,10 +2,11 @@ import { ilike, or } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { companies, contacts, deals, leads, orders, quotes, tickets } from "@/db/schema";
 
 export async function GET(req: NextRequest) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

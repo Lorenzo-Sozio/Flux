@@ -35,6 +35,7 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  serverExternalPackages: ["drizzle-kit"],
   reactCompiler: true,
   compiler: {
     removeConsole: process.env.NODE_ENV === "production",

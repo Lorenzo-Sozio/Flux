@@ -39,6 +39,8 @@
       "pipelineStages": "Pipeline Stages",
       "email": "Email",
       "webhooks": "Webhooks",
+      "tenants": "Tenant Management",
+      "help": "Help Center",
       "macros": "Macros",
       "analytics": "Analytics",
       "salesFunnel": "Sales Funnel",
@@ -2571,5 +2573,9 @@
       "fieldCountry": "Country",
       "fieldNotes": "Notes"
     }
+  },
+  "currency": {
+    "switchCurrency": "Switch currency",
+    "displayCurrency": "Display currency"
   }
 }

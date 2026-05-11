@@ -12,7 +12,7 @@
  * - {{createdAt}}, {{updatedAt}} (date ISO)
  */
 
-import { db } from "@/db"
+import { getDb } from "@/lib/tenant-context";
 import { campaignLogs, deals, leads, contacts, companies, users } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { executeWithRetryTracked } from "../../crm/automation/retry-engine"
@@ -79,6 +79,7 @@ async function loadEntityData(
       return {}
   }
 
+  const db = await getDb();
   const [entity] = await db.select().from(table).where(eq(table.id, entityId))
   return entity ?? {}
 }
@@ -87,6 +88,7 @@ async function loadEntityData(
  * Carica i dati dell'owner
  */
 async function loadOwnerData(ownerId: string | null): Promise<Record<string, any>> {
+  const db = await getDb();
   if (!ownerId) return {}
   const [owner] = await db.select().from(users).where(eq(users.id, ownerId))
   return owner ? { owner } : {}
@@ -186,6 +188,7 @@ export async function sendAutomationEmailWithContext(
 
   // Create a campaign_log record (campaignId = null → automation email)
   // This allows the same /api/track/* endpoints to record opens/clicks.
+  const db = await getDb();
   const [log] = await db
     .insert(campaignLogs)
     .values({

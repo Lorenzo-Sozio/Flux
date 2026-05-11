@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, gte, inArray, isNotNull, lte, ne, or } from "drizzle-orm";
 
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { appointmentAttendees, appointments, companies, contacts, deals, leads, users } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
 import { type AppointmentEmailData, sendAppointmentInviteEmail } from "@/lib/email";
@@ -32,6 +32,7 @@ function generateResponseToken(): string {
 }
 
 async function dispatchInvites(appointmentId: string, method: "REQUEST" | "CANCEL"): Promise<InviteResult> {
+  const db = await getDb();
   // Check email provider before doing any work
   const config = await getEmailConfig();
   const isConfigured =
@@ -169,6 +170,7 @@ export async function createAppointment(data: {
   attendees: AttendeeInput[];
 }) {
   await requireWriteAccess();
+  const db = await getDb();
   const session = await auth();
   const organizerId = session?.user?.id;
 
@@ -260,6 +262,7 @@ export async function updateAppointment(
   },
 ) {
   await requireWriteAccess();
+  const db = await getDb();
 
   const [existing] = await db
     .select({ sequence: appointments.sequence })
@@ -330,6 +333,7 @@ export async function updateAppointment(
 
 export async function cancelAppointment(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
 
   // Increment sequence so iCalendar clients recognise this as a newer update (RFC 5545 §3.7.4)
   const [existing] = await db
@@ -355,6 +359,7 @@ export async function cancelAppointment(id: string) {
 
 export async function deleteAppointment(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(appointments).where(eq(appointments.id, id));
   revalidatePath("/dashboard/calendar");
 }
@@ -362,6 +367,7 @@ export async function deleteAppointment(id: string) {
 // ─── RSVP ─────────────────────────────────────────────────────────────────────
 
 export async function updateAttendeeRsvp(token: string, response: "accept" | "decline" | "tentative") {
+  const db = await getDb();
   const statusMap = {
     accept: "accepted",
     decline: "declined",
@@ -386,6 +392,7 @@ export async function updateAttendeeRsvp(token: string, response: "accept" | "de
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getAppointments(filterUserIds?: string[] | null, range?: { start: Date; end: Date }) {
+  const db = await getDb();
   let userFilter: ReturnType<typeof or> | undefined;
 
   if (filterUserIds && filterUserIds.length > 0) {
@@ -441,6 +448,7 @@ export async function getAppointments(filterUserIds?: string[] | null, range?: {
 }
 
 export async function getAppointmentById(id: string) {
+  const db = await getDb();
   const [appt] = await db.select().from(appointments).where(eq(appointments.id, id));
 
   if (!appt) return null;
@@ -452,6 +460,7 @@ export async function getAppointmentById(id: string) {
 
 // Returns appointments that overlap with [start, end] for conflict detection
 export async function getOverlappingAppointments(startAt: Date, endAt: Date, excludeId?: string) {
+  const db = await getDb();
   const rows = await db
     .select({
       id: appointments.id,
@@ -497,6 +506,7 @@ export async function getAppointmentCalendarEvents(filterUserIds?: string[] | nu
 
 // Lists all users for participant picker (only those with a verified email)
 export async function getInternalUsers() {
+  const db = await getDb();
   return await db
     .select({ id: users.id, name: users.name, email: users.email })
     .from(users)
@@ -505,6 +515,7 @@ export async function getInternalUsers() {
 
 // Lists contacts for participant picker
 export async function getContactsForPicker() {
+  const db = await getDb();
   return await db
     .select({
       id: contacts.id,
@@ -526,6 +537,7 @@ export async function getColleagueAvailability(
   date: Date,
 ): Promise<Record<string, BusySlot[]>> {
   if (userIds.length === 0) return {};
+  const db = await getDb();
 
   const dayStart = new Date(date);
   dayStart.setHours(0, 0, 0, 0);

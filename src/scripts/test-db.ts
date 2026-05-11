@@ -1,4 +1,4 @@
-import { db } from "../db";
+import { platformDb as db } from "../db";
 import { leads } from "../db/schema";
 
 async function main() {

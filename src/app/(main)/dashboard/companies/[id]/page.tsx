@@ -40,7 +40,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { companies } from "@/db/schema";
 
 const TYPE_STYLES: Record<string, string> = {
@@ -77,6 +77,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const { id: companyId } = await params;
   const session = await auth();
   const userId = session?.user?.id;
+  const db = await getDb();
 
   const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
   if (!company) return notFound();

@@ -10,10 +10,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { eq } from "drizzle-orm";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { campaignLogs, emailSuppressions } from "@/db/schema";
 
 export async function POST(req: NextRequest) {
+  const db = await getDb();
   const body = await req.text();
 
   // Verify Svix signature — mandatory; reject if secret is not configured

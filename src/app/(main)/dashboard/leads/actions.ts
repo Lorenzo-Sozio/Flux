@@ -6,7 +6,7 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { leads } from "@/db/schema";
 
 const emptyStringToNull = z.union([z.string(), z.null(), z.undefined()]).transform((v) => (!v ? null : v));
@@ -35,6 +35,7 @@ const leadSchema = z.object({
 });
 
 export async function getLeads() {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
 
@@ -42,6 +43,7 @@ export async function getLeads() {
 }
 
 export async function createLead(formData: FormData) {
+  const db = await getDb();
   try {
     const session = await auth();
     if (!session?.user) throw new Error("Unauthorized");
@@ -77,6 +79,7 @@ export async function createLead(formData: FormData) {
 }
 
 export async function deleteLead(id: string) {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user) throw new Error("Unauthorized");
 

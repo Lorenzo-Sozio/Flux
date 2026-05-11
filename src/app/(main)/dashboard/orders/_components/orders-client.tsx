@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useCurrency } from "@/hooks/use-currency";
 import { createOrder, updateOrderStatus, deleteOrder, type OrderStatus } from "@/actions/orders";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -99,10 +100,6 @@ const newOrderSchema = z.object({
 });
 type NewOrderValues = z.infer<typeof newOrderSchema>;
 
-function formatCurrency(amount: string | number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(amount));
-}
-
 function formatDate(date: Date | string) {
   return new Date(date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
 }
@@ -118,6 +115,7 @@ function NewOrderDialog({
 }) {
   const t = useTranslations("orders");
   const tc = useTranslations("common");
+  const { formatAmount } = useCurrency();
   const [open, setOpen]             = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const activeProducts = products.filter((p) => p.isActive);
@@ -272,7 +270,7 @@ function NewOrderDialog({
 
               <div className="flex items-center justify-end border-t pt-3">
                 <span className="text-sm text-muted-foreground mr-3">{t("dialog.total")}</span>
-                <span className="text-lg font-bold tabular-nums">{formatCurrency(total)}</span>
+                <span className="text-lg font-bold tabular-nums">{formatAmount(total)}</span>
               </div>
             </div>
 
@@ -305,6 +303,7 @@ export function OrdersClient({
 }) {
   const t = useTranslations("orders");
   const tc = useTranslations("common");
+  const { formatAmount } = useCurrency();
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [orders, setOrders]   = useState(initial);
@@ -344,7 +343,7 @@ export function OrdersClient({
     { labelKey: "stats.totalOrders", value: stats.total,     filter: "all",        icon: ShoppingCart, color: "text-primary" },
     { labelKey: "stats.processing",  value: stats.processing, filter: "processing", icon: Clock,        color: "text-blue-500" },
     { labelKey: "stats.completed",   value: stats.completed,  filter: "completed",  icon: CheckCircle2, color: "text-emerald-500" },
-    { labelKey: "stats.revenue",     value: formatCurrency(stats.revenue ?? 0), filter: null, icon: TrendingUp, color: "text-violet-500" },
+    { labelKey: "stats.revenue",     value: formatAmount(stats.revenue ?? 0), filter: null, icon: TrendingUp, color: "text-violet-500" },
   ] as const;
 
   const STATUS_KEYS = ["draft", "processing", "completed", "cancelled"] as const;
@@ -474,7 +473,7 @@ export function OrdersClient({
                       </Select>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <span className="font-semibold tabular-nums">{formatCurrency(order.totalAmount)}</span>
+                      <span className="font-semibold tabular-nums">{formatAmount(Number(order.totalAmount))}</span>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">

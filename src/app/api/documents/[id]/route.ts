@@ -12,7 +12,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { documents } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { readFile } from "fs/promises";
@@ -30,6 +30,7 @@ export async function GET(
 
   const { id } = await params;
   const view = req.nextUrl.searchParams.get("view") === "1";
+  const db = await getDb();
 
   // Validate ID format to reject path traversal attempts at the param level
   if (!id || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) {

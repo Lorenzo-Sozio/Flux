@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireWriteAccess } from "@/lib/auth-guard";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import {
   campaignLogs,
   contacts,
@@ -17,11 +17,13 @@ import { executeCampaignSend } from "@/lib/campaign-send";
 // ─── Email Templates ──────────────────────────────────────────────────────────
 
 export async function getEmailTemplates() {
+  const db = await getDb();
   return db.select().from(emailTemplates).orderBy(emailTemplates.createdAt);
 }
 
 export async function createEmailTemplate(data: any) {
   await requireWriteAccess();
+  const db = await getDb();
   const [t] = await db.insert(emailTemplates).values(data).returning();
   revalidatePath("/dashboard/marketing/templates");
   return t;
@@ -29,6 +31,7 @@ export async function createEmailTemplate(data: any) {
 
 export async function updateEmailTemplate(id: string, data: any) {
   await requireWriteAccess();
+  const db = await getDb();
   const [t] = await db
     .update(emailTemplates)
     .set({ ...data, updatedAt: new Date() })
@@ -40,6 +43,7 @@ export async function updateEmailTemplate(id: string, data: any) {
 
 export async function deleteEmailTemplate(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
   revalidatePath("/dashboard/marketing/templates");
 }
@@ -47,11 +51,13 @@ export async function deleteEmailTemplate(id: string) {
 // ─── Marketing Campaigns ──────────────────────────────────────────────────────
 
 export async function getMarketingCampaigns() {
+  const db = await getDb();
   return db.select().from(marketingCampaigns).orderBy(marketingCampaigns.createdAt);
 }
 
 export async function createMarketingCampaign(data: any) {
   await requireWriteAccess();
+  const db = await getDb();
   const [c] = await db.insert(marketingCampaigns).values(data).returning();
   revalidatePath("/dashboard/marketing/campaigns");
   return c;
@@ -59,6 +65,7 @@ export async function createMarketingCampaign(data: any) {
 
 export async function updateMarketingCampaign(id: string, data: any) {
   await requireWriteAccess();
+  const db = await getDb();
   const [c] = await db
     .update(marketingCampaigns)
     .set({ ...data, updatedAt: new Date() })
@@ -70,6 +77,7 @@ export async function updateMarketingCampaign(id: string, data: any) {
 
 export async function deleteMarketingCampaign(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(marketingCampaigns).where(eq(marketingCampaigns.id, id));
   revalidatePath("/dashboard/marketing/campaigns");
 }
@@ -82,12 +90,14 @@ export async function sendCampaignAction(data: {
   recipientIds?: string[];
 }) {
   await requireWriteAccess();
+  const db = await getDb();
   return executeCampaignSend(data);
 }
 
 // ─── Campaign Report ──────────────────────────────────────────────────────────
 
 export async function getCampaignReport(campaignId: string) {
+  const db = await getDb();
   const [campaign] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, campaignId));
   if (!campaign) return null;
 
@@ -153,6 +163,7 @@ export async function getCampaignReport(campaignId: string) {
 // ─── Batch stats for campaign list ───────────────────────────────────────────
 
 export async function getCampaignsWithStats() {
+  const db = await getDb();
   const campaigns = await db
     .select()
     .from(marketingCampaigns)
@@ -184,6 +195,7 @@ export async function getCampaignsWithStats() {
 // ─── Eligible recipient counts ────────────────────────────────────────────────
 
 export async function getEligibleRecipientCounts() {
+  const db = await getDb();
   const suppressions = await db.select({ email: emailSuppressions.email }).from(emailSuppressions);
   const suppressedEmails = new Set(suppressions.map((s) => s.email.toLowerCase()));
 
@@ -216,6 +228,7 @@ export async function scheduleCampaignAction(data: {
   scheduledAt: Date;
 }) {
   await requireWriteAccess();
+  const db = await getDb();
   const { campaignId, recipientType, scheduledAt } = data;
   if (scheduledAt <= new Date()) throw new Error("Scheduled time must be in the future");
   await db
@@ -227,6 +240,7 @@ export async function scheduleCampaignAction(data: {
 
 export async function cancelScheduledCampaignAction(campaignId: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db
     .update(marketingCampaigns)
     .set({ status: "draft", scheduledAt: null, recipientType: null, updatedAt: new Date() })
@@ -238,6 +252,7 @@ export async function cancelScheduledCampaignAction(campaignId: string) {
 
 export async function duplicateCampaignAction(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
   const [original] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, id));
   if (!original) throw new Error("Campaign not found");
 

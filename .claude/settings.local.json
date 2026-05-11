@@ -119,11 +119,28 @@
       "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\)\\); console.log\\('en.json OK'\\)\")",
       "Bash(node -e \"JSON.parse\\(require\\('fs'\\).readFileSync\\('c:/React/Flux/messages/it.json','utf8'\\)\\); console.log\\('it.json OK'\\)\")",
       "Bash(node -e \"const f=require\\('fs'\\).readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\); const lines=f.split\\('\\\\n'\\); console.log\\('Total lines:', lines.length\\); console.log\\('Last 5:', lines.slice\\(-5\\).join\\('\\\\n'\\)\\)\")",
-      "Bash(node -e \"const f=require\\('fs'\\).readFileSync\\('c:/React/Flux/messages/it.json','utf8'\\); const lines=f.split\\('\\\\n'\\); console.log\\('Last 5:', lines.slice\\(-5\\).join\\('\\\\n'\\)\\)\")"
+      "Bash(node -e \"const f=require\\('fs'\\).readFileSync\\('c:/React/Flux/messages/it.json','utf8'\\); const lines=f.split\\('\\\\n'\\); console.log\\('Last 5:', lines.slice\\(-5\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\(JSON.stringify\\({next: p.dependencies?.next, drizzle: p.dependencies?.['drizzle-orm'], neon: p.dependencies?.['@neondatabase/serverless']}, null, 2\\)\\)\")",
+      "Bash(powershell -Command ' *)",
+      "Bash(Get-ChildItem -Path \"c:\\\\React\\\\Flux\" -Recurse -Directory)",
+      "Bash(node -e \"console.log\\(require\\('./package.json'\\).dependencies.next\\)\")",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\('next:', p.dependencies.next\\); console.log\\('next-auth:', p.dependencies['next-auth']\\)\")",
+      "Bash(node -e \"const fs = require\\('fs'\\); const p = JSON.parse\\(fs.readFileSync\\('node_modules/next/package.json','utf8'\\)\\); console.log\\('installed next version:', p.version\\)\")",
+      "Bash(curl -s \"http://localhost:4983/api/tables\")",
+      "Bash(kill %1)",
+      "Bash(Get-ChildItem -Path \"c:\\\\React\\\\Flux\\\\src\" -Recurse -Depth 1)",
+      "Bash(Get-ChildItem \"c:\\\\React\\\\Flux\\\\src\\\\db\" -Filter \"*.ts\" -Recurse)",
+      "Bash(mkdir -p \"c:/React/Flux/src/app/\\(main\\)/admin/tenants/[subdomain]\")",
+      "Bash(mkdir -p \"c:/React/Flux/src/app/\\(main\\)/admin/tenants/[subdomain]/_components\")",
+      "Bash(node --input-type=module)",
+      "Bash(Remove-Item -Recurse -Force \"c:\\\\React\\\\Flux\\\\.next\" -ErrorAction SilentlyContinue)",
+      "Bash(Write-Host \"Cache cleared\")"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",
-      "c:\\React\\Flux\\src\\app\\(main)\\dashboard\\pipeline\\[id]\\_components"
+      "c:\\React\\Flux\\src\\app\\(main)\\dashboard\\pipeline\\[id]\\_components",
+      "c:\\React\\Flux\\src\\app\\(main)\\admin\\tenants",
+      "c:\\React\\Flux\\src\\app\\(main)\\admin\\tenants\\[subdomain]"
     ]
   }
 }

@@ -3,7 +3,7 @@
 import { inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { companies, contacts, leads } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
 
@@ -11,6 +11,7 @@ import { requireWriteAccess } from "@/lib/auth-guard";
 
 export async function bulkDeleteLeads(ids: string[]) {
   await requireWriteAccess();
+  const db = await getDb();
   if (ids.length === 0) return { deleted: 0 };
   await db.delete(leads).where(inArray(leads.id, ids));
   revalidatePath("/dashboard/leads");
@@ -19,6 +20,7 @@ export async function bulkDeleteLeads(ids: string[]) {
 
 export async function bulkUpdateLeadStatus(ids: string[], status: string) {
   await requireWriteAccess();
+  const db = await getDb();
   if (ids.length === 0) return { updated: 0 };
   await db.update(leads).set({ status, updatedAt: new Date() }).where(inArray(leads.id, ids));
   revalidatePath("/dashboard/leads");
@@ -27,6 +29,7 @@ export async function bulkUpdateLeadStatus(ids: string[], status: string) {
 
 export async function bulkAssignLeads(ids: string[], ownerId: string) {
   await requireWriteAccess();
+  const db = await getDb();
   if (ids.length === 0) return { updated: 0 };
   await db.update(leads).set({ ownerId, updatedAt: new Date() }).where(inArray(leads.id, ids));
   revalidatePath("/dashboard/leads");
@@ -37,6 +40,7 @@ export async function bulkAssignLeads(ids: string[], ownerId: string) {
 
 export async function bulkDeleteContacts(ids: string[]) {
   await requireWriteAccess();
+  const db = await getDb();
   if (ids.length === 0) return { deleted: 0 };
   await db.delete(contacts).where(inArray(contacts.id, ids));
   revalidatePath("/dashboard/contacts");
@@ -45,6 +49,7 @@ export async function bulkDeleteContacts(ids: string[]) {
 
 export async function bulkUpdateContactStatus(ids: string[], status: string) {
   await requireWriteAccess();
+  const db = await getDb();
   if (ids.length === 0) return { updated: 0 };
   await db.update(contacts).set({ status, updatedAt: new Date() }).where(inArray(contacts.id, ids));
   revalidatePath("/dashboard/contacts");
@@ -53,6 +58,7 @@ export async function bulkUpdateContactStatus(ids: string[], status: string) {
 
 export async function bulkAssignContacts(ids: string[], ownerId: string) {
   await requireWriteAccess();
+  const db = await getDb();
   if (ids.length === 0) return { updated: 0 };
   await db.update(contacts).set({ ownerId, updatedAt: new Date() }).where(inArray(contacts.id, ids));
   revalidatePath("/dashboard/contacts");
@@ -63,6 +69,7 @@ export async function bulkAssignContacts(ids: string[], ownerId: string) {
 
 export async function bulkDeleteCompanies(ids: string[]) {
   await requireWriteAccess();
+  const db = await getDb();
   if (ids.length === 0) return { deleted: 0 };
   await db.delete(companies).where(inArray(companies.id, ids));
   revalidatePath("/dashboard/companies");
@@ -71,6 +78,7 @@ export async function bulkDeleteCompanies(ids: string[]) {
 
 export async function bulkUpdateCompanyStatus(ids: string[], status: string) {
   await requireWriteAccess();
+  const db = await getDb();
   if (ids.length === 0) return { updated: 0 };
   await db.update(companies).set({ status, updatedAt: new Date() }).where(inArray(companies.id, ids));
   revalidatePath("/dashboard/companies");
@@ -79,6 +87,7 @@ export async function bulkUpdateCompanyStatus(ids: string[], status: string) {
 
 export async function bulkAssignCompanies(ids: string[], ownerId: string) {
   await requireWriteAccess();
+  const db = await getDb();
   if (ids.length === 0) return { updated: 0 };
   await db.update(companies).set({ ownerId, updatedAt: new Date() }).where(inArray(companies.id, ids));
   revalidatePath("/dashboard/companies");

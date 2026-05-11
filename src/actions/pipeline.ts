@@ -8,11 +8,13 @@ import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { createNotificationAction } from "@/actions/auth";
 import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { activities, companies, contacts, deals, pipelineStages, salesTargets, users } from "@/db/schema";
 import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
+import { getExchangeRates, convertToEur } from "@/lib/exchange-rates";
 
 export async function getPipelineData() {
+  const db = await getDb();
   let stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
 
   // Seed default stages if pipeline is completely empty
@@ -34,12 +36,21 @@ export async function getPipelineData() {
 
 export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
   await requireWriteAccess();
+  const db = await getDb();
   if (!data.name || !data.stageId) throw new Error("Name and Stage are required.");
+
+  // Convert input amount to EUR for storage; record the original input currency
+  let amountEur = data.amount ? Number(data.amount) : 0;
+  const inputCurrency = (data.currency || "EUR").toUpperCase();
+  if (inputCurrency !== "EUR" && amountEur > 0) {
+    const { rates } = await getExchangeRates();
+    amountEur = convertToEur(amountEur, inputCurrency, rates);
+  }
 
   const payload = {
     ...data,
-    amount: data.amount ? String(data.amount) : "0",
-    currency: data.currency || "EUR",
+    amount: String(amountEur),
+    currency: inputCurrency,
     status: data.status || "open",
   };
 
@@ -71,6 +82,7 @@ export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
 
 export async function updateDealStage(dealId: string, newStageId: string) {
   await requireWriteAccess();
+  const db = await getDb();
 
   // Capture old state BEFORE the update (needed for "changed" operators)
   const [oldDeal] = await db.select().from(deals).where(eq(deals.id, dealId));
@@ -116,13 +128,26 @@ export async function updateDealStage(dealId: string, newStageId: string) {
 
 export async function updateDeal(dealId: string, data: Partial<typeof deals.$inferInsert>) {
   await requireWriteAccess();
+  const db = await getDb();
 
   // Capture old state BEFORE the update
   const [oldDeal] = await db.select().from(deals).where(eq(deals.id, dealId));
 
+  // Convert input amount to EUR if a non-EUR currency is provided
+  let amountStr: string | undefined;
+  if (data.amount !== undefined) {
+    const inputCurrency = (data.currency || "EUR").toUpperCase();
+    if (inputCurrency !== "EUR") {
+      const { rates } = await getExchangeRates();
+      amountStr = String(convertToEur(Number(data.amount), inputCurrency, rates));
+    } else {
+      amountStr = String(data.amount);
+    }
+  }
+
   const payload = {
     ...data,
-    amount: data.amount ? String(data.amount) : undefined,
+    amount: amountStr,
   };
 
   const [updatedDeal] = await db
@@ -167,6 +192,7 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
 // ─── Deal Detail ─────────────────────────────────────────────────────────────
 
 export async function getDealById(dealId: string) {
+  const db = await getDb();
   const [row] = await db
     .select({
       deal: deals,
@@ -189,6 +215,7 @@ export async function getDealById(dealId: string) {
 
 // ─── Pipeline Report ──────────────────────────────────────────────────────────
 export async function getPipelineReport() {
+  const db = await getDb();
   const stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
   const allDeals = await db.select().from(deals);
   const now = Date.now();
@@ -241,11 +268,13 @@ export async function getPipelineReport() {
 // ── Pipeline Stage Management ────────────────────────────────────────────────
 
 export async function getPipelineStages() {
+  const db = await getDb();
   return db.select().from(pipelineStages).orderBy(pipelineStages.order);
 }
 
 export async function createPipelineStage(data: { name: string; color?: string; defaultProbability?: number }) {
   await requireAdminAccess();
+  const db = await getDb();
   const stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
   const maxOrder = stages.length > 0 ? Math.max(...stages.map((s) => s.order)) : 0;
   const [stage] = await db
@@ -267,6 +296,7 @@ export async function updatePipelineStage(
   data: { name?: string; color?: string; defaultProbability?: number; order?: number },
 ) {
   await requireAdminAccess();
+  const db = await getDb();
   await db
     .update(pipelineStages)
     .set({ ...data, updatedAt: new Date() })
@@ -277,6 +307,7 @@ export async function updatePipelineStage(
 
 export async function deletePipelineStage(id: string) {
   await requireAdminAccess();
+  const db = await getDb();
   const dealsInStage = await db.select().from(deals).where(eq(deals.stageId, id));
   if (dealsInStage.length > 0) {
     throw new Error("Cannot delete a stage with active deals.");
@@ -287,6 +318,7 @@ export async function deletePipelineStage(id: string) {
 }
 
 export async function getDealsForSelect() {
+  const db = await getDb();
   return db.select({ id: deals.id, name: deals.name }).from(deals).orderBy(deals.name);
 }
 
@@ -324,6 +356,7 @@ function computeHealthScore(
 }
 
 async function refreshDealHealthScore(dealId: string) {
+  const db = await getDb();
   const [deal] = await db
     .select({ status: deals.status, probability: deals.probability, expectedCloseDate: deals.expectedCloseDate, updatedAt: deals.updatedAt })
     .from(deals)
@@ -344,6 +377,7 @@ async function refreshDealHealthScore(dealId: string) {
 // ── Forecast ──────────────────────────────────────────────────────────────────
 
 export async function getForecastData() {
+  const db = await getDb();
   const openDeals = await db
     .select({
       id: deals.id,

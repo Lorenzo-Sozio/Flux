@@ -34,16 +34,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { products } from "@/db/schema";
 
 import { CommentsThread } from "./_components/comments-thread";
+import { DealAmount } from "./_components/deal-amount";
 
 export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: dealId } = await params;
   const session = await auth();
   const userId = session?.user?.id;
   const userRole = session?.user?.role ?? "user";
+  const db = await getDb();
 
   const [
     row,
@@ -171,14 +173,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 <TrendingUpIcon className="h-4 w-4 text-muted-foreground shrink-0" />
                 <span className="text-muted-foreground">{t("fieldValue")}</span>
                 <span className="font-semibold text-base">
-                  {deal.amount
-                    ? new Intl.NumberFormat("it-IT", { style: "currency", currency: deal.currency || "EUR" }).format(
-                        Number(deal.amount),
-                      )
-                    : "—"}
-                  {deal.probability != null && (
-                    <span className="ml-1.5 text-xs font-normal text-muted-foreground">({deal.probability}%)</span>
-                  )}
+                  <DealAmount amount={deal.amount} probability={deal.probability} />
                 </span>
               </div>
 

@@ -1,4 +1,4 @@
-import { db } from "@/db"
+import { getDb } from "@/lib/tenant-context";
 import { ticketAuditLogs } from "@/db/schema"
 
 interface LogTicketChangeParams {
@@ -12,6 +12,7 @@ interface LogTicketChangeParams {
 }
 
 export async function logTicketChange(params: LogTicketChangeParams) {
+  const db = await getDb();
   await db.insert(ticketAuditLogs).values({
     ticketId: params.ticketId,
     actorId: params.actorId,

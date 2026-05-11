@@ -12,7 +12,7 @@ import { after } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { runAutomations } from "@/components/crm/automation/rule-engine";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { contacts, documents, ticketMessages, tickets } from "@/db/schema";
 import {
   extractTicketReference,
@@ -54,6 +54,7 @@ export interface InboundAttachment {
  * Returns the IDs of the saved documents.
  */
 async function saveAttachments(attachments: InboundAttachment[], ticketId: string): Promise<string[]> {
+  const db = await getDb();
   const docIds: string[] = [];
 
   for (const att of attachments) {
@@ -149,6 +150,7 @@ export interface InboundEmailResult {
 }
 
 export async function processInboundEmail(payload: InboundEmailPayload): Promise<InboundEmailResult> {
+  const db = await getDb();
   const { fromRaw, subject, htmlBody, textBody, inboundMessageId, inReplyTo, attachments = [] } = payload;
 
   if (!fromRaw || !subject) return { ok: false };

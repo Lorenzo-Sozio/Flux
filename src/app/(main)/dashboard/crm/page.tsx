@@ -30,7 +30,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { activities, companies, contacts, deals, leads, salesTargets, tasks, tickets } from "@/db/schema";
 
 import { type AgendaItem, AgendaWidget } from "./_components/agenda-widget";
@@ -72,6 +72,7 @@ function formatToday(d: Date) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function CRMPage() {
+  const db = await getDb();
   const t = await getTranslations("crm");
   const tc = await getTranslations("common");
 

@@ -7,7 +7,7 @@ import { alias } from "drizzle-orm/pg-core";
 
 import { createNotificationAction } from "@/actions/auth";
 import { dispatchWebhook } from "@/actions/webhooks";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import {
   activities,
   companies,
@@ -41,6 +41,7 @@ export async function createTask(data: {
   estimatedHours?: string;
 }) {
   await requireWriteAccess();
+  const db = await getDb();
   let depth = 0;
   if (data.parentId) {
     const parent = await db.select({ depth: tasks.depth }).from(tasks).where(eq(tasks.id, data.parentId)).limit(1);
@@ -77,6 +78,7 @@ export async function createSubtask(
 }
 
 export async function recalcParentProgress(taskId: string): Promise<void> {
+  const db = await getDb();
   const children = await db.select({ status: tasks.status }).from(tasks).where(eq(tasks.parentId, taskId));
   if (children.length === 0) return;
   const done = children.filter((c) => c.status === "done").length;
@@ -88,6 +90,7 @@ export async function recalcParentProgress(taskId: string): Promise<void> {
 }
 
 export async function getSubtasks(parentId: string) {
+  const db = await getDb();
   const creator = alias(users, "creator");
   const assignee = alias(users, "assignee");
   return await db
@@ -117,6 +120,7 @@ export async function getSubtasks(parentId: string) {
 
 export async function addTaskAssignee(taskId: string, userId: string, role: string) {
   await requireWriteAccess();
+  const db = await getDb();
   const existing = await db
     .select({ id: taskAssignees.id })
     .from(taskAssignees)
@@ -131,10 +135,12 @@ export async function addTaskAssignee(taskId: string, userId: string, role: stri
 
 export async function removeTaskAssignee(taskId: string, userId: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(taskAssignees).where(and(eq(taskAssignees.taskId, taskId), eq(taskAssignees.userId, userId)));
 }
 
 export async function getTaskAssignees(taskId: string) {
+  const db = await getDb();
   return await db
     .select({
       id: taskAssignees.id,
@@ -164,6 +170,7 @@ export async function getTasksByDeal(dealId: string) {
 }
 
 async function getTasksGeneric(where: { leadId?: string; contactId?: string; companyId?: string; dealId?: string }) {
+  const db = await getDb();
   const creator = alias(users, "creator");
   const assignee = alias(users, "assignee");
 
@@ -208,6 +215,7 @@ async function getTasksGeneric(where: { leadId?: string; contactId?: string; com
 
 export async function updateTask(id: string, data: Partial<typeof tasks.$inferInsert>, revalidatePathStr?: string) {
   await requireWriteAccess();
+  const db = await getDb();
   const result = await db.update(tasks).set(data).where(eq(tasks.id, id)).returning();
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
   revalidatePath("/dashboard/calendar");
@@ -216,6 +224,7 @@ export async function updateTask(id: string, data: Partial<typeof tasks.$inferIn
 
 export async function updateTaskStatus(id: string, status: string, revalidatePathStr?: string) {
   await requireWriteAccess();
+  const db = await getDb();
   if (status === "done") {
     const blocking = await checkDependencyViolation(id);
     if (blocking.length > 0) {
@@ -274,16 +283,19 @@ export async function updateTaskStatus(id: string, status: string, revalidatePat
 
 export async function deleteTask(id: string, revalidatePathStr?: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(tasks).where(eq(tasks.id, id));
   if (revalidatePathStr) revalidatePath(revalidatePathStr);
   revalidatePath("/dashboard/calendar");
 }
 
 export async function getAllUsers() {
+  const db = await getDb();
   return await db.select({ id: users.id, name: users.name }).from(users);
 }
 
 export async function getCalendarTasks() {
+  const db = await getDb();
   return await db
     .select({
       id: tasks.id,
@@ -303,6 +315,7 @@ export async function getCalendarTasks() {
 // Returns tasks due today (for email/notification dispatch)
 /** All tasks visible to the current user (admin = all, user = own+assigned). */
 export async function getAllTasks(userId: string, role: string) {
+  const db = await getDb();
   const ownerAlias = alias(users, "owner");
   const assigneeAlias = alias(users, "assignee");
   const leadAlias = alias(leads, "lead");
@@ -381,6 +394,7 @@ export async function getAllTasks(userId: string, role: string) {
 }
 
 export async function getTasksByTicketId(ticketId: string) {
+  const db = await getDb();
   const ownerAlias = alias(users, "owner");
   const assigneeAlias = alias(users, "assignee");
   return db
@@ -417,6 +431,7 @@ export async function getTasksByTicketId(ticketId: string) {
 }
 
 export async function getTasksDueToday() {
+  const db = await getDb();
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   const end = new Date();
@@ -438,6 +453,7 @@ export async function getTasksDueToday() {
 }
 
 export async function getTaskActualHours(taskId: string): Promise<string | null> {
+  const db = await getDb();
   const [row] = await db.select({ actualHours: tasks.actualHours }).from(tasks).where(eq(tasks.id, taskId));
   return row?.actualHours ?? null;
 }
@@ -446,12 +462,14 @@ export async function getTaskActualHours(taskId: string): Promise<string | null>
 
 export async function startTimer(taskId: string, userId: string) {
   await requireWriteAccess();
+  const db = await getDb();
   const [log] = await db.insert(taskTimeLogs).values({ taskId, userId, startedAt: new Date() }).returning();
   return log;
 }
 
 export async function stopTimer(logId: string) {
   await requireWriteAccess();
+  const db = await getDb();
   const stoppedAt = new Date();
   const [log] = await db
     .select({ startedAt: taskTimeLogs.startedAt, taskId: taskTimeLogs.taskId })
@@ -481,6 +499,7 @@ export async function stopTimer(logId: string) {
 
 export async function logHoursManual(taskId: string, userId: string, hours: number, note?: string) {
   await requireWriteAccess();
+  const db = await getDb();
   const now = new Date();
   await db.insert(taskTimeLogs).values({
     taskId,
@@ -504,6 +523,7 @@ export async function logHoursManual(taskId: string, userId: string, hours: numb
 }
 
 export async function getTimeLogs(taskId: string) {
+  const db = await getDb();
   return await db
     .select({
       id: taskTimeLogs.id,
@@ -523,6 +543,7 @@ export async function getTimeLogs(taskId: string) {
 
 export async function deleteTimeLog(logId: string, taskId: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(taskTimeLogs).where(eq(taskTimeLogs.id, logId));
   // recalculate
   const total = await db
@@ -539,6 +560,7 @@ export async function deleteTimeLog(logId: string, taskId: string) {
 
 export async function updateTaskHours(taskId: string, estimatedHours: number | null) {
   await requireWriteAccess();
+  const db = await getDb();
   await db
     .update(tasks)
     .set({ estimatedHours: estimatedHours !== null ? String(estimatedHours) : null })
@@ -550,6 +572,7 @@ export async function updateTaskHours(taskId: string, estimatedHours: number | n
 
 export async function addDependency(predecessorId: string, successorId: string, type = "FS", lagDays = 0) {
   await requireWriteAccess();
+  const db = await getDb();
   if (predecessorId === successorId) throw new Error("A task cannot depend on itself.");
 
   // cycle check: would adding predecessorId→successorId create a cycle?
@@ -587,11 +610,13 @@ export async function addDependency(predecessorId: string, successorId: string, 
 
 export async function removeDependency(dependencyId: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(taskDependencies).where(eq(taskDependencies.id, dependencyId));
   revalidatePath("/dashboard/tasks");
 }
 
 export async function getDependencies(taskId: string) {
+  const db = await getDb();
   const predecessor = alias(tasks, "predecessor");
   const successor = alias(tasks, "successor");
 
@@ -625,6 +650,7 @@ export async function getDependencies(taskId: string) {
 }
 
 export async function checkDependencyViolation(taskId: string) {
+  const db = await getDb();
   const predecessor = alias(tasks, "predecessor");
   const blocking = await db
     .select({
@@ -648,6 +674,7 @@ export async function propagateDateShift(
   if (visited.has(taskId)) return [];
   visited.add(taskId);
   await requireWriteAccess();
+  const db = await getDb();
   const task = await db.select({ dueDate: tasks.dueDate }).from(tasks).where(eq(tasks.id, taskId)).limit(1);
   if (!task[0]) return [];
 
@@ -672,6 +699,7 @@ export async function propagateDateShift(
 // this propagates the delta to its FS successors only, without re-touching the root.
 export async function propagateSuccessors(taskId: string, deltaDays: number): Promise<number> {
   await requireWriteAccess();
+  const db = await getDb();
   const successorRows = await db
     .select({ successorId: taskDependencies.successorId })
     .from(taskDependencies)
@@ -687,6 +715,7 @@ export async function propagateSuccessors(taskId: string, deltaDays: number): Pr
 }
 
 export async function getTaskById(id: string) {
+  const db = await getDb();
   const ownerAlias = alias(users, "owner");
   const assigneeAlias = alias(users, "assignee");
   const [task] = await db
@@ -718,6 +747,7 @@ export async function getTaskById(id: string) {
 }
 
 export async function getAllTasksForGantt() {
+  const db = await getDb();
   const rows = await db
     .select({
       id: tasks.id,

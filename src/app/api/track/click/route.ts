@@ -3,7 +3,7 @@
  * URL: /api/track/click?log=<campaignLogId>&url=<encodedUrl>
  */
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { campaignLogs } from "@/db/schema";
 import { and, eq, isNull, notInArray, sql } from "drizzle-orm";
 
@@ -11,6 +11,7 @@ import { and, eq, isNull, notInArray, sql } from "drizzle-orm";
 const PROTECTED_STATUSES = ["unsubscribed", "bounced", "complained"];
 
 export async function GET(req: NextRequest) {
+  const db = await getDb();
   const logId = req.nextUrl.searchParams.get("log");
   const url = req.nextUrl.searchParams.get("url");
 

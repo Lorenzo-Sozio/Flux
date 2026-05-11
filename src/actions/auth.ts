@@ -1,7 +1,7 @@
 "use server";
 
 import { signIn, signOut } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import {
   notifications,
   passwordResetTokens,
@@ -20,10 +20,12 @@ export async function logoutAction() {
 
 // ─── Register ────────────────────────────────────────────────────────────────
 export async function registerAction(data: {
+
   name?: string;
   email: string;
   password: string;
 }) {
+  const db = await getDb();
   const { name, email, password } = data;
 
   const [existing] = await db
@@ -60,6 +62,7 @@ export async function registerAction(data: {
 
 // ─── Forgot Password ─────────────────────────────────────────────────────────
 export async function forgotPasswordAction(email: string) {
+  const db = await getDb();
   const [user] = await db
     .select({ id: users.id, email: users.email })
     .from(users)
@@ -85,10 +88,12 @@ export async function forgotPasswordAction(email: string) {
 
 // ─── Reset Password ───────────────────────────────────────────────────────────
 export async function resetPasswordAction(data: {
+
   email: string;
   token: string;
   password: string;
 }) {
+  const db = await getDb();
   const { email, token, password } = data;
 
   const [resetToken] = await db
@@ -120,11 +125,13 @@ export async function resetPasswordAction(data: {
 
 // ─── Invite User ──────────────────────────────────────────────────────────────
 export async function inviteUserAction(data: {
+
   email: string;
   role: string;
   invitedById: string;
   invitedByName: string;
 }) {
+  const db = await getDb();
   const { email, role, invitedById, invitedByName } = data;
 
   // Check user doesn't already exist
@@ -170,10 +177,12 @@ export async function inviteUserAction(data: {
 
 // ─── Accept Invitation ────────────────────────────────────────────────────────
 export async function acceptInvitationAction(data: {
+
   token: string;
   name: string;
   password: string;
 }) {
+  const db = await getDb();
   const { token, name, password } = data;
 
   const [invitation] = await db
@@ -216,6 +225,7 @@ export async function acceptInvitationAction(data: {
 export async function updateUserRoleAction(userId: string, role: string) {
   const { requireAdminAccess } = await import("@/lib/auth-guard");
   await requireAdminAccess();
+  const db = await getDb();
   await db.update(users).set({ role }).where(eq(users.id, userId));
   revalidatePath("/dashboard/users");
   return { success: true };
@@ -225,6 +235,7 @@ export async function updateUserRoleAction(userId: string, role: string) {
 export async function deleteUserAction(userId: string) {
   const { requireAdminAccess } = await import("@/lib/auth-guard");
   await requireAdminAccess();
+  const db = await getDb();
   await db.delete(users).where(eq(users.id, userId));
   revalidatePath("/dashboard/users");
   return { success: true };
@@ -232,6 +243,7 @@ export async function deleteUserAction(userId: string) {
 
 // ─── Get All Users ────────────────────────────────────────────────────────────
 export async function getAllUsersAction() {
+  const db = await getDb();
   return await db
     .select({
       id: users.id,
@@ -246,6 +258,7 @@ export async function getAllUsersAction() {
 
 // ─── Get Pending Invitations ──────────────────────────────────────────────────
 export async function getPendingInvitationsAction() {
+  const db = await getDb();
   return await db
     .select()
     .from(userInvitations)
@@ -259,6 +272,7 @@ export async function getPendingInvitationsAction() {
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 export async function getNotificationsAction(userId: string) {
+  const db = await getDb();
   return await db
     .select()
     .from(notifications)
@@ -267,6 +281,7 @@ export async function getNotificationsAction(userId: string) {
 }
 
 export async function markNotificationReadAction(notificationId: string) {
+  const db = await getDb();
   await db
     .update(notifications)
     .set({ isRead: true })
@@ -274,6 +289,7 @@ export async function markNotificationReadAction(notificationId: string) {
 }
 
 export async function markAllNotificationsReadAction(userId: string) {
+  const db = await getDb();
   await db
     .update(notifications)
     .set({ isRead: true })
@@ -282,12 +298,14 @@ export async function markAllNotificationsReadAction(userId: string) {
 }
 
 export async function createNotificationAction(data: {
+
   userId: string;
   type: string;
   title: string;
   message?: string;
   link?: string;
 }) {
+  const db = await getDb();
   await db.insert(notifications).values(data);
 }
 
@@ -295,14 +313,17 @@ export async function createNotificationsBatch(
   rows: { userId: string; type: string; title: string; message?: string; link?: string }[],
 ) {
   if (rows.length === 0) return;
+  const db = await getDb();
   await db.insert(notifications).values(rows);
 }
 
 // ─── Change Own Password ──────────────────────────────────────────────────────
 export async function changePasswordAction(data: {
+
   currentPassword: string;
   newPassword: string;
 }) {
+  const db = await getDb();
   const { auth } = await import("@/auth");
   const session = await auth();
   if (!session?.user?.id) return { error: "Not authenticated." };
@@ -330,6 +351,7 @@ export async function changePasswordAction(data: {
 export async function adminSendPasswordResetAction(targetUserId: string) {
   const { requireAdminAccess } = await import("@/lib/auth-guard");
   await requireAdminAccess();
+  const db = await getDb();
 
   const [user] = await db
     .select({ id: users.id, email: users.email })

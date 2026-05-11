@@ -12,7 +12,7 @@
  *   Rule C (Deal) → Triggered by change to Y → Update Field X (LOOP!)
  */
 
-import { db } from "@/db"
+import { getDb } from "@/lib/tenant-context";
 import { automationLogs } from "@/db/schema"
 import { eq, and, desc } from "drizzle-orm"
 
@@ -93,6 +93,7 @@ export async function checkLoopDetection(
 
   // 4. Check per cicli lenti (query gli ultimi log)
   // Se la stessa rule è stata eseguita 3+ volte sullo stesso entity negli ultimi 10 secondi
+  const db = await getDb();
   const recentLogs = await db
     .select({ ruleId: automationLogs.ruleId, entityId: automationLogs.entityId, createdAt: automationLogs.createdAt })
     .from(automationLogs)

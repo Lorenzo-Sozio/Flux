@@ -3,11 +3,12 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { desc, eq } from "drizzle-orm";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { quoteActivities, quoteItems, quotes } from "@/db/schema";
 
 // GET /api/quotes/public?token=xxx  — fetch quote by public token (no auth)
 export async function GET(req: NextRequest) {
+  const db = await getDb();
   const token = req.nextUrl.searchParams.get("token");
   if (!token) return NextResponse.json({ error: "Missing token" }, { status: 400 });
 
@@ -36,6 +37,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/quotes/public  — accept or decline quote by public token
 export async function POST(req: NextRequest) {
+  const db = await getDb();
   const body = await req.json();
   const { token, action, reason } = body as { token: string; action: "accepted" | "declined"; reason?: string };
 

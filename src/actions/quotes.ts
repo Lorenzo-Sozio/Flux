@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { quotes, quoteItems, quoteActivities, deals, companies, products, users } from "@/db/schema";
 import { eq, desc, and, inArray } from "drizzle-orm";
 import { createNotificationAction, createNotificationsBatch } from "@/actions/auth";
@@ -11,6 +11,7 @@ import { sendEmail } from "@/lib/email-provider";
 import crypto from "crypto";
 import { CreateQuoteSchema, UpdateQuoteSchema } from "@/actions/quotes-validation";
 import { revalidatePath } from "next/cache";
+import { getExchangeRates, convertToEur } from "@/lib/exchange-rates";
 
 // --- HELPERS ---
 
@@ -44,6 +45,7 @@ async function logQuoteActivity(
   ipAddress?: string,
   userAgent?: string
 ) {
+  const db = await getDb();
   await db.insert(quoteActivities).values({
     quoteId,
     type,
@@ -57,6 +59,7 @@ async function logQuoteActivity(
 // --- MAIN ACTIONS ---
 
 export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>) {
+  const db = await getDb();
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -74,7 +77,17 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
       throw new Error("Deal not found");
     }
 
-    // Calculate totals
+    // Resolve EUR conversion rate for the input currency
+    const inputCurrency = (validated.currency || "EUR").toUpperCase();
+    let eurRate = 1; // multiplier: amount_in_eur = input_amount * eurRate
+    if (inputCurrency !== "EUR") {
+      const { rates } = await getExchangeRates();
+      const rate = rates[inputCurrency.toLowerCase()];
+      if (rate) eurRate = 1 / rate;
+    }
+    const toEur = (n: number) => n * eurRate;
+
+    // Calculate totals (in input currency first, then convert)
     let subtotal = 0;
     const itemsData = validated.items.map((item) => {
       const { discountAmount, taxAmount, totalPrice } = calculateLineTotal(
@@ -93,7 +106,7 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
     const quoteTaxAmount = (subtotalAfterDiscount * (validated.taxPercent || 0)) / 100;
     const totalAmount = subtotalAfterDiscount + quoteTaxAmount;
 
-    // Create quote
+    // Create quote — all monetary values stored in EUR
     const quoteNumber = generateQuoteNumber();
     const [quote] = await db
       .insert(quotes)
@@ -104,30 +117,31 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
         contactId: validated.contactId || null,
         ownerId: session.user.id,
         status: "draft",
-        subtotal: subtotal.toString(),
-        discountAmount: quoteDiscountAmount.toString(),
+        currency: "EUR",
+        subtotal: toEur(subtotal).toString(),
+        discountAmount: toEur(quoteDiscountAmount).toString(),
         discountPercent: (validated.discountPercent || 0).toString(),
-        taxAmount: quoteTaxAmount.toString(),
+        taxAmount: toEur(quoteTaxAmount).toString(),
         taxPercent: (validated.taxPercent || 0).toString(),
-        totalAmount: totalAmount.toString(),
+        totalAmount: toEur(totalAmount).toString(),
         expiresAt: validated.expiresAt ? new Date(validated.expiresAt) : null,
         notes: validated.notes,
       })
       .returning();
 
-    // Create quote items
+    // Create quote items — all unit prices stored in EUR
     for (const item of itemsData) {
       await db.insert(quoteItems).values({
         quoteId: quote.id,
         productId: item.productId || null,
         description: item.description,
         quantity: item.quantity,
-        unitPrice: item.unitPrice.toString(),
+        unitPrice: toEur(item.unitPrice).toString(),
         discountPercent: item.discountPercent.toString(),
-        discountAmount: item.discountAmount.toString(),
+        discountAmount: toEur(item.discountAmount).toString(),
         taxPercent: item.taxPercent.toString(),
-        taxAmount: item.taxAmount.toString(),
-        totalPrice: item.totalPrice.toString(),
+        taxAmount: toEur(item.taxAmount).toString(),
+        totalPrice: toEur(item.totalPrice).toString(),
       });
     }
 
@@ -143,6 +157,7 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
 }
 
 export async function getQuoteById(quoteId: string) {
+  const db = await getDb();
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -192,6 +207,7 @@ export async function getQuoteById(quoteId: string) {
 }
 
 export async function getQuotesByDeal(dealId: string) {
+  const db = await getDb();
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -217,6 +233,7 @@ export async function getQuotesByDeal(dealId: string) {
 }
 
 export async function updateQuoteAction(quoteId: string, data: z.infer<typeof UpdateQuoteSchema>) {
+  const db = await getDb();
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -325,6 +342,7 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
 }
 
 export async function deleteQuoteAction(quoteId: string) {
+  const db = await getDb();
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -370,6 +388,7 @@ export async function sendQuoteEmailAction(
     if (!session?.user?.id) {
       throw new Error("Unauthorized");
     }
+    const db = await getDb();
 
     const quote = await db.query.quotes.findFirst({
       where: eq(quotes.id, quoteId),
@@ -423,6 +442,7 @@ export async function sendQuoteEmailAction(
 }
 
 export async function markQuoteAsViewedAction(quoteId: string, email?: string, ipAddress?: string) {
+  const db = await getDb();
   try {
     const quote = await db.query.quotes.findFirst({
       where: eq(quotes.id, quoteId),
@@ -450,6 +470,7 @@ export async function markQuoteAsViewedAction(quoteId: string, email?: string, i
 }
 
 export async function getAllQuotes(filters?: { status?: string; searchTerm?: string }) {
+  const db = await getDb();
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -490,6 +511,7 @@ export async function getAllQuotes(filters?: { status?: string; searchTerm?: str
 // ── Approval Workflow ──────────────────────────────────────────────────────────
 
 export async function requestApprovalAction(quoteId: string) {
+  const db = await getDb();
   const session = await requireWriteAccess();
 
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
@@ -522,6 +544,7 @@ export async function requestApprovalAction(quoteId: string) {
 }
 
 export async function approveQuoteAction(quoteId: string) {
+  const db = await getDb();
   const session = await requireAdminAccess();
 
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
@@ -550,6 +573,7 @@ export async function approveQuoteAction(quoteId: string) {
 }
 
 export async function rejectQuoteAction(quoteId: string, note: string) {
+  const db = await getDb();
   const session = await requireAdminAccess();
 
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
@@ -579,6 +603,7 @@ export async function rejectQuoteAction(quoteId: string, note: string) {
 
 /** Lightweight list of deals + companies + products for the quote creation form. */
 export async function getQuoteFormData() {
+  const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 

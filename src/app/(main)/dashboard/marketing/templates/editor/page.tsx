@@ -1,4 +1,4 @@
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { emailTemplates } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
@@ -11,6 +11,7 @@ interface Props {
 }
 
 export default async function EmailEditorPage({ searchParams }: Props) {
+  const db = await getDb();
   const { id } = await searchParams;
 
   if (!id) {

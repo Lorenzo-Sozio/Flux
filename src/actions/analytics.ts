@@ -2,10 +2,11 @@
 
 import { and, count, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { contacts, deals, leads, quotes } from "@/db/schema";
 
 export async function getFunnelData(periodDays = 90) {
+  const db = await getDb();
   const since = new Date(Date.now() - periodDays * 86_400_000);
 
   const [[leadsRow], [convertedRow], [contactsRow], [dealsRow], [quotesRow], [wonRow]] = await Promise.all([

@@ -12,6 +12,7 @@ import {
   GanttChartSquare,
   Gauge,
   GitMerge,
+  HelpCircle,
   Kanban,
   type LucideIcon,
   Mail,
@@ -29,6 +30,7 @@ import {
   Users2,
   Webhook,
   Zap,
+  Shield,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -136,6 +138,8 @@ export const sidebarItems: NavGroup[] = [
           { titleKey: "webhooks", url: "/dashboard/settings/webhooks", icon: Webhook },
         ],
       },
+      { titleKey: "tenants", url: "/admin/tenants", icon: Shield, isNew: true },
+      { titleKey: "help", url: "/dashboard/help", icon: HelpCircle },
     ],
   },
   /*{

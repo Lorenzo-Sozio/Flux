@@ -10,9 +10,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 import { and, eq, lte, sql } from "drizzle-orm";
-import { db } from "@/db";
+import { verifyCronRequest } from "@/lib/cron-auth";
+import { getDb } from "@/lib/tenant-context";
 import { campaignLogs, emailJobs, marketingCampaigns, users } from "@/db/schema";
 import { sendEmail, getEmailConfig } from "@/lib/email-provider";
 import { sendActivityReminderEmail } from "@/lib/email";
@@ -25,21 +25,10 @@ const BATCH_SIZE = parseInt(process.env.EMAILS_PER_WORKER_RUN ?? "30");
 const RETRY_DELAYS_MS = [5 * 60 * 1000, 30 * 60 * 1000];
 
 export async function GET(req: NextRequest) {
-  // Verify cron secret (timing-safe to prevent oracle attacks)
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const authHeader = req.headers.get("authorization") ?? "";
-    const provided = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
-    let authorized = false;
-    try {
-      const a = Buffer.from(provided);
-      const b = Buffer.from(secret);
-      authorized = a.length === b.length && timingSafeEqual(a, b);
-    } catch {}
-    if (!authorized) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-  }
+  const authError = verifyCronRequest(req);
+  if (authError) return authError;
+
+  const db = await getDb();
 
   const now = new Date();
   const config = await getEmailConfig();
@@ -164,6 +153,7 @@ export async function GET(req: NextRequest) {
 }
 
 async function handleJobFailure(job: typeof emailJobs.$inferSelect, error: string, now: Date) {
+  const db = await getDb();
   const newAttempts = job.attempts + 1;
 
   if (newAttempts >= job.maxAttempts) {

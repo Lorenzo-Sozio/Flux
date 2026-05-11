@@ -1,7 +1,7 @@
 import NextAuth from "next-auth"
 import type { DefaultSession } from "next-auth"
 import { DrizzleAdapter } from "@auth/drizzle-adapter"
-import { db } from "./db"
+import { platformDb } from "./db"
 import { accounts, sessions, users, verificationTokens } from "./db/schema"
 import CredentialsProvider from "next-auth/providers/credentials"
 import GoogleProvider from "next-auth/providers/google"
@@ -21,9 +21,29 @@ declare module "next-auth" {
   }
 }
 
+// Wildcard cookie domain so the same session works on main domain + all subdomains.
+// ".localhost" in dev covers localhost:3000 and *.localhost:3000.
+// ".dominio.com" in prod covers dominio.com and *.dominio.com.
+const rootHost = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.split(":")[0] ?? "";
+const cookieDomain =
+  process.env.NODE_ENV === "production" && rootHost
+    ? `.${rootHost}`
+    : ".localhost";
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
-  adapter: DrizzleAdapter(db, {
+  cookies: {
+    sessionToken: {
+      options: {
+        domain: cookieDomain,
+        sameSite: "lax",
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        path: "/",
+      },
+    },
+  },
+  adapter: DrizzleAdapter(platformDb, {
     usersTable: users,
     accountsTable: accounts,
     sessionsTable: sessions,
@@ -43,7 +63,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
         
-        const [user] = await db
+        const [user] = await platformDb
           .select()
           .from(users)
           .where(eq(users.email, credentials.email as string))

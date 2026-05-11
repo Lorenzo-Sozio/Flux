@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { products } from "@/db/schema";
 import { eq, ilike, or, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -23,6 +23,7 @@ const productSchema = z.object({
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export async function getProducts(search?: string) {
+  const db = await getDb();
   const rows = await db
     .select()
     .from(products)
@@ -42,6 +43,7 @@ export async function getProducts(search?: string) {
 
 export async function createProduct(data: z.infer<typeof productSchema>) {
   await requireWriteAccess();
+  const db = await getDb();
   const validated = productSchema.parse(data);
   const [product] = await db
     .insert(products)
@@ -62,6 +64,7 @@ export async function createProduct(data: z.infer<typeof productSchema>) {
 
 export async function updateProduct(id: string, data: Partial<z.infer<typeof productSchema>>) {
   await requireWriteAccess();
+  const db = await getDb();
   const [product] = await db
     .update(products)
     .set({
@@ -78,12 +81,14 @@ export async function updateProduct(id: string, data: Partial<z.infer<typeof pro
 
 export async function toggleProductActive(id: string, isActive: boolean) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.update(products).set({ isActive, updatedAt: new Date() }).where(eq(products.id, id));
   revalidatePath("/dashboard/products");
 }
 
 export async function deleteProduct(id: string) {
   await requireWriteAccess();
+  const db = await getDb();
   await db.delete(products).where(eq(products.id, id));
   revalidatePath("/dashboard/products");
 }

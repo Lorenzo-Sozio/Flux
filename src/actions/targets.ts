@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { getAllUsersAction } from "@/actions/auth";
 import { requireAdminAccess } from "@/lib/auth-guard";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { salesTargets } from "@/db/schema";
 
 export { getAllUsersAction as getAllUsers };
@@ -25,6 +25,7 @@ const upsertSchema = z.object({
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export async function getSalesTargets(period?: string) {
+  const db = await getDb();
   return db.query.salesTargets.findMany({
     where: period ? eq(salesTargets.period, period) : undefined,
     with: { user: true },
@@ -36,6 +37,7 @@ export async function getSalesTargets(period?: string) {
 
 export async function upsertSalesTarget(data: z.infer<typeof upsertSchema>) {
   await requireAdminAccess();
+  const db = await getDb();
   const v = upsertSchema.parse(data);
 
   await db
@@ -64,6 +66,7 @@ export async function upsertSalesTarget(data: z.infer<typeof upsertSchema>) {
 
 export async function deleteSalesTarget(id: string) {
   await requireAdminAccess();
+  const db = await getDb();
   await db.delete(salesTargets).where(eq(salesTargets.id, id));
   revalidatePath("/dashboard/settings/targets");
   revalidatePath("/dashboard/pipeline/forecast");

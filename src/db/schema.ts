@@ -84,6 +84,42 @@ export const verificationTokens = pgTable(
   }),
 );
 
+// ─── GEO REFERENCE TABLES ─────────────────────────────────────────────────────
+
+export const geoCountries = pgTable(
+  "geo_country",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    iso2: text("iso2").notNull(),
+    iso3: text("iso3"),
+    nameEn: text("name_en").notNull(),
+    nameIt: text("name_it"),
+    callingCode: text("calling_code"),
+    active: boolean("active").default(true).notNull(),
+  },
+  (t) => [unique("geo_country_iso2_uniq").on(t.iso2)],
+);
+
+export const geoCities = pgTable(
+  "geo_city",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    countryId: text("country_id")
+      .notNull()
+      .references(() => geoCountries.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    slug: text("slug").notNull(),
+    region: text("region"),
+    postalCodes: text("postal_codes").array().default([]),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [unique("geo_city_country_slug_uniq").on(t.countryId, t.slug)],
+);
+
 // --- CRM CORE ENTITIES ---
 
 export const companies = pgTable("company", {
@@ -102,6 +138,8 @@ export const companies = pgTable("company", {
   state: text("state"),
   zipCode: text("zip_code"),
   country: text("country"),
+  countryId: text("country_id").references(() => geoCountries.id, { onDelete: "set null" }),
+  cityId: text("city_id").references(() => geoCities.id, { onDelete: "set null" }),
   mainPhone: text("main_phone"),
   mainEmail: text("main_email"),
   linkedinUrl: text("linkedin_url"),
@@ -136,6 +174,8 @@ export const leads = pgTable("lead", {
   state: text("state"),
   zipCode: text("zip_code"),
   country: text("country"),
+  countryId: text("country_id").references(() => geoCountries.id, { onDelete: "set null" }),
+  cityId: text("city_id").references(() => geoCities.id, { onDelete: "set null" }),
   status: text("status").default("new").notNull(), // new, contacting, engaged, qualified, unqualified
   source: text("source"), // organic, referral, outbound, event, etc.
   rating: text("rating"), // hot, warm, cold
@@ -172,6 +212,8 @@ export const contacts = pgTable("contact", {
   state: text("state"),
   zipCode: text("zip_code"),
   country: text("country"),
+  countryId: text("country_id").references(() => geoCountries.id, { onDelete: "set null" }),
+  cityId: text("city_id").references(() => geoCities.id, { onDelete: "set null" }),
   status: text("status").default("active").notNull(),
   source: text("source"),
   leadScore: integer("lead_score"),
@@ -270,7 +312,7 @@ export const deals = pgTable("deal", {
     .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull(),
   amount: numeric("amount", { precision: 12, scale: 2 }),
-  currency: text("currency").default("USD").notNull(),
+  currency: text("currency").default("EUR").notNull(),
   probability: integer("probability").default(0),
   expectedCloseDate: timestamp("expected_close_date", { mode: "date" }),
   stageId: text("stage_id").references(() => pipelineStages.id, { onDelete: "restrict" }),
@@ -730,7 +772,7 @@ export const quotes = pgTable("quote", {
   taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
   taxPercent: numeric("tax_percent", { precision: 5, scale: 2 }).default("0"),
   totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
-  currency: text("currency").default("USD").notNull(),
+  currency: text("currency").default("EUR").notNull(),
   issuedAt: timestamp("issued_at", { mode: "date" }).defaultNow().notNull(),
   expiresAt: timestamp("expires_at", { mode: "date" }),
   sentAt: timestamp("sent_at", { mode: "date" }),
@@ -1291,4 +1333,51 @@ export const savedReports = pgTable("saved_report", {
 
 export const savedReportsRelations = relations(savedReports, ({ one }) => ({
   owner: one(users, { fields: [savedReports.ownerId], references: [users.id] }),
+}));
+
+// ─── Exchange Rates Cache ─────────────────────────────────────────────────────
+
+export const exchangeRatesCache = pgTable("exchange_rates_cache", {
+  id: text("id").primaryKey().default("eur"),
+  rates: text("rates").notNull(), // JSON: { usd: 1.09, gbp: 0.86, ... }
+  fetchedAt: timestamp("fetched_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// ─── Multi-tenant registry (platform DB) ──────────────────────────────────────
+
+export const tenants = pgTable("tenants", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  subdomain: text("subdomain").notNull().unique(),
+  dbUrl: text("db_url").notNull(), // AES-256-GCM encrypted Neon connection string
+  settings: text("settings"), // JSON: { emoji?, logo?, primaryColor? }
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// Maps platform users to tenants with a role. Lives only in the platform DB.
+export const tenantMembers = pgTable(
+  "tenant_members",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Mirrors the roles used throughout the app: owner > admin > editor > viewer
+    role: text("role").notNull().default("editor"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [unique("tenant_members_tenant_user_unique").on(t.tenantId, t.userId)],
+);
+
+export const tenantMembersRelations = relations(tenantMembers, ({ one }) => ({
+  tenant: one(tenants, { fields: [tenantMembers.tenantId], references: [tenants.id] }),
+  user: one(users, { fields: [tenantMembers.userId], references: [users.id] }),
 }));

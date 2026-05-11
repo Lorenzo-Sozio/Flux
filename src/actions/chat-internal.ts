@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import {
   dmConversations,
   dmConversationMembers,
@@ -27,6 +27,7 @@ function isMuted(mutedUntil: Date | null): boolean {
 // ── Conversations list ────────────────────────────────────────────────────────
 
 export async function getConversations() {
+  const db = await getDb();
   const me = await requireSession();
 
   const myMemberships = await db
@@ -78,6 +79,7 @@ export async function getConversations() {
 // ── Total unread badge ────────────────────────────────────────────────────────
 
 export async function getTotalUnreadCount(): Promise<number> {
+  const db = await getDb();
   const me = await requireSession();
 
   const memberships = await db
@@ -106,6 +108,7 @@ export async function getTotalUnreadCount(): Promise<number> {
 // ── Get or create direct conversation ─────────────────────────────────────────
 
 export async function getOrCreateDirectConversation(otherUserId: string) {
+  const db = await getDb();
   const me = await requireSession();
   if (me.id === otherUserId) throw new Error("Cannot DM yourself");
 
@@ -146,6 +149,7 @@ export async function getOrCreateDirectConversation(otherUserId: string) {
 // ── Create group conversation ─────────────────────────────────────────────────
 
 export async function createGroupConversation(name: string, memberIds: string[]) {
+  const db = await getDb();
   const me = await requireSession();
   const allIds = Array.from(new Set([me.id, ...memberIds]));
   if (allIds.length < 2) throw new Error("Group needs at least 2 members");
@@ -160,6 +164,7 @@ export async function createGroupConversation(name: string, memberIds: string[])
 // ── Get messages ──────────────────────────────────────────────────────────────
 
 export async function getMessages(conversationId: string, before?: string) {
+  const db = await getDb();
   const me = await requireSession();
 
   const membership = await db.query.dmConversationMembers.findFirst({
@@ -182,6 +187,7 @@ export async function getMessages(conversationId: string, before?: string) {
 // ── Send message ──────────────────────────────────────────────────────────────
 
 export async function sendMessage(conversationId: string, content: string) {
+  const db = await getDb();
   const me = await requireSession();
   const trimmed = content.trim();
   if (!trimmed) throw new Error("Empty message");
@@ -224,6 +230,7 @@ export async function sendMessage(conversationId: string, content: string) {
 // ── Mark read ─────────────────────────────────────────────────────────────────
 
 export async function markConversationRead(conversationId: string) {
+  const db = await getDb();
   const me = await requireSession();
   await db
     .update(dmConversationMembers)
@@ -234,6 +241,7 @@ export async function markConversationRead(conversationId: string) {
 // ── Mute / unmute ─────────────────────────────────────────────────────────────
 
 export async function muteConversation(conversationId: string, minutes: number | null) {
+  const db = await getDb();
   const me = await requireSession();
   const mutedUntil = minutes === null ? null : new Date(Date.now() + minutes * 60_000);
   await db
@@ -245,6 +253,7 @@ export async function muteConversation(conversationId: string, minutes: number |
 // ── Leave group ───────────────────────────────────────────────────────────────
 
 export async function leaveConversation(conversationId: string) {
+  const db = await getDb();
   const me = await requireSession();
   await db
     .delete(dmConversationMembers)
@@ -254,6 +263,7 @@ export async function leaveConversation(conversationId: string) {
 // ── Delete conversation ───────────────────────────────────────────────────────
 
 export async function deleteConversation(conversationId: string) {
+  const db = await getDb();
   const me = await requireSession();
 
   // Verify membership before deleting
@@ -269,6 +279,7 @@ export async function deleteConversation(conversationId: string) {
 // ── Users picker ──────────────────────────────────────────────────────────────
 
 export async function getChatUsers() {
+  const db = await getDb();
   const me = await requireSession();
   return db
     .select({ id: users.id, name: users.name, email: users.email })

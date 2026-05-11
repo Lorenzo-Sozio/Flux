@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { and, eq } from "drizzle-orm";
 
 import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sidebar";
 import { auth } from "@/auth";
@@ -13,18 +15,67 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { SIDEBAR_COLLAPSIBLE_VALUES, SIDEBAR_VARIANT_VALUES } from "@/lib/preferences/layout";
 import { cn } from "@/lib/utils";
 import { getPreference } from "@/server/server-actions";
+import { platformDb } from "@/db";
+import { tenantMembers, tenants, users } from "@/db/schema";
+import { getCurrentSubdomain, getDb } from "@/lib/tenant-context";
 
 //import { AccountSwitcher } from "./_components/sidebar/account-switcher";
 import { LayoutControls } from "./_components/sidebar/layout-controls";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
 import { LocaleSwitcher } from "@/components/ui/locale-switcher";
+import { CurrencySwitcher } from "@/components/ui/currency-switcher";
+import { CurrencyProvider } from "@/contexts/currency-context";
 import { RecentlyVisited } from "@/components/crm/recently-visited";
 import { ChatWidget } from "@/components/chat/chat-widget";
 
 export default async function Layout({ children }: Readonly<{ children: ReactNode }>) {
   const session = await auth();
   const user = session?.user || { name: "Ospite", email: "" };
+
+  // ── Tenant subdomain: verify membership + sync user to tenant DB ──────────
+  const subdomain = await getCurrentSubdomain();
+  if (subdomain) {
+    if (!session?.user?.id) redirect("/auth/v1/login");
+  }
+  if (subdomain && session?.user?.id) {
+    const [tenant] = await platformDb
+      .select()
+      .from(tenants)
+      .where(eq(tenants.subdomain, subdomain));
+
+    if (!tenant) redirect("/not-found");
+
+    const [member] = await platformDb
+      .select()
+      .from(tenantMembers)
+      .where(
+        and(
+          eq(tenantMembers.tenantId, tenant.id),
+          eq(tenantMembers.userId, session.user.id),
+        ),
+      );
+
+    if (!member) redirect("/unauthorized");
+
+    // Upsert the user into the tenant DB so tenant-side FK constraints work.
+    // This is a fast no-op on subsequent visits (onConflictDoUpdate is idempotent).
+    const db = await getDb();
+    await db
+      .insert(users)
+      .values({
+        id: session.user.id,
+        name: session.user.name ?? "",
+        email: session.user.email ?? "",
+        role: member.role,
+      })
+      .onConflictDoUpdate({
+        target: users.id,
+        set: { name: session.user.name ?? "", role: member.role },
+      });
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   const cookieStore = await cookies();
   const userNotifications = session?.user?.id
     ? await getNotificationsAction(session.user.id)
@@ -36,6 +87,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
   ]);
 
   return (
+    <CurrencyProvider>
     <SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar user={user} variant={variant} collapsible={collapsible} />
       <SidebarInset
@@ -71,6 +123,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
                   userId={session.user.id}
                 />
               )}
+              <CurrencySwitcher />
               <LocaleSwitcher />
               <LayoutControls />
               <ThemeSwitcher />
@@ -81,5 +134,6 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
       </SidebarInset>
       {session?.user?.id && <ChatWidget userId={session.user.id} />}
     </SidebarProvider>
+    </CurrencyProvider>
   );
 }

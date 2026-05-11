@@ -1,6 +1,6 @@
 "use server";
 
-import { db } from "@/db";
+import { getDb } from "@/lib/tenant-context";
 import { customFilters, customFilterTags, filterPresets } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -9,6 +9,7 @@ import { auth } from "@/auth";
 // --- CUSTOM FILTERS ---
 
 export async function getCustomFilters(entityType: string) {
+  const db = await getDb();
   const session = await auth();
   const userId = session?.user?.id;
 
@@ -25,6 +26,7 @@ export async function getCustomFilters(entityType: string) {
 }
 
 export async function getPublicFilters(entityType: string) {
+  const db = await getDb();
   return await db
     .select()
     .from(customFilters)
@@ -46,6 +48,7 @@ export async function createCustomFilter(data: {
   isPinned?: boolean;
   tags?: string[];
 }) {
+  const db = await getDb();
   const session = await auth();
   const userId = session?.user?.id;
 
@@ -89,6 +92,7 @@ export async function updateCustomFilter(
     isPinned?: boolean;
   }
 ) {
+  const db = await getDb();
   const updateData: Record<string, any> = {};
   if (data.name) updateData.name = data.name;
   if (data.description) updateData.description = data.description;
@@ -111,6 +115,7 @@ export async function updateCustomFilter(
 }
 
 export async function deleteCustomFilter(id: string) {
+  const db = await getDb();
   await db.delete(customFilterTags).where(eq(customFilterTags.filterId, id));
   await db.delete(customFilters).where(eq(customFilters.id, id));
   revalidatePath(`/dashboard/leads`);
@@ -120,6 +125,7 @@ export async function deleteCustomFilter(id: string) {
 }
 
 export async function togglePinFilter(id: string, isPinned: boolean) {
+  const db = await getDb();
   await db
     .update(customFilters)
     .set({ isPinned })
@@ -130,6 +136,7 @@ export async function togglePinFilter(id: string, isPinned: boolean) {
 // --- FILTER PRESETS (System defaults) ---
 
 export async function getFilterPresets(entityType: string) {
+  const db = await getDb();
   return await db
     .select()
     .from(filterPresets)
@@ -142,6 +149,7 @@ export async function createFilterPreset(data: {
   entityType: string;
   defaultCriteria: Record<string, any>;
 }) {
+  const db = await getDb();
   const [newPreset] = await db
     .insert(filterPresets)
     .values({
