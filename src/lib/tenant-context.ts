@@ -10,7 +10,7 @@
  * keep working during the Block 2 migration.
  */
 import { cache } from "react";
-import { headers } from "next/headers";
+import { headers, cookies } from "next/headers";
 import { platformDb, createTenantDb } from "@/db";
 import { getTenantBySubdomain } from "./get-tenant";
 import { decryptDbUrl } from "./tenant-db";
@@ -20,7 +20,7 @@ export { extractSubdomainFromHost };
 
 export const getDb = cache(async () => {
   let host = "";
-  
+
   try {
     // Try to get headers from request context
     const h = await headers();
@@ -35,7 +35,19 @@ export const getDb = cache(async () => {
     return platformDb;
   }
 
-  const subdomain = extractSubdomainFromHost(host);
+  let subdomain = extractSubdomainFromHost(host);
+
+  // Test-mode cookie override: allows accessing tenant CRM on Vercel preview URLs
+  // where wildcard subdomains aren't available. Enable via ENABLE_TENANT_OVERRIDE=true.
+  if (!subdomain && process.env.ENABLE_TENANT_OVERRIDE === "true") {
+    try {
+      const cookieStore = await cookies();
+      const override = cookieStore.get("__tenant_override")?.value;
+      if (override) subdomain = override;
+    } catch {
+      // cookie access outside request context — ignore
+    }
+  }
 
   if (!subdomain) return platformDb;
 
@@ -58,9 +70,16 @@ export const getDb = cache(async () => {
 export const getCurrentSubdomain = cache(async (): Promise<string | null> => {
   try {
     const h = await headers();
-    return extractSubdomainFromHost(h.get("host") ?? "");
-  } catch (err) {
-    // Outside request context
+    const sub = extractSubdomainFromHost(h.get("host") ?? "");
+    if (sub) return sub;
+
+    if (process.env.ENABLE_TENANT_OVERRIDE === "true") {
+      const cookieStore = await cookies();
+      return cookieStore.get("__tenant_override")?.value ?? null;
+    }
+
+    return null;
+  } catch {
     return null;
   }
 });

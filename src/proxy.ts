@@ -27,7 +27,15 @@ const { auth } = NextAuth(authConfig);
 
 export const proxy = auth((req) => {
   const host = req.headers.get("host") ?? "";
-  const subdomain = extractSubdomainFromHost(host);
+  let subdomain = extractSubdomainFromHost(host);
+
+  // Test-mode override: read __tenant_override cookie when on a Vercel preview URL
+  // (wildcard subdomains are unavailable on vercel.app). Requires ENABLE_TENANT_OVERRIDE=true.
+  if (!subdomain && process.env.ENABLE_TENANT_OVERRIDE === "true") {
+    const override = req.cookies.get("__tenant_override")?.value;
+    if (override) subdomain = override;
+  }
+
   const isLoggedIn = !!req.auth?.user;
 
   // ── Tenant subdomain routing ──────────────────────────────────────────────

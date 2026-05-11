@@ -135,7 +135,9 @@
       "Bash(node --input-type=module)",
       "Bash(Remove-Item -Recurse -Force \"c:\\\\React\\\\Flux\\\\.next\" -ErrorAction SilentlyContinue)",
       "Bash(Write-Host \"Cache cleared\")",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "PowerShell(Get-ChildItem \"c:\\\\React\\\\Flux\" -Recurse -Name -Filter \"middleware.ts\" | Where-Object { $_ -notmatch \"node_modules\" })",
+      "PowerShell(Get-ChildItem \"c:\\\\React\\\\Flux\" -Name | Where-Object { $_ -match \"vercel|next\\\\.config\" })"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",
