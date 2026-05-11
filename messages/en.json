@@ -1630,7 +1630,9 @@
       "stageRates": "Stage Conversion Rates",
       "avgLeadConversion": "Avg lead conversion time",
       "avgDealCycle": "Avg deal cycle",
-      "leadsBySource": "Leads by Source"
+      "leadsBySource": "Leads by Source",
+      "back": "Pipeline",
+      "daysLabel": "{count} days"
     },
     "overview": "Overview",
     "visitors": "Visitors",
@@ -1751,7 +1753,12 @@
       "viewer": "Viewer"
     },
     "rolePerms": {
-      "owner": ["All admin permissions", "Transfer workspace ownership", "Delete workspace", "Manage billing"],
+      "owner": [
+        "All admin permissions",
+        "Transfer workspace ownership",
+        "Delete workspace",
+        "Manage billing"
+      ],
       "admin": [
         "All user permissions",
         "Invite and manage users",
@@ -2235,7 +2242,6 @@
     "filterAll": "All",
     "filterMine": "Mine",
     "filterGroup": "My group",
-    "allDay": "All day",
     "noEventsThisDay": "No events scheduled for this day"
   },
   "chat": {

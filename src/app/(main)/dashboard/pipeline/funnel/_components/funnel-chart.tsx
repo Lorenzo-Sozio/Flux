@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import { useTranslations } from "next-intl";
+
 type Stage = {
   label: string;
   count: number;
@@ -22,7 +24,6 @@ export function FunnelChart({ stages, conversionRates }: { stages: Stage[]; conv
       {stages.map((stage, i) => {
         const widthPct = Math.max((stage.count / maxCount) * 100, stage.count > 0 ? 4 : 1);
         const cr = conversionRates[i - 1];
-        const displayRate = Math.min(cr?.rate ?? 0, 100);
         return (
           <div key={stage.label}>
             {i > 0 && cr && (
@@ -55,11 +56,12 @@ export function FunnelChart({ stages, conversionRates }: { stages: Stage[]; conv
 }
 
 export function PeriodSelector({ current, base }: { current: number; base: string }) {
+  const t = useTranslations("analytics.funnel");
   const options = [
-    { label: "30 days", value: 30 },
-    { label: "90 days", value: 90 },
-    { label: "180 days", value: 180 },
-    { label: "365 days", value: 365 },
+    { value: 30 },
+    { value: 90 },
+    { value: 180 },
+    { value: 365 },
   ];
 
   return (
@@ -74,7 +76,7 @@ export function PeriodSelector({ current, base }: { current: number; base: strin
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
           }`}
         >
-          {opt.label}
+          {t("daysLabel", { count: opt.value })}
         </Link>
       ))}
     </div>

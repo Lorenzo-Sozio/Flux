@@ -137,7 +137,19 @@
       "Bash(Write-Host \"Cache cleared\")",
       "Bash(git add *)",
       "PowerShell(Get-ChildItem \"c:\\\\React\\\\Flux\" -Recurse -Name -Filter \"middleware.ts\" | Where-Object { $_ -notmatch \"node_modules\" })",
-      "PowerShell(Get-ChildItem \"c:\\\\React\\\\Flux\" -Name | Where-Object { $_ -match \"vercel|next\\\\.config\" })"
+      "PowerShell(Get-ChildItem \"c:\\\\React\\\\Flux\" -Name | Where-Object { $_ -match \"vercel|next\\\\.config\" })",
+      "Bash(node -e \"const f = require\\('c:/React/Flux/messages/en.json'\\); const keys = Object.keys\\(f\\); console.log\\(keys.join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"const f = require\\('c:/React/Flux/messages/en.json'\\); console.log\\(JSON.stringify\\(f.settings, null, 2\\)\\)\")",
+      "Bash(node -e \"const f = require\\('c:/React/Flux/messages/it.json'\\); console.log\\(JSON.stringify\\(f.settings?.targets, null, 2\\)\\)\")",
+      "Bash(node -e \"const f = require\\('c:/React/Flux/messages/it.json'\\); console.log\\(JSON.stringify\\(f.settings, null, 2\\)\\)\")",
+      "Bash(node -e \"const fs = require\\('fs'\\); const content = fs.readFileSync\\('c:/React/Flux/messages/it.json', 'utf8'\\); const lines = content.split\\('\\\\n'\\); const pipelineEnd = lines.reduce\\(\\(acc, l, i\\) => l.includes\\('\\\\\"deleteFailed\\\\\": \\\\\"Impossibile eliminare una fase con trattative attive.\\\\\"'\\) ? i : acc, -1\\); console.log\\('Line:', pipelineEnd, '| Content:', lines[pipelineEnd]\\)\")",
+      "Bash(Get-ChildItem \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\dashboard\" -Directory)",
+      "Bash(node -e \"try { const f = require\\('c:/React/Flux/messages/it.json'\\); console.log\\('Valid JSON'\\); console.log\\('settings.targets.title:', f.settings?.targets?.title\\); } catch\\(e\\) { console.error\\('INVALID:', e.message\\); }\")",
+      "Bash(node -e \"try { const f = require\\('c:/React/Flux/messages/it.json'\\); console.log\\('it.json valid'\\); console.log\\('settings.targets.title:', f.settings?.targets?.title\\); console.log\\('settings.targets.savedToast:', f.settings?.targets?.savedToast\\); const e = require\\('c:/React/Flux/messages/en.json'\\); console.log\\('en.json valid'\\); console.log\\('settings.targets.title:', e.settings?.targets?.title\\); } catch\\(err\\) { console.error\\(err.message\\); }\")",
+      "Bash(node -e \"const f = require\\('c:/React/Flux/messages/en.json'\\); console.log\\(JSON.stringify\\(f.analytics, null, 2\\)\\)\")",
+      "Bash(node -e \"const f = require\\('c:/React/Flux/messages/it.json'\\); console.log\\(JSON.stringify\\(f.analytics, null, 2\\)\\)\")",
+      "Bash(node -e \"const f = require\\('c:/React/Flux/messages/en.json'\\); console.log\\(JSON.stringify\\(f.nav, null, 2\\)\\)\")",
+      "Bash(node -e \"try { require\\('c:/React/Flux/messages/en.json'\\); require\\('c:/React/Flux/messages/it.json'\\); console.log\\('Both JSON valid'\\); } catch\\(e\\) { console.error\\(e.message\\); }\")"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",

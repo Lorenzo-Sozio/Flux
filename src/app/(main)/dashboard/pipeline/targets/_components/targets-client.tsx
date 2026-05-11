@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 
 import { format, addMonths, startOfMonth } from "date-fns";
 import { Loader2, Plus, Save, Target, Trash2, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteSalesTarget, upsertSalesTarget } from "@/actions/targets";
@@ -37,6 +38,7 @@ function getNextMonths(count = 6): string[] {
 }
 
 export function TargetsClient({ users, initialTargets }: Props) {
+  const t = useTranslations("settings.targets");
   const [targets, setTargets] = useState(initialTargets);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState("");
@@ -47,13 +49,13 @@ export function TargetsClient({ users, initialTargets }: Props) {
   const months = getNextMonths(7);
 
   const getTarget = (userId: string, period: string) =>
-    targets.find((t) => t.userId === userId && t.period === period);
+    targets.find((tgt) => tgt.userId === userId && tgt.period === period);
 
-  const startEdit = (t: SalesTarget) => {
-    setEditingKey(`${t.userId}:${t.period}`);
-    setEditAmount(String(parseFloat(t.targetAmount)));
-    setEditDeals(t.targetDeals != null ? String(t.targetDeals) : "");
-    setEditCurrency(t.currency);
+  const startEdit = (tgt: SalesTarget) => {
+    setEditingKey(`${tgt.userId}:${tgt.period}`);
+    setEditAmount(String(parseFloat(tgt.targetAmount)));
+    setEditDeals(tgt.targetDeals != null ? String(tgt.targetDeals) : "");
+    setEditCurrency(tgt.currency);
   };
 
   const startNew = (userId: string, period: string) => {
@@ -70,7 +72,7 @@ export function TargetsClient({ users, initialTargets }: Props) {
   const saveEdit = (userId: string, period: string) => {
     const amount = parseFloat(editAmount);
     if (Number.isNaN(amount) || amount < 0) {
-      toast.error("Enter a valid amount.");
+      toast.error(t("invalidAmount"));
       return;
     }
     startTransition(async () => {
@@ -84,7 +86,7 @@ export function TargetsClient({ users, initialTargets }: Props) {
           currency: editCurrency,
         });
         setTargets((prev) => {
-          const filtered = prev.filter((t) => !(t.userId === userId && t.period === period));
+          const filtered = prev.filter((tgt) => !(tgt.userId === userId && tgt.period === period));
           return [
             ...filtered,
             {
@@ -99,10 +101,10 @@ export function TargetsClient({ users, initialTargets }: Props) {
             },
           ];
         });
-        toast.success("Target saved.");
+        toast.success(t("savedToast"));
         cancelEdit();
       } catch {
-        toast.error("Failed to save target.");
+        toast.error(t("saveFailed"));
       }
     });
   };
@@ -111,10 +113,10 @@ export function TargetsClient({ users, initialTargets }: Props) {
     startTransition(async () => {
       try {
         await deleteSalesTarget(id);
-        setTargets((prev) => prev.filter((t) => t.id !== id));
-        toast.success("Target removed.");
+        setTargets((prev) => prev.filter((tgt) => tgt.id !== id));
+        toast.success(t("removedToast"));
       } catch {
-        toast.error("Failed to remove target.");
+        toast.error(t("removeFailed"));
       }
     });
   };
@@ -124,17 +126,15 @@ export function TargetsClient({ users, initialTargets }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-            <Target className="h-6 w-6 text-primary" /> Sales Targets
+            <Target className="h-6 w-6 text-primary" /> {t("title")}
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Set monthly revenue and deal targets per user. These appear in the Pipeline Forecast.
-          </p>
+          <p className="text-muted-foreground text-sm mt-1">{t("subtitle")}</p>
         </div>
       </div>
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">Monthly Targets by User</CardTitle>
+          <CardTitle className="text-sm font-medium text-muted-foreground">{t("cardTitle")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -142,7 +142,7 @@ export function TargetsClient({ users, initialTargets }: Props) {
               <thead>
                 <tr className="border-b bg-muted/40">
                   <th className="px-4 py-2.5 text-left font-medium text-xs text-muted-foreground sticky left-0 bg-muted/40 min-w-[160px]">
-                    User
+                    {t("colUser")}
                   </th>
                   {months.map((m) => (
                     <th key={m} className="px-3 py-2.5 text-center font-medium text-xs text-muted-foreground min-w-[140px]">
@@ -164,7 +164,7 @@ export function TargetsClient({ users, initialTargets }: Props) {
                     </td>
                     {months.map((period) => {
                       const key = `${user.id}:${period}`;
-                      const t = getTarget(user.id, period);
+                      const target = getTarget(user.id, period);
                       const isEditing = editingKey === key;
 
                       return (
@@ -189,7 +189,7 @@ export function TargetsClient({ users, initialTargets }: Props) {
                                   step="100"
                                   value={editAmount}
                                   onChange={(e) => setEditAmount(e.target.value)}
-                                  placeholder="Amount"
+                                  placeholder={t("amountPlaceholder")}
                                   className="h-7 text-xs flex-1"
                                 />
                               </div>
@@ -198,7 +198,7 @@ export function TargetsClient({ users, initialTargets }: Props) {
                                 min="0"
                                 value={editDeals}
                                 onChange={(e) => setEditDeals(e.target.value)}
-                                placeholder="Deals (opt.)"
+                                placeholder={t("dealsPlaceholder")}
                                 className="h-7 text-xs"
                               />
                               <div className="flex items-center justify-end gap-1">
@@ -225,23 +225,25 @@ export function TargetsClient({ users, initialTargets }: Props) {
                                 </Button>
                               </div>
                             </div>
-                          ) : t ? (
+                          ) : target ? (
                             <div className="group relative inline-flex flex-col items-center gap-0.5">
                               <button
                                 type="button"
-                                onClick={() => startEdit(t)}
+                                onClick={() => startEdit(target)}
                                 className="text-sm font-semibold tabular-nums hover:text-primary transition-colors"
                               >
-                                {formatCurrency(parseFloat(t.targetAmount), { currency: t.currency, maximumFractionDigits: 0 })}
+                                {formatCurrency(parseFloat(target.targetAmount), { currency: target.currency, maximumFractionDigits: 0 })}
                               </button>
-                              {t.targetDeals != null && (
-                                <span className="text-xs text-muted-foreground">{t.targetDeals} deals</span>
+                              {target.targetDeals != null && (
+                                <span className="text-xs text-muted-foreground">
+                                  {t("dealsLabel", { count: target.targetDeals })}
+                                </span>
                               )}
                               <Button
                                 size="icon"
                                 variant="ghost"
                                 className="h-5 w-5 absolute -right-5 top-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                                onClick={() => handleDelete(t.id)}
+                                onClick={() => handleDelete(target.id)}
                                 disabled={isPending}
                               >
                                 <Trash2 className="h-3 w-3" />
@@ -252,7 +254,7 @@ export function TargetsClient({ users, initialTargets }: Props) {
                               type="button"
                               onClick={() => startNew(user.id, period)}
                               className="text-muted-foreground/40 hover:text-primary transition-colors"
-                              title="Set target"
+                              title={t("setTargetTitle")}
                             >
                               <Plus className="h-4 w-4 mx-auto" />
                             </button>
@@ -268,9 +270,7 @@ export function TargetsClient({ users, initialTargets }: Props) {
         </CardContent>
       </Card>
 
-      <p className="text-xs text-muted-foreground">
-        Click any cell to set or edit a target. Targets appear as reference lines in the Pipeline Forecast.
-      </p>
+      <p className="text-xs text-muted-foreground">{t("footerHint")}</p>
     </div>
   );
 }

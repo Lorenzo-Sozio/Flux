@@ -16,11 +16,7 @@ export default async function ForecastPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/dashboard/pipeline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Pipeline
-          </Link>
-        </Button>
+        
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-muted-foreground text-sm">{t("subtitle")}</p>

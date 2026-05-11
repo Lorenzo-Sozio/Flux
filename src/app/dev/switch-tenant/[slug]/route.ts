@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { getTenantBySubdomain } from "@/lib/get-tenant";
 
 export async function GET(
@@ -7,6 +8,12 @@ export async function GET(
 ) {
   if (process.env.ENABLE_TENANT_OVERRIDE !== "true") {
     return new Response("Not found", { status: 404 });
+  }
+
+  // Require login before revealing whether a tenant slug exists.
+  const session = await auth();
+  if (!session?.user?.id) {
+    return new Response("Unauthorized", { status: 401 });
   }
 
   const { slug } = await params;

@@ -89,8 +89,8 @@ export const sidebarItems: NavGroup[] = [
       { titleKey: "products", url: "/dashboard/products", icon: Package, isNew: true },
       { titleKey: "orders", url: "/dashboard/orders", icon: ShoppingCart, isNew: true },
       { titleKey: "pipeline", url: "/dashboard/pipeline", icon: Kanban },
-      { titleKey: "salesTargets", url: "/dashboard/settings/targets", icon: TrendingUp, isNew: true },
-      { titleKey: "salesFunnel", url: "/dashboard/analytics/funnel", icon: GitMerge, isNew: true },
+      { titleKey: "salesTargets", url: "/dashboard/pipeline/targets", icon: TrendingUp, isNew: true },
+      { titleKey: "salesFunnel", url: "/dashboard/pipeline/funnel", icon: GitMerge, isNew: true },
     ],
   },
   {

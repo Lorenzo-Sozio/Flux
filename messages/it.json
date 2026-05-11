@@ -1569,7 +1569,26 @@
     "last7Days": "Ultimi 7 giorni",
     "last30Days": "Ultimi 30 giorni",
     "last90Days": "Ultimi 90 giorni",
-    "thisYear": "Quest'anno"
+    "thisYear": "Quest'anno",
+    "funnel": {
+      "title": "Funnel Vendite",
+      "subtitle": "Analisi conversione lead→vinto — ultimi {days} giorni",
+      "totalLeads": "Lead Totali",
+      "totalLeadsDesc": "Entrati nell'imbuto",
+      "won": "Vinti",
+      "wonDesc": "Trattative chiuse vinte",
+      "overallRate": "Tasso Globale",
+      "overallRateDesc": "Lead → Vinto",
+      "avgCycle": "Ciclo Medio",
+      "avgCycleDesc": "Creazione trattativa → vinto",
+      "conversionFunnel": "Imbuto di Conversione",
+      "stageRates": "Tassi di Conversione per Fase",
+      "avgLeadConversion": "Tempo medio conversione lead",
+      "avgDealCycle": "Ciclo medio trattativa",
+      "leadsBySource": "Lead per Fonte",
+      "back": "Pipeline",
+      "daysLabel": "{count} giorni"
+    }
   },
   "users": {
     "title": "Utenti",
@@ -1912,6 +1931,26 @@
       "deleteConfirm": "Eliminare questa fase? Tutte le trattative devono essere spostate in un'altra fase prima.",
       "deleteSuccess": "Fase eliminata.",
       "deleteFailed": "Impossibile eliminare una fase con trattative attive."
+    },
+    "targets": {
+      "title": "Obiettivi di Vendita",
+      "subtitle": "Imposta obiettivi mensili di fatturato e trattative per utente. Appaiono nelle Previsioni Pipeline.",
+      "cardTitle": "Obiettivi Mensili per Utente",
+      "colUser": "Utente",
+      "amountPlaceholder": "Importo",
+      "dealsPlaceholder": "Trattative (opz.)",
+      "footerHint": "Fai clic su una cella per impostare o modificare un obiettivo. Gli obiettivi appaiono come linee di riferimento nelle Previsioni Pipeline.",
+      "setTargetTitle": "Imposta obiettivo",
+      "savedToast": "Obiettivo salvato.",
+      "saveFailed": "Salvataggio obiettivo non riuscito.",
+      "removedToast": "Obiettivo rimosso.",
+      "removeFailed": "Rimozione obiettivo non riuscita.",
+      "invalidAmount": "Inserisci un importo valido.",
+      "dealsLabel": "{count} trattative",
+      "monthCardTitle": "Obiettivo Mensile",
+      "monthCardNoTarget": "Nessun obiettivo impostato",
+      "monthCardOf": "di {amount}",
+      "monthCardPct": "dell'obiettivo"
     }
   },
   "reports": {
@@ -2145,7 +2184,6 @@
     "filterAll": "Tutti",
     "filterMine": "I miei",
     "filterGroup": "Il mio gruppo",
-    "allDay": "Tutto il giorno",
     "noEventsThisDay": "Nessun evento programmato per questo giorno"
   },
   "chat": {
