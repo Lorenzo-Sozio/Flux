@@ -91,6 +91,7 @@ const STATUS_CLASS: Record<string, string> = {
 
 const newOrderSchema = z.object({
   status:    z.enum(["draft", "processing", "completed", "cancelled"]).default("draft"),
+  currency:  z.string().default("EUR"),
   orderDate: z.string().optional(),
   items: z.array(z.object({
     productId: z.string().min(1, "Select a product"),
@@ -115,7 +116,7 @@ function NewOrderDialog({
 }) {
   const t = useTranslations("orders");
   const tc = useTranslations("common");
-  const { formatAmount } = useCurrency();
+  const { formatAmount, currency } = useCurrency();
   const [open, setOpen]             = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const activeProducts = products.filter((p) => p.isActive);
@@ -124,6 +125,7 @@ function NewOrderDialog({
     resolver: zodResolver(newOrderSchema),
     defaultValues: {
       status:    "draft",
+      currency:  currency ?? "EUR",
       orderDate: new Date().toISOString().slice(0, 10),
       items: [{ productId: "", quantity: 1, unitPrice: 0 }],
     },
