@@ -138,31 +138,7 @@ export const sidebarItems: NavGroup[] = [
           { titleKey: "webhooks", url: "/dashboard/settings/webhooks", icon: Webhook },
         ],
       },
-      { titleKey: "tenants", url: "/admin/tenants", icon: Shield, isNew: true },
       { titleKey: "help", url: "/dashboard/help", icon: HelpCircle },
     ],
   },
-  /*{
-    id: 6,
-    labelKey: "dashboardTemplates",
-    items: [
-      {
-        titleKey: "analytics",
-        url: "/dashboard/analytics",
-        icon: Gauge,
-      },
-      {
-        titleKey: "authPages",
-        url: "/auth",
-        icon: Fingerprint,
-        subItems: [
-          { titleKey: "loginV1", url: "/auth/v1/login", newTab: true },
-          { titleKey: "loginV2", url: "/auth/v2/login", newTab: true },
-          { titleKey: "registerV1", url: "/auth/v1/register", newTab: true },
-          { titleKey: "registerV2", url: "/auth/v2/register", newTab: true },
-          { titleKey: "forgotPassword", url: "/auth/v1/forgot-password", newTab: true },
-        ],
-      },
-    ],
-  },*/
 ];
