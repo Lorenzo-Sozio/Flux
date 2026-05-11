@@ -475,7 +475,7 @@ export default async function CRMPage() {
           </Card>
         </Link>
 
-        <Link href="/dashboard/quotes" className="group">
+        <Link href="/dashboard/sales/quotes" className="group">
           <Card className="cursor-pointer border-l-4 border-l-violet-500 shadow-sm transition-shadow group-hover:shadow-md">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="font-medium text-muted-foreground text-sm">{t("quotesPipeline")}</CardTitle>

@@ -114,7 +114,7 @@ export default function NewQuotePage() {
     try {
       const result = await createQuoteAction(data);
       toast.success(`Quote ${result.quoteNumber} created`);
-      router.push(`/dashboard/quotes/${result.quoteId}`);
+      router.push(`/dashboard/sales/quotes/${result.quoteId}`);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to create quote");
     } finally {
@@ -127,7 +127,7 @@ export default function NewQuotePage() {
       {/* Header */}
       <div>
         <Link
-          href="/dashboard/quotes"
+          href="/dashboard/sales/quotes"
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
         >
           <ChevronLeft className="h-4 w-4" />

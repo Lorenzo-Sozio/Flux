@@ -148,7 +148,7 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
     // Log activity
     await logQuoteActivity(quote.id, "created", session.user.id);
 
-    revalidatePath("/dashboard/quotes");
+    revalidatePath("/dashboard/sales/quotes");
     return { success: true, quoteId: quote.id, quoteNumber };
   } catch (error) {
     console.error("[createQuoteAction]", error);
@@ -332,8 +332,8 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
       await logQuoteActivity(quoteId, validated.status, session.user.id);
     }
 
-    revalidatePath("/dashboard/quotes");
-    revalidatePath(`/dashboard/quotes/${quoteId}`);
+    revalidatePath("/dashboard/sales/quotes");
+    revalidatePath(`/dashboard/sales/quotes/${quoteId}`);
     return { success: true, quote: updated };
   } catch (error) {
     console.error("[updateQuoteAction]", error);
@@ -369,7 +369,7 @@ export async function deleteQuoteAction(quoteId: string) {
 
     await db.delete(quotes).where(eq(quotes.id, quoteId));
 
-    revalidatePath("/dashboard/quotes");
+    revalidatePath("/dashboard/sales/quotes");
     return { success: true };
   } catch (error) {
     console.error("[deleteQuoteAction]", error);
@@ -534,13 +534,13 @@ export async function requestApprovalAction(quoteId: string) {
           type: "quote_approval_requested",
           title: "Approvazione preventivo richiesta",
           message: `Il preventivo ${quote.quoteNumber} richiede la tua approvazione.`,
-          link: `/dashboard/quotes/${quoteId}`,
+          link: `/dashboard/sales/quotes/${quoteId}`,
         })),
     ),
   ]);
 
-  revalidatePath("/dashboard/quotes");
-  revalidatePath(`/dashboard/quotes/${quoteId}`);
+  revalidatePath("/dashboard/sales/quotes");
+  revalidatePath(`/dashboard/sales/quotes/${quoteId}`);
 }
 
 export async function approveQuoteAction(quoteId: string) {
@@ -564,12 +564,12 @@ export async function approveQuoteAction(quoteId: string) {
       type: "quote_approved",
       title: "Preventivo approvato",
       message: `Il preventivo ${quote.quoteNumber} è stato approvato. Puoi ora inviarlo al cliente.`,
-      link: `/dashboard/quotes/${quoteId}`,
+      link: `/dashboard/sales/quotes/${quoteId}`,
     });
   }
 
-  revalidatePath("/dashboard/quotes");
-  revalidatePath(`/dashboard/quotes/${quoteId}`);
+  revalidatePath("/dashboard/sales/quotes");
+  revalidatePath(`/dashboard/sales/quotes/${quoteId}`);
 }
 
 export async function rejectQuoteAction(quoteId: string, note: string) {
@@ -593,12 +593,12 @@ export async function rejectQuoteAction(quoteId: string, note: string) {
       type: "quote_rejected",
       title: "Preventivo rifiutato",
       message: `Il preventivo ${quote.quoteNumber} è stato rifiutato.${note ? ` Nota: ${note}` : ""}`,
-      link: `/dashboard/quotes/${quoteId}`,
+      link: `/dashboard/sales/quotes/${quoteId}`,
     });
   }
 
-  revalidatePath("/dashboard/quotes");
-  revalidatePath(`/dashboard/quotes/${quoteId}`);
+  revalidatePath("/dashboard/sales/quotes");
+  revalidatePath(`/dashboard/sales/quotes/${quoteId}`);
 }
 
 /** Lightweight list of deals + companies + products for the quote creation form. */

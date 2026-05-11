@@ -155,7 +155,18 @@
       "Bash(Out-Null)",
       "PowerShell(New-Item -ItemType Directory -Force -Path \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\admin\\\\plans\\\\_components\")",
       "PowerShell(Copy-Item \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\admin\\\\billing\\\\plans\\\\_components\\\\plan-form.tsx\" \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\admin\\\\plans\\\\_components\\\\plan-form.tsx\")",
-      "PowerShell(Copy-Item \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\admin\\\\billing\\\\plans\\\\_components\\\\plans-client.tsx\" \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\admin\\\\plans\\\\_components\\\\plans-client.tsx\")"
+      "PowerShell(Copy-Item \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\admin\\\\billing\\\\plans\\\\_components\\\\plans-client.tsx\" \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\admin\\\\plans\\\\_components\\\\plans-client.tsx\")",
+      "Bash(Remove-Item \"c:\\\\React\\\\Flux\\\\src\\\\middleware.ts\")",
+      "Bash(git mv *)",
+      "Bash(robocopy \"src/app/\\(main\\)/dashboard/finance\" \"src/app/\\(main\\)/dashboard/sales/finance\" /E /MOVE)",
+      "Bash(robocopy \"src/app/\\(main\\)/dashboard/quotes\" \"src/app/\\(main\\)/dashboard/sales/quotes\" /E /MOVE)",
+      "Bash(robocopy \"src/app/\\(main\\)/dashboard/products\" \"src/app/\\(main\\)/dashboard/sales/products\" /E /MOVE)",
+      "Bash(robocopy \"src/app/\\(main\\)/dashboard/orders\" \"src/app/\\(main\\)/dashboard/sales/orders\" /E /MOVE)",
+      "Bash(cp -r \"src/app/\\(main\\)/dashboard/finance\" \"src/app/\\(main\\)/dashboard/sales/\")",
+      "Bash(cp -r \"src/app/\\(main\\)/dashboard/quotes\" \"src/app/\\(main\\)/dashboard/sales/\")",
+      "Bash(cp -r \"src/app/\\(main\\)/dashboard/products\" \"src/app/\\(main\\)/dashboard/sales/\")",
+      "Bash(cp -r \"src/app/\\(main\\)/dashboard/orders\" \"src/app/\\(main\\)/dashboard/sales/\")",
+      "Bash(xargs sed -i 's|/dashboard/settings/sla|/dashboard/support/sla|g; s|/dashboard/finance|/dashboard/sales/finance|g; s|/dashboard/quotes|/dashboard/sales/quotes|g; s|/dashboard/products|/dashboard/sales/products|g; s|/dashboard/orders|/dashboard/sales/orders|g')"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",

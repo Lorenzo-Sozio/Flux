@@ -221,7 +221,7 @@ const sections = [
     border: "border-emerald-200 dark:border-emerald-800",
     title: "Finance",
     subtitle: "Dashboard finanziaria e ricavi",
-    href: "/dashboard/finance",
+    href: "/dashboard/sales/finance",
     description:
       "La Finance Dashboard aggrega i dati economici reali dell'organizzazione: ricavi da deal vinte, ordini completati e preventivi accettati, con trend mensile a 12 mesi e forecast ponderato della pipeline.",
     topics: [
@@ -247,7 +247,7 @@ const sections = [
     border: "border-orange-200 dark:border-orange-800",
     title: "Prodotti",
     subtitle: "Catalogo beni e servizi",
-    href: "/dashboard/products",
+    href: "/dashboard/sales/products",
     description:
       "Il Catalogo Prodotti è il registro centralizzato di tutti i beni e servizi che la tua organizzazione vende. I prodotti vengono riutilizzati nei preventivi e negli ordini, garantendo coerenza di prezzo e descrizione.",
     topics: [
@@ -273,7 +273,7 @@ const sections = [
     border: "border-violet-200 dark:border-violet-800",
     title: "Preventivi",
     subtitle: "Offerte commerciali e approvazioni",
-    href: "/dashboard/quotes",
+    href: "/dashboard/sales/quotes",
     description:
       "Il modulo Preventivi gestisce l'intero processo di offerta commerciale: dalla redazione interna con workflow di approvazione, all'invio via email al cliente con link di visualizzazione, fino all'accettazione o al declino.",
     topics: [
@@ -311,7 +311,7 @@ const sections = [
     border: "border-pink-200 dark:border-pink-800",
     title: "Ordini",
     subtitle: "Vendite confermate",
-    href: "/dashboard/orders",
+    href: "/dashboard/sales/orders",
     description:
       "Gli Ordini rappresentano le transazioni commerciali confermate. Tipicamente vengono generati dalla conversione di un preventivo accettato, ma possono anche essere creati manualmente.",
     topics: [

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+
+import { Check, CheckCircle2, Zap } from "lucide-react";
+import { toast } from "sonner";
+
+import { createCheckoutSession } from "@/actions/billing";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Check, Zap } from "lucide-react";
-import { toast } from "sonner";
-import { createCheckoutSession } from "@/actions/billing";
 import type { BillingCycle } from "@/lib/billing/plans-config";
 
 interface Plan {
@@ -100,29 +102,40 @@ export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {plans.map((plan) => {
-          const price =
-            cycle === "annual" ? plan.pricePerUserAnnual : plan.pricePerUserMonthly;
+          const price = cycle === "annual" ? plan.pricePerUserAnnual : plan.pricePerUserMonthly;
           const modules: string[] = JSON.parse(plan.enabledModules ?? '["crm"]');
           const isCurrent = plan.name === currentPlanName;
-          const hasStripePrice = cycle === "annual"
-            ? !!plan.stripePriceAnnualId
-            : !!plan.stripePriceMonthlyId;
+          const isClickable = !isCurrent && plan.name !== "free" && !loading;
 
           return (
             <Card
               key={plan.id}
-              className={`flex flex-col ${
-                plan.name === "professional" ? "border-primary ring-1 ring-primary" : ""
-              } ${isCurrent ? "opacity-70" : ""}`}
+              onClick={() => isClickable && handleSelectPlan(plan, plan.includedUsers)}
+              className={`flex flex-col transition-all ${
+                isCurrent
+                  ? "border-green-500 bg-green-50/50 ring-2 ring-green-500 dark:bg-green-950/20"
+                  : plan.name === "professional" && isClickable
+                    ? "cursor-pointer border-primary ring-1 ring-primary hover:shadow-md hover:ring-2"
+                    : isClickable
+                      ? "cursor-pointer hover:border-primary/40 hover:shadow-md"
+                      : ""
+              }`}
             >
               <CardHeader className="pb-2">
-                {plan.name === "professional" && (
+                {isCurrent && (
+                  <Badge
+                    variant="outline"
+                    className="mb-1 w-fit text-xs border-green-500 text-green-600 dark:text-green-400"
+                  >
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                    Current Plan
+                  </Badge>
+                )}
+                {!isCurrent && plan.name === "professional" && (
                   <Badge className="mb-1 w-fit text-xs">Most Popular</Badge>
                 )}
                 <CardTitle className="text-lg">{plan.displayName}</CardTitle>
-                <CardDescription className="min-h-[2.5rem] text-xs">
-                  {plan.description}
-                </CardDescription>
+                <CardDescription className="min-h-[2.5rem] text-xs">{plan.description}</CardDescription>
                 <div className="mt-2">
                   <span className="text-3xl font-bold">{formatPrice(price)}</span>
                   {price > 0 && (
@@ -148,30 +161,32 @@ export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
                   ))}
                 </ul>
                 {plan.trialDays > 0 && !isCurrent && (
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    {plan.trialDays}-day free trial
-                  </p>
+                  <p className="mt-3 text-xs text-muted-foreground">{plan.trialDays}-day free trial</p>
                 )}
               </CardContent>
 
               <CardFooter>
                 {isCurrent ? (
-                  <Button className="w-full" disabled variant="outline">
+                  <Button
+                    className="w-full border-green-500 text-green-600 dark:text-green-400"
+                    disabled
+                    variant="outline"
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
                     Current Plan
                   </Button>
                 ) : plan.name === "free" ? (
                   <Button className="w-full" variant="outline" disabled>
                     Free Forever
                   </Button>
-                ) : !hasStripePrice ? (
-                  <Button className="w-full" variant="outline" disabled>
-                    Contact Sales
-                  </Button>
                 ) : (
                   <Button
                     className="w-full"
-                    onClick={() => handleSelectPlan(plan, plan.includedUsers)}
-                    disabled={loading === plan.id}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectPlan(plan, plan.includedUsers);
+                    }}
+                    disabled={!!loading}
                   >
                     {loading === plan.id ? (
                       "Redirecting…"

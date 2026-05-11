@@ -141,7 +141,7 @@ export function QuoteEditForm({ quote, formData }: Props) {
     try {
       await updateQuoteAction(quote.id, data);
       toast.success("Quote updated");
-      router.push(`/dashboard/quotes/${quote.id}`);
+      router.push(`/dashboard/sales/quotes/${quote.id}`);
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Failed to update quote");
     } finally {
@@ -536,7 +536,7 @@ export function QuoteEditForm({ quote, formData }: Props) {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => router.push(`/dashboard/quotes/${quote.id}`)}
+                onClick={() => router.push(`/dashboard/sales/quotes/${quote.id}`)}
               >
                 Cancel
               </Button>

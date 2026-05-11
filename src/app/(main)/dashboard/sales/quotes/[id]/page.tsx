@@ -27,7 +27,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
     <div className="flex flex-col gap-6 p-6">
       <div>
         <Link
-          href="/dashboard/quotes"
+          href="/dashboard/sales/quotes"
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ChevronLeft className="h-4 w-4" />

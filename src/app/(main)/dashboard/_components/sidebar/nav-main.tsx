@@ -228,12 +228,12 @@ export function NavMain({ items }: NavMainProps) {
                   <DropdownMenuSeparator />
                   <DropdownMenuLabel className="text-xs text-muted-foreground">{t("quickCreate.sales")}</DropdownMenuLabel>
                   <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/quotes/new" className="flex items-center gap-2">
+                    <Link prefetch={false} href="/dashboard/sales/quotes/new" className="flex items-center gap-2">
                       <FileText className="h-3.5 w-3.5" /> {t("quickCreate.newQuote")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/orders?new=true" className="flex items-center gap-2">
+                    <Link prefetch={false} href="/dashboard/sales/orders?new=true" className="flex items-center gap-2">
                       <ShoppingCart className="h-3.5 w-3.5" /> {t("quickCreate.newOrder")}
                     </Link>
                   </DropdownMenuItem>

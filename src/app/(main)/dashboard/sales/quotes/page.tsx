@@ -137,7 +137,7 @@ export default function QuotesPage() {
             {t("quoteNumber")}
           </p>
         </div>
-        <Link href="/dashboard/quotes/new">
+        <Link href="/dashboard/sales/quotes/new">
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             {t("newQuote")}
@@ -266,7 +266,7 @@ export default function QuotesPage() {
                   : t("newQuote")}
               </p>
               {!searchTerm && statusFilter === "all" && (
-                <Link href="/dashboard/quotes/new">
+                <Link href="/dashboard/sales/quotes/new">
                   <Button variant="outline" size="sm">
                     <Plus className="mr-2 h-4 w-4" />
                     {t("newQuote")}
@@ -304,7 +304,7 @@ export default function QuotesPage() {
                       <TableRow key={quote.id} className="group hover:bg-muted/30 transition-colors">
                         <TableCell className="font-mono text-sm font-medium">
                           <Link
-                            href={`/dashboard/quotes/${quote.id}`}
+                            href={`/dashboard/sales/quotes/${quote.id}`}
                             className="text-primary hover:underline"
                           >
                             {quote.quoteNumber}
@@ -356,7 +356,7 @@ export default function QuotesPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-44">
                               <DropdownMenuItem asChild>
-                                <Link href={`/dashboard/quotes/${quote.id}`}>
+                                <Link href={`/dashboard/sales/quotes/${quote.id}`}>
                                   <Eye className="mr-2 h-3.5 w-3.5" />
                                   {tc("view")}
                                 </Link>
@@ -364,13 +364,13 @@ export default function QuotesPage() {
                               {quote.status === "draft" && (
                                 <>
                                   <DropdownMenuItem asChild>
-                                    <Link href={`/dashboard/quotes/${quote.id}/edit`}>
+                                    <Link href={`/dashboard/sales/quotes/${quote.id}/edit`}>
                                       <Pencil className="mr-2 h-3.5 w-3.5" />
                                       {tc("edit")}
                                     </Link>
                                   </DropdownMenuItem>
                                   <DropdownMenuItem asChild>
-                                    <Link href={`/dashboard/quotes/${quote.id}?send=1`}>
+                                    <Link href={`/dashboard/sales/quotes/${quote.id}?send=1`}>
                                       <Send className="mr-2 h-3.5 w-3.5" />
                                       {t("sendQuote")}
                                     </Link>

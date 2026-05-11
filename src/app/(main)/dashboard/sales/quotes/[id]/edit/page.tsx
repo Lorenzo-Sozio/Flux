@@ -19,7 +19,7 @@ export default async function QuoteEditPage({ params }: Props) {
   }
 
   if (quote.status !== "draft") {
-    redirect(`/dashboard/quotes/${id}`);
+    redirect(`/dashboard/sales/quotes/${id}`);
   }
 
   const formData = await getQuoteFormData();
@@ -28,7 +28,7 @@ export default async function QuoteEditPage({ params }: Props) {
     <div className="flex flex-col gap-6 p-6">
       <div>
         <Link
-          href={`/dashboard/quotes/${id}`}
+          href={`/dashboard/sales/quotes/${id}`}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
         >
           <ChevronLeft className="h-4 w-4" />

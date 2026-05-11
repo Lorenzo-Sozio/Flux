@@ -4,7 +4,7 @@ import { requireAdminAccess } from "@/lib/auth-guard";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { platformDb, createTenantDb, invalidateTenantDbCache } from "@/db";
-import { tenants, tenantMembers, users, billingSubscriptions } from "@/db/schema";
+import { tenants, tenantMembers, users, billingSubscriptions, billingPlans } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { encryptDbUrl, decryptDbUrl } from "@/lib/tenant-db";
@@ -57,8 +57,14 @@ export async function listTenants() {
       settings: tenants.settings,
       createdAt: tenants.createdAt,
       updatedAt: tenants.updatedAt,
+      subscriptionStatus: billingSubscriptions.status,
+      planId: billingSubscriptions.planId,
+      planName: billingPlans.name,
+      planDisplayName: billingPlans.displayName,
     })
     .from(tenants)
+    .leftJoin(billingSubscriptions, eq(billingSubscriptions.tenantId, tenants.id))
+    .leftJoin(billingPlans, eq(billingPlans.id, billingSubscriptions.planId))
     .orderBy(tenants.createdAt);
 
   return result;

@@ -5,28 +5,29 @@
  * Called from /dashboard/settings/billing pages.
  */
 
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { eq, and, desc } from "drizzle-orm";
+
+import { and, count, desc, eq } from "drizzle-orm";
+
+import { auth } from "@/auth";
 import { platformDb } from "@/db";
 import {
-  tenants,
-  tenantMembers,
-  billingSubscriptions,
   billingPlans,
+  billingSubscriptions,
   billingTenantAddons,
+  companies,
+  contacts,
+  deals,
+  tenantMembers,
+  tenants,
 } from "@/db/schema";
-import { getStripe } from "@/lib/billing/stripe";
-import {
-  getEntitlements,
-  invalidateEntitlementCache,
-  logEntitlementChange,
-} from "@/lib/billing/licensing";
-import { getAllUsage } from "@/lib/billing/usage";
-import { getCurrentSubdomain } from "@/lib/tenant-context";
-import { getTenantBySubdomain } from "@/lib/get-tenant";
-import type { BillingCycle, AddonType } from "@/lib/billing/plans-config";
+import { getEntitlements, invalidateEntitlementCache, logEntitlementChange } from "@/lib/billing/licensing";
+import type { AddonType, BillingCycle } from "@/lib/billing/plans-config";
 import { ADDON_CONFIGS } from "@/lib/billing/plans-config";
+import { getStripe } from "@/lib/billing/stripe";
+import { getAllUsage } from "@/lib/billing/usage";
+import { getTenantBySubdomain } from "@/lib/get-tenant";
+import { getCurrentSubdomain, getDb } from "@/lib/tenant-context";
 
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 
@@ -42,10 +43,7 @@ async function requireBillingAdmin() {
 
   // Only owner or admin can manage billing
   const member = await platformDb.query.tenantMembers.findFirst({
-    where: and(
-      eq(tenantMembers.tenantId, tenant.id),
-      eq(tenantMembers.userId, session.user.id),
-    ),
+    where: and(eq(tenantMembers.tenantId, tenant.id), eq(tenantMembers.userId, session.user.id)),
   });
   if (!member || !["owner", "admin"].includes(member.role)) {
     throw new Error("Only admins can manage billing.");
@@ -98,15 +96,39 @@ export async function getSubscriptionDetails() {
   const addons = await platformDb
     .select()
     .from(billingTenantAddons)
-    .where(
-      and(
-        eq(billingTenantAddons.tenantId, tenant.id),
-        eq(billingTenantAddons.status, "active"),
-      ),
-    );
+    .where(and(eq(billingTenantAddons.tenantId, tenant.id), eq(billingTenantAddons.status, "active")));
 
   const entitlements = await getEntitlements(tenant.id);
-  const usage = await getAllUsage(tenant.id);
+  const [usage, db, memberRows] = await Promise.all([
+    getAllUsage(tenant.id),
+    getDb(),
+    platformDb.select({ value: count() }).from(tenantMembers).where(eq(tenantMembers.tenantId, tenant.id)),
+  ]);
+
+  const memberCount = Number(memberRows[0]?.value ?? 0);
+
+  const [contactRows, companyRows, dealRows] = await Promise.all([
+    db.select({ value: count() }).from(contacts),
+    db.select({ value: count() }).from(companies),
+    db.select({ value: count() }).from(deals),
+  ]);
+
+  const totalRecords =
+    Number(contactRows[0]?.value ?? 0) + Number(companyRows[0]?.value ?? 0) + Number(dealRows[0]?.value ?? 0);
+
+  const maxUserLimit = entitlements.limits.maxUsers;
+  const maxRecordLimit = entitlements.limits.maxRecords;
+
+  usage.maxUsers = {
+    current: memberCount,
+    limit: maxUserLimit,
+    percent: maxUserLimit !== null ? Math.round((memberCount / maxUserLimit) * 100) : null,
+  };
+  usage.maxRecords = {
+    current: totalRecords,
+    limit: maxRecordLimit,
+    percent: maxRecordLimit !== null ? Math.round((totalRecords / maxRecordLimit) * 100) : null,
+  };
 
   return { subscription: sub, addons, entitlements, usage };
 }
@@ -132,8 +154,7 @@ export async function createCheckoutSession(
   });
   if (!plan) throw new Error("Plan not found");
 
-  const priceId =
-    billingCycle === "annual" ? plan.stripePriceAnnualId : plan.stripePriceMonthlyId;
+  const priceId = billingCycle === "annual" ? plan.stripePriceAnnualId : plan.stripePriceMonthlyId;
   if (!priceId) throw new Error("This plan has no Stripe price configured yet.");
 
   const customerId = await getOrCreateStripeCustomer(tenant.id, tenant.name);
@@ -231,16 +252,11 @@ export async function addAddon(
 
   let stripePriceId: string | null = null;
   if (addonType === "extra_users" && plan) {
-    stripePriceId =
-      billingCycle === "annual"
-        ? plan.stripeExtraUserAnnualPriceId
-        : plan.stripeExtraUserMonthlyPriceId;
+    stripePriceId = billingCycle === "annual" ? plan.stripeExtraUserAnnualPriceId : plan.stripeExtraUserMonthlyPriceId;
   }
 
   if (!stripePriceId) {
-    throw new Error(
-      `No Stripe price configured for add-on "${addonType}". Please map it in the admin panel.`,
-    );
+    throw new Error(`No Stripe price configured for add-on "${addonType}". Please map it in the admin panel.`);
   }
 
   // Add as a new line item on the Stripe subscription
@@ -274,10 +290,7 @@ export async function removeAddon(addonId: string): Promise<void> {
   const { tenant } = await requireBillingAdmin();
 
   const addon = await platformDb.query.billingTenantAddons.findFirst({
-    where: and(
-      eq(billingTenantAddons.id, addonId),
-      eq(billingTenantAddons.tenantId, tenant.id),
-    ),
+    where: and(eq(billingTenantAddons.id, addonId), eq(billingTenantAddons.tenantId, tenant.id)),
   });
   if (!addon) throw new Error("Add-on not found.");
 

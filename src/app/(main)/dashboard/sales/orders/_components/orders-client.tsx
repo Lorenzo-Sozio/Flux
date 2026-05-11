@@ -444,7 +444,7 @@ export function OrdersClient({
                 return (
                   <tr key={order.id} className="hover:bg-muted/30 transition-colors group">
                     <td className="px-4 py-3">
-                      <Link href={`/dashboard/orders/${order.id}`} className="font-mono text-xs font-semibold hover:text-primary transition-colors">
+                      <Link href={`/dashboard/sales/orders/${order.id}`} className="font-mono text-xs font-semibold hover:text-primary transition-colors">
                         {order.orderNumber}
                       </Link>
                     </td>
@@ -480,7 +480,7 @@ export function OrdersClient({
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
                         <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-                          <Link href={`/dashboard/orders/${order.id}`}>
+                          <Link href={`/dashboard/sales/orders/${order.id}`}>
                             <ExternalLink className="h-3.5 w-3.5" />
                           </Link>
                         </Button>

@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { listTenants } from "@/actions/tenants";
+import { listPlans } from "@/actions/admin-billing";
 import { TenantsList } from "./_components/tenants-list";
 import { CreateTenantForm } from "./_components/create-tenant-form";
 
@@ -9,7 +10,7 @@ export const metadata: Metadata = {
 };
 
 export default async function TenantsPage() {
-  const allTenants = await listTenants();
+  const [allTenants, plans] = await Promise.all([listTenants(), listPlans()]);
 
   return (
     <div className="space-y-8">
@@ -26,7 +27,7 @@ export default async function TenantsPage() {
         <h2 className="mb-6 text-xl font-semibold text-gray-900">
           Existing Tenants ({allTenants.length})
         </h2>
-        <TenantsList tenants={allTenants} />
+        <TenantsList tenants={allTenants} plans={plans} />
       </div>
     </div>
   );

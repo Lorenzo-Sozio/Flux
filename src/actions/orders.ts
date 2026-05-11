@@ -190,7 +190,7 @@ export async function createOrder(data: z.infer<typeof createSchema>) {
     })),
   );
 
-  revalidatePath("/dashboard/orders");
+  revalidatePath("/dashboard/sales/orders");
   return order;
 }
 
@@ -198,8 +198,8 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   await requireWriteAccess();
   const db = await getDb();
   await db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, id));
-  revalidatePath("/dashboard/orders");
-  revalidatePath(`/dashboard/orders/${id}`);
+  revalidatePath("/dashboard/sales/orders");
+  revalidatePath(`/dashboard/sales/orders/${id}`);
 }
 
 export async function addOrderItem(
@@ -220,7 +220,7 @@ export async function addOrderItem(
   const allItems = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
   const total = allItems.reduce((s, i) => s + Number(i.totalPrice), 0);
   await db.update(orders).set({ totalAmount: String(total), updatedAt: new Date() }).where(eq(orders.id, orderId));
-  revalidatePath(`/dashboard/orders/${orderId}`);
+  revalidatePath(`/dashboard/sales/orders/${orderId}`);
 }
 
 export async function removeOrderItem(itemId: string, orderId: string) {
@@ -231,12 +231,12 @@ export async function removeOrderItem(itemId: string, orderId: string) {
   const allItems = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
   const total = allItems.reduce((s, i) => s + Number(i.totalPrice), 0);
   await db.update(orders).set({ totalAmount: String(total), updatedAt: new Date() }).where(eq(orders.id, orderId));
-  revalidatePath(`/dashboard/orders/${orderId}`);
+  revalidatePath(`/dashboard/sales/orders/${orderId}`);
 }
 
 export async function deleteOrder(id: string) {
   await requireWriteAccess();
   const db = await getDb();
   await db.delete(orders).where(eq(orders.id, id));
-  revalidatePath("/dashboard/orders");
+  revalidatePath("/dashboard/sales/orders");
 }

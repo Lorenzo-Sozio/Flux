@@ -1,15 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
+
 import { toast } from "sonner";
+
+import { createBillingPortalSession } from "@/actions/billing";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { TenantEntitlements } from "@/lib/billing/licensing";
+
+import { AddonManager } from "./addon-manager";
 import { CurrentPlan } from "./current-plan";
+import { InvoiceList } from "./invoice-list";
 import { PlanSelector } from "./plan-selector";
 import { UsageOverview } from "./usage-overview";
-import { AddonManager } from "./addon-manager";
-import { InvoiceList } from "./invoice-list";
-import { createBillingPortalSession } from "@/actions/billing";
-import type { TenantEntitlements } from "@/lib/billing/licensing";
 
 interface BillingClientProps {
   entitlements: TenantEntitlements;
@@ -48,6 +51,7 @@ interface BillingClientProps {
     created: number;
   }>;
   usage: Record<string, { current: number; limit: number | null; percent: number | null }>;
+  defaultTab?: "overview" | "plans";
 }
 
 export function BillingClient({
@@ -57,6 +61,7 @@ export function BillingClient({
   addons,
   invoices,
   usage,
+  defaultTab = "overview",
 }: BillingClientProps) {
   const [portalLoading, startPortal] = useTransition();
 
@@ -72,7 +77,7 @@ export function BillingClient({
   }
 
   return (
-    <Tabs defaultValue="overview" className="space-y-6">
+    <Tabs defaultValue={defaultTab} className="space-y-6">
       <TabsList>
         <TabsTrigger value="overview">Overview</TabsTrigger>
         <TabsTrigger value="plans">Plans</TabsTrigger>
@@ -88,7 +93,7 @@ export function BillingClient({
           onManageClick={handleManageBilling}
           loading={portalLoading}
         />
-        <UsageOverview usage={usage} />
+        <UsageOverview usage={usage} limits={entitlements.limits} />
       </TabsContent>
 
       <TabsContent value="plans" className="space-y-4">

@@ -17,6 +17,8 @@ import {
   billingTenantAddons,
   billingUsageStats,
 } from "@/db/schema";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 import { getStripe } from "@/lib/billing/stripe";
 import {
   invalidateEntitlementCache,
@@ -343,6 +345,92 @@ export async function downgradeToFree(tenantId: string, adminId: string) {
     triggeredBy: `admin:${adminId}`,
   });
 
+  revalidatePath("/admin/billing");
+}
+
+/**
+ * Admin-UI: manually assign any plan to a tenant.
+ * Self-contained (single auth check, all validation inline).
+ * Handles free-plan downgrade vs. paid plan change.
+ */
+export async function adminSetTenantPlan(tenantId: string, planId: string) {
+  const session = await requirePlatformAdmin();
+
+  if (!UUID_RE.test(tenantId)) throw new Error("Invalid tenant ID format");
+  if (!UUID_RE.test(planId)) throw new Error("Invalid plan ID format");
+
+  const [tenant, plan] = await Promise.all([
+    platformDb.query.tenants.findFirst({ where: eq(tenants.id, tenantId) }),
+    platformDb.query.billingPlans.findFirst({ where: eq(billingPlans.id, planId) }),
+  ]);
+  if (!tenant) throw new Error("Tenant not found");
+  if (!plan) throw new Error("Plan not found");
+  if (!plan.isActive) throw new Error("Cannot assign an inactive plan");
+
+  const adminId = session.user.id ?? "unknown";
+
+  const previousSub = await platformDb.query.billingSubscriptions.findFirst({
+    where: eq(billingSubscriptions.tenantId, tenantId),
+    with: { plan: true },
+  });
+
+  if (!previousSub) {
+    // Tenant predates billing — provision the subscription row now
+    await platformDb.insert(billingSubscriptions).values({
+      tenantId,
+      planId: plan.name === "free" ? null : planId,
+      status: plan.name === "free" ? "free" : "active",
+    });
+  } else if (plan.name === "free") {
+    // Cancel any active Stripe subscription
+    if (previousSub.stripeSubscriptionId) {
+      await getStripe().subscriptions.cancel(previousSub.stripeSubscriptionId).catch(() => {});
+    }
+    // Remove active add-ons
+    await platformDb
+      .update(billingTenantAddons)
+      .set({ status: "canceled", updatedAt: new Date() })
+      .where(and(eq(billingTenantAddons.tenantId, tenantId), eq(billingTenantAddons.status, "active")));
+
+    await platformDb
+      .update(billingSubscriptions)
+      .set({
+        planId: null,
+        status: "free",
+        stripeSubscriptionId: null,
+        stripeSubscriptionItemId: null,
+        currentPeriodStart: null,
+        currentPeriodEnd: null,
+        trialEnd: null,
+        gracePeriodEnd: null,
+        canceledAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(billingSubscriptions.tenantId, tenantId));
+  } else {
+    await platformDb
+      .update(billingSubscriptions)
+      .set({
+        planId,
+        status: "active",
+        gracePeriodEnd: null,
+        canceledAt: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(billingSubscriptions.tenantId, tenantId));
+  }
+
+  invalidateEntitlementCache(tenantId);
+
+  await logEntitlementChange({
+    tenantId,
+    eventType: "plan_changed",
+    previousValue: { planName: previousSub?.plan?.name ?? "free" },
+    newValue: { planName: plan.name },
+    triggeredBy: `admin:${adminId}`,
+  });
+
+  revalidatePath("/admin/tenants");
   revalidatePath("/admin/billing");
 }
 

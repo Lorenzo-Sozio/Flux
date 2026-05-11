@@ -152,7 +152,7 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
                   variant="ghost"
                   size="icon"
                   title="Edit quote"
-                  onClick={() => router.push(`/dashboard/quotes/${quote.id}/edit`)}
+                  onClick={() => router.push(`/dashboard/sales/quotes/${quote.id}/edit`)}
                 >
                   <Pencil className="h-4 w-4" />
                 </Button>

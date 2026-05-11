@@ -95,13 +95,13 @@ export function SearchDialog() {
       icon: <FileText className="h-4 w-4" />,
       badge: t("badges.quote"),
       badgeClass: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
-      href: "/dashboard/quotes",
+      href: "/dashboard/sales/quotes",
     },
     order: {
       icon: <ShoppingCart className="h-4 w-4" />,
       badge: t("badges.order"),
       badgeClass: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
-      href: "/dashboard/orders",
+      href: "/dashboard/sales/orders",
     },
   };
 

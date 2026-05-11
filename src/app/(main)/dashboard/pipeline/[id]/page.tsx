@@ -268,7 +268,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             ) : (
               <div className="space-y-2">
                 {quotesList.map((quote) => (
-                  <Link key={quote.id} href={`/dashboard/quotes/${quote.id}`}>
+                  <Link key={quote.id} href={`/dashboard/sales/quotes/${quote.id}`}>
                     <div className="flex items-center justify-between p-3 rounded-md border hover:bg-accent cursor-pointer transition-colors">
                       <div>
                         <p className="font-medium text-sm">{quote.quoteNumber}</p>

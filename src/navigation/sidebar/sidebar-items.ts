@@ -85,10 +85,10 @@ export const sidebarItems: NavGroup[] = [
     id: 2,
     labelKey: "sales",
     items: [
-      { titleKey: "finance", url: "/dashboard/finance", icon: Banknote },
-      { titleKey: "quotes", url: "/dashboard/quotes", icon: FileText, isNew: true },
-      { titleKey: "products", url: "/dashboard/products", icon: Package, isNew: true },
-      { titleKey: "orders", url: "/dashboard/orders", icon: ShoppingCart, isNew: true },
+      { titleKey: "finance", url: "/dashboard/sales/finance", icon: Banknote },
+      { titleKey: "quotes", url: "/dashboard/sales/quotes", icon: FileText, isNew: true },
+      { titleKey: "products", url: "/dashboard/sales/products", icon: Package, isNew: true },
+      { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, isNew: true },
       { titleKey: "pipeline", url: "/dashboard/pipeline", icon: Kanban },
       { titleKey: "salesTargets", url: "/dashboard/pipeline/targets", icon: TrendingUp, isNew: true },
       { titleKey: "salesFunnel", url: "/dashboard/pipeline/funnel", icon: GitMerge, isNew: true },
@@ -104,7 +104,7 @@ export const sidebarItems: NavGroup[] = [
     labelKey: "support",
     items: [
       { titleKey: "tickets", url: "/dashboard/support/tickets", icon: MessageSquare, isNew: true },
-      { titleKey: "slaManagement", url: "/dashboard/settings/sla", icon: Clock, isNew: true },
+      { titleKey: "slaManagement", url: "/dashboard/support/sla", icon: Clock, isNew: true },
     ],
   },
   {

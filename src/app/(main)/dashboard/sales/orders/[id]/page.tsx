@@ -211,7 +211,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     startTransition(async () => {
       await deleteOrder(id);
       toast.success("Order deleted.");
-      router.push("/dashboard/orders");
+      router.push("/dashboard/sales/orders");
     });
   };
 
@@ -233,7 +233,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       <div className="text-center py-20">
         <ShoppingCart className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
         <p className="text-muted-foreground mb-4">Order not found</p>
-        <Button asChild><Link href="/dashboard/orders">Back to Orders</Link></Button>
+        <Button asChild><Link href="/dashboard/sales/orders">Back to Orders</Link></Button>
       </div>
     );
   }
@@ -246,7 +246,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="p-6 space-y-5">
       {/* Back nav */}
-      <Link href="/dashboard/orders" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+      <Link href="/dashboard/sales/orders" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
         <ArrowLeft className="h-4 w-4" /> All Orders
       </Link>
 

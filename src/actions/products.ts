@@ -58,7 +58,7 @@ export async function createProduct(data: z.infer<typeof productSchema>) {
       isActive:    validated.isActive,
     })
     .returning();
-  revalidatePath("/dashboard/products");
+  revalidatePath("/dashboard/sales/products");
   return product;
 }
 
@@ -75,7 +75,7 @@ export async function updateProduct(id: string, data: Partial<z.infer<typeof pro
     })
     .where(eq(products.id, id))
     .returning();
-  revalidatePath("/dashboard/products");
+  revalidatePath("/dashboard/sales/products");
   return product;
 }
 
@@ -83,12 +83,12 @@ export async function toggleProductActive(id: string, isActive: boolean) {
   await requireWriteAccess();
   const db = await getDb();
   await db.update(products).set({ isActive, updatedAt: new Date() }).where(eq(products.id, id));
-  revalidatePath("/dashboard/products");
+  revalidatePath("/dashboard/sales/products");
 }
 
 export async function deleteProduct(id: string) {
   await requireWriteAccess();
   const db = await getDb();
   await db.delete(products).where(eq(products.id, id));
-  revalidatePath("/dashboard/products");
+  revalidatePath("/dashboard/sales/products");
 }
