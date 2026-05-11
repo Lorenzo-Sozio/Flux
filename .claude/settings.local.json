@@ -149,7 +149,13 @@
       "Bash(node -e \"const f = require\\('c:/React/Flux/messages/en.json'\\); console.log\\(JSON.stringify\\(f.analytics, null, 2\\)\\)\")",
       "Bash(node -e \"const f = require\\('c:/React/Flux/messages/it.json'\\); console.log\\(JSON.stringify\\(f.analytics, null, 2\\)\\)\")",
       "Bash(node -e \"const f = require\\('c:/React/Flux/messages/en.json'\\); console.log\\(JSON.stringify\\(f.nav, null, 2\\)\\)\")",
-      "Bash(node -e \"try { require\\('c:/React/Flux/messages/en.json'\\); require\\('c:/React/Flux/messages/it.json'\\); console.log\\('Both JSON valid'\\); } catch\\(e\\) { console.error\\(e.message\\); }\")"
+      "Bash(node -e \"try { require\\('c:/React/Flux/messages/en.json'\\); require\\('c:/React/Flux/messages/it.json'\\); console.log\\('Both JSON valid'\\); } catch\\(e\\) { console.error\\(e.message\\); }\")",
+      "Bash(Get-Content \"c:\\\\React\\\\Flux\\\\.env.example\" -ErrorAction SilentlyContinue)",
+      "Bash(New-Item -ItemType Directory -Path \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\api\\\\webhooks\\\\stripe\" -Force)",
+      "Bash(Out-Null)",
+      "PowerShell(New-Item -ItemType Directory -Force -Path \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\admin\\\\plans\\\\_components\")",
+      "PowerShell(Copy-Item \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\admin\\\\billing\\\\plans\\\\_components\\\\plan-form.tsx\" \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\admin\\\\plans\\\\_components\\\\plan-form.tsx\")",
+      "PowerShell(Copy-Item \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\admin\\\\billing\\\\plans\\\\_components\\\\plans-client.tsx\" \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\admin\\\\plans\\\\_components\\\\plans-client.tsx\")"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",

@@ -35,6 +35,7 @@
       "reports": "Rapporti",
       "reportBuilder": "Generatore di report",
       "settings": "Impostazioni",
+      "billing": "Fatturazione",
       "customFields": "Campi Personalizzati",
       "pipelineStages": "Fasi Pipeline",
       "email": "Email",
@@ -998,11 +999,13 @@
       "createOrder": "Crea Ordine"
     },
     "statuses": {
+      "draft": "Bozza",
       "pending": "In attesa",
       "processing": "In lavorazione",
       "shipped": "Spedito",
       "delivered": "Consegnato",
       "cancelled": "Annullato",
+      "completed": "Completato",
       "refunded": "Rimborsato"
     },
     "paymentStatuses": {

@@ -204,6 +204,13 @@
       "when": 1746662400000,
       "tag": "0028_saved_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1778505251670,
+      "tag": "0029_billing_tables",
+      "breakpoints": true
     }
   ]
 }

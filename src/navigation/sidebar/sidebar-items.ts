@@ -7,6 +7,7 @@ import {
   CheckSquare,
   Clock,
   Contact,
+  CreditCard,
   FileText,
   Fingerprint,
   GanttChartSquare,
@@ -133,6 +134,7 @@ export const sidebarItems: NavGroup[] = [
         url: "/dashboard/settings",
         icon: Settings,
         subItems: [
+          { titleKey: "billing", url: "/dashboard/settings/billing", icon: CreditCard },
           { titleKey: "customFields", url: "/dashboard/settings/custom-fields", icon: Settings2 },
           { titleKey: "email", url: "/dashboard/settings/email", icon: MailOpen },
           { titleKey: "webhooks", url: "/dashboard/settings/webhooks", icon: Webhook },

@@ -1381,3 +1381,176 @@ export const tenantMembersRelations = relations(tenantMembers, ({ one }) => ({
   tenant: one(tenants, { fields: [tenantMembers.tenantId], references: [tenants.id] }),
   user: one(users, { fields: [tenantMembers.userId], references: [users.id] }),
 }));
+
+// ─── Billing / Licensing (platform DB) ───────────────────────────────────────
+
+/**
+ * Plan definitions — managed by platform admin.
+ * limits and enabledModules are JSON stored as text.
+ */
+export const billingPlans = pgTable("billing_plan", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull().unique(), // slug: free | basic | professional | enterprise | custom
+  displayName: text("display_name").notNull(),
+  description: text("description"),
+
+  // Stripe product/price mapping
+  stripeProductId: text("stripe_product_id"),
+  stripePriceMonthlyId: text("stripe_price_monthly_id"),
+  stripePriceAnnualId: text("stripe_price_annual_id"),
+  stripeExtraUserMonthlyPriceId: text("stripe_extra_user_monthly_price_id"),
+  stripeExtraUserAnnualPriceId: text("stripe_extra_user_annual_price_id"),
+
+  // Pricing (in cents; 0 for free)
+  pricePerUserMonthly: integer("price_per_user_monthly").default(0).notNull(),
+  pricePerUserAnnual: integer("price_per_user_annual").default(0).notNull(),
+  annualDiscountPercent: integer("annual_discount_percent").default(0).notNull(),
+
+  // User seat rules
+  includedUsers: integer("included_users").default(1).notNull(),
+  maxUsers: integer("max_users"), // null = unlimited
+  minUsers: integer("min_users").default(1).notNull(),
+  extraUserPriceMonthly: integer("extra_user_price_monthly").default(0).notNull(),
+  extraUserPriceAnnual: integer("extra_user_price_annual").default(0).notNull(),
+
+  trialDays: integer("trial_days").default(0).notNull(),
+
+  // JSON strings (parse at runtime)
+  limits: text("limits").notNull().default("{}"),          // PlanLimits
+  enabledModules: text("enabled_modules").notNull().default('["crm"]'), // string[]
+
+  supportTier: text("support_tier").default("community").notNull(),
+  hasWhiteLabel: boolean("has_white_label").default(false).notNull(),
+  hasSandbox: boolean("has_sandbox").default(false).notNull(),
+
+  isActive: boolean("is_active").default(true).notNull(),
+  isPublic: boolean("is_public").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  isCustom: boolean("is_custom").default(false).notNull(),
+
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/**
+ * Active Stripe subscription per tenant (one active per tenant at most).
+ */
+export const billingSubscriptions = pgTable("billing_subscription", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  planId: text("plan_id").references(() => billingPlans.id),
+
+  stripeSubscriptionId: text("stripe_subscription_id").unique(),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionItemId: text("stripe_subscription_item_id"), // base seat item
+
+  // trialing | active | past_due | canceled | suspended | free
+  status: text("status").notNull().default("free"),
+  billingCycle: text("billing_cycle").default("monthly").notNull(), // monthly | annual
+  quantity: integer("quantity").default(1).notNull(), // billable user seats
+
+  currentPeriodStart: timestamp("current_period_start", { mode: "date" }),
+  currentPeriodEnd: timestamp("current_period_end", { mode: "date" }),
+  trialEnd: timestamp("trial_end", { mode: "date" }),
+  canceledAt: timestamp("canceled_at", { mode: "date" }),
+  gracePeriodEnd: timestamp("grace_period_end", { mode: "date" }),
+
+  currency: text("currency").default("eur").notNull(),
+
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/**
+ * Add-ons attached to a tenant (extra users, optional modules).
+ * Each maps to a separate Stripe subscription item.
+ */
+export const billingTenantAddons = pgTable("billing_tenant_addon", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+
+  // extra_users | helpdesk | advanced_reporting | white_label | sandbox
+  addonType: text("addon_type").notNull(),
+  quantity: integer("quantity").default(1).notNull(),
+
+  stripeSubscriptionItemId: text("stripe_subscription_item_id"),
+  stripePriceId: text("stripe_price_id"),
+
+  // active | canceled
+  status: text("status").default("active").notNull(),
+
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/**
+ * Monthly usage counters per tenant.
+ * Unique on (tenantId, metricType, periodStart) — upserted each time.
+ */
+export const billingUsageStats = pgTable(
+  "billing_usage_stat",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    metricType: text("metric_type").notNull(), // api_calls | storage_mb | automation_runs | active_users
+    currentValue: integer("current_value").default(0).notNull(),
+    periodStart: timestamp("period_start", { mode: "date" }).notNull(),
+    periodEnd: timestamp("period_end", { mode: "date" }).notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [unique("billing_usage_stat_unique").on(t.tenantId, t.metricType, t.periodStart)],
+);
+
+/**
+ * Stripe webhook events — stored for idempotency and audit.
+ */
+export const billingStripeEvents = pgTable("billing_stripe_event", {
+  id: text("id").primaryKey(), // Stripe event ID
+  type: text("type").notNull(),
+  tenantId: text("tenant_id"),
+  payload: text("payload").notNull(), // raw JSON
+  processedAt: timestamp("processed_at", { mode: "date" }),
+  error: text("error"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/**
+ * Threshold alerts (usage approaching plan limit).
+ */
+export const billingAlerts = pgTable("billing_alert", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  metricType: text("metric_type").notNull(),
+  thresholdPercent: integer("threshold_percent").notNull(), // 80 | 90 | 100
+  sentAt: timestamp("sent_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/**
+ * Immutable audit log of all entitlement changes.
+ */
+export const billingAuditLog = pgTable("billing_audit_log", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id").notNull(),
+  eventType: text("event_type").notNull(), // plan_changed | addon_added | addon_removed | suspended | reactivated
+  previousValue: text("previous_value"), // JSON snapshot
+  newValue: text("new_value"),           // JSON snapshot
+  triggeredBy: text("triggered_by"),     // 'stripe_webhook' | 'admin:{userId}' | 'system'
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// ─── Billing relations ────────────────────────────────────────────────────────
+
+export const billingSubscriptionsRelations = relations(billingSubscriptions, ({ one, many }) => ({
+  tenant: one(tenants, { fields: [billingSubscriptions.tenantId], references: [tenants.id] }),
+  plan: one(billingPlans, { fields: [billingSubscriptions.planId], references: [billingPlans.id] }),
+  addons: many(billingTenantAddons),
+}));
+
+export const billingTenantAddonsRelations = relations(billingTenantAddons, ({ one }) => ({
+  tenant: one(tenants, { fields: [billingTenantAddons.tenantId], references: [tenants.id] }),
+}));
+
+export const billingUsageStatsRelations = relations(billingUsageStats, ({ one }) => ({
+  tenant: one(tenants, { fields: [billingUsageStats.tenantId], references: [tenants.id] }),
+}));

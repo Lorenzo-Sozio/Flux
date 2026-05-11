@@ -35,6 +35,7 @@
       "reports": "Reports",
       "reportBuilder": "Report Builder",
       "settings": "Settings",
+      "billing": "Billing",
       "customFields": "Custom Fields",
       "pipelineStages": "Pipeline Stages",
       "email": "Email",
@@ -998,11 +999,13 @@
       "createOrder": "Create Order"
     },
     "statuses": {
+      "draft": "Draft",
       "pending": "Pending",
       "processing": "Processing",
       "shipped": "Shipped",
       "delivered": "Delivered",
       "cancelled": "Cancelled",
+      "completed": "Completed",
       "refunded": "Refunded"
     },
     "paymentStatuses": {

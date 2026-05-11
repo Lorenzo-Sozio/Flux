@@ -4,7 +4,7 @@ import { requireAdminAccess } from "@/lib/auth-guard";
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { platformDb, createTenantDb, invalidateTenantDbCache } from "@/db";
-import { tenants, tenantMembers, users } from "@/db/schema";
+import { tenants, tenantMembers, users, billingSubscriptions } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { encryptDbUrl, decryptDbUrl } from "@/lib/tenant-db";
@@ -165,6 +165,12 @@ export async function createTenant(
       role: "owner",
     });
   }
+
+  // Provision a free subscription so the licensing engine always finds one
+  await platformDb.insert(billingSubscriptions).values({
+    tenantId: id,
+    status: "free",
+  });
 
   invalidateTenantCache(subdomain.toLowerCase());
   revalidatePath("/admin/tenants");

@@ -1,0 +1,107 @@
+"use client";
+
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CurrentPlan } from "./current-plan";
+import { PlanSelector } from "./plan-selector";
+import { UsageOverview } from "./usage-overview";
+import { AddonManager } from "./addon-manager";
+import { InvoiceList } from "./invoice-list";
+import { createBillingPortalSession } from "@/actions/billing";
+import type { TenantEntitlements } from "@/lib/billing/licensing";
+
+interface BillingClientProps {
+  entitlements: TenantEntitlements;
+  subscription: {
+    status: string;
+    billingCycle: string;
+    currentPeriodEnd: Date | null;
+  } | null;
+  plans: Array<{
+    id: string;
+    name: string;
+    displayName: string;
+    description: string | null;
+    pricePerUserMonthly: number;
+    pricePerUserAnnual: number;
+    annualDiscountPercent: number;
+    includedUsers: number;
+    maxUsers: number | null;
+    trialDays: number;
+    enabledModules: string;
+    stripePriceMonthlyId: string | null;
+    stripePriceAnnualId: string | null;
+  }>;
+  addons: Array<{ id: string; addonType: string; quantity: number; status: string }>;
+  invoices: Array<{
+    id: string;
+    number: string | null;
+    status: string | null;
+    amountDue: number;
+    amountPaid: number;
+    currency: string;
+    periodStart: number;
+    periodEnd: number;
+    hostedInvoiceUrl: string | null;
+    invoicePdf: string | null;
+    created: number;
+  }>;
+  usage: Record<string, { current: number; limit: number | null; percent: number | null }>;
+}
+
+export function BillingClient({
+  entitlements,
+  subscription,
+  plans,
+  addons,
+  invoices,
+  usage,
+}: BillingClientProps) {
+  const [portalLoading, startPortal] = useTransition();
+
+  function handleManageBilling() {
+    startPortal(async () => {
+      try {
+        const { url } = await createBillingPortalSession();
+        window.location.href = url;
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : "Failed to open billing portal");
+      }
+    });
+  }
+
+  return (
+    <Tabs defaultValue="overview" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="plans">Plans</TabsTrigger>
+        <TabsTrigger value="addons">Add-ons</TabsTrigger>
+        <TabsTrigger value="invoices">Invoices</TabsTrigger>
+      </TabsList>
+
+      <TabsContent value="overview" className="space-y-4">
+        <CurrentPlan
+          entitlements={entitlements}
+          periodEnd={subscription?.currentPeriodEnd}
+          billingCycle={subscription?.billingCycle}
+          onManageClick={handleManageBilling}
+          loading={portalLoading}
+        />
+        <UsageOverview usage={usage} />
+      </TabsContent>
+
+      <TabsContent value="plans" className="space-y-4">
+        <PlanSelector plans={plans} currentPlanName={entitlements.planName} />
+      </TabsContent>
+
+      <TabsContent value="addons" className="space-y-4">
+        <AddonManager addons={addons} />
+      </TabsContent>
+
+      <TabsContent value="invoices" className="space-y-4">
+        <InvoiceList invoices={invoices} />
+      </TabsContent>
+    </Tabs>
+  );
+}
