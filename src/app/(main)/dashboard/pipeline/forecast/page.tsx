@@ -33,7 +33,6 @@ export default async function ForecastPage() {
         bestCase={data.bestCase}
         committed={data.committed}
         currentMonthTarget={data.currentMonthTarget}
-        byOwner={data.byOwner}
       />
 
       {/* Monthly bar chart */}
