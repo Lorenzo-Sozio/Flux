@@ -22,7 +22,15 @@ import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { checkCompanyDuplicates, createCompany, deleteCompany, updateCompany } from "@/actions/crm";
+import {
+  checkCompanyDuplicates,
+  createCompany,
+  createCompanyCategory,
+  createCompanyType,
+  deleteCompany,
+  updateCompany,
+} from "@/actions/crm";
+import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combobox";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
 import { Button } from "@/components/ui/button";
@@ -35,10 +43,14 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { MergeCompaniesModal } from "./merge-companies-modal";
 
+type LookupItem = { id: string; name: string };
+
 const companySchema = z.object({
   name: z.string().min(1, "Company name is required"),
   type: z.string().default("prospect"),
   status: z.string().default("active"),
+  companyCategoryId: z.string().optional().nullable(),
+  companyTypeId: z.string().optional().nullable(),
   ownerId: z.string().optional().nullable(),
   groupId: z.string().optional().nullable(),
   assigneeValue: z.string().optional(),
@@ -58,8 +70,6 @@ const companySchema = z.object({
   state: z.string().optional(),
   zipCode: z.string().optional(),
   country: z.string().optional(),
-  countryId: z.string().nullable().optional(),
-  cityId: z.string().nullable().optional(),
   vatNumber: z.string().optional(),
   sdiCode: z.string().optional(),
 });
@@ -88,7 +98,17 @@ function F({
   );
 }
 
-export function CompanyModal({ company, children }: { company?: any; children: React.ReactNode }) {
+export function CompanyModal({
+  company,
+  children,
+  categories = [],
+  companyTypes = [],
+}: {
+  company?: any;
+  children: React.ReactNode;
+  categories?: LookupItem[];
+  companyTypes?: LookupItem[];
+}) {
   const t = useTranslations("companies");
   const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
@@ -97,6 +117,12 @@ export function CompanyModal({ company, children }: { company?: any; children: R
   const [mergeTargetId, setMergeTargetId] = useState<string | null>(null);
   const isEditing = !!company;
   const searchParams = useSearchParams();
+
+  const [localCategories, setLocalCategories] = useState<LookupItem[]>(categories);
+  const [localTypes, setLocalTypes] = useState<LookupItem[]>(companyTypes);
+
+  useEffect(() => { setLocalCategories(categories); }, [categories]);
+  useEffect(() => { setLocalTypes(companyTypes); }, [companyTypes]);
 
   useEffect(() => {
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
@@ -119,6 +145,8 @@ export function CompanyModal({ company, children }: { company?: any; children: R
       name: company?.name || "",
       type: company?.type || "prospect",
       status: company?.status || "active",
+      companyCategoryId: company?.companyCategoryId ?? null,
+      companyTypeId: company?.companyTypeId ?? null,
       industry: company?.industry || "",
       employeeCount: company?.employeeCount ?? null,
       annualRevenue: company?.annualRevenue ?? null,
@@ -138,8 +166,6 @@ export function CompanyModal({ company, children }: { company?: any; children: R
       state: company?.state || "",
       zipCode: company?.zipCode || "",
       country: company?.country || "",
-      countryId: company?.countryId ?? null,
-      cityId: company?.cityId ?? null,
       vatNumber: company?.vatNumber || "",
       sdiCode: company?.sdiCode || "",
     },
@@ -160,6 +186,8 @@ export function CompanyModal({ company, children }: { company?: any; children: R
         name: company.name || "",
         type: company.type || "prospect",
         status: company.status || "active",
+        companyCategoryId: company.companyCategoryId ?? null,
+        companyTypeId: company.companyTypeId ?? null,
         industry: company.industry || "",
         employeeCount: company.employeeCount ?? null,
         annualRevenue: company.annualRevenue ?? null,
@@ -179,8 +207,6 @@ export function CompanyModal({ company, children }: { company?: any; children: R
         state: company.state || "",
         zipCode: company.zipCode || "",
         country: company.country || "",
-        countryId: company.countryId ?? null,
-        cityId: company.cityId ?? null,
         vatNumber: company.vatNumber || "",
         sdiCode: company.sdiCode || "",
       });
@@ -226,7 +252,14 @@ export function CompanyModal({ company, children }: { company?: any; children: R
 
   const onSubmit = async (data: CompanyFormValues) => {
     const { ownerId, groupId } = decodeAssignee(data.assigneeValue);
-    const payload = { ...data, ownerId, groupId, assigneeValue: undefined };
+    const payload = {
+      ...data,
+      ownerId,
+      groupId,
+      assigneeValue: undefined,
+      companyCategoryId: data.companyCategoryId || null,
+      companyTypeId: data.companyTypeId || null,
+    };
 
     const found = await checkCompanyDuplicates({
       name: data.name,
@@ -333,6 +366,48 @@ export function CompanyModal({ company, children }: { company?: any; children: R
                             <SelectItem value="inactive">{t("statuses.inactive")}</SelectItem>
                           </SelectContent>
                         </Select>
+                      )}
+                    />
+                  </F>
+                  <F label={t("form.category")} error={e.companyCategoryId?.message}>
+                    <Controller
+                      control={control}
+                      name="companyCategoryId"
+                      render={({ field }) => (
+                        <CreatableLookupCombobox
+                          value={field.value ?? null}
+                          onChange={field.onChange}
+                          items={localCategories}
+                          onAddItem={(item) =>
+                            setLocalCategories((prev) =>
+                              [...prev, item].sort((a, b) => a.name.localeCompare(b.name)),
+                            )
+                          }
+                          onCreate={createCompanyCategory}
+                          placeholder={t("form.selectCategory")}
+                          createPrefix={t("form.createNew")}
+                        />
+                      )}
+                    />
+                  </F>
+                  <F label={t("form.companyType")} error={e.companyTypeId?.message}>
+                    <Controller
+                      control={control}
+                      name="companyTypeId"
+                      render={({ field }) => (
+                        <CreatableLookupCombobox
+                          value={field.value ?? null}
+                          onChange={field.onChange}
+                          items={localTypes}
+                          onAddItem={(item) =>
+                            setLocalTypes((prev) =>
+                              [...prev, item].sort((a, b) => a.name.localeCompare(b.name)),
+                            )
+                          }
+                          onCreate={createCompanyType}
+                          placeholder={t("form.selectCompanyType")}
+                          createPrefix={t("form.createNew")}
+                        />
                       )}
                     />
                   </F>
@@ -551,7 +626,15 @@ export function DeleteCompanyButton({ id }: { id: string }) {
   );
 }
 
-export function CompanyActions({ company }: { company: any }) {
+export function CompanyActions({
+  company,
+  categories = [],
+  companyTypes = [],
+}: {
+  company: any;
+  categories?: LookupItem[];
+  companyTypes?: LookupItem[];
+}) {
   return (
     <div className="flex items-center gap-2 justify-end">
       <Link href={`/dashboard/companies/${company.id}`}>
@@ -559,7 +642,7 @@ export function CompanyActions({ company }: { company: any }) {
           <EyeIcon className="h-4 w-4" />
         </Button>
       </Link>
-      <CompanyModal company={company}>
+      <CompanyModal company={company} categories={categories} companyTypes={companyTypes}>
         <Button variant="ghost" size="icon">
           <PencilIcon className="h-4 w-4" />
         </Button>

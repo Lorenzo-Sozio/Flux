@@ -35,6 +35,21 @@ interface SearchableSelectProps {
   className?: string;
 }
 
+function useScrollWheel(ref: React.RefObject<HTMLDivElement | null>, open: boolean) {
+  React.useEffect(() => {
+    if (!open) return;
+    const el = ref.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const px = e.deltaMode === 0 ? e.deltaY : e.deltaMode === 1 ? e.deltaY * 20 : e.deltaY * el.clientHeight;
+      el.scrollTop += px;
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, [open, ref]);
+}
+
 export function SearchableSelect({
   options,
   value,
@@ -46,7 +61,10 @@ export function SearchableSelect({
   className,
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
   const selected = options.find((o) => o.value === value);
+
+  useScrollWheel(scrollRef, open);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -74,37 +92,43 @@ export function SearchableSelect({
       >
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList>
-            <CommandEmpty>{emptyText}</CommandEmpty>
-            <CommandGroup>
-              {options.map((option) => (
-                <CommandItem
-                  key={option.value}
-                  value={option.label}
-                  onSelect={() => {
-                    onChange(option.value);
-                    setOpen(false);
-                  }}
-                  data-checked={value === option.value}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="truncate">{option.label}</p>
-                    {option.sublabel && (
-                      <p className="text-xs text-muted-foreground truncate">
-                        {option.sublabel}
-                      </p>
-                    )}
-                  </div>
-                  <Check
-                    className={cn(
-                      "ml-2 h-4 w-4 shrink-0",
-                      value === option.value ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
+          <div
+            ref={scrollRef}
+            className="max-h-[280px] overflow-y-auto overflow-x-hidden"
+            style={{ scrollbarWidth: "thin" }}
+          >
+            <CommandList className="max-h-none overflow-visible">
+              <CommandEmpty>{emptyText}</CommandEmpty>
+              <CommandGroup>
+                {options.map((option) => (
+                  <CommandItem
+                    key={option.value}
+                    value={option.label}
+                    onSelect={() => {
+                      onChange(option.value);
+                      setOpen(false);
+                    }}
+                    data-checked={value === option.value}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate">{option.label}</p>
+                      {option.sublabel && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {option.sublabel}
+                        </p>
+                      )}
+                    </div>
+                    <Check
+                      className={cn(
+                        "ml-2 h-4 w-4 shrink-0",
+                        value === option.value ? "opacity-100" : "opacity-0"
+                      )}
+                    />
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </div>
         </Command>
       </PopoverContent>
     </Popover>

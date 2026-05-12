@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { deleteTenant, migrateAllTenants, migrateTenantDb } from "@/actions/tenants";
-import { adminSetTenantPlan } from "@/actions/admin-billing";
+import { adminSetTenantPlan, adminSyncTenantSubscription } from "@/actions/admin-billing";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -16,6 +16,7 @@ import {
   Users,
   Pencil,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -92,6 +93,22 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
   const [pendingPlanId, setPendingPlanId] = useState<string>("");
   const [savingPlan, setSavingPlan] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
+
+  // ── Stripe sync ─────────────────────────────────────────────────────────────
+  const [syncingTenantId, setSyncingTenantId] = useState<string | null>(null);
+
+  const handleSyncStripe = async (tenant: Tenant) => {
+    setSyncingTenantId(tenant.id);
+    setError(null);
+    try {
+      await adminSyncTenantSubscription(tenant.id);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sync failed");
+    } finally {
+      setSyncingTenantId(null);
+    }
+  };
 
   const openPlanDialog = (tenant: Tenant) => {
     // Pre-select the current plan; fall back to the "free" plan entry if planId is null
@@ -355,10 +372,20 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
                           variant="ghost"
                           className="h-6 w-6 text-gray-400 hover:text-gray-700"
                           onClick={() => openPlanDialog(tenant)}
-                          title="Change plan"
+                          title="Override plan manually"
                           disabled={activePlans.length === 0}
                         >
                           <Pencil className="h-3 w-3" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-gray-400 hover:text-blue-600"
+                          onClick={() => handleSyncStripe(tenant)}
+                          title="Reset to Stripe data"
+                          disabled={syncingTenantId === tenant.id}
+                        >
+                          <RefreshCw className={`h-3 w-3 ${syncingTenantId === tenant.id ? "animate-spin" : ""}`} />
                         </Button>
                       </div>
                     </td>

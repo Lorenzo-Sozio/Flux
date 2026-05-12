@@ -6,7 +6,6 @@ import { and, desc, eq, getTableColumns, ilike, isNull, ne, or } from "drizzle-o
 import { getTranslations } from "next-intl/server";
 
 import { createNotificationAction } from "@/actions/auth";
-import { syncZipToCity } from "@/actions/geo";
 import { dispatchWebhook } from "@/actions/webhooks";
 import { getDb } from "@/lib/tenant-context";
 import {
@@ -14,11 +13,11 @@ import {
   appointments,
   campaignLogs,
   companies,
+  companyCategories,
+  companyTypes,
   contacts,
   customFieldDefinitions,
   deals,
-  geoCities,
-  geoCountries,
   leads,
   pipelineStages,
   quotes,
@@ -37,6 +36,46 @@ import {
 import type { FilterTree } from "@/lib/filter-types";
 import { decodeFilter } from "@/lib/filter-types";
 import { computeLeadScore } from "@/lib/lead-score";
+
+// ── Company lookup tables ──────────────────────────────────────────────────────
+
+export async function getCompanyCategories() {
+  const db = await getDb();
+  return db
+    .select({ id: companyCategories.id, name: companyCategories.name })
+    .from(companyCategories)
+    .orderBy(companyCategories.name);
+}
+
+export async function getCompanyTypes() {
+  const db = await getDb();
+  return db
+    .select({ id: companyTypes.id, name: companyTypes.name })
+    .from(companyTypes)
+    .orderBy(companyTypes.name);
+}
+
+export async function createCompanyCategory(name: string) {
+  await requireWriteAccess();
+  const db = await getDb();
+  const [row] = await db
+    .insert(companyCategories)
+    .values({ name: name.trim() })
+    .returning({ id: companyCategories.id, name: companyCategories.name });
+  revalidatePath("/dashboard/companies");
+  return row;
+}
+
+export async function createCompanyType(name: string) {
+  await requireWriteAccess();
+  const db = await getDb();
+  const [row] = await db
+    .insert(companyTypes)
+    .values({ name: name.trim() })
+    .returning({ id: companyTypes.id, name: companyTypes.name });
+  revalidatePath("/dashboard/companies");
+  return row;
+}
 
 // ── Users ─────────────────────────────────────────────────────────────────────
 export async function getAllUsers() {
@@ -85,8 +124,6 @@ export async function createLead(data: any) {
   const db = await getDb();
   const payload = {
     ...data,
-    countryId: data.countryId || null,
-    cityId: data.cityId || null,
     marketingConsent: data.marketingConsent ?? false,
     consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
     tags: Array.isArray(data.tags)
@@ -100,7 +137,6 @@ export async function createLead(data: any) {
     leadScore: computeLeadScore(data),
   };
   const [newLead] = await db.insert(leads).values(payload).returning();
-  syncZipToCity(newLead.cityId, newLead.zipCode);
   revalidatePath("/dashboard/leads");
   dispatchWebhook("lead.created", {
     id: newLead.id,
@@ -132,8 +168,6 @@ export async function updateLead(id: string, data: any) {
   }
   const payload = {
     ...data,
-    countryId: data.countryId || null,
-    cityId: data.cityId || null,
     marketingConsent: data.marketingConsent ?? false,
     consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
     tags: Array.isArray(data.tags)
@@ -147,7 +181,6 @@ export async function updateLead(id: string, data: any) {
     leadScore: computeLeadScore(data),
   };
   const [updatedLead] = await db.update(leads).set(payload).where(eq(leads.id, id)).returning();
-  syncZipToCity(updatedLead.cityId, updatedLead.zipCode);
   revalidatePath("/dashboard/leads");
   return updatedLead;
 }
@@ -200,8 +233,6 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
             state: lead.state ?? undefined,
             zipCode: lead.zipCode ?? undefined,
             country: lead.country ?? undefined,
-            countryId: lead.countryId ?? undefined,
-            cityId: lead.cityId ?? undefined,
             source: lead.source ?? undefined,
             ownerId: lead.ownerId,
             sourceLeadId: lead.id,
@@ -226,8 +257,6 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
         state: lead.state ?? undefined,
         zipCode: lead.zipCode ?? undefined,
         country: lead.country ?? undefined,
-        countryId: lead.countryId ?? undefined,
-        cityId: lead.cityId ?? undefined,
         source: lead.source ?? undefined,
         notes: lead.notes ?? undefined,
         ownerId: lead.ownerId,
@@ -299,8 +328,6 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
 
   if (!result) throw new Error("Conversion transaction failed");
 
-  syncZipToCity(lead.cityId, lead.zipCode);
-
   dispatchWebhook("lead.converted", {
     leadId,
     contactId: result.contactId,
@@ -321,8 +348,6 @@ export async function createContact(data: any) {
   const db = await getDb();
   const payload = {
     ...data,
-    countryId: data.countryId || null,
-    cityId: data.cityId || null,
     marketingConsent: data.marketingConsent ?? false,
     consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
     tags: Array.isArray(data.tags)
@@ -336,7 +361,6 @@ export async function createContact(data: any) {
     leadScore: computeLeadScore(data),
   };
   const [newContact] = await db.insert(contacts).values(payload).returning();
-  syncZipToCity(newContact.cityId, newContact.zipCode);
   revalidatePath("/dashboard/contacts");
   dispatchWebhook("contact.created", {
     id: newContact.id,
@@ -368,8 +392,6 @@ export async function updateContact(id: string, data: any) {
   }
   const payload = {
     ...data,
-    countryId: data.countryId || null,
-    cityId: data.cityId || null,
     marketingConsent: data.marketingConsent ?? false,
     consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
     tags: Array.isArray(data.tags)
@@ -383,7 +405,6 @@ export async function updateContact(id: string, data: any) {
     leadScore: computeLeadScore(data),
   };
   const [updatedContact] = await db.update(contacts).set(payload).where(eq(contacts.id, id)).returning();
-  syncZipToCity(updatedContact.cityId, updatedContact.zipCode);
   revalidatePath("/dashboard/contacts");
   dispatchWebhook("contact.updated", {
     id: updatedContact.id,
@@ -425,8 +446,6 @@ export async function createCompany(data: any) {
   const db = await getDb();
   const payload = {
     ...data,
-    countryId: data.countryId || null,
-    cityId: data.cityId || null,
     vatNumber: data.vatNumber,
     sdiCode: data.sdiCode,
     tags: Array.isArray(data.tags)
@@ -439,7 +458,6 @@ export async function createCompany(data: any) {
         : null,
   };
   const [newCompany] = await db.insert(companies).values(payload).returning();
-  syncZipToCity(newCompany.cityId, newCompany.zipCode);
   revalidatePath("/dashboard/companies");
   return newCompany;
 }
@@ -465,8 +483,6 @@ export async function updateCompany(id: string, data: any) {
   }
   const payload = {
     ...data,
-    countryId: data.countryId || null,
-    cityId: data.cityId || null,
     vatNumber: data.vatNumber,
     sdiCode: data.sdiCode,
     tags: Array.isArray(data.tags)
@@ -479,7 +495,6 @@ export async function updateCompany(id: string, data: any) {
         : null,
   };
   const [updatedCompany] = await db.update(companies).set(payload).where(eq(companies.id, id)).returning();
-  syncZipToCity(updatedCompany.cityId, updatedCompany.zipCode);
   revalidatePath("/dashboard/companies");
   return updatedCompany;
 }
@@ -636,8 +651,6 @@ type LeadMergeFields = {
   state?: string | null;
   zipCode?: string | null;
   country?: string | null;
-  countryId?: string | null;
-  cityId?: string | null;
   source?: string | null;
   ownerId?: string | null;
 };
@@ -690,8 +703,6 @@ type ContactMergeFields = {
   state?: string | null;
   zipCode?: string | null;
   country?: string | null;
-  countryId?: string | null;
-  cityId?: string | null;
   source?: string | null;
   companyId?: string | null;
   ownerId?: string | null;
@@ -729,8 +740,6 @@ type CompanyMergeFields = {
   state?: string | null;
   zipCode?: string | null;
   country?: string | null;
-  countryId?: string | null;
-  cityId?: string | null;
   vatNumber?: string | null;
   sdiCode?: string | null;
   linkedinUrl?: string | null;

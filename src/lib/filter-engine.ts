@@ -63,20 +63,30 @@ export const CONTACT_FIELDS: FieldRegistry = {
 };
 
 export const COMPANY_FIELDS: FieldRegistry = {
-  name:             { label: "Company Name",     type: "text",    col: companies.name },
-  industry:         { label: "Industry",         type: "text",    col: companies.industry },
-  city:             { label: "City",             type: "text",    col: companies.city },
-  state:            { label: "Region / Province",type: "text",    col: companies.state },
-  country:          { label: "Country",          type: "text",    col: companies.country },
-  mainEmail:        { label: "Main Email",       type: "text",    col: companies.mainEmail },
-  mainPhone:        { label: "Main Phone",       type: "text",    col: companies.mainPhone },
-  website:          { label: "Website",          type: "text",    col: companies.website },
-  type:             { label: "Type",             type: "enum",    col: companies.type,
-                      options: ["prospect","customer","partner","vendor"] },
-  status:           { label: "Status",           type: "enum",    col: companies.status,
-                      options: ["active","inactive"] },
-  employeeCount:    { label: "Employees",        type: "number",  col: companies.employeeCount },
-  createdAt:        { label: "Created Date",     type: "date",    col: companies.createdAt },
+  name:               { label: "Company Name",     type: "text",   col: companies.name },
+  industry:           { label: "Industry",         type: "text",   col: companies.industry },
+  city:               { label: "City",             type: "text",   col: companies.city },
+  state:              { label: "Region / Province",type: "text",   col: companies.state },
+  country:            { label: "Country",          type: "text",   col: companies.country },
+  mainEmail:          { label: "Main Email",       type: "text",   col: companies.mainEmail },
+  mainPhone:          { label: "Main Phone",       type: "text",   col: companies.mainPhone },
+  website:            { label: "Website",          type: "text",   col: companies.website },
+  vatNumber:          { label: "VAT Number",       type: "text",   col: companies.vatNumber },
+  sdiCode:            { label: "SDI Code",         type: "text",   col: companies.sdiCode },
+  type:               { label: "Type",             type: "enum",   col: companies.type,
+                        options: ["prospect","customer","partner","vendor"] },
+  status:             { label: "Status",           type: "enum",   col: companies.status,
+                        options: ["active","inactive"] },
+  source:             { label: "Source",           type: "enum",   col: companies.source,
+                        options: ["website","referral","linkedin","cold_outreach","trade_show","advertisement","email_campaign","other"] },
+  employeeCount:      { label: "Employees",        type: "number", col: companies.employeeCount },
+  annualRevenue:      { label: "Annual Revenue",   type: "number", col: companies.annualRevenue },
+  leadScore:          { label: "Lead Score",       type: "number", col: companies.leadScore },
+  companyCategoryId:  { label: "Category",         type: "enum",   col: companies.companyCategoryId,
+                        options: [] }, // lookupOptions injected dynamically in page.tsx
+  companyTypeId:      { label: "Activity Type",    type: "enum",   col: companies.companyTypeId,
+                        options: [] }, // lookupOptions injected dynamically in page.tsx
+  createdAt:          { label: "Created Date",     type: "date",   col: companies.createdAt },
 };
 
 /** Extract client-safe FieldMetaMap from a FieldRegistry */
@@ -84,7 +94,14 @@ export function toFieldMetaMap(registry: FieldRegistry): FieldMetaMap {
   return Object.fromEntries(
     Object.entries(registry).map(([k, v]) => [
       k,
-      { label: v.label, type: v.type, options: v.options, isCustom: v.isCustom, customFieldId: v.customFieldId },
+      {
+        label: v.label,
+        type: v.type,
+        options: v.options,
+        lookupOptions: v.lookupOptions,
+        isCustom: v.isCustom,
+        customFieldId: v.customFieldId,
+      },
     ])
   );
 }

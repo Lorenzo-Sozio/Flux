@@ -39,14 +39,21 @@ interface User {
   email: string | null;
 }
 
+interface LookupItem {
+  id: string;
+  name: string;
+}
+
 interface Props {
   companies: Company[];
   users: User[];
   canEdit: boolean;
   activeCount: number;
+  categories?: LookupItem[];
+  companyTypes?: LookupItem[];
 }
 
-export function CompaniesTable({ companies, users, canEdit, activeCount }: Props) {
+export function CompaniesTable({ companies, users, canEdit, activeCount, categories = [], companyTypes = [] }: Props) {
   const t = useTranslations("companies");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
@@ -195,7 +202,7 @@ export function CompaniesTable({ companies, users, canEdit, activeCount }: Props
               </TableCell>
               {canEdit && (
                 <TableCell className="text-right">
-                  <CompanyActions company={company} />
+                  <CompanyActions company={company} categories={categories} companyTypes={companyTypes} />
                 </TableCell>
               )}
             </TableRow>

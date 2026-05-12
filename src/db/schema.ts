@@ -120,6 +120,24 @@ export const geoCities = pgTable(
   (t) => [unique("geo_city_country_slug_uniq").on(t.countryId, t.slug)],
 );
 
+// --- CRM LOOKUP TABLES ---
+
+export const companyCategories = pgTable("company_category", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull().unique(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const companyTypes = pgTable("company_type", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull().unique(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // --- CRM CORE ENTITIES ---
 
 export const companies = pgTable("company", {
@@ -138,8 +156,6 @@ export const companies = pgTable("company", {
   state: text("state"),
   zipCode: text("zip_code"),
   country: text("country"),
-  countryId: text("country_id").references(() => geoCountries.id, { onDelete: "set null" }),
-  cityId: text("city_id").references(() => geoCities.id, { onDelete: "set null" }),
   mainPhone: text("main_phone"),
   mainEmail: text("main_email"),
   linkedinUrl: text("linkedin_url"),
@@ -152,6 +168,8 @@ export const companies = pgTable("company", {
   sdiCode: text("sdi_code"),
   tags: text("tags").array(),
   sourceLeadId: text("source_lead_id"), // FK set via migration → lead.id (set null)
+  companyCategoryId: text("company_category_id").references(() => companyCategories.id, { onDelete: "set null" }),
+  companyTypeId: text("company_type_id").references(() => companyTypes.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -174,8 +192,6 @@ export const leads = pgTable("lead", {
   state: text("state"),
   zipCode: text("zip_code"),
   country: text("country"),
-  countryId: text("country_id").references(() => geoCountries.id, { onDelete: "set null" }),
-  cityId: text("city_id").references(() => geoCities.id, { onDelete: "set null" }),
   status: text("status").default("new").notNull(), // new, contacting, engaged, qualified, unqualified
   source: text("source"), // organic, referral, outbound, event, etc.
   rating: text("rating"), // hot, warm, cold
@@ -212,8 +228,6 @@ export const contacts = pgTable("contact", {
   state: text("state"),
   zipCode: text("zip_code"),
   country: text("country"),
-  countryId: text("country_id").references(() => geoCountries.id, { onDelete: "set null" }),
-  cityId: text("city_id").references(() => geoCities.id, { onDelete: "set null" }),
   status: text("status").default("active").notNull(),
   source: text("source"),
   leadScore: integer("lead_score"),
@@ -1553,4 +1567,12 @@ export const billingTenantAddonsRelations = relations(billingTenantAddons, ({ on
 
 export const billingUsageStatsRelations = relations(billingUsageStats, ({ one }) => ({
   tenant: one(tenants, { fields: [billingUsageStats.tenantId], references: [tenants.id] }),
+}));
+
+export const companyCategoriesRelations = relations(companyCategories, ({ many }) => ({
+  companies: many(companies),
+}));
+
+export const companyTypesRelations = relations(companyTypes, ({ many }) => ({
+  companies: many(companies),
 }));

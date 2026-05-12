@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
+import type React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Dialog,
@@ -15,9 +16,15 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
   SlidersHorizontal, X, BookmarkPlus, Trash2, Loader2,
-  Plus, FolderPlus, ChevronRight,
+  Plus, FolderPlus, ChevronRight, Check, ChevronsUpDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { SearchableSelect } from "@/components/ui/searchable-select";
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { createCustomFilter, deleteCustomFilter } from "@/actions/filters";
 import {
   FilterTree, FilterNode, FilterCondition,
@@ -35,6 +42,102 @@ const DEPTH_COLORS = [
   "border-blue-400/30 bg-blue-400/[0.02]",
   "border-purple-400/30 bg-purple-400/[0.02]",
 ];
+
+// ─── Lookup multi-select (FK fields with many options) ───────────────────────
+
+function useLookupScrollWheel(ref: React.RefObject<HTMLDivElement | null>, open: boolean) {
+  useEffect(() => {
+    if (!open) return;
+    const el = ref.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const px = e.deltaMode === 0 ? e.deltaY : e.deltaMode === 1 ? e.deltaY * 20 : e.deltaY * el.clientHeight;
+      el.scrollTop += px;
+    };
+    el.addEventListener("wheel", handler, { passive: false });
+    return () => el.removeEventListener("wheel", handler);
+  }, [open, ref]);
+}
+
+function LookupMultiSelect({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: string; label: string }[];
+  value: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useLookupScrollWheel(scrollRef, open);
+
+  const filtered = search.trim()
+    ? options.filter((o) => o.label.toLowerCase().includes(search.trim().toLowerCase()))
+    : options;
+
+  const toggle = (val: string) => {
+    onChange(value.includes(val) ? value.filter((v) => v !== val) : [...value, val]);
+  };
+
+  const selectedLabels = value
+    .map((v) => options.find((o) => o.value === v)?.label ?? v)
+    .join(", ");
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) setSearch("");
+      }}
+    >
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="h-8 w-full justify-between font-normal text-sm"
+        >
+          <span className="truncate text-left">
+            {value.length > 0 ? (
+              selectedLabels
+            ) : (
+              <span className="text-muted-foreground">Select…</span>
+            )}
+          </span>
+          <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <Command shouldFilter={false}>
+          <CommandInput placeholder="Search…" value={search} onValueChange={setSearch} />
+          <div ref={scrollRef} className="max-h-[260px] overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: "thin" }}>
+            <CommandList className="max-h-none overflow-visible">
+              {filtered.length === 0 && <CommandEmpty>No results.</CommandEmpty>}
+              <CommandGroup>
+                {filtered.map((opt) => (
+                  <CommandItem key={opt.value} value={opt.value} onSelect={() => toggle(opt.value)}>
+                    <Check
+                      className={cn(
+                        "mr-2 h-4 w-4 shrink-0",
+                        value.includes(opt.value) ? "opacity-100" : "opacity-0",
+                      )}
+                    />
+                    {opt.label}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            </CommandList>
+          </div>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 // ─── Value input ─────────────────────────────────────────────────────────────
 
@@ -139,6 +242,16 @@ function ValueInput({
     );
   }
 
+  if (fieldMeta.type === "enum" && fieldMeta.lookupOptions !== undefined) {
+    return (
+      <LookupMultiSelect
+        options={fieldMeta.lookupOptions}
+        value={(value as string[]) ?? []}
+        onChange={onChange}
+      />
+    );
+  }
+
   if (fieldMeta.type === "enum" && fieldMeta.options) {
     const selected = (value as string[]) ?? [];
     return (
@@ -198,33 +311,24 @@ function ConditionRow({
   return (
     <div className="grid gap-2 items-start" style={{ gridTemplateColumns: "1fr 1fr 1.4fr 32px" }}>
       {/* Field */}
-      <select
+      <SearchableSelect
+        options={[
+          ...standardFields.map(([k, f]) => ({ value: k, label: f.label })),
+          ...customFieldEntries.map(([k, f]) => ({ value: k, label: f.label, sublabel: "Custom" })),
+        ]}
         value={condition.field}
-        onChange={(e) => changeField(e.target.value)}
-        className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      >
-        {standardFields.map(([k, f]) => (
-          <option key={k} value={k}>{f.label}</option>
-        ))}
-        {customFieldEntries.length > 0 && (
-          <optgroup label="── Custom Fields">
-            {customFieldEntries.map(([k, f]) => (
-              <option key={k} value={k}>{f.label}</option>
-            ))}
-          </optgroup>
-        )}
-      </select>
+        onChange={changeField}
+        searchPlaceholder="Search field…"
+        className="h-8 text-sm"
+      />
 
       {/* Operator */}
-      <select
+      <SearchableSelect
+        options={operators.map((op) => ({ value: op.value, label: op.label }))}
         value={condition.operator}
-        onChange={(e) => changeOp(e.target.value as FilterOperator)}
-        className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-      >
-        {operators.map((op) => (
-          <option key={op.value} value={op.value}>{op.label}</option>
-        ))}
-      </select>
+        onChange={(v) => changeOp(v as FilterOperator)}
+        className="h-8 text-sm"
+      />
 
       {/* Value */}
       <div className="min-w-0">

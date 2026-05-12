@@ -60,8 +60,9 @@ export type FieldMeta = {
   label: string;
   type: FieldType;
   options?: string[];
-  isCustom?: boolean;      // true for custom field definitions
-  customFieldId?: string;  // the DB id of the custom_field_definition row
+  lookupOptions?: { value: string; label: string }[]; // FK fields: show labels, store IDs
+  isCustom?: boolean;
+  customFieldId?: string;
 };
 
 export type FieldMetaMap = Record<string, FieldMeta>;

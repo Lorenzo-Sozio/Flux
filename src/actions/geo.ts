@@ -1,7 +1,5 @@
 "use server";
 
-import { after } from "next/server";
-
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 
 import { getDb } from "@/lib/tenant-context";
@@ -98,7 +96,6 @@ export async function createCity(countryId: string, name: string, region?: strin
 
 /**
  * Adds a postal code to a city's postal_codes array if not already present.
- * Called fire-and-forget via after() in create/update actions.
  */
 export async function addPostalCodeToCity(cityId: string, postalCode: string): Promise<void> {
   const db = await getDb();
@@ -110,59 +107,3 @@ export async function addPostalCodeToCity(cityId: string, postalCode: string): P
   );
 }
 
-// ── Import helper ─────────────────────────────────────────────────────────────
-
-/**
- * Resolves country/city text values to geo FK IDs.
- * Tries nameEn, nameIt, and iso2 for country.
- * Used during CSV import to populate FK columns alongside text fields.
- */
-export async function resolveGeoFromText(
-  countryText: string | null | undefined,
-  cityText: string | null | undefined,
-): Promise<{ countryId: string | null; cityId: string | null }> {
-  const db = await getDb();
-  let countryId: string | null = null;
-  let cityId: string | null = null;
-
-  if (countryText?.trim()) {
-    const normalized = countryText.trim();
-    const [row] = await db
-      .select()
-      .from(geoCountries)
-      .where(
-        or(
-          ilike(geoCountries.nameEn, normalized),
-          ilike(geoCountries.nameIt, normalized),
-          ilike(geoCountries.iso2, normalized),
-          ilike(geoCountries.iso3, normalized),
-        ),
-      )
-      .limit(1);
-    if (row) countryId = row.id;
-  }
-
-  if (cityText?.trim() && countryId) {
-    const slug = slugifyCity(cityText.trim());
-    const [row] = await db
-      .select()
-      .from(geoCities)
-      .where(and(eq(geoCities.countryId, countryId), eq(geoCities.slug, slug)))
-      .limit(1);
-    if (row) cityId = row.id;
-  }
-
-  return { countryId, cityId };
-}
-
-// ── Sync helper (used inside create/update actions) ───────────────────────────
-
-/**
- * Fire-and-forget: if both cityId and zipCode are set, add the zip to the city's
- * postal_codes array so future users see it as a suggestion.
- */
-export async function syncZipToCity(cityId: string | null | undefined, zipCode: string | null | undefined) {
-  if (cityId && zipCode) {
-    after(() => addPostalCodeToCity(cityId, zipCode));
-  }
-}

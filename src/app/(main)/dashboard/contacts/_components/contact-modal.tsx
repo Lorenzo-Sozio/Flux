@@ -60,8 +60,6 @@ const contactSchema = z.object({
   state: z.string().optional(),
   zipCode: z.string().optional(),
   country: z.string().optional(),
-  countryId: z.string().nullable().optional(),
-  cityId: z.string().nullable().optional(),
 });
 type ContactFormValues = z.infer<typeof contactSchema>;
 
@@ -154,8 +152,6 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
       state: contact?.state || "",
       zipCode: contact?.zipCode || "",
       country: contact?.country || "",
-      countryId: contact?.countryId ?? null,
-      cityId: contact?.cityId ?? null,
     },
   });
 
@@ -194,8 +190,6 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
         state: contact.state || "",
         zipCode: contact.zipCode || "",
         country: contact.country || "",
-        countryId: contact.countryId ?? null,
-        cityId: contact.cityId ?? null,
       });
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps

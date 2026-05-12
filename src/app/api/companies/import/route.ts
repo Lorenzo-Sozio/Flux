@@ -3,7 +3,6 @@ import { type NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import Papa from "papaparse";
 
-import { resolveGeoFromText } from "@/actions/geo";
 import { auth } from "@/auth";
 import { getDb } from "@/lib/tenant-context";
 import { companies } from "@/db/schema";
@@ -66,7 +65,6 @@ export async function POST(req: NextRequest) {
 
     const countryText = row.country?.trim() || null;
     const cityText = row.city?.trim() || null;
-    const { countryId: resolvedCountryId, cityId: resolvedCityId } = await resolveGeoFromText(countryText, cityText);
 
     await db.insert(companies).values({
       name,
@@ -81,8 +79,6 @@ export async function POST(req: NextRequest) {
       state: row.state?.trim() || null,
       zipCode: row.zipCode?.trim() || row.zip_code?.trim() || null,
       country: countryText,
-      countryId: resolvedCountryId,
-      cityId: resolvedCityId,
       mainPhone: row.mainPhone?.trim() || row.main_phone?.trim() || null,
       mainEmail: row.mainEmail?.trim() || row.main_email?.trim() || null,
       linkedinUrl: row.linkedinUrl?.trim() || row.linkedin_url?.trim() || null,

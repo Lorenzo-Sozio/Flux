@@ -61,8 +61,6 @@ const leadSchema = z.object({
   state: z.string().optional(),
   zipCode: z.string().optional(),
   country: z.string().optional(),
-  countryId: z.string().nullable().optional(),
-  cityId: z.string().nullable().optional(),
 });
 type LeadFormValues = z.infer<typeof leadSchema>;
 
@@ -141,8 +139,6 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
       state: lead?.state || "",
       zipCode: lead?.zipCode || "",
       country: lead?.country || "",
-      countryId: lead?.countryId ?? null,
-      cityId: lead?.cityId ?? null,
     },
   });
 
@@ -182,8 +178,6 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
         state: lead.state || "",
         zipCode: lead.zipCode || "",
         country: lead.country || "",
-        countryId: lead.countryId ?? null,
-        cityId: lead.cityId ?? null,
       });
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps

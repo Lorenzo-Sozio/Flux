@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { getCompanies, getAllUsers } from "@/actions/crm";
+import { getCompanies, getAllUsers, getCompanyCategories, getCompanyTypes } from "@/actions/crm";
 import { getCustomFilters } from "@/actions/filters";
 import { getCustomFieldDefinitions } from "@/actions/custom-fields";
 import { toFieldMetaMap, COMPANY_FIELDS, customFieldsToMetaMap } from "@/lib/filter-engine";
@@ -25,11 +25,13 @@ export default async function CompaniesPage({
   const session = await auth();
   const canEdit = session?.user?.role !== "viewer";
 
-  const [allCompanies, savedFilters, customDefs, users] = await Promise.all([
+  const [allCompanies, savedFilters, customDefs, users, categories, companyTypes] = await Promise.all([
     getCompanies(encoded),
     getCustomFilters("companies").catch(() => []),
     getCustomFieldDefinitions("company").catch(() => []),
     getAllUsers(),
+    getCompanyCategories().catch(() => []),
+    getCompanyTypes().catch(() => []),
   ]);
 
   const t = await getTranslations("companies");
@@ -37,6 +39,19 @@ export default async function CompaniesPage({
   const tree = encoded ? decodeFilter(encoded) : null;
   const activeCount = tree ? countActive(tree.conditions) : 0;
   const fields = { ...toFieldMetaMap(COMPANY_FIELDS), ...customFieldsToMetaMap(customDefs) };
+
+  if (fields.companyCategoryId) {
+    fields.companyCategoryId = {
+      ...fields.companyCategoryId,
+      lookupOptions: categories.map((c) => ({ value: c.id, label: c.name })),
+    };
+  }
+  if (fields.companyTypeId) {
+    fields.companyTypeId = {
+      ...fields.companyTypeId,
+      lookupOptions: companyTypes.map((t) => ({ value: t.id, label: t.name })),
+    };
+  }
 
   return (
     <div className="p-6">
@@ -64,7 +79,7 @@ export default async function CompaniesPage({
           />
           <ImportExportButtons entityType="companies" />
           {canEdit && (
-            <CompanyModal>
+            <CompanyModal categories={categories} companyTypes={companyTypes}>
               <Button>{t("newCompany")}</Button>
             </CompanyModal>
           )}
@@ -76,6 +91,8 @@ export default async function CompaniesPage({
         users={users}
         canEdit={canEdit}
         activeCount={activeCount}
+        categories={categories}
+        companyTypes={companyTypes}
       />
     </div>
   );

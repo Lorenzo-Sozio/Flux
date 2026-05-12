@@ -7,7 +7,7 @@
  */
 
 import { auth } from "@/auth";
-import { eq, desc, and, gte, lte, count, sql, isNotNull, inArray } from "drizzle-orm";
+import { eq, desc, and, gte, lte, count, sql, isNotNull, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { platformDb } from "@/db";
 import {
@@ -428,6 +428,133 @@ export async function adminSetTenantPlan(tenantId: string, planId: string) {
     previousValue: { planName: previousSub?.plan?.name ?? "free" },
     newValue: { planName: plan.name },
     triggeredBy: `admin:${adminId}`,
+  });
+
+  revalidatePath("/admin/tenants");
+  revalidatePath("/admin/billing");
+}
+
+/**
+ * Re-syncs a tenant's subscription from Stripe, discarding any manual override.
+ * If no Stripe subscription exists, resets to free.
+ */
+export async function adminSyncTenantSubscription(tenantId: string) {
+  const session = await requirePlatformAdmin();
+
+  if (!UUID_RE.test(tenantId)) throw new Error("Invalid tenant ID format");
+
+  const tenant = await platformDb.query.tenants.findFirst({
+    where: eq(tenants.id, tenantId),
+  });
+  if (!tenant) throw new Error("Tenant not found");
+
+  const adminId = session.user.id ?? "unknown";
+
+  const sub = await platformDb.query.billingSubscriptions.findFirst({
+    where: eq(billingSubscriptions.tenantId, tenantId),
+    with: { plan: true },
+  });
+
+  if (!sub?.stripeSubscriptionId) {
+    // No Stripe subscription on record — reset to free
+    const resetValues = {
+      planId: null as string | null,
+      status: "free",
+      gracePeriodEnd: null as Date | null,
+      canceledAt: null as Date | null,
+      updatedAt: new Date(),
+    };
+    if (sub) {
+      await platformDb
+        .update(billingSubscriptions)
+        .set(resetValues)
+        .where(eq(billingSubscriptions.tenantId, tenantId));
+    } else {
+      await platformDb
+        .insert(billingSubscriptions)
+        .values({ tenantId, status: "free" });
+    }
+
+    invalidateEntitlementCache(tenantId);
+    await logEntitlementChange({
+      tenantId,
+      eventType: "plan_changed",
+      previousValue: { planName: sub?.plan?.name ?? "free" },
+      newValue: { planName: "free" },
+      triggeredBy: `admin:${adminId}:stripe_sync`,
+    });
+
+    revalidatePath("/admin/tenants");
+    revalidatePath("/admin/billing");
+    return;
+  }
+
+  // Retrieve the live subscription from Stripe
+  const stripeSub = await getStripe().subscriptions.retrieve(sub.stripeSubscriptionId);
+
+  // Resolve our plan by matching the Stripe price ID
+  let planId: string | null = null;
+  const priceId = stripeSub.items.data[0]?.price?.id;
+  if (priceId) {
+    const matched = await platformDb.query.billingPlans.findFirst({
+      where: or(
+        eq(billingPlans.stripePriceMonthlyId, priceId),
+        eq(billingPlans.stripePriceAnnualId, priceId),
+      ),
+    });
+    if (matched) planId = matched.id;
+  }
+
+  // Map Stripe status → our status
+  const statusMap: Record<string, string> = {
+    active:             "active",
+    trialing:           "trialing",
+    past_due:           "past_due",
+    canceled:           "canceled",
+    unpaid:             "past_due",
+    incomplete:         "past_due",
+    incomplete_expired: "canceled",
+    paused:             "suspended",
+  };
+  const newStatus = statusMap[stripeSub.status] ?? stripeSub.status;
+
+  // Detect billing cycle from the Stripe price interval
+  const interval = stripeSub.items.data[0]?.price?.recurring?.interval;
+  const billingCycle = interval === "year" ? "annual" : "monthly";
+
+  const raw = stripeSub as unknown as {
+    current_period_start?: number;
+    current_period_end?: number;
+  };
+
+  await platformDb
+    .update(billingSubscriptions)
+    .set({
+      planId,
+      status: newStatus,
+      billingCycle,
+      quantity: stripeSub.items.data[0]?.quantity ?? 1,
+      currentPeriodStart: raw.current_period_start
+        ? new Date(raw.current_period_start * 1000) : null,
+      currentPeriodEnd: raw.current_period_end
+        ? new Date(raw.current_period_end * 1000) : null,
+      trialEnd: stripeSub.trial_end
+        ? new Date(stripeSub.trial_end * 1000) : null,
+      canceledAt: stripeSub.canceled_at
+        ? new Date(stripeSub.canceled_at * 1000) : null,
+      gracePeriodEnd: null,
+      updatedAt: new Date(),
+    })
+    .where(eq(billingSubscriptions.tenantId, tenantId));
+
+  invalidateEntitlementCache(tenantId);
+
+  await logEntitlementChange({
+    tenantId,
+    eventType: "plan_changed",
+    previousValue: { planName: sub.plan?.name ?? "free" },
+    newValue: { planName: planId ?? "free", status: newStatus },
+    triggeredBy: `admin:${adminId}:stripe_sync`,
   });
 
   revalidatePath("/admin/tenants");
