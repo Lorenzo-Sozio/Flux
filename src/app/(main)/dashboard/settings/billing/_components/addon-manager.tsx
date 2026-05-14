@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
+
+import { Package, Plus, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { toast } from "sonner";
+
+import { removeAddon } from "@/actions/billing";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, Package } from "lucide-react";
-import { toast } from "sonner";
-import { removeAddon } from "@/actions/billing";
 import { ADDON_CONFIGS } from "@/lib/billing/plans-config";
 import type { AddonType } from "@/lib/billing/plans-config";
 
@@ -24,6 +27,7 @@ interface AddonManagerProps {
 }
 
 export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
+  const t = useTranslations("settings.billing");
   const [removing, setRemoving] = useState<string | null>(null);
 
   const activeAddons = addons.filter((a) => a.status === "active");
@@ -32,10 +36,10 @@ export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
     setRemoving(addonId);
     try {
       await removeAddon(addonId);
-      toast.success("Add-on removed. Changes take effect immediately.");
+      toast.success(t("addons.removedSuccess"));
       onAddonAdded?.();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to remove add-on");
+      toast.error(err instanceof Error ? err.message : t("addons.removeError"));
     } finally {
       setRemoving(null);
     }
@@ -46,15 +50,13 @@ export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Package className="h-5 w-5 text-primary" />
-          Add-ons
+          {t("addons.title")}
         </CardTitle>
-        <CardDescription>
-          Extend your plan with additional modules and extra user seats.
-        </CardDescription>
+        <CardDescription>{t("addons.description")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {activeAddons.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No add-ons active on your subscription.</p>
+          <p className="text-sm text-muted-foreground">{t("addons.noActive")}</p>
         ) : (
           activeAddons.map((addon) => {
             const cfg = ADDON_CONFIGS[addon.addonType as AddonType];
@@ -92,7 +94,7 @@ export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
 
         <div className="space-y-2">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Available Add-ons
+            {t("addons.availableTitle")}
           </p>
           {(Object.entries(ADDON_CONFIGS) as [AddonType, (typeof ADDON_CONFIGS)[AddonType]][]).map(
             ([type, cfg]) => {
@@ -106,23 +108,19 @@ export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
                     <p className="text-sm font-medium">{cfg.displayName}</p>
                     <p className="text-xs text-muted-foreground">{cfg.description}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      €{(cfg.priceMonthly / 100).toFixed(0)}/mo
+                      {t("addons.pricePerMonth", { price: (cfg.priceMonthly / 100).toFixed(0) })}
                     </p>
                   </div>
                   {alreadyActive ? (
-                    <Badge variant="outline" className="text-xs">Active</Badge>
+                    <Badge variant="outline" className="text-xs">{t("addons.activeBadge")}</Badge>
                   ) : (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() =>
-                        toast.info(
-                          "To add this module, please use the Manage Billing portal above.",
-                        )
-                      }
+                      onClick={() => toast.info(t("addons.addViaPortal"))}
                     >
                       <Plus className="mr-1 h-3 w-3" />
-                      Add
+                      {t("addons.addButton")}
                     </Button>
                   )}
                 </div>

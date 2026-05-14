@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createBillingPortalSession } from "@/actions/billing";
@@ -35,6 +36,7 @@ interface BillingClientProps {
     enabledModules: string;
     stripePriceMonthlyId: string | null;
     stripePriceAnnualId: string | null;
+    sortOrder: number;
   }>;
   addons: Array<{ id: string; addonType: string; quantity: number; status: string }>;
   invoices: Array<{
@@ -63,6 +65,7 @@ export function BillingClient({
   usage,
   defaultTab = "overview",
 }: BillingClientProps) {
+  const t = useTranslations("settings.billing");
   const [portalLoading, startPortal] = useTransition();
 
   function handleManageBilling() {
@@ -71,7 +74,7 @@ export function BillingClient({
         const { url } = await createBillingPortalSession();
         window.location.href = url;
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : "Failed to open billing portal");
+        toast.error(err instanceof Error ? err.message : t("portalError"));
       }
     });
   }
@@ -79,10 +82,10 @@ export function BillingClient({
   return (
     <Tabs defaultValue={defaultTab} className="space-y-6">
       <TabsList>
-        <TabsTrigger value="overview">Overview</TabsTrigger>
-        <TabsTrigger value="plans">Plans</TabsTrigger>
-        <TabsTrigger value="addons">Add-ons</TabsTrigger>
-        <TabsTrigger value="invoices">Invoices</TabsTrigger>
+        <TabsTrigger value="overview">{t("tabs.overview")}</TabsTrigger>
+        <TabsTrigger value="plans">{t("tabs.plans")}</TabsTrigger>
+        <TabsTrigger value="addons">{t("tabs.addons")}</TabsTrigger>
+        <TabsTrigger value="invoices">{t("tabs.invoices")}</TabsTrigger>
       </TabsList>
 
       <TabsContent value="overview" className="space-y-4">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Settings2, Webhook, Mail } from "lucide-react";
+import { CreditCard, Settings2, Webhook, Mail } from "lucide-react";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
@@ -21,6 +21,17 @@ export default async function SettingsPage() {
         <p className="text-muted-foreground">{t("general.title")}</p>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <Link href="/dashboard/settings/billing">
+          <Card className="cursor-pointer transition-shadow hover:shadow-md">
+            <CardHeader>
+              <CreditCard className="mb-2 h-8 w-8 text-primary" />
+              <CardTitle>{t("billing.title")}</CardTitle>
+              <CardDescription>
+                {t("billing.description")}
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </Link>
         <Link href="/dashboard/settings/custom-fields">
           <Card className="cursor-pointer transition-shadow hover:shadow-md">
             <CardHeader>
@@ -32,7 +43,7 @@ export default async function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
-<Link href="/dashboard/settings/webhooks">
+        <Link href="/dashboard/settings/webhooks">
           <Card className="cursor-pointer transition-shadow hover:shadow-md">
             <CardHeader>
               <Webhook className="mb-2 h-8 w-8 text-primary" />

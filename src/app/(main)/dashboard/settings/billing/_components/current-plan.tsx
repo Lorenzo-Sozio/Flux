@@ -1,11 +1,13 @@
 "use client";
 
+import { useTranslations } from "next-intl";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { CreditCard, ExternalLink, Zap } from "lucide-react";
 import type { TenantEntitlements } from "@/lib/billing/licensing";
+import { CreditCard, ExternalLink, Zap } from "lucide-react";
 
 interface CurrentPlanProps {
   entitlements: TenantEntitlements;
@@ -15,13 +17,13 @@ interface CurrentPlanProps {
   loading?: boolean;
 }
 
-const STATUS_BADGE: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-  active: { label: "Active", variant: "default" },
-  trialing: { label: "Trial", variant: "secondary" },
-  free: { label: "Free", variant: "outline" },
-  past_due: { label: "Past Due", variant: "destructive" },
-  suspended: { label: "Suspended", variant: "destructive" },
-  canceled: { label: "Canceled", variant: "destructive" },
+const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+  active: "default",
+  trialing: "secondary",
+  free: "outline",
+  past_due: "destructive",
+  suspended: "destructive",
+  canceled: "destructive",
 };
 
 function formatCents(cents: number) {
@@ -39,7 +41,11 @@ export function CurrentPlan({
   onManageClick,
   loading,
 }: CurrentPlanProps) {
-  const badge = STATUS_BADGE[entitlements.status] ?? STATUS_BADGE.free;
+  const t = useTranslations("settings.billing");
+
+  const statusKey = entitlements.status in STATUS_VARIANT ? entitlements.status : "free";
+  const statusVariant = STATUS_VARIANT[statusKey] ?? "outline";
+  const statusLabel = t(`currentPlan.status.${statusKey}` as Parameters<typeof t>[0]);
 
   return (
     <Card>
@@ -48,15 +54,15 @@ export function CurrentPlan({
           <CardTitle className="flex items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
             {entitlements.planName.charAt(0).toUpperCase() + entitlements.planName.slice(1)} Plan
-            <Badge variant={badge.variant}>{badge.label}</Badge>
+            <Badge variant={statusVariant}>{statusLabel}</Badge>
           </CardTitle>
           <CardDescription>
-            {billingCycle === "annual" ? "Annual billing" : "Monthly billing"}
+            {billingCycle === "annual" ? t("currentPlan.annualBilling") : t("currentPlan.monthlyBilling")}
             {periodEnd && (
               <>
                 {" "}
-                · Renews{" "}
-                {new Date(periodEnd).toLocaleDateString("en-GB", {
+                · {t("currentPlan.renews")}{" "}
+                {new Date(periodEnd).toLocaleDateString("it-IT", {
                   day: "numeric",
                   month: "short",
                   year: "numeric",
@@ -68,7 +74,7 @@ export function CurrentPlan({
         {entitlements.status !== "free" && (
           <Button variant="outline" size="sm" onClick={onManageClick} disabled={loading}>
             <CreditCard className="mr-2 h-4 w-4" />
-            Manage Billing
+            {t("currentPlan.manageBilling")}
             <ExternalLink className="ml-2 h-3 w-3 opacity-60" />
           </Button>
         )}
@@ -78,31 +84,31 @@ export function CurrentPlan({
         <Separator className="mb-4" />
         <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
           <Stat
-            label="Max Users"
-            value={entitlements.maxUsers === null ? "Unlimited" : String(entitlements.maxUsers)}
+            label={t("currentPlan.statMaxUsers")}
+            value={entitlements.maxUsers === null ? t("currentPlan.status.free") : String(entitlements.maxUsers)}
           />
-          <Stat label="Support" value={capitalize(entitlements.supportTier)} />
+          <Stat label={t("currentPlan.statSupport")} value={capitalize(entitlements.supportTier)} />
           <Stat
-            label="Modules"
-            value={`${entitlements.enabledModules.length} enabled`}
+            label={t("currentPlan.statModules")}
+            value={t("currentPlan.modulesEnabled", { count: entitlements.enabledModules.length })}
           />
           <Stat
-            label="Storage"
+            label={t("currentPlan.statStorage")}
             value={`${entitlements.limits.storageGb ?? 1} GB`}
           />
           <Stat
-            label="API Calls / mo"
+            label={t("currentPlan.statApiCalls")}
             value={
               entitlements.limits.apiCallsPerMonth === null
-                ? "Unlimited"
+                ? t("usage.unlimited")
                 : formatNumber(entitlements.limits.apiCallsPerMonth)
             }
           />
           <Stat
-            label="Automations / mo"
+            label={t("currentPlan.statAutomations")}
             value={
               entitlements.limits.automationRunsPerMonth === null
-                ? "Unlimited"
+                ? t("usage.unlimited")
                 : formatNumber(entitlements.limits.automationRunsPerMonth)
             }
           />
@@ -110,12 +116,12 @@ export function CurrentPlan({
 
         {entitlements.status === "past_due" && (
           <div className="mt-4 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            Your payment is overdue. Please update your payment method to restore full access.
+            {t("currentPlan.pastDueWarning")}
           </div>
         )}
         {entitlements.status === "suspended" && (
           <div className="mt-4 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            Your account is suspended. Please contact support to reactivate.
+            {t("currentPlan.suspendedWarning")}
           </div>
         )}
       </CardContent>
@@ -137,5 +143,5 @@ function capitalize(s: string) {
 }
 
 function formatNumber(n: number) {
-  return new Intl.NumberFormat("en").format(n);
+  return new Intl.NumberFormat("it-IT").format(n);
 }

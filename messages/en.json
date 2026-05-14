@@ -2017,6 +2017,107 @@
       "monthCardNoTarget": "No target set",
       "monthCardOf": "of {amount}",
       "monthCardPct": "of target"
+    },
+    "billing": {
+      "title": "Billing & Subscription",
+      "description": "Manage your subscription plan, usage, add-ons, and invoices.",
+      "upgradeNoticeSuffix": "is not included in your current plan. Upgrade below to unlock it.",
+      "tabs": {
+        "overview": "Overview",
+        "plans": "Plans",
+        "addons": "Add-ons",
+        "invoices": "Invoices"
+      },
+      "portalError": "Failed to open billing portal",
+      "currentPlan": {
+        "manageBilling": "Manage Billing",
+        "annualBilling": "Annual billing",
+        "monthlyBilling": "Monthly billing",
+        "renews": "Renews",
+        "statMaxUsers": "Max Users",
+        "statSupport": "Support",
+        "statModules": "Modules",
+        "statStorage": "Storage",
+        "statApiCalls": "API Calls / mo",
+        "statAutomations": "Automations / mo",
+        "modulesEnabled": "{count} enabled",
+        "pastDueWarning": "Your payment is overdue. Please update your payment method to restore full access.",
+        "suspendedWarning": "Your account is suspended. Please contact support to reactivate.",
+        "status": {
+          "active": "Active",
+          "trialing": "Trial",
+          "free": "Free",
+          "past_due": "Past Due",
+          "suspended": "Suspended",
+          "canceled": "Canceled"
+        }
+      },
+      "usage": {
+        "title": "Usage",
+        "titlePeriod": "Usage This Period",
+        "description": "Current usage compared to your plan limits. Metered counters reset each billing period.",
+        "noData": "No usage data for this billing period yet.",
+        "unlimited": "Unlimited",
+        "metrics": {
+          "apiCallsPerMonth": "API Calls",
+          "storageGb": "Storage",
+          "automationRunsPerMonth": "Automation Runs",
+          "maxUsers": "Users",
+          "maxRecords": "Records",
+          "maxIntegrations": "Integrations"
+        }
+      },
+      "plans": {
+        "monthly": "Monthly",
+        "annual": "Annual",
+        "save": "Save {percent}%",
+        "currentPlan": "Current Plan",
+        "mostPopular": "Most Popular",
+        "freePrice": "Free",
+        "perUserPerMonth": "/user/mo",
+        "billedAnnually": "(billed annually)",
+        "includesUsers": "Includes {count, plural, one {# user} other {# users}}",
+        "trialDays": "{count}-day free trial",
+        "upgrade": "Upgrade",
+        "downgrade": "Downgrade",
+        "freeForever": "Free Forever",
+        "redirecting": "Redirecting…",
+        "checkoutError": "Failed to start checkout",
+        "toggleCycleLabel": "Toggle billing cycle",
+        "modules": {
+          "crm": "CRM",
+          "sales": "Sales & Pipeline",
+          "marketing": "Marketing",
+          "support": "Support Tickets",
+          "automation": "Automation",
+          "reporting": "Advanced Reports",
+          "helpdesk": "Helpdesk"
+        }
+      },
+      "addons": {
+        "title": "Add-ons",
+        "description": "Extend your plan with additional modules and extra user seats.",
+        "noActive": "No add-ons active on your subscription.",
+        "removedSuccess": "Add-on removed. Changes take effect immediately.",
+        "removeError": "Failed to remove add-on",
+        "activeBadge": "Active",
+        "addButton": "Add",
+        "addViaPortal": "To add this module, please use the Manage Billing portal above.",
+        "availableTitle": "Available Add-ons",
+        "pricePerMonth": "€{price}/mo"
+      },
+      "invoices": {
+        "title": "Invoices",
+        "noInvoices": "No invoices yet.",
+        "description": "Download or view your past invoices.",
+        "status": {
+          "paid": "Paid",
+          "open": "Open",
+          "draft": "Draft",
+          "void": "Void",
+          "uncollectible": "Uncollectible"
+        }
+      }
     }
   },
   "reports": {
@@ -2591,5 +2692,107 @@
   "currency": {
     "switchCurrency": "Switch currency",
     "displayCurrency": "Display currency"
+  },
+  "filterBuilder": {
+    "title": "Advanced Filters",
+    "activeConditions": "{count, plural, one {# active condition} other {# active conditions}}",
+    "savedFilters": "Saved Filters",
+    "conditions": "Conditions",
+    "noConditions": "No conditions yet — add one below.",
+    "allMustMatch": "All conditions must match",
+    "anyMustMatch": "Any condition must match",
+    "addCondition": "Add condition",
+    "addGroup": "Add group",
+    "columnField": "Field",
+    "columnOperator": "Operator",
+    "columnValue": "Value",
+    "saveAsPreset": "Save as Preset",
+    "filterNamePlaceholder": "Filter name…",
+    "clearAll": "Clear All",
+    "applyFilters": "Apply Filters",
+    "searchField": "Search field…",
+    "selectPlaceholder": "Select…",
+    "valuePlaceholder": "value…",
+    "fromPlaceholder": "from",
+    "toPlaceholder": "to",
+    "daysPlaceholder": "days",
+    "noResults": "No results.",
+    "deletePreset": "Delete preset",
+    "removeCondition": "Remove condition",
+    "removeGroup": "Remove group",
+    "custom": "Custom",
+    "operators": {
+      "text": {
+        "contains": "Contains",
+        "not_contains": "Does not contain",
+        "eq": "Is exactly",
+        "neq": "Is not",
+        "starts_with": "Starts with",
+        "ends_with": "Ends with",
+        "is_empty": "Is empty",
+        "is_not_empty": "Is not empty"
+      },
+      "number": {
+        "eq": "= equals",
+        "neq": "≠ not equal",
+        "gt": "> greater than",
+        "gte": "≥ at least",
+        "lt": "< less than",
+        "lte": "≤ at most",
+        "between": "Between"
+      },
+      "date": {
+        "eq": "On date",
+        "before": "Before",
+        "after": "After",
+        "between": "Between",
+        "last_n_days": "Last N days",
+        "this_week": "This week",
+        "this_month": "This month",
+        "this_year": "This year"
+      },
+      "enum": {
+        "in": "Is one of",
+        "not_in": "Is not one of"
+      },
+      "boolean": {
+        "is_true": "Is true",
+        "is_false": "Is false"
+      }
+    },
+    "fields": {
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email",
+      "phone": "Phone",
+      "companyName": "Company Name",
+      "jobTitle": "Job Title",
+      "industry": "Industry",
+      "city": "City",
+      "state": "Region / Province",
+      "country": "Country",
+      "department": "Department",
+      "website": "Website",
+      "status": "Status",
+      "rating": "Rating",
+      "source": "Source",
+      "leadScore": "Lead Score",
+      "marketingConsent": "Marketing Consent",
+      "isConverted": "Converted",
+      "createdAt": "Created Date",
+      "name": "Company Name",
+      "mainEmail": "Main Email",
+      "mainPhone": "Main Phone",
+      "vatNumber": "VAT Number",
+      "sdiCode": "SDI Code",
+      "type": "Type",
+      "employeeCount": "Employees",
+      "annualRevenue": "Annual Revenue",
+      "companyCategoryId": "Category",
+      "companyTypeId": "Activity Type"
+    },
+    "cancel": "Cancel",
+    "save": "Save",
+    "triggerLabel": "Filters"
   }
 }

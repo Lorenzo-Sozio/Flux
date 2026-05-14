@@ -1959,6 +1959,107 @@
       "monthCardNoTarget": "Nessun obiettivo impostato",
       "monthCardOf": "di {amount}",
       "monthCardPct": "dell'obiettivo"
+    },
+    "billing": {
+      "title": "Fatturazione e Abbonamento",
+      "description": "Gestisci il tuo piano di abbonamento, utilizzo, componenti aggiuntivi e fatture.",
+      "upgradeNoticeSuffix": "non è incluso nel tuo piano attuale. Esegui un upgrade per sbloccarlo.",
+      "tabs": {
+        "overview": "Panoramica",
+        "plans": "Piani",
+        "addons": "Componenti aggiuntivi",
+        "invoices": "Fatture"
+      },
+      "portalError": "Impossibile aprire il portale di fatturazione",
+      "currentPlan": {
+        "manageBilling": "Gestisci Fatturazione",
+        "annualBilling": "Fatturazione annuale",
+        "monthlyBilling": "Fatturazione mensile",
+        "renews": "Rinnova il",
+        "statMaxUsers": "Utenti Massimi",
+        "statSupport": "Supporto",
+        "statModules": "Moduli",
+        "statStorage": "Spazio",
+        "statApiCalls": "Chiamate API / mese",
+        "statAutomations": "Automazioni / mese",
+        "modulesEnabled": "{count} attivi",
+        "pastDueWarning": "Il pagamento è scaduto. Aggiorna il metodo di pagamento per ripristinare l'accesso completo.",
+        "suspendedWarning": "Il tuo account è sospeso. Contatta il supporto per riattivarlo.",
+        "status": {
+          "active": "Attivo",
+          "trialing": "In Prova",
+          "free": "Gratuito",
+          "past_due": "Scaduto",
+          "suspended": "Sospeso",
+          "canceled": "Annullato"
+        }
+      },
+      "usage": {
+        "title": "Utilizzo",
+        "titlePeriod": "Utilizzo del Periodo",
+        "description": "Utilizzo attuale rispetto ai limiti del piano. I contatori si azzerano ad ogni periodo.",
+        "noData": "Nessun dato di utilizzo per questo periodo di fatturazione.",
+        "unlimited": "Illimitato",
+        "metrics": {
+          "apiCallsPerMonth": "Chiamate API",
+          "storageGb": "Spazio",
+          "automationRunsPerMonth": "Esecuzioni Automazione",
+          "maxUsers": "Utenti",
+          "maxRecords": "Record",
+          "maxIntegrations": "Integrazioni"
+        }
+      },
+      "plans": {
+        "monthly": "Mensile",
+        "annual": "Annuale",
+        "save": "Risparmia {percent}%",
+        "currentPlan": "Piano Attuale",
+        "mostPopular": "Più Popolare",
+        "freePrice": "Gratuito",
+        "perUserPerMonth": "/utente/mese",
+        "billedAnnually": "(fatturato annualmente)",
+        "includesUsers": "Include {count, plural, one {# utente} other {# utenti}}",
+        "trialDays": "{count} giorni di prova gratuita",
+        "upgrade": "Upgrade",
+        "downgrade": "Downgrade",
+        "freeForever": "Gratuito per Sempre",
+        "redirecting": "Reindirizzamento…",
+        "checkoutError": "Impossibile avviare il checkout",
+        "toggleCycleLabel": "Cambia ciclo di fatturazione",
+        "modules": {
+          "crm": "CRM",
+          "sales": "Vendite e Pipeline",
+          "marketing": "Marketing",
+          "support": "Ticket di Supporto",
+          "automation": "Automazione",
+          "reporting": "Report Avanzati",
+          "helpdesk": "Helpdesk"
+        }
+      },
+      "addons": {
+        "title": "Componenti Aggiuntivi",
+        "description": "Estendi il tuo piano con moduli aggiuntivi e posti utente extra.",
+        "noActive": "Nessun componente aggiuntivo attivo nel tuo abbonamento.",
+        "removedSuccess": "Componente aggiuntivo rimosso. Le modifiche hanno effetto immediato.",
+        "removeError": "Impossibile rimuovere il componente aggiuntivo",
+        "activeBadge": "Attivo",
+        "addButton": "Aggiungi",
+        "addViaPortal": "Per aggiungere questo modulo, utilizza il portale Gestisci Fatturazione in alto.",
+        "availableTitle": "Componenti Aggiuntivi Disponibili",
+        "pricePerMonth": "€{price}/mese"
+      },
+      "invoices": {
+        "title": "Fatture",
+        "noInvoices": "Nessuna fattura disponibile.",
+        "description": "Scarica o visualizza le tue fatture precedenti.",
+        "status": {
+          "paid": "Pagata",
+          "open": "Aperta",
+          "draft": "Bozza",
+          "void": "Annullata",
+          "uncollectible": "Inesigibile"
+        }
+      }
     }
   },
   "reports": {
@@ -2533,5 +2634,107 @@
   "currency": {
     "switchCurrency": "Cambia valuta",
     "displayCurrency": "Valuta di visualizzazione"
+  },
+  "filterBuilder": {
+    "title": "Filtri Avanzati",
+    "activeConditions": "{count, plural, one {# condizione attiva} other {# condizioni attive}}",
+    "savedFilters": "Filtri Salvati",
+    "conditions": "Condizioni",
+    "noConditions": "Nessuna condizione — aggiungine una qui sotto.",
+    "allMustMatch": "Tutte le condizioni devono corrispondere",
+    "anyMustMatch": "Qualsiasi condizione deve corrispondere",
+    "addCondition": "Aggiungi condizione",
+    "addGroup": "Aggiungi gruppo",
+    "columnField": "Campo",
+    "columnOperator": "Operatore",
+    "columnValue": "Valore",
+    "saveAsPreset": "Salva come Preset",
+    "filterNamePlaceholder": "Nome filtro…",
+    "clearAll": "Cancella Tutto",
+    "applyFilters": "Applica Filtri",
+    "searchField": "Cerca campo…",
+    "selectPlaceholder": "Seleziona…",
+    "valuePlaceholder": "valore…",
+    "fromPlaceholder": "da",
+    "toPlaceholder": "a",
+    "daysPlaceholder": "giorni",
+    "noResults": "Nessun risultato.",
+    "deletePreset": "Elimina preset",
+    "removeCondition": "Rimuovi condizione",
+    "removeGroup": "Rimuovi gruppo",
+    "custom": "Personalizzato",
+    "operators": {
+      "text": {
+        "contains": "Contiene",
+        "not_contains": "Non contiene",
+        "eq": "È esattamente",
+        "neq": "Non è",
+        "starts_with": "Inizia con",
+        "ends_with": "Finisce con",
+        "is_empty": "È vuoto",
+        "is_not_empty": "Non è vuoto"
+      },
+      "number": {
+        "eq": "= uguale",
+        "neq": "≠ diverso",
+        "gt": "> maggiore di",
+        "gte": "≥ almeno",
+        "lt": "< minore di",
+        "lte": "≤ al massimo",
+        "between": "Tra"
+      },
+      "date": {
+        "eq": "In data",
+        "before": "Prima di",
+        "after": "Dopo",
+        "between": "Tra",
+        "last_n_days": "Ultimi N giorni",
+        "this_week": "Questa settimana",
+        "this_month": "Questo mese",
+        "this_year": "Quest'anno"
+      },
+      "enum": {
+        "in": "È uno di",
+        "not_in": "Non è uno di"
+      },
+      "boolean": {
+        "is_true": "È vero",
+        "is_false": "È falso"
+      }
+    },
+    "fields": {
+      "firstName": "Nome",
+      "lastName": "Cognome",
+      "email": "Email",
+      "phone": "Telefono",
+      "companyName": "Nome Azienda",
+      "jobTitle": "Mansione",
+      "industry": "Settore",
+      "city": "Città",
+      "state": "Regione / Provincia",
+      "country": "Paese",
+      "department": "Reparto",
+      "website": "Sito Web",
+      "status": "Stato",
+      "rating": "Valutazione",
+      "source": "Fonte",
+      "leadScore": "Punteggio Lead",
+      "marketingConsent": "Consenso Marketing",
+      "isConverted": "Convertito",
+      "createdAt": "Data Creazione",
+      "name": "Nome Azienda",
+      "mainEmail": "Email Principale",
+      "mainPhone": "Telefono Principale",
+      "vatNumber": "Partita IVA",
+      "sdiCode": "Codice SDI",
+      "type": "Tipo",
+      "employeeCount": "Dipendenti",
+      "annualRevenue": "Fatturato Annuo",
+      "companyCategoryId": "Categoria",
+      "companyTypeId": "Tipo di Attività"
+    },
+    "cancel": "Annulla",
+    "save": "Salva",
+    "triggerLabel": "Filtri"
   }
 }

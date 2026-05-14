@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Check, CheckCircle2, Zap } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createCheckoutSession } from "@/actions/billing";
@@ -25,6 +26,7 @@ interface Plan {
   enabledModules: string; // JSON
   stripePriceMonthlyId: string | null;
   stripePriceAnnualId: string | null;
+  sortOrder: number;
 }
 
 interface PlanSelectorProps {
@@ -32,24 +34,11 @@ interface PlanSelectorProps {
   currentPlanName: string;
 }
 
-const MODULE_LABELS: Record<string, string> = {
-  crm: "CRM",
-  sales: "Sales & Pipeline",
-  marketing: "Marketing",
-  support: "Support Tickets",
-  automation: "Automation",
-  reporting: "Advanced Reports",
-  helpdesk: "Helpdesk",
-};
-
-function formatPrice(cents: number) {
-  if (cents === 0) return "Free";
-  return `€${(cents / 100).toFixed(0)}`;
-}
-
 export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
+  const t = useTranslations("settings.billing");
   const [cycle, setCycle] = useState<BillingCycle>("monthly");
   const [loading, setLoading] = useState<string | null>(null);
+  const currentSortOrder = plans.find((p) => p.name === currentPlanName)?.sortOrder ?? 0;
 
   async function handleSelectPlan(plan: Plan, userCount: number) {
     if (plan.name === currentPlanName) return;
@@ -58,20 +47,19 @@ export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
       const { url } = await createCheckoutSession(plan.id, cycle, userCount);
       window.location.href = url;
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to start checkout");
+      toast.error(err instanceof Error ? err.message : t("plans.checkoutError"));
       setLoading(null);
     }
   }
 
   return (
     <div className="space-y-4">
-      {/* Billing cycle toggle */}
       <div className="flex items-center justify-center gap-2">
         <span
           className={`cursor-pointer text-sm ${cycle === "monthly" ? "font-semibold" : "text-muted-foreground"}`}
           onClick={() => setCycle("monthly")}
         >
-          Monthly
+          {t("plans.monthly")}
         </span>
         <button
           type="button"
@@ -79,7 +67,7 @@ export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
             cycle === "annual" ? "bg-primary" : "bg-muted"
           }`}
-          aria-label="Toggle billing cycle"
+          aria-label={t("plans.toggleCycleLabel")}
         >
           <span
             className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
@@ -91,10 +79,10 @@ export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
           className={`cursor-pointer text-sm ${cycle === "annual" ? "font-semibold" : "text-muted-foreground"}`}
           onClick={() => setCycle("annual")}
         >
-          Annual
+          {t("plans.annual")}
           {plans[1]?.annualDiscountPercent > 0 && (
             <Badge variant="secondary" className="ml-2 text-xs">
-              Save {plans[1].annualDiscountPercent}%
+              {t("plans.save", { percent: plans[1].annualDiscountPercent })}
             </Badge>
           )}
         </span>
@@ -128,25 +116,28 @@ export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
                     className="mb-1 w-fit text-xs border-green-500 text-green-600 dark:text-green-400"
                   >
                     <CheckCircle2 className="mr-1 h-3 w-3" />
-                    Current Plan
+                    {t("plans.currentPlan")}
                   </Badge>
                 )}
                 {!isCurrent && plan.name === "professional" && (
-                  <Badge className="mb-1 w-fit text-xs">Most Popular</Badge>
+                  <Badge className="mb-1 w-fit text-xs">{t("plans.mostPopular")}</Badge>
                 )}
                 <CardTitle className="text-lg">{plan.displayName}</CardTitle>
                 <CardDescription className="min-h-[2.5rem] text-xs">{plan.description}</CardDescription>
                 <div className="mt-2">
-                  <span className="text-3xl font-bold">{formatPrice(price)}</span>
+                  <span className="text-3xl font-bold">
+                    {price === 0 ? t("plans.freePrice") : `€${(price / 100).toFixed(0)}`}
+                  </span>
                   {price > 0 && (
                     <span className="text-sm text-muted-foreground">
-                      /user/mo{cycle === "annual" ? " (billed annually)" : ""}
+                      {t("plans.perUserPerMonth")}
+                      {cycle === "annual" ? ` ${t("plans.billedAnnually")}` : ""}
                     </span>
                   )}
                 </div>
                 {plan.includedUsers > 0 && price > 0 && (
                   <p className="text-xs text-muted-foreground">
-                    Includes {plan.includedUsers} user{plan.includedUsers > 1 ? "s" : ""}
+                    {t("plans.includesUsers", { count: plan.includedUsers })}
                   </p>
                 )}
               </CardHeader>
@@ -156,12 +147,14 @@ export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
                   {modules.map((mod) => (
                     <li key={mod} className="flex items-center gap-2 text-sm">
                       <Check className="h-3.5 w-3.5 shrink-0 text-green-500" />
-                      {MODULE_LABELS[mod] ?? mod}
+                      {t(`plans.modules.${mod}` as Parameters<typeof t>[0], { fallback: mod })}
                     </li>
                   ))}
                 </ul>
                 {plan.trialDays > 0 && !isCurrent && (
-                  <p className="mt-3 text-xs text-muted-foreground">{plan.trialDays}-day free trial</p>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {t("plans.trialDays", { count: plan.trialDays })}
+                  </p>
                 )}
               </CardContent>
 
@@ -173,15 +166,16 @@ export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
                     variant="outline"
                   >
                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Current Plan
+                    {t("plans.currentPlan")}
                   </Button>
                 ) : plan.name === "free" ? (
                   <Button className="w-full" variant="outline" disabled>
-                    Free Forever
+                    {t("plans.freeForever")}
                   </Button>
                 ) : (
                   <Button
                     className="w-full"
+                    variant={plan.sortOrder < currentSortOrder ? "outline" : "default"}
                     onClick={(e) => {
                       e.stopPropagation();
                       handleSelectPlan(plan, plan.includedUsers);
@@ -189,12 +183,14 @@ export function PlanSelector({ plans, currentPlanName }: PlanSelectorProps) {
                     disabled={!!loading}
                   >
                     {loading === plan.id ? (
-                      "Redirecting…"
-                    ) : (
+                      t("plans.redirecting")
+                    ) : plan.sortOrder > currentSortOrder ? (
                       <>
                         <Zap className="mr-2 h-4 w-4" />
-                        Upgrade
+                        {t("plans.upgrade")}
                       </>
+                    ) : (
+                      t("plans.downgrade")
                     )}
                   </Button>
                 )}

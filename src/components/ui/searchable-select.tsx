@@ -41,12 +41,14 @@ function useScrollWheel(ref: React.RefObject<HTMLDivElement | null>, open: boole
     const el = ref.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
+      if (!el.contains(e.target as Node)) return;
       e.preventDefault();
       const px = e.deltaMode === 0 ? e.deltaY : e.deltaMode === 1 ? e.deltaY * 20 : e.deltaY * el.clientHeight;
       el.scrollTop += px;
     };
-    el.addEventListener("wheel", handler, { passive: false });
-    return () => el.removeEventListener("wheel", handler);
+    // Capture phase fires before react-remove-scroll's document-level bubble handler
+    document.addEventListener("wheel", handler, { passive: false, capture: true });
+    return () => document.removeEventListener("wheel", handler, { capture: true });
   }, [open, ref]);
 }
 

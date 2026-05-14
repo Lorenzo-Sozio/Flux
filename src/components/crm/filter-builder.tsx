@@ -1,39 +1,54 @@
 "use client";
 
-import { useState, useTransition, useEffect, useRef } from "react";
 import type React from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
+
 import { useRouter, useSearchParams } from "next/navigation";
+
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+  BookmarkPlus,
+  Check,
+  ChevronRight,
+  ChevronsUpDown,
+  FolderPlus,
+  Loader2,
+  Plus,
+  SlidersHorizontal,
+  Trash2,
+  X,
+} from "lucide-react";
+import { useMessages, useTranslations } from "next-intl";
+import { toast } from "sonner";
+
+import { createCustomFilter, deleteCustomFilter } from "@/actions/filters";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Separator } from "@/components/ui/separator";
 import {
-  SlidersHorizontal, X, BookmarkPlus, Trash2, Loader2,
-  Plus, FolderPlus, ChevronRight, Check, ChevronsUpDown,
-} from "lucide-react";
-import { toast } from "sonner";
-import { cn } from "@/lib/utils";
-import { SearchableSelect } from "@/components/ui/searchable-select";
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { createCustomFilter, deleteCustomFilter } from "@/actions/filters";
-import {
-  FilterTree, FilterNode, FilterCondition,
-  FieldMeta, FieldMetaMap, FilterOperator, FilterValue,
-  emptyTree, newCondition, newGroup,
-  countActive, encodeFilter, decodeFilter,
-  operatorsForType, defaultOperatorForType, defaultValueForOperator,
+  countActive,
+  decodeFilter,
+  defaultOperatorForType,
+  defaultValueForOperator,
+  emptyTree,
+  encodeFilter,
+  type FieldMeta,
+  type FieldMetaMap,
+  type FieldType,
+  type FilterCondition,
+  type FilterNode,
+  type FilterOperator,
+  type FilterTree,
+  type FilterValue,
   NO_VALUE_OPERATORS,
+  newCondition,
+  newGroup,
+  operatorsForType,
 } from "@/lib/filter-types";
+import { cn } from "@/lib/utils";
 
 // ─── Depth colors ─────────────────────────────────────────────────────────────
 
@@ -43,22 +58,46 @@ const DEPTH_COLORS = [
   "border-purple-400/30 bg-purple-400/[0.02]",
 ];
 
-// ─── Lookup multi-select (FK fields with many options) ───────────────────────
+// ─── Wheel hook (document capture — fires before react-remove-scroll) ─────────
 
-function useLookupScrollWheel(ref: React.RefObject<HTMLDivElement | null>, open: boolean) {
+function useScrollWheelCapture(ref: React.RefObject<HTMLDivElement | null>, open: boolean) {
   useEffect(() => {
     if (!open) return;
     const el = ref.current;
     if (!el) return;
     const handler = (e: WheelEvent) => {
+      if (!el.contains(e.target as Node)) return;
       e.preventDefault();
       const px = e.deltaMode === 0 ? e.deltaY : e.deltaMode === 1 ? e.deltaY * 20 : e.deltaY * el.clientHeight;
       el.scrollTop += px;
     };
-    el.addEventListener("wheel", handler, { passive: false });
-    return () => el.removeEventListener("wheel", handler);
+    document.addEventListener("wheel", handler, { passive: false, capture: true });
+    return () => document.removeEventListener("wheel", handler, { capture: true });
   }, [open, ref]);
 }
+
+// ─── Translation helpers ───────────────────────────────────────────────────────
+
+function useFilterTranslations() {
+  const t = useTranslations("filterBuilder");
+  const messages = useMessages();
+  const fb = (messages as Record<string, unknown>).filterBuilder as Record<string, unknown> | undefined;
+
+  const getFieldLabel = (key: string, meta: FieldMeta): string => {
+    if (meta.isCustom) return meta.label;
+    const fields = fb?.fields as Record<string, string> | undefined;
+    return fields?.[key] ?? meta.label;
+  };
+
+  const getOpLabel = (type: FieldType, op: string, fallback: string): string => {
+    const ops = fb?.operators as Record<string, Record<string, string>> | undefined;
+    return ops?.[type]?.[op] ?? fallback;
+  };
+
+  return { t, getFieldLabel, getOpLabel };
+}
+
+// ─── Lookup multi-select (FK fields with many options) ───────────────────────
 
 function LookupMultiSelect({
   options,
@@ -69,10 +108,11 @@ function LookupMultiSelect({
   value: string[];
   onChange: (v: string[]) => void;
 }) {
+  const { t } = useFilterTranslations();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
-  useLookupScrollWheel(scrollRef, open);
+  useScrollWheelCapture(scrollRef, open);
 
   const filtered = search.trim()
     ? options.filter((o) => o.label.toLowerCase().includes(search.trim().toLowerCase()))
@@ -82,9 +122,7 @@ function LookupMultiSelect({
     onChange(value.includes(val) ? value.filter((v) => v !== val) : [...value, val]);
   };
 
-  const selectedLabels = value
-    .map((v) => options.find((o) => o.value === v)?.label ?? v)
-    .join(", ");
+  const selectedLabels = value.map((v) => options.find((o) => o.value === v)?.label ?? v).join(", ");
 
   return (
     <Popover
@@ -106,7 +144,7 @@ function LookupMultiSelect({
             {value.length > 0 ? (
               selectedLabels
             ) : (
-              <span className="text-muted-foreground">Select…</span>
+              <span className="text-muted-foreground">{t("selectPlaceholder")}</span>
             )}
           </span>
           <ChevronsUpDown className="ml-2 h-3.5 w-3.5 shrink-0 opacity-50" />
@@ -114,18 +152,19 @@ function LookupMultiSelect({
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command shouldFilter={false}>
-          <CommandInput placeholder="Search…" value={search} onValueChange={setSearch} />
-          <div ref={scrollRef} className="max-h-[260px] overflow-y-auto overflow-x-hidden" style={{ scrollbarWidth: "thin" }}>
+          <CommandInput placeholder={t("searchField")} value={search} onValueChange={setSearch} />
+          <div
+            ref={scrollRef}
+            className="max-h-[260px] overflow-y-auto overflow-x-hidden"
+            style={{ scrollbarWidth: "thin" }}
+          >
             <CommandList className="max-h-none overflow-visible">
-              {filtered.length === 0 && <CommandEmpty>No results.</CommandEmpty>}
+              {filtered.length === 0 && <CommandEmpty>{t("noResults")}</CommandEmpty>}
               <CommandGroup>
                 {filtered.map((opt) => (
                   <CommandItem key={opt.value} value={opt.value} onSelect={() => toggle(opt.value)}>
                     <Check
-                      className={cn(
-                        "mr-2 h-4 w-4 shrink-0",
-                        value.includes(opt.value) ? "opacity-100" : "opacity-0",
-                      )}
+                      className={cn("mr-2 h-4 w-4 shrink-0", value.includes(opt.value) ? "opacity-100" : "opacity-0")}
                     />
                     {opt.label}
                   </CommandItem>
@@ -142,15 +181,20 @@ function LookupMultiSelect({
 // ─── Value input ─────────────────────────────────────────────────────────────
 
 function ValueInput({
-  fieldMeta, operator, value, onChange,
+  fieldMeta,
+  operator,
+  value,
+  onChange,
 }: {
   fieldMeta: FieldMeta;
   operator: FilterOperator;
   value: FilterValue;
   onChange: (v: FilterValue) => void;
 }) {
+  const { t } = useFilterTranslations();
+
   if (NO_VALUE_OPERATORS.includes(operator)) {
-    return <span className="text-sm text-muted-foreground italic px-1 self-center">—</span>;
+    return <span className="self-center px-1 text-muted-foreground text-sm italic">—</span>;
   }
 
   if (fieldMeta.type === "text") {
@@ -160,7 +204,7 @@ function ValueInput({
         value={(value as string) ?? ""}
         onChange={(e) => onChange(e.target.value)}
         className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        placeholder="value…"
+        placeholder={t("valuePlaceholder")}
       />
     );
   }
@@ -169,21 +213,21 @@ function ValueInput({
     if (operator === "between") {
       const [a, b] = (value as [number, number]) ?? [0, 0];
       return (
-        <div className="flex gap-2 items-center">
+        <div className="flex items-center gap-2">
           <input
             type="number"
             value={a ?? ""}
             onChange={(e) => onChange([Number(e.target.value), b])}
             className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            placeholder="from"
+            placeholder={t("fromPlaceholder")}
           />
-          <span className="text-muted-foreground text-sm shrink-0">–</span>
+          <span className="shrink-0 text-muted-foreground text-sm">–</span>
           <input
             type="number"
             value={b ?? ""}
             onChange={(e) => onChange([a, Number(e.target.value)])}
             className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            placeholder="to"
+            placeholder={t("toPlaceholder")}
           />
         </div>
       );
@@ -194,7 +238,7 @@ function ValueInput({
         value={(value as number) ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
         className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-        placeholder="number"
+        placeholder={t("valuePlaceholder")}
       />
     );
   }
@@ -203,14 +247,14 @@ function ValueInput({
     if (operator === "between") {
       const [a, b] = (value as [string, string]) ?? ["", ""];
       return (
-        <div className="flex gap-2 items-center">
+        <div className="flex items-center gap-2">
           <input
             type="date"
             value={a ?? ""}
             onChange={(e) => onChange([e.target.value, b])}
             className="flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
           />
-          <span className="text-muted-foreground text-sm shrink-0">–</span>
+          <span className="shrink-0 text-muted-foreground text-sm">–</span>
           <input
             type="date"
             value={b ?? ""}
@@ -228,7 +272,7 @@ function ValueInput({
           value={(value as number) ?? 7}
           onChange={(e) => onChange(Number(e.target.value))}
           className="flex h-8 w-24 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          placeholder="days"
+          placeholder={t("daysPlaceholder")}
         />
       );
     }
@@ -244,11 +288,7 @@ function ValueInput({
 
   if (fieldMeta.type === "enum" && fieldMeta.lookupOptions !== undefined) {
     return (
-      <LookupMultiSelect
-        options={fieldMeta.lookupOptions}
-        value={(value as string[]) ?? []}
-        onChange={onChange}
-      />
+      <LookupMultiSelect options={fieldMeta.lookupOptions} value={(value as string[]) ?? []} onChange={onChange} />
     );
   }
 
@@ -260,11 +300,9 @@ function ValueInput({
           <Badge
             key={opt}
             variant={selected.includes(opt) ? "default" : "outline"}
-            className="cursor-pointer capitalize font-normal hover:bg-muted"
+            className="cursor-pointer font-normal capitalize hover:bg-muted"
             onClick={() => {
-              const next = selected.includes(opt)
-                ? selected.filter((v) => v !== opt)
-                : [...selected, opt];
+              const next = selected.includes(opt) ? selected.filter((v) => v !== opt) : [...selected, opt];
               onChange(next);
             }}
           >
@@ -291,6 +329,7 @@ function ConditionRow({
   onChange: (c: FilterCondition) => void;
   onRemove: () => void;
 }) {
+  const { t, getFieldLabel, getOpLabel } = useFilterTranslations();
   const fieldMeta = fields[condition.field];
   const operators = fieldMeta ? operatorsForType(fieldMeta.type) : [];
 
@@ -309,24 +348,31 @@ function ConditionRow({
   const customFieldEntries = Object.entries(fields).filter(([, f]) => f.isCustom);
 
   return (
-    <div className="grid gap-2 items-start" style={{ gridTemplateColumns: "1fr 1fr 1.4fr 32px" }}>
+    <div className="grid items-start gap-2" style={{ gridTemplateColumns: "1fr 1fr 1.4fr 32px" }}>
       {/* Field */}
       <SearchableSelect
         options={[
-          ...standardFields.map(([k, f]) => ({ value: k, label: f.label })),
-          ...customFieldEntries.map(([k, f]) => ({ value: k, label: f.label, sublabel: "Custom" })),
+          ...standardFields.map(([k, f]) => ({ value: k, label: getFieldLabel(k, f) })),
+          ...customFieldEntries.map(([k, f]) => ({ value: k, label: f.label, sublabel: t("custom") })),
         ]}
         value={condition.field}
         onChange={changeField}
-        searchPlaceholder="Search field…"
+        searchPlaceholder={t("searchField")}
+        placeholder={t("selectPlaceholder")}
+        emptyText={t("noResults")}
         className="h-8 text-sm"
       />
 
       {/* Operator */}
       <SearchableSelect
-        options={operators.map((op) => ({ value: op.value, label: op.label }))}
+        options={operators.map((op) => ({
+          value: op.value,
+          label: getOpLabel(fieldMeta?.type ?? "text", op.value, op.label),
+        }))}
         value={condition.operator}
         onChange={(v) => changeOp(v as FilterOperator)}
+        placeholder={t("selectPlaceholder")}
+        emptyText={t("noResults")}
         className="h-8 text-sm"
       />
 
@@ -344,9 +390,10 @@ function ConditionRow({
 
       {/* Remove */}
       <button
+        type="button"
         onClick={onRemove}
-        className="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
-        title="Remove condition"
+        className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+        title={t("removeCondition")}
       >
         <X className="h-3.5 w-3.5" />
       </button>
@@ -373,6 +420,7 @@ function GroupNode({
   fields: FieldMetaMap;
   depth: number;
 }) {
+  const { t } = useFilterTranslations();
   const firstField = Object.keys(fields)[0] ?? "";
   const firstType = fields[firstField]?.type ?? "text";
 
@@ -397,13 +445,14 @@ function GroupNode({
   const colorClass = DEPTH_COLORS[Math.min(depth, DEPTH_COLORS.length - 1)];
 
   return (
-    <div className={`rounded-lg border-l-2 pl-4 pr-3 py-3 space-y-3 ${colorClass}`}>
+    <div className={`space-y-3 rounded-lg border-l-2 py-3 pr-3 pl-4 ${colorClass}`}>
       {/* Group header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={() => onLogicChange("AND")}
-            className={`h-6 px-2.5 text-xs font-semibold rounded transition-colors ${
+            className={`h-6 rounded px-2.5 font-semibold text-xs transition-colors ${
               logic === "AND"
                 ? "bg-primary text-primary-foreground"
                 : "bg-muted text-muted-foreground hover:bg-muted/80"
@@ -412,24 +461,24 @@ function GroupNode({
             AND
           </button>
           <button
+            type="button"
             onClick={() => onLogicChange("OR")}
-            className={`h-6 px-2.5 text-xs font-semibold rounded transition-colors ${
-              logic === "OR"
-                ? "bg-primary text-primary-foreground"
-                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            className={`h-6 rounded px-2.5 font-semibold text-xs transition-colors ${
+              logic === "OR" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
             }`}
           >
             OR
           </button>
-          <span className="text-xs text-muted-foreground ml-1">
-            {logic === "AND" ? "All conditions must match" : "Any condition must match"}
+          <span className="ml-1 text-muted-foreground text-xs">
+            {logic === "AND" ? t("allMustMatch") : t("anyMustMatch")}
           </span>
         </div>
         {onRemove && (
           <button
+            type="button"
             onClick={onRemove}
-            className="h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-muted transition-colors"
-            title="Remove group"
+            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
+            title={t("removeGroup")}
           >
             <X className="h-3 w-3" />
           </button>
@@ -438,32 +487,30 @@ function GroupNode({
 
       {/* Column headers (only at root level, depth 0) */}
       {depth === 0 && conditions.some((n) => n.type === "condition") && (
-        <div className="grid gap-2 text-[11px] font-medium text-muted-foreground px-0.5"
-          style={{ gridTemplateColumns: "1fr 1fr 1.4fr 32px" }}>
-          <span>Field</span>
-          <span>Operator</span>
-          <span>Value</span>
+        <div
+          className="grid gap-2 px-0.5 font-medium text-[11px] text-muted-foreground"
+          style={{ gridTemplateColumns: "1fr 1fr 1.4fr 32px" }}
+        >
+          <span>{t("columnField")}</span>
+          <span>{t("columnOperator")}</span>
+          <span>{t("columnValue")}</span>
           <span />
         </div>
       )}
 
       {/* Conditions */}
-      {conditions.length === 0 && (
-        <p className="text-sm text-muted-foreground italic px-1">
-          No conditions yet — add one below.
-        </p>
-      )}
+      {conditions.length === 0 && <p className="px-1 text-muted-foreground text-sm italic">{t("noConditions")}</p>}
 
       <div className="space-y-2">
         {conditions.map((node, i) => (
           <div key={node.id}>
             {i > 0 && (
               <div className="flex items-center gap-2 py-1">
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-[10px] font-bold text-muted-foreground bg-background border border-border rounded px-1.5 py-0.5">
+                <div className="h-px flex-1 bg-border" />
+                <span className="rounded border border-border bg-background px-1.5 py-0.5 font-bold text-[10px] text-muted-foreground">
                   {logic}
                 </span>
-                <div className="flex-1 h-px bg-border" />
+                <div className="h-px flex-1 bg-border" />
               </div>
             )}
 
@@ -492,19 +539,21 @@ function GroupNode({
       {/* Add buttons */}
       <div className="flex items-center gap-3 pt-1">
         <button
+          type="button"
           onClick={addCondition}
-          className="flex items-center gap-1.5 text-xs text-primary hover:text-primary/80 font-medium"
+          className="flex items-center gap-1.5 font-medium text-primary text-xs hover:text-primary/80"
         >
           <Plus className="h-3.5 w-3.5" />
-          Add condition
+          {t("addCondition")}
         </button>
         {depth < 2 && (
           <button
+            type="button"
             onClick={addGroup}
-            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground font-medium"
+            className="flex items-center gap-1.5 font-medium text-muted-foreground text-xs hover:text-foreground"
           >
             <FolderPlus className="h-3.5 w-3.5" />
-            Add group
+            {t("addGroup")}
           </button>
         )}
       </div>
@@ -525,12 +574,8 @@ interface FilterBuilderProps {
   basePath: string;
 }
 
-export function FilterBuilder({
-  entityType,
-  fields,
-  savedFilters: initialSaved,
-  basePath,
-}: FilterBuilderProps) {
+export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, basePath }: FilterBuilderProps) {
+  const { t } = useFilterTranslations();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [open, setOpen] = useState(false);
@@ -540,14 +585,12 @@ export function FilterBuilder({
   const [saving, setSaving] = useState(false);
 
   const encoded = searchParams.get("filter");
-  const [tree, setTree] = useState<FilterTree>(() =>
-    encoded ? decodeFilter(encoded) ?? emptyTree() : emptyTree()
-  );
+  const [tree, setTree] = useState<FilterTree>(() => (encoded ? (decodeFilter(encoded) ?? emptyTree()) : emptyTree()));
 
   const handleOpenChange = (o: boolean) => {
     if (o) {
       const enc = searchParams.get("filter");
-      setTree(enc ? decodeFilter(enc) ?? emptyTree() : emptyTree());
+      setTree(enc ? (decodeFilter(enc) ?? emptyTree()) : emptyTree());
     }
     setOpen(o);
   };
@@ -586,10 +629,17 @@ export function FilterBuilder({
   };
 
   const handleSave = async () => {
-    if (!saveName.trim()) { toast.error("Enter a name for this filter."); return; }
-    if (countActive(tree.conditions) === 0) { toast.error("No active conditions to save."); return; }
+    if (!saveName.trim()) {
+      toast.error("Enter a name for this filter.");
+      return;
+    }
+    if (countActive(tree.conditions) === 0) {
+      toast.error("No active conditions to save.");
+      return;
+    }
     setSaving(true);
     try {
+      // biome-ignore lint/suspicious/noExplicitAny: criteria is a JSON-compatible object
       await createCustomFilter({ name: saveName.trim(), entityType, criteria: tree as any });
       setSaved((prev) => [
         ...prev,
@@ -617,16 +667,11 @@ export function FilterBuilder({
   return (
     <>
       {/* Trigger button */}
-      <Button
-        variant="outline"
-        size="sm"
-        className="relative gap-2"
-        onClick={() => handleOpenChange(true)}
-      >
+      <Button variant="outline" size="sm" className="relative gap-2" onClick={() => handleOpenChange(true)}>
         <SlidersHorizontal className="h-4 w-4" />
-        Filters
+        {t("triggerLabel")}
         {activeCount > 0 && (
-          <Badge className="h-4 min-w-4 px-1 text-[10px] flex items-center justify-center absolute -top-1.5 -right-1.5">
+          <Badge className="-top-1.5 -right-1.5 absolute flex h-4 min-w-4 items-center justify-center px-1 text-[10px]">
             {activeCount}
           </Badge>
         )}
@@ -634,47 +679,47 @@ export function FilterBuilder({
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
-          className="flex flex-col p-0 gap-0 overflow-hidden"
+          className="flex flex-col gap-0 overflow-hidden p-0"
           style={{ maxWidth: "min(760px, 95vw)", width: "100%", maxHeight: "85vh" }}
         >
           {/* Header */}
-          <DialogHeader className="px-5 py-4 border-b shrink-0">
+          <DialogHeader className="shrink-0 border-b px-5 py-4">
             <DialogTitle className="flex items-center gap-2.5">
               <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
-              Advanced Filters
+              {t("title")}
               {activeCount > 0 && (
-                <Badge variant="secondary" className="text-xs font-normal">
-                  {activeCount} active condition{activeCount !== 1 ? "s" : ""}
+                <Badge variant="secondary" className="font-normal text-xs">
+                  {t("activeConditions", { count: activeCount })}
                 </Badge>
               )}
             </DialogTitle>
           </DialogHeader>
 
           {/* Scrollable body */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
-
+          <div className="flex-1 space-y-5 overflow-y-auto p-5">
             {/* Saved presets */}
             {saved.length > 0 && (
               <div className="space-y-2">
-                <p className="text-xs uppercase font-semibold tracking-wider text-muted-foreground">
-                  Saved Filters
+                <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
+                  {t("savedFilters")}
                 </p>
                 <div className="grid grid-cols-2 gap-1.5">
                   {saved.map((f) => (
-                    <div key={f.id} className="flex items-center gap-1 border rounded-md overflow-hidden">
+                    <div key={f.id} className="flex items-center gap-1 overflow-hidden rounded-md border">
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="flex-1 justify-start h-8 text-sm gap-1.5 rounded-none font-normal"
+                        className="h-8 flex-1 justify-start gap-1.5 rounded-none font-normal text-sm"
                         onClick={() => loadPreset(f.criteria)}
                       >
-                        <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
+                        <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground" />
                         <span className="truncate">{f.name}</span>
                       </Button>
                       <button
-                        className="h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-muted transition-colors shrink-0"
+                        type="button"
+                        className="flex h-8 w-8 shrink-0 items-center justify-center text-muted-foreground transition-colors hover:bg-muted hover:text-destructive"
                         onClick={() => handleDeleteSaved(f.id)}
-                        title="Delete preset"
+                        title={t("deletePreset")}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -687,14 +732,12 @@ export function FilterBuilder({
 
             {/* Conditions */}
             <div className="space-y-2">
-              <p className="text-xs uppercase font-semibold tracking-wider text-muted-foreground">
-                Conditions
-              </p>
+              <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">{t("conditions")}</p>
               <GroupNode
                 conditions={tree.conditions}
                 logic={tree.logic}
-                onLogicChange={(l) => setTree((t) => ({ ...t, logic: l }))}
-                onConditionsChange={(c) => setTree((t) => ({ ...t, conditions: c }))}
+                onLogicChange={(l) => setTree((tr) => ({ ...tr, logic: l }))}
+                onConditionsChange={(c) => setTree((tr) => ({ ...tr, conditions: c }))}
                 fields={fields}
                 depth={0}
               />
@@ -704,13 +747,13 @@ export function FilterBuilder({
 
             {/* Save as preset */}
             <div className="space-y-2">
-              <p className="text-xs uppercase font-semibold tracking-wider text-muted-foreground">
-                Save as Preset
+              <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
+                {t("saveAsPreset")}
               </p>
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Filter name…"
+                  placeholder={t("filterNamePlaceholder")}
                   value={saveName}
                   onChange={(e) => setSaveName(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSave()}
@@ -719,46 +762,29 @@ export function FilterBuilder({
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-9 px-4 gap-1.5 shrink-0"
+                  className="h-9 shrink-0 gap-1.5 px-4"
                   onClick={handleSave}
                   disabled={saving}
                 >
-                  {saving
-                    ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    : <BookmarkPlus className="h-3.5 w-3.5" />
-                  }
-                  Save
+                  {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BookmarkPlus className="h-3.5 w-3.5" />}
+                  {t("save")}
                 </Button>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <DialogFooter className="px-5 py-3 border-t flex items-center gap-2 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={clearFilters}
-              className="gap-1.5 mr-auto"
-            >
+          <DialogFooter className="flex shrink-0 items-center gap-2 border-t px-5 py-3">
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="mr-auto gap-1.5">
               <X className="h-3.5 w-3.5" />
-              Clear All
+              {t("clearAll")}
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setOpen(false)}
-            >
-              Cancel
+            <Button variant="outline" size="sm" onClick={() => setOpen(false)}>
+              {t("cancel")}
             </Button>
-            <Button
-              size="sm"
-              onClick={applyFilters}
-              disabled={isPending}
-              className="min-w-[120px]"
-            >
+            <Button size="sm" onClick={applyFilters} disabled={isPending} className="min-w-[120px]">
               {isPending && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
-              Apply Filters
+              {t("applyFilters")}
             </Button>
           </DialogFooter>
         </DialogContent>

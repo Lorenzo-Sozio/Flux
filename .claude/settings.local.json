@@ -173,7 +173,17 @@
       "Bash(node -e \"const t=require\\('./node_modules/shadcn/tailwind.css' || ''\\); console.log\\('found'\\)\")",
       "Bash(node -e \"const p=require\\('./node_modules/cmdk/package.json'\\); console.log\\(p.version\\)\")",
       "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('./node_modules/cmdk/dist/index.js','utf8'\\); const m=s.match\\(/cmdk-list-height[^}]+/g\\); console.log\\(m\\)\")",
-      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('./node_modules/cmdk/dist/index.js','utf8'\\); const idx=s.indexOf\\('cmdk-list-height'\\); console.log\\(s.slice\\(Math.max\\(0,idx-300\\), idx+200\\)\\)\")"
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('./node_modules/cmdk/dist/index.js','utf8'\\); const idx=s.indexOf\\('cmdk-list-height'\\); console.log\\(s.slice\\(Math.max\\(0,idx-300\\), idx+200\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const en=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\)\\); console.log\\(Object.keys\\(en\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const en=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\)\\); console.log\\(JSON.stringify\\(en.common, null, 2\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const en=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\)\\); console.log\\(JSON.stringify\\(en.crm || {}, null, 2\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const it=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/it.json','utf8'\\)\\); console.log\\(JSON.stringify\\(it.common?.sources || it.common?.city || 'no', null, 2\\)\\); console.log\\(Object.keys\\(it\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const it=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/it.json','utf8'\\)\\); console.log\\(JSON.stringify\\(it.common, null, 2\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const en=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\)\\); console.log\\(JSON.stringify\\(en.companies, null, 2\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const it=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/it.json','utf8'\\)\\); console.log\\(JSON.stringify\\(it.companies, null, 2\\)\\)\")",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(p.dependencies['next-intl']\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const en=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\)\\); console.log\\(JSON.stringify\\(Object.keys\\(en\\)\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\); const en=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\)\\); const it=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/it.json','utf8'\\)\\); console.log\\('has filterBuilder:', 'filterBuilder' in en, 'filterBuilder' in it\\)\")"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",
