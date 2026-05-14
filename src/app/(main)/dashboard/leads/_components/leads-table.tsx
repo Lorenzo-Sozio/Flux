@@ -40,14 +40,21 @@ interface User {
   email: string | null;
 }
 
+interface LookupItem {
+  id: string;
+  name: string;
+}
+
 interface Props {
   leads: Lead[];
   users: User[];
   canEdit: boolean;
   activeCount: number;
+  categories?: LookupItem[];
+  companyTypes?: LookupItem[];
 }
 
-export function LeadsTable({ leads, users, canEdit, activeCount }: Props) {
+export function LeadsTable({ leads, users, canEdit, activeCount, categories = [], companyTypes = [] }: Props) {
   const t = useTranslations("leads");
   const tc = useTranslations("common");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -205,7 +212,7 @@ export function LeadsTable({ leads, users, canEdit, activeCount }: Props) {
               </TableCell>
               {canEdit && (
                 <TableCell className="text-right">
-                  <LeadActions lead={lead} />
+                  <LeadActions lead={lead} categories={categories} companyTypes={companyTypes} />
                 </TableCell>
               )}
             </TableRow>

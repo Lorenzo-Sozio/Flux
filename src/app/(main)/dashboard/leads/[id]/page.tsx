@@ -29,6 +29,7 @@ import {
 import { getTranslations } from "next-intl/server";
 
 import { createActivity, deleteActivity, getActivitiesByLead } from "@/actions/activities";
+import { getCompanyCategories, getCompanyTypes } from "@/actions/crm";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { getEmailTemplates } from "@/actions/marketing";
 import { deleteTask, getAllUsers, getTasksByLead, updateTaskStatus } from "@/actions/tasks";
@@ -158,15 +159,20 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       ])
     : [null, null, null];
 
-  const [leadActivities, leadTasks, allUsers, customFieldDefs, customFieldVals, t, tD] = await Promise.all([
+  const [leadActivities, leadTasks, allUsers, customFieldDefs, customFieldVals, allCompanyTypes, allCategories, t, tD] = await Promise.all([
     getActivitiesByLead(leadId),
     getTasksByLead(leadId),
     getAllUsers(),
     getCustomFieldDefinitions("lead"),
     getCustomFieldValues("lead", leadId),
+    getCompanyTypes().catch(() => [] as { id: string; name: string }[]),
+    getCompanyCategories().catch(() => [] as { id: string; name: string }[]),
     getTranslations("leads"),
     getTranslations("entityDetail"),
   ]);
+
+  const leadTypeName = lead.leadTypeId ? (allCompanyTypes.find((t) => t.id === lead.leadTypeId)?.name ?? null) : null;
+  const leadCategoryName = lead.leadCategoryId ? (allCategories.find((c) => c.id === lead.leadCategoryId)?.name ?? null) : null;
 
   const ownerName = allUsers.find((u) => u.id === lead.ownerId)?.name ?? null;
   const fullName = [lead.firstName, lead.lastName].filter(Boolean).join(" ");
@@ -237,7 +243,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
-              <LeadModal lead={lead}>
+              <LeadModal lead={lead} categories={allCategories} companyTypes={allCompanyTypes}>
                 <Button variant="outline" size="sm">
                   <PencilIcon className="w-4 h-4 mr-1.5" />
                   {t("editLead")}
@@ -344,6 +350,16 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {lead.source && (
                 <InfoRow label={tD("fieldSource")}>
                   <span className="capitalize">{lead.source}</span>
+                </InfoRow>
+              )}
+              {leadTypeName && (
+                <InfoRow label={t("form.leadType")}>
+                  <span>{leadTypeName}</span>
+                </InfoRow>
+              )}
+              {leadCategoryName && (
+                <InfoRow label={t("form.leadCategory")}>
+                  <span>{leadCategoryName}</span>
                 </InfoRow>
               )}
               {ownerName && (

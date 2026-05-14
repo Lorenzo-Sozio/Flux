@@ -236,6 +236,8 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
             source: lead.source ?? undefined,
             ownerId: lead.ownerId,
             sourceLeadId: lead.id,
+            companyTypeId: lead.leadTypeId ?? undefined,
+            companyCategoryId: lead.leadCategoryId ?? undefined,
           })
           .returning({ id: companies.id });
         companyId = newCompany.id;

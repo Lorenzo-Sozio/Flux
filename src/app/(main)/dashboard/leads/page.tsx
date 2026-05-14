@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { getLeads, getAllUsers } from "@/actions/crm";
+import { getLeads, getAllUsers, getCompanyCategories, getCompanyTypes } from "@/actions/crm";
 import { getCustomFilters } from "@/actions/filters";
 import { getCustomFieldDefinitions } from "@/actions/custom-fields";
 import { toFieldMetaMap, LEAD_FIELDS, customFieldsToMetaMap } from "@/lib/filter-engine";
@@ -25,11 +25,13 @@ export default async function LeadsPage({
   const session = await auth();
   const canEdit = session?.user?.role !== "viewer";
 
-  const [allLeads, savedFilters, customDefs, users] = await Promise.all([
+  const [allLeads, savedFilters, customDefs, users, categories, companyTypes] = await Promise.all([
     getLeads(encoded),
     getCustomFilters("leads").catch(() => []),
     getCustomFieldDefinitions("lead").catch(() => []),
     getAllUsers(),
+    getCompanyCategories().catch(() => []),
+    getCompanyTypes().catch(() => []),
   ]);
 
   const t = await getTranslations("leads");
@@ -37,6 +39,19 @@ export default async function LeadsPage({
   const tree = encoded ? decodeFilter(encoded) : null;
   const activeCount = tree ? countActive(tree.conditions) : 0;
   const fields = { ...toFieldMetaMap(LEAD_FIELDS), ...customFieldsToMetaMap(customDefs) };
+
+  if (fields.leadTypeId) {
+    fields.leadTypeId = {
+      ...fields.leadTypeId,
+      lookupOptions: companyTypes.map((t) => ({ value: t.id, label: t.name })),
+    };
+  }
+  if (fields.leadCategoryId) {
+    fields.leadCategoryId = {
+      ...fields.leadCategoryId,
+      lookupOptions: categories.map((c) => ({ value: c.id, label: c.name })),
+    };
+  }
 
   return (
     <div className="p-6">
@@ -64,7 +79,7 @@ export default async function LeadsPage({
           />
           <ImportExportButtons entityType="leads" />
           {canEdit && (
-            <LeadModal>
+            <LeadModal categories={categories} companyTypes={companyTypes}>
               <Button>{t("newLead")}</Button>
             </LeadModal>
           )}
@@ -76,6 +91,8 @@ export default async function LeadsPage({
         users={users}
         canEdit={canEdit}
         activeCount={activeCount}
+        categories={categories}
+        companyTypes={companyTypes}
       />
     </div>
   );

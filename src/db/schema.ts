@@ -202,6 +202,8 @@ export const leads = pgTable("lead", {
   marketingConsent: boolean("marketing_consent").default(false),
   consentDate: timestamp("consent_date", { mode: "date" }),
   tags: text("tags").array(),
+  leadTypeId: text("lead_type_id").references(() => companyTypes.id, { onDelete: "set null" }),
+  leadCategoryId: text("lead_category_id").references(() => companyCategories.id, { onDelete: "set null" }),
   isConverted: boolean("is_converted").default(false).notNull(),
   convertedAt: timestamp("converted_at", { mode: "date" }),
   convertedToContactId: text("converted_to_contact_id"), // FK set via migration → contact.id (set null)

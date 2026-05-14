@@ -485,7 +485,12 @@
       "notesPlaceholder": "Notes about this lead…",
       "selectStatus": "Select status",
       "selectSource": "Select source",
-      "selectAssignee": "Select assignee"
+      "selectAssignee": "Select assignee",
+      "leadType": "Activity Type",
+      "selectLeadType": "— Select type —",
+      "leadCategory": "Commercial Category",
+      "selectLeadCategory": "— Select category —",
+      "createNew": "Create"
     },
     "createSuccess": "Lead created.",
     "updateSuccess": "Lead updated.",

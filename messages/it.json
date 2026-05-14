@@ -485,7 +485,12 @@
       "notesPlaceholder": "Note su questo lead…",
       "selectStatus": "Seleziona stato",
       "selectSource": "Seleziona fonte",
-      "selectAssignee": "Seleziona assegnatario"
+      "selectAssignee": "Seleziona assegnatario",
+      "leadType": "Tipo di Attività",
+      "selectLeadType": "— Seleziona tipo —",
+      "leadCategory": "Categoria Commerciale",
+      "selectLeadCategory": "— Seleziona categoria —",
+      "createNew": "Crea"
     },
     "createSuccess": "Lead creato.",
     "updateSuccess": "Lead aggiornato.",

@@ -40,6 +40,10 @@ export const LEAD_FIELDS: FieldRegistry = {
   leadScore:        { label: "Lead Score",       type: "number",  col: leads.leadScore },
   marketingConsent: { label: "Marketing Consent",type: "boolean", col: leads.marketingConsent },
   isConverted:      { label: "Converted",        type: "boolean", col: leads.isConverted },
+  leadTypeId:       { label: "Lead Type",        type: "enum",    col: leads.leadTypeId,
+                      options: [] }, // lookupOptions injected dynamically in page.tsx
+  leadCategoryId:   { label: "Lead Category",    type: "enum",    col: leads.leadCategoryId,
+                      options: [] }, // lookupOptions injected dynamically in page.tsx
   createdAt:        { label: "Created Date",     type: "date",    col: leads.createdAt },
 };
 

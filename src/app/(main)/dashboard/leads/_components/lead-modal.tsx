@@ -22,8 +22,9 @@ import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { checkLeadDuplicates, createLead, deleteLead, updateLead } from "@/actions/crm";
+import { checkLeadDuplicates, createCompanyCategory, createCompanyType, createLead, deleteLead, updateLead } from "@/actions/crm";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
+import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combobox";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -53,6 +54,8 @@ const leadSchema = z.object({
   source: z.string().optional(),
   rating: z.string().optional(),
   leadScore: z.coerce.number().optional().nullable(),
+  leadTypeId: z.string().optional().nullable(),
+  leadCategoryId: z.string().optional().nullable(),
   tags: z.string().optional(),
   marketingConsent: z.boolean().default(false),
   notes: z.string().optional(),
@@ -87,13 +90,27 @@ function F({
   );
 }
 
-export function LeadModal({ lead, children }: { lead?: any; children: React.ReactNode }) {
+type LookupItem = { id: string; name: string };
+
+export function LeadModal({
+  lead,
+  children,
+  categories = [],
+  companyTypes = [],
+}: {
+  lead?: any;
+  children: React.ReactNode;
+  categories?: LookupItem[];
+  companyTypes?: LookupItem[];
+}) {
   const t = useTranslations("leads");
   const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [duplicates, setDuplicates] = useState<Awaited<ReturnType<typeof checkLeadDuplicates>>>([]);
   const [pendingPayload, setPendingPayload] = useState<Record<string, unknown> | null>(null);
   const [mergeTargetId, setMergeTargetId] = useState<string | null>(null);
+  const [localCategories, setLocalCategories] = useState<LookupItem[]>(categories);
+  const [localTypes, setLocalTypes] = useState<LookupItem[]>(companyTypes);
   const isEditing = !!lead;
   const searchParams = useSearchParams();
 
@@ -131,6 +148,8 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
       source: lead?.source || "",
       rating: lead?.rating || "",
       leadScore: lead?.leadScore ?? null,
+      leadTypeId: lead?.leadTypeId ?? null,
+      leadCategoryId: lead?.leadCategoryId ?? null,
       tags: lead?.tags ? lead.tags.join(", ") : "",
       marketingConsent: lead?.marketingConsent || false,
       notes: lead?.notes || "",
@@ -170,6 +189,8 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
         source: lead.source || "",
         rating: lead.rating || "",
         leadScore: lead.leadScore ?? null,
+        leadTypeId: lead.leadTypeId ?? null,
+        leadCategoryId: lead.leadCategoryId ?? null,
         tags: lead.tags ? lead.tags.join(", ") : "",
         marketingConsent: lead.marketingConsent || false,
         notes: lead.notes || "",
@@ -195,7 +216,7 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
       e.industry ||
       e.website
     ),
-    crm: !!(e.status || e.source || e.rating || e.leadScore || e.tags),
+    crm: !!(e.status || e.source || e.rating || e.leadScore || e.leadTypeId || e.leadCategoryId || e.tags),
     address: !!(e.street || e.city || e.state || e.zipCode || e.country),
     notes: !!e.notes,
   };
@@ -394,6 +415,44 @@ export function LeadModal({ lead, children }: { lead?: any; children: React.Reac
                   <F label={t("form.leadScore")} error={e.leadScore?.message}>
                     <Input {...register("leadScore")} type="number" min={0} max={100} placeholder="0" />
                   </F>
+                  <F label={t("form.leadType")} error={e.leadTypeId?.message}>
+                    <Controller
+                      control={control}
+                      name="leadTypeId"
+                      render={({ field }) => (
+                        <CreatableLookupCombobox
+                          value={field.value ?? null}
+                          onChange={field.onChange}
+                          items={localTypes}
+                          onAddItem={(item) =>
+                            setLocalTypes((prev) => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)))
+                          }
+                          onCreate={createCompanyType}
+                          placeholder={t("form.selectLeadType")}
+                          createPrefix={t("form.createNew")}
+                        />
+                      )}
+                    />
+                  </F>
+                  <F label={t("form.leadCategory")} error={e.leadCategoryId?.message}>
+                    <Controller
+                      control={control}
+                      name="leadCategoryId"
+                      render={({ field }) => (
+                        <CreatableLookupCombobox
+                          value={field.value ?? null}
+                          onChange={field.onChange}
+                          items={localCategories}
+                          onAddItem={(item) =>
+                            setLocalCategories((prev) => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)))
+                          }
+                          onCreate={createCompanyCategory}
+                          placeholder={t("form.selectLeadCategory")}
+                          createPrefix={t("form.createNew")}
+                        />
+                      )}
+                    />
+                  </F>
                   <div className="col-span-2">
                     <F label={t("form.tags")} error={e.tags?.message}>
                       <Input {...register("tags")} placeholder="tech, startup, b2b" />
@@ -551,7 +610,15 @@ export function DeleteLeadButton({ id }: { id: string }) {
   );
 }
 
-export function LeadActions({ lead }: { lead: any }) {
+export function LeadActions({
+  lead,
+  categories,
+  companyTypes,
+}: {
+  lead: any;
+  categories?: LookupItem[];
+  companyTypes?: LookupItem[];
+}) {
   return (
     <div className="flex items-center gap-2">
       <Link href={`/dashboard/leads/${lead.id}`}>
@@ -559,7 +626,7 @@ export function LeadActions({ lead }: { lead: any }) {
           <EyeIcon className="h-4 w-4" />
         </Button>
       </Link>
-      <LeadModal lead={lead}>
+      <LeadModal lead={lead} categories={categories} companyTypes={companyTypes}>
         <Button variant="ghost" size="icon">
           <PencilIcon className="h-4 w-4" />
         </Button>
