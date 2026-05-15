@@ -35,6 +35,30 @@ function safeHref(url: string): string {
   return "#";
 }
 
+// ─── Admin OTP ────────────────────────────────────────────────────────────────
+
+export async function sendAdminOtpEmail(
+  email: string,
+  otp: string,
+): Promise<{ success: boolean; error?: string }> {
+  const result = await sendEmail({
+    to: sanitizeHeader(email),
+    subject: "Codice di accesso al pannello admin — Flux CRM",
+    html: `
+      <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
+        <h2 style="color:#111827">Accesso pannello di amministrazione</h2>
+        <p style="color:#374151">Usa il codice seguente per completare la verifica. Scade tra <strong>10 minuti</strong>.</p>
+        <div style="margin:24px 0;padding:20px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;text-align:center">
+          <span style="font-family:monospace;font-size:32px;font-weight:700;letter-spacing:8px;color:#111827">${otp}</span>
+        </div>
+        <p style="color:#6b7280;font-size:13px">Se non hai richiesto questo codice, ignora questa email. Il tuo account è al sicuro.</p>
+      </div>`,
+  });
+
+  if (!result.success) console.error("[EMAIL] Admin OTP send failed:", result.error);
+  return result;
+}
+
 // ─── Password Reset ───────────────────────────────────────────────────────────
 
 export async function sendPasswordResetEmail(

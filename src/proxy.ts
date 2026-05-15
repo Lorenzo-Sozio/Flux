@@ -108,8 +108,9 @@ export const proxy = auth((req) => {
 
   if (isOnLogin || isOnPublicAuth) {
     if (isLoggedIn && isOnLogin) {
-      // Main domain: go to tenant management. Subdomains never reach here (handled above).
-      return Response.redirect(new URL("/admin/tenants", nextUrl));
+      // Main domain: send admin users to verify their identity first.
+      // The admin layout redirects to /admin/tenants once the session cookie is set.
+      return Response.redirect(new URL("/admin/login", nextUrl));
     }
     return;
   }
@@ -125,8 +126,15 @@ export const proxy = auth((req) => {
   // Root "/" on main domain: admin panel if logged in, otherwise login.
   if (pathname === "/") {
     return Response.redirect(
-      new URL(isLoggedIn ? "/admin/tenants" : "/auth/v1/login", nextUrl),
+      new URL(isLoggedIn ? "/admin/login" : "/auth/v1/login", nextUrl),
     );
+  }
+
+  // Inject pathname so admin layouts can detect /admin/login without a separate header package.
+  if (pathname.startsWith("/admin")) {
+    const res = NextResponse.next();
+    res.headers.set("x-pathname", pathname);
+    return res;
   }
 
   return;

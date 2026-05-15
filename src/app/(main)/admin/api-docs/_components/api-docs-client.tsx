@@ -77,10 +77,22 @@ const GROUPS: ApiGroup[] = [
     label: "Authentication",
     icon: Lock,
     color: "text-amber-600",
-    bg: "bg-amber-50 dark:bg-amber-950/30",
-    border: "border-amber-200 dark:border-amber-800",
+    bg: "bg-amber-50",
+    border: "border-amber-200",
     description:
       "Flux CRM utilizza l'autenticazione basata su sessione tramite NextAuth v5. Dopo il login, un cookie HttpOnly `authjs.session-token` viene impostato automaticamente e inviato con ogni richiesta successiva. Le Server Actions e gli endpoint API verificano la sessione invocando `auth()` lato server — non sono necessarie API key o token Bearer per l'uso normale. Per i cron job è previsto un secret separato (`CRON_SECRET`) passato come `Authorization: Bearer <secret>`. Per i webhook di terze parti (Stripe, Resend) viene verificata la firma HMAC del payload.",
+    isInfoOnly: true,
+    endpoints: [],
+  },
+  {
+    id: "tenant",
+    label: "Multi-tenancy & Routing",
+    icon: Globe,
+    color: "text-cyan-600",
+    bg: "bg-cyan-50",
+    border: "border-cyan-200",
+    description:
+      "Flux CRM è un'applicazione multi-tenant: ogni organizzazione ha il proprio database isolato. Il tenant viene identificato automaticamente dall'header Host di ogni richiesta HTTP estraendo il sottodominio — non è necessario alcun parametro esplicito nel body o negli header. Formato URL: https://{tenant}.fluxcrm.com/api/... dove {tenant} è lo slug dell'organizzazione. Ambienti supportati: produzione (acme.fluxcrm.com → tenant «acme»), Vercel preview (acme---project-abc.vercel.app → tenant «acme») e sviluppo locale (acme.localhost:3000 → tenant «acme»). Se non è presente alcun sottodominio (dominio radice), viene usato il database della piattaforma. Se il sottodominio non corrisponde a nessun tenant registrato, la richiesta fallisce con HTTP 500 (TENANT_NOT_FOUND). Override per ambienti di test: se la variabile d'ambiente ENABLE_TENANT_OVERRIDE=true è attiva, è possibile forzare il tenant impostando il cookie __tenant_override=<subdomain> — utile su URL Vercel preview dove i sottodomini wildcard non sono disponibili. ownerId nei record CRM: con autenticazione via sessione, l'ID utente della sessione viene automaticamente impostato come ownerId del record creato. Con API key (flusso machine-to-machine), ownerId rimane null — il record viene inserito senza proprietario assegnato.",
     isInfoOnly: true,
     endpoints: [],
   },
@@ -89,8 +101,8 @@ const GROUPS: ApiGroup[] = [
     label: "Contacts",
     icon: Users,
     color: "text-blue-600",
-    bg: "bg-blue-50 dark:bg-blue-950/30",
-    border: "border-blue-200 dark:border-blue-800",
+    bg: "bg-blue-50",
+    border: "border-blue-200",
     description: "Importazione ed esportazione dei dati dei contatti in formato CSV.",
     endpoints: [
       {
@@ -161,8 +173,8 @@ const GROUPS: ApiGroup[] = [
     label: "Companies",
     icon: Building2,
     color: "text-violet-600",
-    bg: "bg-violet-50 dark:bg-violet-950/30",
-    border: "border-violet-200 dark:border-violet-800",
+    bg: "bg-violet-50",
+    border: "border-violet-200",
     description: "Importazione ed esportazione dei dati delle aziende in formato CSV.",
     endpoints: [
       {
@@ -233,8 +245,8 @@ const GROUPS: ApiGroup[] = [
     label: "Leads",
     icon: UserPlus,
     color: "text-green-600",
-    bg: "bg-green-50 dark:bg-green-950/30",
-    border: "border-green-200 dark:border-green-800",
+    bg: "bg-green-50",
+    border: "border-green-200",
     description: "Esportazione dei lead in formato CSV.",
     endpoints: [
       {
@@ -265,8 +277,8 @@ const GROUPS: ApiGroup[] = [
     label: "Documents",
     icon: FileText,
     color: "text-orange-600",
-    bg: "bg-orange-50 dark:bg-orange-950/30",
-    border: "border-orange-200 dark:border-orange-800",
+    bg: "bg-orange-50",
+    border: "border-orange-200",
     description:
       "Gestione degli allegati associati alle entità CRM (contatti, lead, aziende, deal, ticket). I file sono memorizzati fuori dalla cartella pubblica e serviti tramite route autenticata.",
     endpoints: [
@@ -453,8 +465,8 @@ const GROUPS: ApiGroup[] = [
     label: "Search",
     icon: Search,
     color: "text-sky-600",
-    bg: "bg-sky-50 dark:bg-sky-950/30",
-    border: "border-sky-200 dark:border-sky-800",
+    bg: "bg-sky-50",
+    border: "border-sky-200",
     description: "Ricerca globale full-text su tutte le entità CRM.",
     endpoints: [
       {
@@ -525,8 +537,8 @@ const GROUPS: ApiGroup[] = [
     label: "Notifications",
     icon: Bell,
     color: "text-indigo-600",
-    bg: "bg-indigo-50 dark:bg-indigo-950/30",
-    border: "border-indigo-200 dark:border-indigo-800",
+    bg: "bg-indigo-50",
+    border: "border-indigo-200",
     description: "Endpoint di polling per le notifiche dell'utente corrente.",
     endpoints: [
       {
@@ -580,8 +592,8 @@ const GROUPS: ApiGroup[] = [
     label: "Quotes (Public)",
     icon: FileText,
     color: "text-teal-600",
-    bg: "bg-teal-50 dark:bg-teal-950/30",
-    border: "border-teal-200 dark:border-teal-800",
+    bg: "bg-teal-50",
+    border: "border-teal-200",
     description:
       "Endpoint pubblici per la visualizzazione e l'accettazione dei preventivi da parte dei clienti. Nessuna autenticazione richiesta — il token univoco funge da identificatore sicuro.",
     endpoints: [
@@ -708,8 +720,8 @@ const GROUPS: ApiGroup[] = [
     label: "Currency & Geo",
     icon: Globe,
     color: "text-emerald-600",
-    bg: "bg-emerald-50 dark:bg-emerald-950/30",
-    border: "border-emerald-200 dark:border-emerald-800",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
     description:
       "Endpoint di riferimento per tassi di cambio e dati geografici (paesi e città). I tassi di cambio sono cachati nel database per 6 ore.",
     endpoints: [
@@ -876,8 +888,8 @@ const GROUPS: ApiGroup[] = [
     label: "Appointments",
     icon: Clock,
     color: "text-pink-600",
-    bg: "bg-pink-50 dark:bg-pink-950/30",
-    border: "border-pink-200 dark:border-pink-800",
+    bg: "bg-pink-50",
+    border: "border-pink-200",
     description: "Endpoint pubblici per la gestione delle risposte RSVP agli appuntamenti tramite link email.",
     endpoints: [
       {
@@ -927,8 +939,8 @@ const GROUPS: ApiGroup[] = [
     label: "Marketing Tracking",
     icon: Mail,
     color: "text-rose-600",
-    bg: "bg-rose-50 dark:bg-rose-950/30",
-    border: "border-rose-200 dark:border-rose-800",
+    bg: "bg-rose-50",
+    border: "border-rose-200",
     description:
       "Endpoint di tracking per le campagne email: aperture (pixel), click e disiscrizioni. Non richiedono autenticazione — operano su token o ID di log.",
     endpoints: [
@@ -1035,8 +1047,8 @@ const GROUPS: ApiGroup[] = [
     label: "Webhooks",
     icon: Webhook,
     color: "text-purple-600",
-    bg: "bg-purple-50 dark:bg-purple-950/30",
-    border: "border-purple-200 dark:border-purple-800",
+    bg: "bg-purple-50",
+    border: "border-purple-200",
     description:
       "Endpoint per ricevere notifiche da servizi terzi. Ogni webhook verifica la firma/autenticità prima dell'elaborazione. Non richiedono sessione utente.",
     endpoints: [
@@ -1172,8 +1184,8 @@ const GROUPS: ApiGroup[] = [
     label: "Cron Jobs",
     icon: Zap,
     color: "text-yellow-600",
-    bg: "bg-yellow-50 dark:bg-yellow-950/30",
-    border: "border-yellow-200 dark:border-yellow-800",
+    bg: "bg-yellow-50",
+    border: "border-yellow-200",
     description:
       "Endpoint interni eseguiti periodicamente da un job scheduler (es. Vercel Cron). Protetti dall'header `Authorization: Bearer $CRON_SECRET`. Non devono essere invocati manualmente in produzione.",
     endpoints: [
@@ -1325,17 +1337,1059 @@ const GROUPS: ApiGroup[] = [
       },
     ],
   },
+  {
+    id: "crm-import",
+    label: "CRM Import API",
+    icon: Terminal,
+    color: "text-teal-600",
+    bg: "bg-teal-50",
+    border: "border-teal-200",
+    description:
+      "Endpoint REST dedicati all'import programmatico di Lead, Company, Contact e Activity. Tutte le richieste devono essere indirizzate al sottodominio del tenant (es. https://acme.fluxcrm.com/api/crm/leads): il server identifica il database corretto dall'header Host — non è necessario alcun parametro tenant nel body. Supportano sia l'autenticazione via sessione (cookie authjs.session-token) che tramite API key (Authorization: Bearer <IMPORT_API_KEY>). Con sessione, ownerId viene impostato all'ID utente corrente; con API key rimane null. Ogni endpoint dispone di una variante bulk (fino a 500 record per richiesta) con strategia di deduplicazione configurabile (onDuplicate: skip | update | error).",
+    endpoints: [
+      {
+        id: "crm-leads-create",
+        method: "POST",
+        path: "/api/crm/leads",
+        summary: "Crea un lead",
+        description:
+          "Crea un singolo lead con validazione completa. La deduplicazione avviene per email (case-insensitive). Se `onDuplicate` è `skip` (default) e l'email è già presente, restituisce lo status `skipped`. Con `update` aggiorna il record esistente; con `error` risponde con HTTP 409.",
+        auth: "session",
+        parameters: [
+          {
+            name: "Authorization",
+            in: "header",
+            required: false,
+            type: "string",
+            description: "Bearer <IMPORT_API_KEY> — alternativa al cookie di sessione",
+            example: "Bearer sk_import_abc123",
+          },
+          {
+            name: "firstName",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Nome del lead",
+            example: "Anna",
+          },
+          {
+            name: "lastName",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Cognome del lead",
+            example: "Bianchi",
+          },
+          {
+            name: "email",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Indirizzo email — usato per la deduplicazione",
+            example: "anna@startup.io",
+          },
+          {
+            name: "phone",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Telefono fisso",
+            example: "+39 02 1234567",
+          },
+          {
+            name: "mobile",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Cellulare",
+            example: "+39 333 1234567",
+          },
+          {
+            name: "companyName",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Azienda di provenienza",
+            example: "StartupIO Srl",
+          },
+          {
+            name: "jobTitle",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Ruolo professionale",
+            example: "CEO",
+          },
+          { name: "industry", in: "body", required: false, type: "string", description: "Settore", example: "SaaS" },
+          {
+            name: "website",
+            in: "body",
+            required: false,
+            type: "string (URL)",
+            description: "Sito web aziendale",
+            example: "https://startup.io",
+          },
+          {
+            name: "status",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Stato del lead",
+            enum: ["new", "contacting", "engaged", "qualified", "unqualified"],
+            example: "new",
+          },
+          {
+            name: "rating",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Priorità del lead",
+            enum: ["hot", "warm", "cold"],
+            example: "warm",
+          },
+          {
+            name: "source",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Sorgente di acquisizione",
+            example: "linkedin",
+          },
+          {
+            name: "leadScore",
+            in: "body",
+            required: false,
+            type: "integer (0–100)",
+            description: "Score qualitativo",
+            example: "72",
+          },
+          {
+            name: "notes",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Note libere (max 5000 caratteri)",
+            example: "Ha partecipato al webinar Q1 2026",
+          },
+          {
+            name: "marketingConsent",
+            in: "body",
+            required: false,
+            type: "boolean",
+            description: "Consenso marketing ricevuto",
+            example: "true",
+          },
+          {
+            name: "tags",
+            in: "body",
+            required: false,
+            type: "string[]",
+            description: "Tag di classificazione",
+            example: '["inbound","q2-2026"]',
+          },
+          {
+            name: "street",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Via/indirizzo",
+            example: "Via Roma 1",
+          },
+          { name: "city", in: "body", required: false, type: "string", description: "Città", example: "Milano" },
+          {
+            name: "state",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Regione / Provincia",
+            example: "MI",
+          },
+          { name: "zipCode", in: "body", required: false, type: "string", description: "CAP", example: "20121" },
+          { name: "country", in: "body", required: false, type: "string", description: "Paese", example: "Italia" },
+          {
+            name: "onDuplicate",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Strategia deduplicazione",
+            enum: ["skip", "update", "error"],
+            example: "skip",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example:
+            `# Il sottodominio nell'URL identifica il tenant (es. acme → database di Acme)\n# curl -X POST https://acme.fluxcrm.com/api/crm/leads \\\n#   -H "Authorization: Bearer <IMPORT_API_KEY>" \\\n#   -H "Content-Type: application/json" \\\n#   -d @body.json\n\n` +
+            JSON.stringify(
+              {
+                firstName: "Anna",
+                lastName: "Bianchi",
+                email: "anna@startup.io",
+                companyName: "StartupIO Srl",
+                status: "new",
+                rating: "warm",
+                source: "linkedin",
+                leadScore: 72,
+                marketingConsent: true,
+                tags: ["inbound", "q2-2026"],
+                onDuplicate: "skip",
+              },
+              null,
+              2,
+            ),
+        },
+        responses: [
+          {
+            status: 201,
+            description: "Lead creato",
+            example: JSON.stringify(
+              {
+                status: "created",
+                id: "lead_01JX",
+                data: {
+                  id: "lead_01JX",
+                  firstName: "Anna",
+                  lastName: "Bianchi",
+                  email: "anna@startup.io",
+                  status: "new",
+                },
+              },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 200,
+            description: "Lead saltato (duplicato) o aggiornato",
+            example: JSON.stringify({ status: "skipped", reason: "duplicate_email", existingId: "lead_99YZ" }, null, 2),
+          },
+          {
+            status: 409,
+            description: "Conflitto — onDuplicate=error e duplicato trovato",
+            example: JSON.stringify({ error: "Conflict", reason: "duplicate_email", existingId: "lead_99YZ" }, null, 2),
+          },
+          {
+            status: 422,
+            description: "Errore di validazione",
+            example: JSON.stringify(
+              {
+                error: "Validation failed",
+                errors: [{ field: "email", message: "email is not a valid email address" }],
+              },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-leads-bulk",
+        method: "POST",
+        path: "/api/crm/leads/bulk",
+        summary: "Import bulk lead",
+        description:
+          "Importa fino a 500 lead in una singola richiesta. Ogni record viene validato e processato individualmente. La risposta include un riepilogo (`summary`) e il dettaglio per ogni record (`results`) con status `created`, `updated`, `skipped` o `error`.",
+        auth: "session",
+        parameters: [
+          {
+            name: "Authorization",
+            in: "header",
+            required: false,
+            type: "string",
+            description: "Bearer <IMPORT_API_KEY>",
+            example: "Bearer sk_import_abc123",
+          },
+          {
+            name: "records",
+            in: "body",
+            required: true,
+            type: "LeadInput[]",
+            description: "Array di lead (max 500). Stessi campi dell'endpoint singolo.",
+            example: "[{ ... }, { ... }]",
+          },
+          {
+            name: "onDuplicate",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Strategia deduplicazione applicata a tutti i record",
+            enum: ["skip", "update", "error"],
+            example: "skip",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              records: [
+                { firstName: "Anna", lastName: "Bianchi", email: "anna@startup.io", status: "new" },
+                { firstName: "Marco", lastName: "Verdi", email: "marco@corp.com", status: "contacting", rating: "hot" },
+              ],
+              onDuplicate: "skip",
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Elaborazione completata",
+            example: JSON.stringify(
+              {
+                summary: { total: 2, created: 1, updated: 0, skipped: 1, errors: 0, durationMs: 87 },
+                results: [
+                  { index: 0, status: "created", id: "lead_01JX" },
+                  { index: 1, status: "skipped", reason: "duplicate_email", existingId: "lead_99YZ" },
+                ],
+              },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 400,
+            description: "records mancante, vuoto o > 500 elementi",
+            example: JSON.stringify({ error: "Batch size exceeds maximum of 500" }, null, 2),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-companies-create",
+        method: "POST",
+        path: "/api/crm/companies",
+        summary: "Crea un'azienda",
+        description:
+          "Crea una singola azienda con validazione. La deduplicazione avviene per nome (case-insensitive, tramite ILIKE). Supporta `onDuplicate: skip | update | error`.",
+        auth: "session",
+        parameters: [
+          {
+            name: "Authorization",
+            in: "header",
+            required: false,
+            type: "string",
+            description: "Bearer <IMPORT_API_KEY>",
+            example: "Bearer sk_import_abc123",
+          },
+          {
+            name: "name",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Ragione sociale — usata per la deduplicazione",
+            example: "Acme Srl",
+          },
+          {
+            name: "industry",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Settore",
+            example: "Manufacturing",
+          },
+          {
+            name: "website",
+            in: "body",
+            required: false,
+            type: "string (URL)",
+            description: "Sito web",
+            example: "https://acme.it",
+          },
+          {
+            name: "description",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Descrizione (max 2000 caratteri)",
+            example: "Produttore di componenti industriali",
+          },
+          {
+            name: "type",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Tipo azienda",
+            enum: ["prospect", "customer", "partner", "vendor"],
+            example: "prospect",
+          },
+          {
+            name: "employeeCount",
+            in: "body",
+            required: false,
+            type: "integer",
+            description: "Numero dipendenti",
+            example: "250",
+          },
+          {
+            name: "annualRevenue",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Fatturato annuo (stringa numerica)",
+            example: "5000000.00",
+          },
+          {
+            name: "mainPhone",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Telefono principale",
+            example: "+39 02 9876543",
+          },
+          {
+            name: "mainEmail",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Email principale",
+            example: "info@acme.it",
+          },
+          {
+            name: "linkedinUrl",
+            in: "body",
+            required: false,
+            type: "string (URL)",
+            description: "URL profilo LinkedIn",
+            example: "https://linkedin.com/company/acme",
+          },
+          {
+            name: "vatNumber",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Partita IVA",
+            example: "IT02345678901",
+          },
+          {
+            name: "sdiCode",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Codice SDI (fatturazione elettronica)",
+            example: "XXXXXXX",
+          },
+          {
+            name: "source",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Sorgente",
+            example: "trade_show",
+          },
+          {
+            name: "tags",
+            in: "body",
+            required: false,
+            type: "string[]",
+            description: "Tag",
+            example: '["nord-italia","enterprise"]',
+          },
+          {
+            name: "street",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Indirizzo",
+            example: "Via Industria 42",
+          },
+          { name: "city", in: "body", required: false, type: "string", description: "Città", example: "Bergamo" },
+          { name: "country", in: "body", required: false, type: "string", description: "Paese", example: "Italia" },
+          {
+            name: "onDuplicate",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Strategia deduplicazione",
+            enum: ["skip", "update", "error"],
+            example: "skip",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              name: "Acme Srl",
+              industry: "Manufacturing",
+              website: "https://acme.it",
+              type: "prospect",
+              employeeCount: 250,
+              mainEmail: "info@acme.it",
+              vatNumber: "IT02345678901",
+              onDuplicate: "update",
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 201,
+            description: "Azienda creata",
+            example: JSON.stringify(
+              { status: "created", id: "cmp_01JX", data: { id: "cmp_01JX", name: "Acme Srl", type: "prospect" } },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 200,
+            description: "Azienda saltata o aggiornata",
+            example: JSON.stringify(
+              { status: "updated", id: "cmp_99YZ", data: { id: "cmp_99YZ", name: "Acme Srl" } },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 422,
+            description: "Errore di validazione",
+            example: JSON.stringify(
+              { error: "Validation failed", errors: [{ field: "website", message: "website is not a valid URL" }] },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-companies-bulk",
+        method: "POST",
+        path: "/api/crm/companies/bulk",
+        summary: "Import bulk aziende",
+        description: "Importa fino a 500 aziende in una singola richiesta. Deduplicazione per nome (ILIKE).",
+        auth: "session",
+        parameters: [
+          {
+            name: "Authorization",
+            in: "header",
+            required: false,
+            type: "string",
+            description: "Bearer <IMPORT_API_KEY>",
+            example: "Bearer sk_import_abc123",
+          },
+          {
+            name: "records",
+            in: "body",
+            required: true,
+            type: "CompanyInput[]",
+            description: "Array di aziende (max 500)",
+            example: "[{ name: 'Acme', ... }]",
+          },
+          {
+            name: "onDuplicate",
+            in: "body",
+            required: false,
+            type: "string",
+            enum: ["skip", "update", "error"],
+            description: "Strategia deduplicazione",
+            example: "skip",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              records: [
+                { name: "Acme Srl", industry: "Manufacturing", type: "customer", vatNumber: "IT02345678901" },
+                { name: "Beta SpA", industry: "Technology", website: "https://beta.it", employeeCount: 80 },
+              ],
+              onDuplicate: "skip",
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Elaborazione completata",
+            example: JSON.stringify(
+              {
+                summary: { total: 2, created: 2, updated: 0, skipped: 0, errors: 0, durationMs: 112 },
+                results: [
+                  { index: 0, status: "created", id: "cmp_01JX" },
+                  { index: 1, status: "created", id: "cmp_02AB" },
+                ],
+              },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-contacts-create",
+        method: "POST",
+        path: "/api/crm/contacts",
+        summary: "Crea un contatto",
+        description:
+          "Crea un singolo contatto. Deduplicazione per email (case-insensitive). Supporta `onDuplicate`. Se si passa `companyId`, il contatto viene collegato all'azienda corrispondente.",
+        auth: "session",
+        parameters: [
+          {
+            name: "Authorization",
+            in: "header",
+            required: false,
+            type: "string",
+            description: "Bearer <IMPORT_API_KEY>",
+            example: "Bearer sk_import_abc123",
+          },
+          { name: "firstName", in: "body", required: true, type: "string", description: "Nome", example: "Mario" },
+          { name: "lastName", in: "body", required: true, type: "string", description: "Cognome", example: "Rossi" },
+          {
+            name: "email",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Email — usata per la deduplicazione",
+            example: "mario@acme.it",
+          },
+          {
+            name: "phone",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Telefono",
+            example: "+39 02 1234567",
+          },
+          {
+            name: "mobile",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Cellulare",
+            example: "+39 333 9876543",
+          },
+          {
+            name: "jobTitle",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Ruolo",
+            example: "Direttore Acquisti",
+          },
+          {
+            name: "department",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Reparto",
+            example: "Procurement",
+          },
+          {
+            name: "linkedinUrl",
+            in: "body",
+            required: false,
+            type: "string (URL)",
+            description: "Profilo LinkedIn",
+            example: "https://linkedin.com/in/mario-rossi",
+          },
+          {
+            name: "companyId",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "ID dell'azienda collegata (UUID)",
+            example: "cmp_01JX",
+          },
+          {
+            name: "source",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Sorgente",
+            example: "trade_show",
+          },
+          {
+            name: "leadScore",
+            in: "body",
+            required: false,
+            type: "integer (0–100)",
+            description: "Score",
+            example: "85",
+          },
+          {
+            name: "notes",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Note",
+            example: "Decisore finale per acquisti IT",
+          },
+          {
+            name: "marketingConsent",
+            in: "body",
+            required: false,
+            type: "boolean",
+            description: "Consenso marketing",
+            example: "true",
+          },
+          {
+            name: "tags",
+            in: "body",
+            required: false,
+            type: "string[]",
+            description: "Tag",
+            example: '["vip","decision-maker"]',
+          },
+          { name: "street", in: "body", required: false, type: "string", description: "Via", example: "Via Roma 1" },
+          { name: "city", in: "body", required: false, type: "string", description: "Città", example: "Milano" },
+          { name: "country", in: "body", required: false, type: "string", description: "Paese", example: "Italia" },
+          {
+            name: "onDuplicate",
+            in: "body",
+            required: false,
+            type: "string",
+            enum: ["skip", "update", "error"],
+            description: "Strategia deduplicazione",
+            example: "skip",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              firstName: "Mario",
+              lastName: "Rossi",
+              email: "mario@acme.it",
+              jobTitle: "Direttore Acquisti",
+              companyId: "cmp_01JX",
+              source: "trade_show",
+              leadScore: 85,
+              marketingConsent: true,
+              tags: ["vip", "decision-maker"],
+              onDuplicate: "skip",
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 201,
+            description: "Contatto creato",
+            example: JSON.stringify(
+              {
+                status: "created",
+                id: "cnt_01JX",
+                data: { id: "cnt_01JX", firstName: "Mario", lastName: "Rossi", email: "mario@acme.it" },
+              },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 200,
+            description: "Contatto saltato o aggiornato",
+            example: JSON.stringify({ status: "skipped", reason: "duplicate_email", existingId: "cnt_99YZ" }, null, 2),
+          },
+          {
+            status: 422,
+            description: "Errore di validazione",
+            example: JSON.stringify(
+              { error: "Validation failed", errors: [{ field: "firstName", message: "firstName is required" }] },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-contacts-bulk",
+        method: "POST",
+        path: "/api/crm/contacts/bulk",
+        summary: "Import bulk contatti",
+        description: "Importa fino a 500 contatti. Deduplicazione per email.",
+        auth: "session",
+        parameters: [
+          {
+            name: "Authorization",
+            in: "header",
+            required: false,
+            type: "string",
+            description: "Bearer <IMPORT_API_KEY>",
+            example: "Bearer sk_import_abc123",
+          },
+          {
+            name: "records",
+            in: "body",
+            required: true,
+            type: "ContactInput[]",
+            description: "Array di contatti (max 500)",
+            example: "[{ firstName: 'Mario', ... }]",
+          },
+          {
+            name: "onDuplicate",
+            in: "body",
+            required: false,
+            type: "string",
+            enum: ["skip", "update", "error"],
+            description: "Strategia deduplicazione",
+            example: "skip",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              records: [
+                { firstName: "Mario", lastName: "Rossi", email: "mario@acme.it", companyId: "cmp_01JX" },
+                { firstName: "Giulia", lastName: "Ferrari", email: "giulia@beta.it", jobTitle: "CTO" },
+              ],
+              onDuplicate: "skip",
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Elaborazione completata",
+            example: JSON.stringify(
+              {
+                summary: { total: 2, created: 1, updated: 0, skipped: 1, errors: 0, durationMs: 95 },
+                results: [
+                  { index: 0, status: "skipped", reason: "duplicate_email", existingId: "cnt_99YZ" },
+                  { index: 1, status: "created", id: "cnt_02AB" },
+                ],
+              },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-activities-create",
+        method: "POST",
+        path: "/api/crm/activities",
+        summary: "Crea un'attività",
+        description:
+          "Crea una singola attività (nota, chiamata, meeting, email) collegata ad almeno un'entità CRM (lead, contact, company o deal). Le attività non sono deduplicate.",
+        auth: "session",
+        parameters: [
+          {
+            name: "Authorization",
+            in: "header",
+            required: false,
+            type: "string",
+            description: "Bearer <IMPORT_API_KEY>",
+            example: "Bearer sk_import_abc123",
+          },
+          {
+            name: "type",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Tipo di attività",
+            enum: ["note", "call", "meeting", "email"],
+            example: "call",
+          },
+          {
+            name: "content",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Corpo/descrizione dell'attività (max 5000 caratteri)",
+            example: "Chiamata di presentazione prodotto",
+          },
+          {
+            name: "date",
+            in: "body",
+            required: false,
+            type: "string (ISO 8601)",
+            description: "Data/ora dell'attività",
+            example: "2026-05-15T14:30:00.000Z",
+          },
+          {
+            name: "durationMinutes",
+            in: "body",
+            required: false,
+            type: "integer",
+            description: "Durata in minuti (per chiamate e meeting)",
+            example: "45",
+          },
+          {
+            name: "participants",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Partecipanti (nomi o email separati da virgola)",
+            example: "mario@acme.it, giulia@beta.it",
+          },
+          {
+            name: "leadId",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "ID del lead collegato",
+            example: "lead_01JX",
+          },
+          {
+            name: "contactId",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "ID del contatto collegato",
+            example: "cnt_01JX",
+          },
+          {
+            name: "companyId",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "ID dell'azienda collegata",
+            example: "cmp_01JX",
+          },
+          {
+            name: "dealId",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "ID del deal collegato",
+            example: "deal_01JX",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              type: "call",
+              content: "Chiamata di presentazione prodotto — interesse confermato per Q3 2026",
+              date: "2026-05-15T14:30:00.000Z",
+              durationMinutes: 45,
+              participants: "mario@acme.it",
+              contactId: "cnt_01JX",
+              companyId: "cmp_01JX",
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 201,
+            description: "Attività creata",
+            example: JSON.stringify(
+              {
+                status: "created",
+                id: "act_01JX",
+                data: { id: "act_01JX", type: "call", content: "Chiamata di presentazione prodotto" },
+              },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 422,
+            description: "Errore di validazione (es. entità mancante)",
+            example: JSON.stringify(
+              {
+                error: "Validation failed",
+                errors: [
+                  { field: "entity", message: "At least one of leadId, contactId, companyId, or dealId is required" },
+                ],
+              },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-activities-bulk",
+        method: "POST",
+        path: "/api/crm/activities/bulk",
+        summary: "Import bulk attività",
+        description:
+          "Importa fino a 500 attività in una singola richiesta. Le attività non sono soggette a deduplicazione — ogni record valido genera sempre un nuovo record in DB.",
+        auth: "session",
+        parameters: [
+          {
+            name: "Authorization",
+            in: "header",
+            required: false,
+            type: "string",
+            description: "Bearer <IMPORT_API_KEY>",
+            example: "Bearer sk_import_abc123",
+          },
+          {
+            name: "records",
+            in: "body",
+            required: true,
+            type: "ActivityInput[]",
+            description: "Array di attività (max 500). Stessi campi dell'endpoint singolo.",
+            example: "[{ type: 'note', ... }]",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              records: [
+                {
+                  type: "note",
+                  content: "Prima presa di contatto",
+                  contactId: "cnt_01JX",
+                  date: "2026-05-10T09:00:00.000Z",
+                },
+                {
+                  type: "call",
+                  content: "Demo prodotto",
+                  contactId: "cnt_01JX",
+                  durationMinutes: 30,
+                  date: "2026-05-15T14:30:00.000Z",
+                },
+              ],
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Elaborazione completata",
+            example: JSON.stringify(
+              {
+                summary: { total: 2, created: 2, updated: 0, skipped: 0, errors: 0, durationMs: 54 },
+                results: [
+                  { index: 0, status: "created", id: "act_01JX" },
+                  { index: 1, status: "created", id: "act_02AB" },
+                ],
+              },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 400,
+            description: "records mancante o > 500 elementi",
+            example: JSON.stringify({ error: "Batch size exceeds maximum of 500" }, null, 2),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+    ],
+  },
 ];
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
 const METHOD_STYLES: Record<Method, string> = {
-  GET: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800",
-  POST: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border-blue-200 dark:border-blue-800",
-  PUT: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300 border-orange-200 dark:border-orange-800",
-  PATCH:
-    "bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800",
-  DELETE: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300 border-red-200 dark:border-red-800",
+  GET: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  POST: "bg-blue-100 text-blue-800 border-blue-200",
+  PUT: "bg-orange-100 text-orange-800 border-orange-200",
+  PATCH: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  DELETE: "bg-red-100 text-red-800 border-red-200",
 };
 
 function MethodBadge({ method, small = false }: { method: Method; small?: boolean }) {
@@ -1356,22 +2410,22 @@ const AUTH_CONFIG: Record<AuthLevel, { label: string; icon: React.ElementType; c
   public: {
     label: "Pubblico",
     icon: Globe,
-    className: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
+    className: "bg-gray-100 text-gray-700",
   },
   session: {
     label: "Session Required",
     icon: Lock,
-    className: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+    className: "bg-amber-100 text-amber-800",
   },
   admin: {
     label: "Admin / Owner",
     icon: Shield,
-    className: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300",
+    className: "bg-red-100 text-red-700",
   },
   cron: {
     label: "CRON_SECRET / Webhook",
     icon: Zap,
-    className: "bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300",
+    className: "bg-purple-100 text-purple-800",
   },
 };
 
@@ -1391,12 +2445,12 @@ function AuthBadge({ level }: { level: AuthLevel }) {
 function StatusBadge({ status }: { status: number }) {
   const cls =
     status >= 500
-      ? "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300"
+      ? "bg-red-100 text-red-700"
       : status >= 400
-        ? "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300"
+        ? "bg-orange-100 text-orange-700"
         : status >= 300
-          ? "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300"
-          : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300";
+          ? "bg-blue-100 text-blue-700"
+          : "bg-emerald-100 text-emerald-700";
   return <span className={cn("rounded px-2 py-0.5 font-bold font-mono text-xs", cls)}>{status}</span>;
 }
 
@@ -1412,18 +2466,18 @@ function CodeBlock({ code, lang = "json", label }: { code: string; lang?: string
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-zinc-700/50 bg-zinc-950">
-      <div className="flex items-center justify-between border-zinc-700/50 border-b px-4 py-2">
-        <span className="font-mono text-[11px] text-zinc-500">{label ?? lang}</span>
+    <div className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
+      <div className="flex items-center justify-between border-gray-200 border-b bg-white px-4 py-2">
+        <span className="font-mono text-[11px] text-gray-400">{label ?? lang}</span>
         <button
           type="button"
           onClick={copy}
-          className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-zinc-300"
+          className="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
         >
           {copied ? (
             <>
-              <Check className="h-3 w-3 text-emerald-400" />
-              <span className="text-emerald-400">Copiato</span>
+              <Check className="h-3 w-3 text-emerald-600" />
+              <span className="text-emerald-600">Copiato</span>
             </>
           ) : (
             <>
@@ -1433,7 +2487,7 @@ function CodeBlock({ code, lang = "json", label }: { code: string; lang?: string
           )}
         </button>
       </div>
-      <pre className="max-h-80 overflow-auto p-4 text-[12px] text-zinc-300 leading-relaxed">
+      <pre className="max-h-80 overflow-auto p-4 text-[12px] text-gray-700 leading-relaxed">
         <code>{code}</code>
       </pre>
     </div>
@@ -1450,54 +2504,50 @@ function ParamTable({ params }: { params: Param[] }) {
   };
 
   return (
-    <div className="overflow-hidden rounded-lg border">
+    <div className="overflow-hidden rounded-lg border border-gray-200">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b bg-muted/50">
-            <th className="px-3 py-2 text-left font-semibold text-muted-foreground text-xs uppercase tracking-wide">
+          <tr className="border-gray-200 border-b bg-gray-50">
+            <th className="px-3 py-2 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">
               Parametro
             </th>
-            <th className="px-3 py-2 text-left font-semibold text-muted-foreground text-xs uppercase tracking-wide">
-              In
-            </th>
-            <th className="px-3 py-2 text-left font-semibold text-muted-foreground text-xs uppercase tracking-wide">
-              Tipo
-            </th>
-            <th className="px-3 py-2 text-left font-semibold text-muted-foreground text-xs uppercase tracking-wide">
+            <th className="px-3 py-2 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">In</th>
+            <th className="px-3 py-2 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">Tipo</th>
+            <th className="px-3 py-2 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">
               Descrizione
             </th>
           </tr>
         </thead>
-        <tbody className="divide-y">
+        <tbody className="divide-y divide-gray-100">
           {params.map((p) => (
-            <tr key={p.name} className="hover:bg-muted/30">
+            <tr key={p.name} className="hover:bg-gray-50">
               <td className="px-3 py-3">
                 <div className="flex items-center gap-1.5">
-                  <code className="rounded bg-muted px-1.5 py-0.5 font-semibold text-[11px] text-foreground">
+                  <code className="rounded bg-gray-100 px-1.5 py-0.5 font-semibold text-[11px] text-gray-800">
                     {p.name}
                   </code>
                   {p.required && <span className="font-bold text-[9px] text-red-500 uppercase tracking-wide">req</span>}
                 </div>
               </td>
               <td className="px-3 py-3">
-                <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                <span className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[10px] text-gray-500">
                   {locationLabel[p.in]}
                 </span>
               </td>
-              <td className="px-3 py-3 font-mono text-[11px] text-muted-foreground">{p.type}</td>
-              <td className="px-3 py-3 text-muted-foreground text-sm">
+              <td className="px-3 py-3 font-mono text-[11px] text-gray-500">{p.type}</td>
+              <td className="px-3 py-3 text-gray-500 text-sm">
                 <span>{p.description}</span>
                 {p.enum && (
                   <div className="mt-1 flex flex-wrap gap-1">
                     {p.enum.map((v) => (
-                      <code key={v} className="rounded bg-muted px-1 py-0.5 text-[10px] text-foreground">
+                      <code key={v} className="rounded bg-gray-100 px-1 py-0.5 text-[10px] text-gray-700">
                         {v}
                       </code>
                     ))}
                   </div>
                 )}
                 {p.example && (
-                  <div className="mt-1 font-mono text-[10px] text-muted-foreground/70">
+                  <div className="mt-1 font-mono text-[10px] text-gray-400">
                     es: <code>{p.example}</code>
                   </div>
                 )}
@@ -1518,33 +2568,31 @@ function EndpointSection({
   sectionRef: (el: HTMLElement | null) => void;
 }) {
   return (
-    <div id={endpoint.id} ref={sectionRef} className="scroll-mt-4 rounded-xl border bg-card shadow-sm">
+    <div id={endpoint.id} ref={sectionRef} className="scroll-mt-4 rounded-xl border border-gray-200 bg-white shadow-sm">
       {/* Endpoint header */}
-      <div className="flex flex-wrap items-start gap-3 border-b p-5">
+      <div className="flex flex-wrap items-start gap-3 border-gray-200 border-b p-5">
         <MethodBadge method={endpoint.method} />
-        <code className="flex-1 break-all font-mono font-semibold text-foreground text-sm">{endpoint.path}</code>
+        <code className="flex-1 break-all font-mono font-semibold text-gray-900 text-sm">{endpoint.path}</code>
         <AuthBadge level={endpoint.auth} />
       </div>
 
       {/* Body */}
       <div className="p-5">
-        <p className="mb-5 text-muted-foreground text-sm leading-relaxed">{endpoint.description}</p>
+        <p className="mb-5 text-gray-500 text-sm leading-relaxed">{endpoint.description}</p>
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Left: params + request body */}
           <div className="space-y-5">
             {endpoint.parameters && endpoint.parameters.length > 0 && (
               <div>
-                <h4 className="mb-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Parametri</h4>
+                <h4 className="mb-2 font-semibold text-gray-400 text-xs uppercase tracking-wide">Parametri</h4>
                 <ParamTable params={endpoint.parameters} />
               </div>
             )}
 
             {endpoint.requestBody && (
               <div>
-                <h4 className="mb-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
-                  Request Body
-                </h4>
+                <h4 className="mb-2 font-semibold text-gray-400 text-xs uppercase tracking-wide">Request Body</h4>
                 <CodeBlock
                   code={endpoint.requestBody.example}
                   lang={endpoint.requestBody.contentType}
@@ -1556,12 +2604,12 @@ function EndpointSection({
 
           {/* Right: responses */}
           <div className="space-y-4">
-            <h4 className="font-semibold text-muted-foreground text-xs uppercase tracking-wide">Risposte</h4>
+            <h4 className="font-semibold text-gray-400 text-xs uppercase tracking-wide">Risposte</h4>
             {endpoint.responses.map((r) => (
               <div key={`${r.status}-${r.description}`}>
                 <div className="mb-1.5 flex items-center gap-2">
                   <StatusBadge status={r.status} />
-                  <span className="text-muted-foreground text-xs">{r.description}</span>
+                  <span className="text-gray-500 text-xs">{r.description}</span>
                 </div>
                 <CodeBlock code={r.example} label={`${r.status} Response`} />
               </div>
@@ -1587,19 +2635,13 @@ function GroupSection({
   return (
     <section id={group.id} ref={groupRef} className="scroll-mt-4 space-y-4">
       {/* Group header */}
-      <div className={cn("flex items-start gap-4 rounded-xl border p-5", group.bg, group.border)}>
-        <div
-          className={cn(
-            "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
-            group.bg,
-            group.border,
-          )}
-        >
+      <div className="flex items-start gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-gray-50">
           <Icon className={cn("h-5 w-5", group.color)} />
         </div>
         <div>
-          <h2 className="font-bold text-lg">{group.label}</h2>
-          <p className="mt-1 text-muted-foreground text-sm leading-relaxed">{group.description}</p>
+          <h2 className="font-bold text-gray-900 text-lg">{group.label}</h2>
+          <p className="mt-1 text-gray-500 text-sm leading-relaxed">{group.description}</p>
         </div>
       </div>
 
@@ -1655,7 +2697,7 @@ function ErrorCodesSection() {
       status: 500,
       name: "Internal Server Error",
       description:
-        "Errore imprevisto lato server. I webhook restituiscono 500 per segnalare a Stripe di ritentare l'invio. Controlla i log dell'applicazione.",
+        "Errore imprevisto lato server. Cause comuni: sottodominio non associato a nessun tenant (TENANT_NOT_FOUND — verifica che l'URL contenga il sottodominio corretto), oppure errore DB/runtime. I webhook restituiscono 500 per segnalare a Stripe di ritentare l'invio. Controlla i log dell'applicazione.",
     },
     {
       status: 503,
@@ -1665,16 +2707,16 @@ function ErrorCodesSection() {
   ];
 
   return (
-    <div className="rounded-xl border bg-card shadow-sm">
-      <div className="flex items-center gap-3 border-b p-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30">
+    <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex items-center gap-3 border-gray-200 border-b p-5">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-200 bg-red-50">
           <AlertCircle className="h-5 w-5 text-red-600" />
         </div>
         <div>
           <h2 className="font-bold text-lg">Codici di Errore</h2>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-gray-500 text-sm">
             Tutti gli errori restituiscono un body JSON con il campo{" "}
-            <code className="rounded bg-muted px-1 text-xs">error</code>: stringa descrittiva.
+            <code className="rounded bg-gray-100 px-1 text-xs">error</code>: stringa descrittiva.
           </p>
         </div>
       </div>
@@ -1687,29 +2729,29 @@ function ErrorCodesSection() {
           />
         </div>
 
-        <div className="overflow-hidden rounded-lg border">
+        <div className="overflow-hidden rounded-lg border border-gray-200">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground text-xs uppercase tracking-wide">
+              <tr className="border-gray-200 border-b bg-gray-50">
+                <th className="px-4 py-3 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">
                   Codice
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground text-xs uppercase tracking-wide">
+                <th className="px-4 py-3 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">
                   Nome
                 </th>
-                <th className="px-4 py-3 text-left font-semibold text-muted-foreground text-xs uppercase tracking-wide">
+                <th className="px-4 py-3 text-left font-semibold text-gray-400 text-xs uppercase tracking-wide">
                   Causa tipica
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y divide-gray-100">
               {errors.map((e) => (
-                <tr key={e.status} className="hover:bg-muted/30">
+                <tr key={e.status} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <StatusBadge status={e.status} />
                   </td>
-                  <td className="px-4 py-3 font-medium">{e.name}</td>
-                  <td className="px-4 py-3 text-muted-foreground">{e.description}</td>
+                  <td className="px-4 py-3 font-medium text-gray-800">{e.name}</td>
+                  <td className="px-4 py-3 text-gray-500">{e.description}</td>
                 </tr>
               ))}
             </tbody>
@@ -1723,7 +2765,7 @@ function ErrorCodesSection() {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export function ApiDocsClient() {
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(["authentication", "contacts"]));
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(["authentication", "tenant", "contacts"]));
   const [activeId, setActiveId] = useState<string>("authentication");
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 
@@ -1750,16 +2792,14 @@ export function ApiDocsClient() {
       <aside className="hidden w-60 shrink-0 xl:block">
         <div className="sticky top-4 space-y-3">
           {/* API badge */}
-          <div className="rounded-lg border border-zinc-700 bg-zinc-900 p-3 text-white">
+          <div className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm">
             <div className="flex items-center gap-2">
-              <Code2 className="h-4 w-4 text-emerald-400" />
-              <span className="font-bold font-mono text-xs text-zinc-100">API Reference</span>
-              <Badge className="ml-auto h-4 bg-emerald-500/20 px-1.5 text-[10px] text-emerald-400 hover:bg-emerald-500/20">
-                v1
-              </Badge>
+              <Code2 className="h-4 w-4 text-gray-700" />
+              <span className="font-bold font-mono text-gray-900 text-xs">API Reference</span>
+              <Badge className="ml-auto h-4 bg-blue-100 px-1.5 text-[10px] text-blue-700 hover:bg-blue-100">v1</Badge>
             </div>
-            <p className="mt-2 font-mono text-[10px] text-zinc-500">Base URL</p>
-            <p className="mt-0.5 break-all font-mono text-[11px] text-emerald-400">/api</p>
+            <p className="mt-2 font-mono text-[10px] text-gray-400">Base URL</p>
+            <p className="mt-0.5 break-all font-mono text-[11px] text-blue-600">{"{tenant}"}.domain.com/api</p>
           </div>
 
           {/* Nav */}
@@ -1780,15 +2820,15 @@ export function ApiDocsClient() {
                     className={cn(
                       "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left font-medium text-xs transition-colors",
                       activeId === group.id
-                        ? "bg-zinc-900 text-white"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
                     )}
                   >
                     <Icon className={cn("h-3.5 w-3.5 shrink-0", group.color)} />
                     <span className="flex-1 truncate">{group.label}</span>
                     {count > 0 && (
                       <>
-                        <span className="rounded bg-muted px-1 py-0.5 font-bold text-[9px] text-muted-foreground">
+                        <span className="rounded bg-gray-100 px-1 py-0.5 font-bold text-[9px] text-gray-500">
                           {count}
                         </span>
                         {isExpanded ? (
@@ -1801,7 +2841,7 @@ export function ApiDocsClient() {
                   </button>
 
                   {isExpanded && count > 0 && (
-                    <div className="mt-0.5 ml-5 space-y-0.5 border-border border-l pl-3">
+                    <div className="mt-0.5 ml-5 space-y-0.5 border-gray-200 border-l pl-3">
                       {group.endpoints.map((ep) => (
                         <button
                           key={ep.id}
@@ -1810,8 +2850,8 @@ export function ApiDocsClient() {
                           className={cn(
                             "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors",
                             activeId === ep.id
-                              ? "bg-muted text-foreground"
-                              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                              ? "bg-blue-50 text-blue-700"
+                              : "text-gray-500 hover:bg-gray-100 hover:text-gray-800",
                           )}
                         >
                           <MethodBadge method={ep.method} small />
@@ -1830,8 +2870,8 @@ export function ApiDocsClient() {
               className={cn(
                 "flex w-full items-center gap-2 rounded-md px-3 py-2 text-left font-medium text-xs transition-colors",
                 activeId === "error-codes"
-                  ? "bg-zinc-900 text-white"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  ? "bg-blue-50 text-blue-700"
+                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
               )}
             >
               <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
@@ -1844,38 +2884,32 @@ export function ApiDocsClient() {
       {/* ── Main Content ───────────────────────────────────────────────────── */}
       <div className="min-w-0 flex-1 space-y-8 pb-20">
         {/* Hero header */}
-        <div className="overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900 p-6 text-white">
+        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gray-900">
               <Terminal className="h-6 w-6 text-emerald-400" />
             </div>
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="font-bold text-2xl tracking-tight">Flux CRM API Reference</h1>
-                <Badge className="bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20">v1.0</Badge>
+                <h1 className="font-bold text-2xl text-gray-900 tracking-tight">Flux CRM API Reference</h1>
+                <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100">v1.0</Badge>
               </div>
-              <p className="mt-1 text-sm text-zinc-400">
+              <p className="mt-1 text-gray-500 text-sm">
                 Documentazione completa degli endpoint HTTP. Base URL:{" "}
-                <code className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-emerald-400">/api</code>
+                <code className="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-blue-600">
+                  {"https://{tenant}.domain.com/api"}
+                </code>
               </p>
 
               <div className="mt-4 flex flex-wrap gap-4">
                 {[
-                  {
-                    dot: "bg-amber-400",
-                    text: "Session-based auth (NextAuth v5)",
-                  },
+                  { dot: "bg-cyan-400", text: "Multi-tenant: database isolato per sottodominio (Host header)" },
+                  { dot: "bg-amber-400", text: "Session-based auth (NextAuth v5) o API key Bearer" },
                   { dot: "bg-blue-400", text: "Risposte JSON (salvo CSV / HTML / GIF)" },
-                  {
-                    dot: "bg-purple-400",
-                    text: "Webhook firmati (Stripe HMAC, Resend)",
-                  },
-                  {
-                    dot: "bg-yellow-400",
-                    text: "Cron protetti da Authorization: Bearer $CRON_SECRET",
-                  },
+                  { dot: "bg-purple-400", text: "Webhook firmati (Stripe HMAC, Resend)" },
+                  { dot: "bg-yellow-400", text: "Cron protetti da Authorization: Bearer $CRON_SECRET" },
                 ].map(({ dot, text }) => (
-                  <span key={text} className="flex items-center gap-1.5 text-xs text-zinc-400">
+                  <span key={text} className="flex items-center gap-1.5 text-gray-500 text-xs">
                     <span className={cn("h-1.5 w-1.5 rounded-full", dot)} />
                     {text}
                   </span>
@@ -1911,15 +2945,16 @@ export function ApiDocsClient() {
         </section>
 
         {/* Footer note */}
-        <div className="rounded-xl border bg-muted/30 p-5">
+        <div className="rounded-xl border border-blue-100 bg-blue-50 p-5">
           <div className="flex items-start gap-3">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-            <div className="text-muted-foreground text-sm">
-              <span className="font-medium text-foreground">Nota:</span> Le mutazioni di dati CRM (creazione,
+            <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-400" />
+            <div className="text-gray-600 text-sm">
+              <span className="font-medium text-gray-900">Nota:</span> Le mutazioni di dati CRM (creazione,
               aggiornamento, eliminazione di contatti, deal, ticket, ecc.) avvengono tramite{" "}
-              <span className="font-medium text-foreground">Next.js Server Actions</span>, non tramite endpoint REST. Le
-              Server Actions sono definite in <code className="rounded bg-muted px-1 text-xs">src/actions/</code> e
-              invocabili solo dall'app stessa (non espongono URL pubblici).
+              <span className="font-medium text-gray-900">Next.js Server Actions</span>, non tramite endpoint REST. Le
+              Server Actions sono definite in{" "}
+              <code className="rounded bg-white px-1 text-blue-700 text-xs">src/actions/</code> e invocabili solo
+              dall'app stessa (non espongono URL pubblici).
             </div>
           </div>
         </div>

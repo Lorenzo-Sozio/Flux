@@ -183,7 +183,8 @@
       "Bash(node -e \"const fs=require\\('fs'\\); const it=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/it.json','utf8'\\)\\); console.log\\(JSON.stringify\\(it.companies, null, 2\\)\\)\")",
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(p.dependencies['next-intl']\\)\")",
       "Bash(node -e \"const fs=require\\('fs'\\); const en=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\)\\); console.log\\(JSON.stringify\\(Object.keys\\(en\\)\\)\\)\")",
-      "Bash(node -e \"const fs=require\\('fs'\\); const en=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\)\\); const it=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/it.json','utf8'\\)\\); console.log\\('has filterBuilder:', 'filterBuilder' in en, 'filterBuilder' in it\\)\")"
+      "Bash(node -e \"const fs=require\\('fs'\\); const en=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/en.json','utf8'\\)\\); const it=JSON.parse\\(fs.readFileSync\\('c:/React/Flux/messages/it.json','utf8'\\)\\); console.log\\('has filterBuilder:', 'filterBuilder' in en, 'filterBuilder' in it\\)\")",
+      "Bash(node -e \"const p = require\\('./package.json'\\); console.log\\('next:', p.dependencies.next, 'react:', p.dependencies.react\\)\")"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { Building2, Code2, CreditCard, HelpCircle, Settings2 } from "lucide-react";
+import { Building2, Code2, CreditCard, HelpCircle, Settings2, Users } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -25,6 +25,12 @@ const NAV_ITEMS = [
     href: "/admin/plans",
     icon: Settings2,
     match: (p: string) => p.startsWith("/admin/plans"),
+  },
+  {
+    label: "Utenti",
+    href: "/admin/users",
+    icon: Users,
+    match: (p: string) => p.startsWith("/admin/users"),
   },
   {
     label: "API Docs",
