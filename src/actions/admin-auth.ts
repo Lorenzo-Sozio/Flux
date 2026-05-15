@@ -80,7 +80,7 @@ export async function adminLogin(_prev: ActionResult, formData: FormData): Promi
   const [user] = await platformDb
     .select({ password: users.password })
     .from(users)
-    .where(eq(users.id, session.user.id));
+    .where(eq(users.id, session.user.id!));
 
   if (!user) return { error: "Utente non trovato." };
 
