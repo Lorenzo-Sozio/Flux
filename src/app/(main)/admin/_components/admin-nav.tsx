@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
+import { Building2, Code2, CreditCard, HelpCircle, Settings2 } from "lucide-react";
+
 import { cn } from "@/lib/utils";
-import { Building2, CreditCard, HelpCircle, Settings2 } from "lucide-react";
 
 const NAV_ITEMS = [
   {
@@ -25,6 +27,12 @@ const NAV_ITEMS = [
     match: (p: string) => p.startsWith("/admin/plans"),
   },
   {
+    label: "API Docs",
+    href: "/admin/api-docs",
+    icon: Code2,
+    match: (p: string) => p.startsWith("/admin/api-docs"),
+  },
+  {
     label: "Help",
     href: "/admin/help",
     icon: HelpCircle,
@@ -44,10 +52,8 @@ export function AdminNav() {
             key={href}
             href={href}
             className={cn(
-              "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
-              active
-                ? "bg-gray-900 text-white"
-                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
+              "flex items-center gap-2 rounded-md px-4 py-2 font-medium text-sm transition-colors",
+              active ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100 hover:text-gray-900",
             )}
           >
             <Icon className="h-4 w-4" />

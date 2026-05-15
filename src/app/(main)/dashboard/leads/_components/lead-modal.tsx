@@ -114,6 +114,9 @@ export function LeadModal({
   const isEditing = !!lead;
   const searchParams = useSearchParams();
 
+  useEffect(() => { setLocalCategories(categories); }, [categories]);
+  useEffect(() => { setLocalTypes(companyTypes); }, [companyTypes]);
+
   useEffect(() => {
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
   }, [isEditing, searchParams]);
