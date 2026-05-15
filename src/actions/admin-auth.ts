@@ -69,7 +69,7 @@ export async function adminLogin(_prev: ActionResult, formData: FormData): Promi
       .delete(passwordResetTokens)
       .where(eq(passwordResetTokens.identifier, identifier));
 
-    await setAdminSession(session.user.id);
+    await setAdminSession(session.user.id!);
     redirect("/admin/tenants");
   }
 
@@ -94,7 +94,7 @@ export async function adminLogin(_prev: ActionResult, formData: FormData): Promi
   const isValid = await bcrypt.compare(password, user.password);
   if (!isValid) return { error: "Password non corretta." };
 
-  await setAdminSession(session.user.id);
+  await setAdminSession(session.user.id!);
   redirect("/admin/tenants");
 }
 
