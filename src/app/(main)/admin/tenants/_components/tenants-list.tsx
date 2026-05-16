@@ -1,24 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+
 import Link from "next/link";
-import { deleteTenant, migrateAllTenants, migrateTenantDb } from "@/actions/tenants";
-import { adminSetTenantPlan, adminSyncTenantSubscription } from "@/actions/admin-billing";
-import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  AlertCircle,
-  Trash2,
-  Copy,
-  CheckCircle2,
-  DatabaseZap,
-  Users,
-  Pencil,
-  Loader2,
-  RefreshCw,
-} from "lucide-react";
+import { useRouter } from "next/navigation";
+
 import { format } from "date-fns";
+import { AlertCircle, CheckCircle2, DatabaseZap, Loader2, Pencil, RefreshCw, Trash2, Users } from "lucide-react";
+
+import { adminSetTenantPlan, adminSyncTenantSubscription } from "@/actions/admin-billing";
+import { deleteTenant, migrateAllTenants, migrateTenantDb } from "@/actions/tenants";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -29,20 +21,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface Tenant {
   id: string;
@@ -65,12 +46,12 @@ interface Plan {
 }
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
-  active:    { label: "Active",    className: "bg-green-100 text-green-700" },
-  trialing:  { label: "Trial",     className: "bg-blue-100 text-blue-700" },
-  past_due:  { label: "Past due",  className: "bg-orange-100 text-orange-700" },
+  active: { label: "Active", className: "bg-green-100 text-green-700" },
+  trialing: { label: "Trial", className: "bg-blue-100 text-blue-700" },
+  past_due: { label: "Past due", className: "bg-orange-100 text-orange-700" },
   suspended: { label: "Suspended", className: "bg-red-100 text-red-700" },
-  canceled:  { label: "Canceled",  className: "bg-gray-100 text-gray-500" },
-  free:      { label: "Free",      className: "bg-gray-100 text-gray-600" },
+  canceled: { label: "Canceled", className: "bg-gray-100 text-gray-500" },
+  free: { label: "Free", className: "bg-gray-100 text-gray-600" },
 };
 
 export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan[] }) {
@@ -86,7 +67,6 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
   >(null);
   const [migrateSuccess, setMigrateSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState<string | null>(null);
 
   // ── Plan dialog ─────────────────────────────────────────────────────────────
   const [planDialogTenant, setPlanDialogTenant] = useState<Tenant | null>(null);
@@ -112,8 +92,7 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
 
   const openPlanDialog = (tenant: Tenant) => {
     // Pre-select the current plan; fall back to the "free" plan entry if planId is null
-    const currentId =
-      tenant.planId ?? activePlans.find((p) => p.name === "free")?.id ?? "";
+    const currentId = tenant.planId ?? activePlans.find((p) => p.name === "free")?.id ?? "";
     setPlanDialogTenant(tenant);
     setPendingPlanId(currentId);
     setPlanError(null);
@@ -185,18 +164,6 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
     }
   };
 
-  // ── Copy URL ────────────────────────────────────────────────────────────────
-  const handleCopyUrl = (subdomain: string) => {
-    const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "localhost:3000";
-    const url =
-      process.env.NODE_ENV === "development"
-        ? `http://${subdomain}.localhost:3000`
-        : `https://${subdomain}.${rootDomain}`;
-    navigator.clipboard.writeText(url);
-    setCopied(subdomain);
-    setTimeout(() => setCopied(null), 2000);
-  };
-
   if (tenants.length === 0) {
     return (
       <Alert>
@@ -209,7 +176,12 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
   return (
     <>
       {/* ── Plan-change dialog ─────────────────────────────────────────────── */}
-      <Dialog open={!!planDialogTenant} onOpenChange={(open) => { if (!open) closePlanDialog(); }}>
+      <Dialog
+        open={!!planDialogTenant}
+        onOpenChange={(open) => {
+          if (!open) closePlanDialog();
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Change Plan</DialogTitle>
@@ -223,15 +195,17 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
               </div>
 
               <div className="space-y-1.5">
-                <p className="text-xs font-medium text-gray-700">Current plan</p>
+                <p className="font-medium text-gray-700 text-xs">Current plan</p>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-gray-900">
+                  <span className="font-semibold text-gray-900 text-sm">
                     {planDialogTenant.planDisplayName ?? "Free"}
                   </span>
                   {planDialogTenant.subscriptionStatus && (
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      (STATUS_BADGE[planDialogTenant.subscriptionStatus] ?? STATUS_BADGE.free).className
-                    }`}>
+                    <span
+                      className={`rounded-full px-2 py-0.5 font-medium text-[10px] ${
+                        (STATUS_BADGE[planDialogTenant.subscriptionStatus] ?? STATUS_BADGE.free).className
+                      }`}
+                    >
                       {(STATUS_BADGE[planDialogTenant.subscriptionStatus] ?? STATUS_BADGE.free).label}
                     </span>
                   )}
@@ -239,15 +213,11 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-gray-700">
+                <label htmlFor="plan-select" className="font-medium text-gray-700 text-xs">
                   New plan
                 </label>
-                <Select
-                  value={pendingPlanId}
-                  onValueChange={setPendingPlanId}
-                  disabled={savingPlan}
-                >
-                  <SelectTrigger>
+                <Select value={pendingPlanId} onValueChange={setPendingPlanId} disabled={savingPlan}>
+                  <SelectTrigger id="plan-select">
                     <SelectValue placeholder="Select a plan…" />
                   </SelectTrigger>
                   <SelectContent>
@@ -260,11 +230,7 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
                 </Select>
               </div>
 
-              {planError && (
-                <p className="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
-                  {planError}
-                </p>
-              )}
+              {planError && <p className="rounded-md bg-red-50 px-3 py-2 text-red-700 text-xs">{planError}</p>}
             </div>
           )}
 
@@ -274,7 +240,11 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
             </Button>
             <Button
               onClick={handleSavePlan}
-              disabled={savingPlan || !pendingPlanId || pendingPlanId === (planDialogTenant?.planId ?? activePlans.find((p) => p.name === "free")?.id ?? "")}
+              disabled={
+                savingPlan ||
+                !pendingPlanId ||
+                pendingPlanId === (planDialogTenant?.planId ?? activePlans.find((p) => p.name === "free")?.id ?? "")
+              }
             >
               {savingPlan && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save
@@ -294,25 +264,23 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
 
         <div className="flex justify-end">
           <Button variant="outline" size="sm" onClick={handleMigrateAll} disabled={migratingAll}>
-            <DatabaseZap className="h-4 w-4 mr-1" />
+            <DatabaseZap className="mr-1 h-4 w-4" />
             {migratingAll ? "Migrating all…" : "Migrate All DBs"}
           </Button>
         </div>
 
         {migrateAllResults && (
-          <div className="rounded-lg border p-3 text-sm space-y-1">
-            <p className="font-semibold text-gray-700 mb-2">Migration results:</p>
+          <div className="space-y-1 rounded-lg border p-3 text-sm">
+            <p className="mb-2 font-semibold text-gray-700">Migration results:</p>
             {migrateAllResults.map((r) => (
               <div key={r.subdomain} className="flex items-center gap-2">
                 {r.success ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600 shrink-0" />
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-600" />
                 ) : (
-                  <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500" />
                 )}
-                <code className="text-xs text-gray-700">{r.subdomain}</code>
-                {!r.success && r.error && (
-                  <span className="text-xs text-red-600 truncate">{r.error}</span>
-                )}
+                <code className="text-gray-700 text-xs">{r.subdomain}</code>
+                {!r.success && r.error && <span className="truncate text-red-600 text-xs">{r.error}</span>}
               </div>
             ))}
           </div>
@@ -320,7 +288,7 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50">
+            <thead className="border-gray-200 border-b bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Tenant</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Subdomain</th>
@@ -332,27 +300,22 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
             <tbody>
               {tenants.map((tenant) => {
                 const settings = tenant.settings ? JSON.parse(tenant.settings) : {};
-                const statusMeta =
-                  STATUS_BADGE[tenant.subscriptionStatus ?? "free"] ?? STATUS_BADGE.free;
+                const statusMeta = STATUS_BADGE[tenant.subscriptionStatus ?? "free"] ?? STATUS_BADGE.free;
 
                 return (
-                  <tr key={tenant.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={tenant.id} className="border-gray-100 border-b hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        {settings.emoji && (
-                          <span className="text-lg">{settings.emoji}</span>
-                        )}
+                        {settings.emoji && <span className="text-lg">{settings.emoji}</span>}
                         <div>
                           <div className="font-medium text-gray-900">{tenant.name}</div>
-                          <div className="text-xs text-gray-400">
-                            {tenant.id.slice(0, 8)}…
-                          </div>
+                          <div className="text-gray-400 text-xs">{tenant.id.slice(0, 8)}…</div>
                         </div>
                       </div>
                     </td>
 
                     <td className="px-4 py-3">
-                      <code className="rounded bg-gray-100 px-2 py-1 font-mono text-xs text-gray-700">
+                      <code className="rounded bg-gray-100 px-2 py-1 font-mono text-gray-700 text-xs">
                         {tenant.subdomain}
                       </code>
                     </td>
@@ -360,10 +323,12 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div>
-                          <span className="block text-xs font-semibold text-gray-800">
+                          <span className="block font-semibold text-gray-800 text-xs">
                             {tenant.planDisplayName ?? "Free"}
                           </span>
-                          <span className={`mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[10px] font-medium ${statusMeta.className}`}>
+                          <span
+                            className={`mt-0.5 inline-block rounded-full px-1.5 py-0.5 font-medium text-[10px] ${statusMeta.className}`}
+                          >
                             {statusMeta.label}
                           </span>
                         </div>
@@ -390,7 +355,7 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
                       </div>
                     </td>
 
-                    <td className="px-4 py-3 text-xs text-gray-500">
+                    <td className="px-4 py-3 text-gray-500 text-xs">
                       {format(new Date(tenant.createdAt), "MMM d, yyyy")}
                     </td>
 
@@ -423,25 +388,6 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
                             </>
                           )}
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleCopyUrl(tenant.subdomain)}
-                          title="Copy tenant URL"
-                        >
-                          {copied === tenant.subdomain ? (
-                            <>
-                              <CheckCircle2 className="h-4 w-4" />
-                              <span className="ml-1 text-xs">Copied!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Copy className="h-4 w-4" />
-                              <span className="ml-1 text-xs">Copy URL</span>
-                            </>
-                          )}
-                        </Button>
-
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
                             <Button variant="destructive" size="sm">
@@ -456,7 +402,7 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
                                 <p>
                                   This will remove <strong>{tenant.name}</strong> from the registry.
                                 </p>
-                                <p className="text-xs text-orange-700 bg-orange-50 p-2 rounded">
+                                <p className="rounded bg-orange-50 p-2 text-orange-700 text-xs">
                                   ⚠️ The database will NOT be deleted. You must manually delete{" "}
                                   <code>flux_tenant_{tenant.subdomain}</code> from PostgreSQL.
                                 </p>
@@ -482,8 +428,8 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
           </table>
         </div>
 
-        <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-          <p className="font-semibold mb-1">📋 Important Notes:</p>
+        <div className="rounded-lg bg-amber-50 p-3 text-amber-800 text-sm">
+          <p className="mb-1 font-semibold">📋 Important Notes:</p>
           <ul className="list-inside list-disc space-y-1 text-xs">
             <li>Database URLs are encrypted but never shown in the UI</li>
             <li>Deleting a tenant only removes it from the registry</li>
