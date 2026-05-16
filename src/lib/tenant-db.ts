@@ -15,7 +15,7 @@ function getKey(): Buffer {
   const raw = process.env.PLATFORM_ENCRYPTION_KEY?.trim().replace(/^["']|["']$/g, "");
   if (!raw || raw.length !== 64 || !/^[0-9a-f]{64}$/i.test(raw)) {
     throw new Error(
-      "PLATFORM_ENCRYPTION_KEY must be set to a 64-char hex string (32 bytes)",
+      `PLATFORM_ENCRYPTION_KEY invalid: got ${raw === undefined ? "undefined" : `"${raw.slice(0, 4)}…" (length ${raw.length})`}`,
     );
   }
   return Buffer.from(raw, "hex");
