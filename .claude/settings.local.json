@@ -198,7 +198,8 @@
       "Bash(node -e \"const p = require\\('./node_modules/next-auth/package.json'\\); console.log\\(p.version\\); console.log\\(Object.keys\\(p.exports || {}\\).filter\\(k => k.includes\\('jwt'\\)\\)\\)\")",
       "Bash(node -e \"const p = require\\('./node_modules/next-auth/package.json'\\); console.log\\(JSON.stringify\\(p.exports['./jwt'], null, 2\\)\\)\")",
       "Bash(node -e \"process.stdin.pipe\\(require\\('stream'\\).Transform\\({transform\\(c,_,cb\\){process.stdout.write\\(c\\);cb\\(\\)}}\\)\\)\")",
-      "Bash(node -e \"const p = require\\('./node_modules/next-auth/package.json'\\); console.log\\(p.typesVersions\\)\")"
+      "Bash(node -e \"const p = require\\('./node_modules/next-auth/package.json'\\); console.log\\(p.typesVersions\\)\")",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",
