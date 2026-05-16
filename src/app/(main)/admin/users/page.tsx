@@ -33,7 +33,7 @@ export default async function PlatformUsersPage() {
         proprio profilo.
       </div>
 
-      <PlatformUsersClient users={users} currentUserId={adminSession?.userId} />
+      <PlatformUsersClient users={users} currentUserId={adminSession?.userId ?? ""} />
     </div>
   );
 }

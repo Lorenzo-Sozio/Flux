@@ -27,7 +27,7 @@ declare module "next-auth" {
   }
 }
 
-declare module "next-auth/jwt" {
+declare module "@auth/core/jwt" {
   interface JWT {
     id?: string;
     role?: string;
@@ -115,8 +115,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (session.user) {
         session.user.id = token.id as string;
         (session.user as any).role = token.role;
-        session.user.activeTenantId = token.activeTenantId ?? null;
-        session.user.tenantRole = token.tenantRole ?? null;
+        session.user.activeTenantId = (token.activeTenantId as string) ?? null;
+        session.user.tenantRole = (token.tenantRole as string) ?? null;
       }
       return session;
     },

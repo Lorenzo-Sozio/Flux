@@ -89,20 +89,20 @@ export default async function AdminBillingPage() {
         </TabsList>
 
         <TabsContent value="all" className="mt-4">
-          <SubscriptionsTable subscriptions={subscriptions} currentUserId={adminSession?.userId} />
+          <SubscriptionsTable subscriptions={subscriptions} currentUserId={adminSession?.userId ?? ""} />
         </TabsContent>
 
         <TabsContent value="active" className="mt-4">
           <SubscriptionsTable
             subscriptions={subscriptions.filter((s) => ["active", "trialing"].includes(s.subscription.status))}
-            currentUserId={adminSession?.userId}
+            currentUserId={adminSession?.userId ?? ""}
           />
         </TabsContent>
 
         <TabsContent value="issues" className="mt-4">
           <SubscriptionsTable
             subscriptions={subscriptions.filter((s) => ["past_due", "suspended"].includes(s.subscription.status))}
-            currentUserId={adminSession?.userId}
+            currentUserId={adminSession?.userId ?? ""}
           />
         </TabsContent>
       </Tabs>

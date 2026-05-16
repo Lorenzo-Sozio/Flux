@@ -39,8 +39,8 @@ export const authConfig = {
       if (session.user) {
         session.user.id = token.id as string;
         (session.user as { role?: string }).role = token.role as string;
-        session.user.activeTenantId = token.activeTenantId ?? null;
-        session.user.tenantRole = token.tenantRole ?? null;
+        session.user.activeTenantId = (token.activeTenantId as string) ?? null;
+        session.user.tenantRole = (token.tenantRole as string) ?? null;
       }
       return session;
     },
