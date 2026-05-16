@@ -1,41 +1,18 @@
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
-import { platformDb } from "@/db";
-import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { getAdminSession } from "@/lib/admin-session";
+import type { Metadata } from "next";
+
 import { AdminLoginForm } from "./_components/admin-login-form";
 
-export const metadata = { title: "Flux CRM — Pannello Admin" };
+export const metadata: Metadata = { title: "Flux CRM — Pannello Admin" };
 
-export default async function AdminLoginPage() {
-  const session = await auth();
-
-  if (!session?.user) redirect("/login");
-
-  const role = (session.user as { role?: string }).role;
-  if (role !== "admin" && role !== "owner") redirect("/unauthorized");
-
-  const adminSession = await getAdminSession();
-  if (adminSession?.userId === session.user.id) redirect("/admin/tenants");
-
-  // Determine if the user has a password set (needed to choose the auth flow)
-  const [user] = await platformDb
-    .select({ password: users.password })
-    .from(users)
-    .where(eq(users.id, session.user.id as string));
-
-  const hasPassword = !!user?.password;
-  const displayName = session.user.name ?? session.user.email ?? "Amministratore";
-
+export default function AdminLoginPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-50 to-zinc-100 dark:from-zinc-950 dark:to-zinc-900 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-zinc-50 to-zinc-100 p-4 dark:from-zinc-950 dark:to-zinc-900">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          {/* Flux Logo */}
-          <div className="inline-flex items-center justify-center w-16 h-16 mb-6 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-lg">
+          <div className="mb-6 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg">
             <svg
-              className="w-8 h-8 text-white"
+              aria-hidden="true"
+              className="h-8 w-8 text-white"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -51,15 +28,15 @@ export default async function AdminLoginPage() {
             </svg>
           </div>
 
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-400 dark:to-blue-500 bg-clip-text text-transparent">
+          <h1 className="bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text font-bold text-3xl text-transparent dark:from-blue-400 dark:to-blue-500">
             Flux CRM
           </h1>
-          <p className="text-zinc-600 dark:text-zinc-400 mt-3 text-sm">
+          <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400">
             Verifica la tua identità per accedere al pannello admin
           </p>
         </div>
 
-        <AdminLoginForm displayName={displayName} hasPassword={hasPassword} />
+        <AdminLoginForm />
       </div>
     </div>
   );

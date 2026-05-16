@@ -1,19 +1,12 @@
 "use server";
 
-import { auth } from "@/auth";
-import { platformDb } from "@/db";
-import { users, accounts } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-async function requirePlatformAdmin() {
-  const session = await auth();
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  if (role !== "admin" && role !== "owner") {
-    throw new Error("Accesso non autorizzato al pannello admin.");
-  }
-  return session!;
-}
+import { eq } from "drizzle-orm";
+
+import { platformDb } from "@/db";
+import { accounts, users } from "@/db/schema";
+import { requireAdminPanelAccess } from "@/lib/auth-guard";
 
 export type PlatformUser = {
   id: string;
@@ -26,7 +19,7 @@ export type PlatformUser = {
 };
 
 export async function listPlatformUsers(): Promise<PlatformUser[]> {
-  await requirePlatformAdmin();
+  await requireAdminPanelAccess();
 
   const rows = await platformDb
     .select({
@@ -60,7 +53,7 @@ export async function listPlatformUsers(): Promise<PlatformUser[]> {
 }
 
 export async function updatePlatformUserRole(userId: string, newRole: string): Promise<void> {
-  const session = await requirePlatformAdmin();
+  const session = await requireAdminPanelAccess();
 
   const validRoles = ["user", "admin", "owner"];
   if (!validRoles.includes(newRole)) {
@@ -70,16 +63,10 @@ export async function updatePlatformUserRole(userId: string, newRole: string): P
   // Prevent demoting a user that would leave the platform with zero owners.
   // Applies both to self-demotion and demoting another user.
   if (newRole !== "owner") {
-    const [target] = await platformDb
-      .select({ role: users.role })
-      .from(users)
-      .where(eq(users.id, userId));
+    const [target] = await platformDb.select({ role: users.role }).from(users).where(eq(users.id, userId));
 
     if (target?.role === "owner") {
-      const allOwners = await platformDb
-        .select({ id: users.id })
-        .from(users)
-        .where(eq(users.role, "owner"));
+      const allOwners = await platformDb.select({ id: users.id }).from(users).where(eq(users.role, "owner"));
 
       if (allOwners.length === 1) {
         const isSelf = userId === session.user.id;
@@ -92,10 +79,7 @@ export async function updatePlatformUserRole(userId: string, newRole: string): P
     }
   }
 
-  await platformDb
-    .update(users)
-    .set({ role: newRole })
-    .where(eq(users.id, userId));
+  await platformDb.update(users).set({ role: newRole }).where(eq(users.id, userId));
 
   revalidatePath("/admin/users");
 }

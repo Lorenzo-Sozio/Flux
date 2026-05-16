@@ -1,15 +1,16 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
-import { signIn } from "next-auth/react";
+import { useState } from "react";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { signIn } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-
-import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -46,10 +47,9 @@ export function LoginForm() {
         return;
       }
 
-      // On a tenant subdomain → CRM dashboard. On main domain → admin panel.
-      const rootHost = process.env.NEXT_PUBLIC_ROOT_DOMAIN?.split(":")[0] ?? "localhost";
-      const isSubdomain = window.location.hostname !== rootHost && window.location.hostname !== "localhost";
-      router.push(isSubdomain ? "/dashboard/crm" : "/admin/tenants");
+      // Redirect to tenant selection; middleware handles further routing
+      // (auto-redirects to /dashboard/crm if the JWT already has an activeTenantId).
+      router.push("/select-tenant");
       router.refresh();
     } catch {
       toast.error(t("error"));
@@ -86,11 +86,7 @@ export function LoginForm() {
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
               <div className="flex items-center justify-between">
                 <FieldLabel htmlFor="login-password">{t("password")}</FieldLabel>
-                <Link
-                  href="/auth/v1/forgot-password"
-                  className="text-xs text-primary hover:underline"
-                  prefetch={false}
-                >
+                <Link href="/auth/v1/forgot-password" className="text-primary text-xs hover:underline" prefetch={false}>
                   {t("forgotPassword")}
                 </Link>
               </div>

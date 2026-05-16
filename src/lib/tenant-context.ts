@@ -6,54 +6,46 @@
  *   const db = await getDb();
  *   const contacts = await db.query.contacts.findMany(...);
  *
- * On the main domain (no subdomain) returns platformDb so existing actions
- * keep working during the Block 2 migration.
+ * Tenant resolution: reads the x-tenant-id header injected by the middleware
+ * after verifying the user's JWT. The client can never forge this header.
  */
 import { cache } from "react";
-import { headers, cookies } from "next/headers";
-import { platformDb, createTenantDb } from "@/db";
-import { getTenantBySubdomain } from "./get-tenant";
-import { decryptDbUrl } from "./tenant-db";
-import { extractSubdomainFromHost } from "./subdomain";
 
-export { extractSubdomainFromHost };
+import { headers } from "next/headers";
+
+import { createTenantDb, platformDb } from "@/db";
+
+import { getTenantById } from "./get-tenant";
+import { decryptDbUrl } from "./tenant-db";
 
 export const getDb = cache(async () => {
-  let host = "";
+  let tenantId: string | null = null;
 
   try {
-    // Try to get headers from request context
     const h = await headers();
-    host = h.get("host") ?? "";
-  } catch (err) {
+    tenantId = h.get("x-tenant-id") ?? null;
+  } catch {
     // Outside request context (e.g., instrumentation, cron jobs)
-    // Fall back to platformDb
     console.warn(
       "[getDb] Called outside request context, using platformDb. " +
-      "(This is normal during server startup or background jobs.)"
+        "(This is normal during server startup or background jobs.)",
     );
     return platformDb;
   }
 
-  let subdomain = extractSubdomainFromHost(host);
-
-  // Test-mode cookie override: allows accessing tenant CRM on Vercel preview URLs
-  // where wildcard subdomains aren't available. Enable via ENABLE_TENANT_OVERRIDE=true.
-  if (!subdomain && process.env.ENABLE_TENANT_OVERRIDE === "true") {
-    try {
-      const cookieStore = await cookies();
-      const override = cookieStore.get("__tenant_override")?.value;
-      if (override) subdomain = override;
-    } catch {
-      // cookie access outside request context — ignore
-    }
+  if (!tenantId) {
+    // FAIL LOUD: every route that calls getDb() must have a tenant context injected
+    // by middleware. Silently falling back to platformDb would route tenant-scoped
+    // queries to the wrong database without any indication to the caller.
+    throw new Error(
+      "[getDb] No x-tenant-id header in request. " +
+        "All dashboard routes require a tenant context — check middleware configuration.",
+    );
   }
 
-  if (!subdomain) return platformDb;
-
-  const tenant = await getTenantBySubdomain(subdomain);
+  const tenant = await getTenantById(tenantId);
   if (!tenant) {
-    const err = new Error(`Tenant not found: ${subdomain}`);
+    const err = new Error(`Tenant not found: ${tenantId}`);
     (err as NodeJS.ErrnoException).code = "TENANT_NOT_FOUND";
     throw err;
   }
@@ -62,23 +54,13 @@ export const getDb = cache(async () => {
 });
 
 /**
- * Returns the current subdomain (if any) derived from request headers.
- * Useful for server actions that need to know which tenant they're serving.
- * 
- * Returns null if called outside request context (e.g., during server startup).
+ * Returns the active tenantId from the x-tenant-id header injected by middleware.
+ * Returns null when called outside a tenant request (e.g., admin panel, cron jobs).
  */
-export const getCurrentSubdomain = cache(async (): Promise<string | null> => {
+export const getCurrentTenantId = cache(async (): Promise<string | null> => {
   try {
     const h = await headers();
-    const sub = extractSubdomainFromHost(h.get("host") ?? "");
-    if (sub) return sub;
-
-    if (process.env.ENABLE_TENANT_OVERRIDE === "true") {
-      const cookieStore = await cookies();
-      return cookieStore.get("__tenant_override")?.value ?? null;
-    }
-
-    return null;
+    return h.get("x-tenant-id") ?? null;
   } catch {
     return null;
   }

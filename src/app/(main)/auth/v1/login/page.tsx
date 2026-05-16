@@ -12,7 +12,7 @@ export default async function LoginV1() {
       <div className="hidden bg-primary lg:block lg:w-1/3">
         <div className="flex h-full flex-col items-center justify-center p-12 text-center">
           <div className="space-y-6">
-            <Command className="mx-auto size-12 text-primary-foreground" />
+            <Command className="mx-auto size-12 text-primary-foreground" suppressHydrationWarning />
             <div className="space-y-2">
               <h1 className="font-light text-5xl text-primary-foreground">{t("title")}</h1>
               <p className="text-primary-foreground/80 text-xl">{t("subtitle")}</p>

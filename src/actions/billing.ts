@@ -7,7 +7,7 @@
 
 import { redirect } from "next/navigation";
 
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { platformDb } from "@/db";
@@ -19,15 +19,14 @@ import {
   contacts,
   deals,
   tenantMembers,
-  tenants,
 } from "@/db/schema";
 import { getEntitlements, invalidateEntitlementCache, logEntitlementChange } from "@/lib/billing/licensing";
 import type { AddonType, BillingCycle } from "@/lib/billing/plans-config";
 import { ADDON_CONFIGS } from "@/lib/billing/plans-config";
 import { getStripe } from "@/lib/billing/stripe";
 import { getAllUsage } from "@/lib/billing/usage";
-import { getTenantBySubdomain } from "@/lib/get-tenant";
-import { getCurrentSubdomain, getDb } from "@/lib/tenant-context";
+import { getTenantById } from "@/lib/get-tenant";
+import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 
 // ─── Auth helper ──────────────────────────────────────────────────────────────
 
@@ -35,10 +34,10 @@ async function requireBillingAdmin() {
   const session = await auth();
   if (!session?.user?.id) redirect("/auth/v1/login");
 
-  const subdomain = await getCurrentSubdomain();
-  if (!subdomain) throw new Error("No tenant context");
+  const tenantId = await getCurrentTenantId();
+  if (!tenantId) throw new Error("No tenant context");
 
-  const tenant = await getTenantBySubdomain(subdomain);
+  const tenant = await getTenantById(tenantId);
   if (!tenant) throw new Error("Tenant not found");
 
   // Only owner or admin can manage billing
@@ -175,7 +174,8 @@ export async function createCheckoutSession(
     metadata: { tenantId: tenant.id, planId: plan.id },
   });
 
-  return { url: session.url! };
+  if (!session.url) throw new Error("Stripe did not return a checkout URL");
+  return { url: session.url };
 }
 
 /** Creates a Stripe Billing Portal session for self-service subscription management. */

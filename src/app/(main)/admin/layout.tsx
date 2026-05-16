@@ -1,37 +1,29 @@
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { adminLogout } from "@/actions/admin-auth";
-import { getAdminSession } from "@/lib/admin-session";
-import { AdminNav } from "./_components/admin-nav";
+import { redirect } from "next/navigation";
+
 import { LogOut } from "lucide-react";
 
-function isAdminRole(role: string | undefined): boolean {
-  return role === "admin" || role === "owner";
-}
+import { adminLogout } from "@/actions/admin-auth";
+import { getAdminSession } from "@/lib/admin-session";
+
+import { AdminNav } from "./_components/admin-nav";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const headersList = await headers();
   const pathname = headersList.get("x-pathname") ?? "";
   const isLoginPage = pathname === "/admin/login";
 
-  const session = await auth();
-  const role = (session?.user as { role?: string } | undefined)?.role;
+  const adminSession = await getAdminSession();
+  const isAuthenticated = adminSession?.role === "admin" || adminSession?.role === "owner";
 
-  if (!session?.user) redirect("/login");
-  if (!isAdminRole(role)) redirect("/unauthorized");
-
-  // /admin/login: only needs NextAuth session + role (no admin cookie yet).
-  // Render without admin chrome so the page controls its own full-screen layout.
+  // Login page: redirect away if already authenticated; otherwise render without chrome
   if (isLoginPage) {
-    const adminSession = await getAdminSession();
-    if (adminSession?.userId === session.user.id) redirect("/admin/tenants");
+    if (isAuthenticated) redirect("/admin/tenants");
     return <>{children}</>;
   }
 
-  // All other /admin/* routes: require a valid admin session cookie
-  const adminSession = await getAdminSession();
-  if (!adminSession || adminSession.userId !== session.user.id) {
+  // All other /admin/* routes require a valid admin session
+  if (!isAuthenticated) {
     redirect("/admin/login");
   }
 
@@ -40,15 +32,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="mb-6 flex items-start justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Administration</h1>
-            <p className="mt-1 text-sm text-gray-600">
-              Manage platform settings and tenants
-            </p>
+            <h1 className="font-bold text-3xl text-gray-900">Administration</h1>
+            <p className="mt-1 text-gray-600 text-sm">Manage platform settings and tenants</p>
           </div>
           <form action={adminLogout}>
             <button
               type="submit"
-              className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 shadow-sm hover:bg-gray-50 hover:text-gray-900 transition-colors"
+              className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 font-medium text-gray-600 text-xs shadow-sm transition-colors hover:bg-gray-50 hover:text-gray-900"
             >
               <LogOut className="h-3.5 w-3.5" />
               Esci dal pannello

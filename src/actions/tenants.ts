@@ -1,15 +1,17 @@
 "use server";
 
-import { requireAdminAccess } from "@/lib/auth-guard";
-import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
-import { platformDb, createTenantDb, invalidateTenantDbCache } from "@/db";
-import { tenants, tenantMembers, users, billingSubscriptions, billingPlans } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { encryptDbUrl, decryptDbUrl } from "@/lib/tenant-db";
-import { invalidateTenantCache } from "@/lib/get-tenant";
+
+import { neon } from "@neondatabase/serverless";
+import { and, eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/neon-http";
+
 import { auth } from "@/auth";
+import { createTenantDb, invalidateTenantDbCache, platformDb } from "@/db";
+import { billingPlans, billingSubscriptions, tenantMembers, tenants, users } from "@/db/schema";
+import { requireAdminPanelAccess } from "@/lib/auth-guard";
+import { invalidateTenantCache } from "@/lib/get-tenant";
+import { decryptDbUrl, encryptDbUrl } from "@/lib/tenant-db";
 
 /**
  * Validates subdomain format: lowercase, alphanumeric + hyphens, 3-63 chars
@@ -27,11 +29,28 @@ function validateSettings(settings: unknown): boolean {
   if (!settings) return true;
   if (typeof settings !== "object") return false;
   const s = settings as Record<string, unknown>;
-  return Object.keys(s).every((key) =>
-    ["emoji", "primaryColor", "theme", "logo"].includes(key) &&
-    typeof s[key] === "string"
-  ) &&
-    (s.emoji === undefined || (typeof s.emoji === "string" && s.emoji.length <= 10));
+  return (
+    Object.keys(s).every(
+      (key) => ["emoji", "primaryColor", "theme", "logo"].includes(key) && typeof s[key] === "string",
+    ) &&
+    (s.emoji === undefined || (typeof s.emoji === "string" && s.emoji.length <= 10))
+  );
+}
+
+/**
+ * Validates that a DB URL targets a Neon endpoint specifically.
+ * Prevents SSRF: without this check an admin could supply an internal-network
+ * hostname (e.g., 169.254.169.254) and cause the app to probe cloud metadata.
+ */
+function validateNeonDbUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return (
+      (parsed.protocol === "postgresql:" || parsed.protocol === "postgres:") && parsed.hostname.endsWith(".neon.tech")
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -41,13 +60,11 @@ function validateName(name: string): boolean {
   return name.trim().length > 0 && name.length <= 255;
 }
 
-
 /**
  * List all tenants (admin only, main domain only)
  */
 export async function listTenants() {
-  await requireAdminAccess();
-
+  await requireAdminPanelAccess();
 
   const result = await platformDb
     .select({
@@ -74,8 +91,7 @@ export async function listTenants() {
  * Get a single tenant by subdomain (admin only, main domain only)
  */
 export async function getTenant(subdomain: string) {
-  await requireAdminAccess();
-
+  await requireAdminPanelAccess();
 
   if (!validateSubdomain(subdomain)) {
     throw new Error("Invalid subdomain format.");
@@ -102,21 +118,15 @@ export async function getTenant(subdomain: string) {
 
 /**
  * Create a new tenant
- * 
+ *
  * Security considerations:
  * - Validates all inputs
  * - Checks subdomain uniqueness
  * - Requires admin access + main domain
  * - Doesn't expose DB credentials in response
  */
-export async function createTenant(
-  name: string,
-  subdomain: string,
-  dbUrl: string,
-  settings?: unknown
-) {
-  await requireAdminAccess();
-
+export async function createTenant(name: string, subdomain: string, dbUrl: string, settings?: unknown) {
+  await requireAdminPanelAccess();
 
   // Validate inputs
   if (!validateName(name)) {
@@ -124,9 +134,7 @@ export async function createTenant(
   }
 
   if (!validateSubdomain(subdomain)) {
-    throw new Error(
-      "Invalid subdomain. Must be 3-63 characters, lowercase alphanumeric with hyphens."
-    );
+    throw new Error("Invalid subdomain. Must be 3-63 characters, lowercase alphanumeric with hyphens.");
   }
 
   if (!validateSettings(settings)) {
@@ -134,23 +142,14 @@ export async function createTenant(
   }
 
   // Check subdomain uniqueness
-  const [existing] = await platformDb
-    .select()
-    .from(tenants)
-    .where(eq(tenants.subdomain, subdomain));
+  const [existing] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
 
   if (existing) {
-    throw new Error(
-      `Subdomain '${subdomain}' is already taken. Choose a different one.`
-    );
+    throw new Error(`Subdomain '${subdomain}' is already taken. Choose a different one.`);
   }
 
-  // Validate dbUrl is a valid connection string (basic check)
-  if (
-    !dbUrl.startsWith("postgresql://") &&
-    !dbUrl.startsWith("postgres://")
-  ) {
-    throw new Error("Invalid database URL. Must be a PostgreSQL connection string.");
+  if (!validateNeonDbUrl(dbUrl)) {
+    throw new Error("Invalid database URL. Must be a Neon PostgreSQL connection string (*.neon.tech).");
   }
 
   const id = crypto.randomUUID();
@@ -190,7 +189,7 @@ export async function createTenant(
 
 /**
  * Update tenant
- * 
+ *
  * Currently allows updating name and settings only (not subdomain or dbUrl)
  */
 export async function updateTenant(
@@ -198,10 +197,9 @@ export async function updateTenant(
   updates: {
     name?: string;
     settings?: unknown;
-  }
+  },
 ) {
-  await requireAdminAccess();
-
+  await requireAdminPanelAccess();
 
   if (!validateSubdomain(subdomain)) {
     throw new Error("Invalid subdomain format.");
@@ -217,10 +215,7 @@ export async function updateTenant(
   }
 
   // Verify tenant exists
-  const [existing] = await platformDb
-    .select()
-    .from(tenants)
-    .where(eq(tenants.subdomain, subdomain));
+  const [existing] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
 
   if (!existing) {
     throw new Error("Tenant not found.");
@@ -239,10 +234,7 @@ export async function updateTenant(
     updateData.settings = updates.settings ? JSON.stringify(updates.settings) : null;
   }
 
-  await platformDb
-    .update(tenants)
-    .set(updateData)
-    .where(eq(tenants.subdomain, subdomain));
+  await platformDb.update(tenants).set(updateData).where(eq(tenants.subdomain, subdomain));
 
   invalidateTenantCache(subdomain);
   revalidatePath("/admin/tenants");
@@ -252,7 +244,7 @@ export async function updateTenant(
 
 /**
  * Delete a tenant
- * 
+ *
  * Security considerations:
  * - Requires admin access + main domain
  * - Requires confirmation (implemented in UI)
@@ -261,8 +253,7 @@ export async function updateTenant(
  *   This is intentional to prevent accidental data loss
  */
 export async function deleteTenant(subdomain: string) {
-  await requireAdminAccess();
-
+  await requireAdminPanelAccess();
 
   if (!validateSubdomain(subdomain)) {
     throw new Error("Invalid subdomain format.");
@@ -274,10 +265,7 @@ export async function deleteTenant(subdomain: string) {
   }
 
   // Verify tenant exists before deletion
-  const [existing] = await platformDb
-    .select()
-    .from(tenants)
-    .where(eq(tenants.subdomain, subdomain));
+  const [existing] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
 
   if (!existing) {
     throw new Error("Tenant not found.");
@@ -298,17 +286,13 @@ export async function deleteTenant(subdomain: string) {
  * Safe to run multiple times — Drizzle tracks applied migrations in __drizzle_migrations.
  */
 export async function migrateTenantDb(subdomain: string) {
-  await requireAdminAccess();
-
+  await requireAdminPanelAccess();
 
   if (!validateSubdomain(subdomain)) {
     throw new Error("Invalid subdomain format.");
   }
 
-  const [tenant] = await platformDb
-    .select()
-    .from(tenants)
-    .where(eq(tenants.subdomain, subdomain));
+  const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
 
   if (!tenant) {
     throw new Error("Tenant not found.");
@@ -343,8 +327,7 @@ export async function migrateTenantDb(subdomain: string) {
  * Returns a per-tenant result array so callers can surface partial failures.
  */
 export async function migrateAllTenants() {
-  await requireAdminAccess();
-
+  await requireAdminPanelAccess();
 
   const allTenants = await platformDb
     .select({ id: tenants.id, subdomain: tenants.subdomain, dbUrl: tenants.dbUrl })
@@ -386,13 +369,9 @@ export async function migrateAllTenants() {
 
 /** Returns all members of a tenant with their user details. */
 export async function listTenantMembers(subdomain: string) {
-  await requireAdminAccess();
+  await requireAdminPanelAccess();
 
-
-  const [tenant] = await platformDb
-    .select()
-    .from(tenants)
-    .where(eq(tenants.subdomain, subdomain));
+  const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
   if (!tenant) throw new Error("Tenant not found.");
 
   return platformDb
@@ -414,30 +393,19 @@ export async function listTenantMembers(subdomain: string) {
  * Adds a platform user (looked up by email) as a tenant member.
  * Also upserts the user record into the tenant DB so FK constraints work.
  */
-export async function addTenantMember(
-  subdomain: string,
-  email: string,
-  role: string,
-) {
-  await requireAdminAccess();
-
+export async function addTenantMember(subdomain: string, email: string, role: string) {
+  await requireAdminPanelAccess();
 
   if (!validateSubdomain(subdomain)) throw new Error("Invalid subdomain.");
 
   const validRoles = ["owner", "admin", "editor", "viewer"];
   if (!validRoles.includes(role)) throw new Error("Invalid role.");
 
-  const [tenant] = await platformDb
-    .select()
-    .from(tenants)
-    .where(eq(tenants.subdomain, subdomain));
+  const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
   if (!tenant) throw new Error("Tenant not found.");
 
   // Resolve user by email in platform DB
-  const [user] = await platformDb
-    .select()
-    .from(users)
-    .where(eq(users.email, email.toLowerCase().trim()));
+  const [user] = await platformDb.select().from(users).where(eq(users.email, email.toLowerCase().trim()));
   if (!user) throw new Error(`No account found for "${email}". The user must register first.`);
 
   // Insert membership (unique constraint prevents duplicates)
@@ -465,14 +433,11 @@ export async function addTenantMember(
 
 /** Removes a member from a tenant (cannot remove the last owner). */
 export async function removeTenantMember(subdomain: string, userId: string) {
-  await requireAdminAccess();
+  await requireAdminPanelAccess();
   if (!validateSubdomain(subdomain)) throw new Error("Invalid subdomain.");
   if (!validateUserId(userId)) throw new Error("Invalid user ID format.");
 
-  const [tenant] = await platformDb
-    .select()
-    .from(tenants)
-    .where(eq(tenants.subdomain, subdomain));
+  const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
   if (!tenant) throw new Error("Tenant not found.");
 
   // Prevent removing the last owner
@@ -485,31 +450,22 @@ export async function removeTenantMember(subdomain: string, userId: string) {
 
   await platformDb
     .delete(tenantMembers)
-    .where(
-      and(eq(tenantMembers.tenantId, tenant.id), eq(tenantMembers.userId, userId)),
-    );
+    .where(and(eq(tenantMembers.tenantId, tenant.id), eq(tenantMembers.userId, userId)));
 
   revalidatePath("/admin/tenants");
   return { success: true };
 }
 
 /** Updates the role of an existing member. */
-export async function updateTenantMemberRole(
-  subdomain: string,
-  userId: string,
-  role: string,
-) {
-  await requireAdminAccess();
+export async function updateTenantMemberRole(subdomain: string, userId: string, role: string) {
+  await requireAdminPanelAccess();
   if (!validateSubdomain(subdomain)) throw new Error("Invalid subdomain.");
   if (!validateUserId(userId)) throw new Error("Invalid user ID format.");
 
   const validRoles = ["owner", "admin", "editor", "viewer"];
   if (!validRoles.includes(role)) throw new Error("Invalid role.");
 
-  const [tenant] = await platformDb
-    .select()
-    .from(tenants)
-    .where(eq(tenants.subdomain, subdomain));
+  const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
   if (!tenant) throw new Error("Tenant not found.");
 
   // Prevent demoting the last owner
@@ -526,9 +482,7 @@ export async function updateTenantMemberRole(
   await platformDb
     .update(tenantMembers)
     .set({ role })
-    .where(
-      and(eq(tenantMembers.tenantId, tenant.id), eq(tenantMembers.userId, userId)),
-    );
+    .where(and(eq(tenantMembers.tenantId, tenant.id), eq(tenantMembers.userId, userId)));
 
   // Keep tenant DB user role in sync
   const tenantDb = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));

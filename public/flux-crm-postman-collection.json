@@ -1,0 +1,1404 @@
+{
+  "info": {
+    "_postman_id": "8694a943-7f99-432c-99b2-9f24a0efa9e6",
+    "name": "Flux CRM API v1.0.0",
+    "description": "REST API reference for Flux CRM. Multi-tenant: each request must be directed to the correct subdomain (e.g. `https://acme.fluxcrm.com/api/...`). The server resolves the tenant from the `Host` header automatically — no explicit tenant parameter needed. Session-based endpoints accept either the `authjs.session-token` cookie (browser) or a Bearer `IMPORT_API_KEY` header (machine-to-machine). Cron endpoints require `Authorization: Bearer $CRON_SECRET`. Public endpoints need no authentication.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "flux-crm-api"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{apiKey}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "id": "baseUrl",
+      "key": "baseUrl",
+      "value": "https://{tenant}.fluxcrm.com",
+      "type": "string",
+      "description": "Base URL — replace with your tenant subdomain (e.g. https://acme.fluxcrm.com)"
+    },
+    {
+      "id": "apiKey",
+      "key": "apiKey",
+      "value": "",
+      "type": "string",
+      "description": "Bearer token for session/import endpoints (IMPORT_API_KEY or leave empty and use cookies)"
+    },
+    {
+      "id": "cronSecret",
+      "key": "cronSecret",
+      "value": "",
+      "type": "string",
+      "description": "CRON_SECRET environment variable — required only for cron job endpoints"
+    }
+  ],
+  "item": [
+    {
+      "name": "Contacts",
+      "description": "Contact import/export endpoints",
+      "item": [
+        {
+          "name": "Export contacts as CSV",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/contacts/export",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "contacts",
+                "export"
+              ]
+            },
+            "description": "Returns all contacts visible to the authenticated user as a CSV attachment. Admins and Owners see all contacts; Editors and Viewers see only their own."
+          }
+        },
+        {
+          "name": "Import contacts from CSV",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/contacts/import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "contacts",
+                "import"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "value": "",
+                  "description": "CSV file — `email` column required",
+                  "type": "file"
+                }
+              ]
+            },
+            "description": "Accepts a CSV file via `multipart/form-data` and imports contacts in bulk. Duplicates detected by email are skipped. Returns a summary of imported, skipped and errored rows."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Companies",
+      "description": "Company import/export endpoints",
+      "item": [
+        {
+          "name": "Export companies as CSV",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/export",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                "export"
+              ]
+            },
+            "description": "Returns all companies in the organisation as a CSV attachment."
+          }
+        },
+        {
+          "name": "Import companies from CSV",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/companies/import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "companies",
+                "import"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "value": "",
+                  "description": "",
+                  "type": "file"
+                }
+              ]
+            },
+            "description": "Accepts a CSV file and imports companies in bulk. Duplicates are detected by company name."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Leads",
+      "description": "Lead export endpoints",
+      "item": [
+        {
+          "name": "Export leads as CSV",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/leads/export",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "leads",
+                "export"
+              ]
+            },
+            "description": "Returns all leads visible to the authenticated user as a CSV attachment."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "description": "Document upload and management",
+      "item": [
+        {
+          "name": "List documents for an entity",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents?entityType=contact&entityId=cnt_01JX4K",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "documents"
+              ],
+              "query": [
+                {
+                  "key": "entityType",
+                  "value": "contact",
+                  "description": "CRM entity type"
+                },
+                {
+                  "key": "entityId",
+                  "value": "cnt_01JX4K",
+                  "description": "Entity ID"
+                }
+              ]
+            },
+            "description": "Returns documents attached to a specific CRM entity, ordered by creation date."
+          }
+        },
+        {
+          "name": "Delete a document",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents?id=doc_02",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "documents"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "doc_02",
+                  "description": "Document ID"
+                }
+              ]
+            },
+            "description": "Deletes a document by ID. Only the document owner can delete it. The file is also removed from disk."
+          }
+        },
+        {
+          "name": "Upload a document",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "documents",
+                "upload"
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "value": "",
+                  "description": "File to upload (max 10 MB)",
+                  "type": "file"
+                },
+                {
+                  "key": "entityType",
+                  "value": "",
+                  "description": "CRM entity type",
+                  "type": "text"
+                },
+                {
+                  "key": "entityId",
+                  "value": "",
+                  "description": "Entity ID to attach the file to",
+                  "type": "text"
+                }
+              ]
+            },
+            "description": "Uploads a file and associates it with a CRM entity. Max 10 MB. Allowed types: PDF, JPEG, PNG, GIF, WebP, DOC/DOCX, XLS/XLSX, PPT/PPTX, TXT, CSV."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "description": "Global full-text search",
+      "item": [
+        {
+          "name": "Global search",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/search?q=Mario Rossi",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Mario Rossi",
+                  "description": "Search term (min 2 chars)"
+                }
+              ]
+            },
+            "description": "Case-insensitive search across contacts, leads, companies, deals, tickets, quotes and orders. Returns up to 5 results per type. Query must be at least 2 characters."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "description": "User notification polling",
+      "item": [
+        {
+          "name": "List user notifications",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications"
+              ]
+            },
+            "description": "Returns the last 50 notifications for the authenticated user, ordered newest first. Used by the NotificationCenter with 60-second polling."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Quotes",
+      "description": "Public quote viewer and acceptance",
+      "item": [
+        {
+          "name": "Get quote by public token",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/public?token=qt_pTkXz3mNR9aQv8",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "public"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "qt_pTkXz3mNR9aQv8",
+                  "description": "Unique public quote token"
+                }
+              ]
+            },
+            "description": "Returns the quote associated with the public token. If status is `sent`, it is automatically marked as `viewed` with timestamp and IP recorded."
+          }
+        },
+        {
+          "name": "Accept or decline a quote",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/quotes/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "quotes",
+                "public"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"qt_pTkXz3mNR9aQv8\",\n  \"action\": \"accepted\",\n  \"reason\": \"Budget not available\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Allows a client to accept or decline a quote via public token. The quote must be in `sent` or `viewed` status."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Currency & Geo",
+      "description": "Exchange rates and geographic reference data",
+      "item": [
+        {
+          "name": "EUR exchange rates",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Currency",
+                "value": "USD",
+                "description": "ISO 4217 currency code to validate (e.g. USD)"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/currency/rates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "currency",
+                "rates"
+              ]
+            },
+            "description": "Returns current exchange rates with EUR as base (sourced from Fawaz API, DB-cached 6h). Response is CDN-cached for 1 hour."
+          }
+        },
+        {
+          "name": "Convert amount between currencies",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/currency/rates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "currency",
+                "rates"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 1000,\n  \"from\": \"USD\",\n  \"to\": \"GBP\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Converts an amount from one currency to another using current rates (EUR as pivot)."
+          }
+        },
+        {
+          "name": "List countries",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/geo/countries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "geo",
+                "countries"
+              ]
+            },
+            "description": "Returns the list of countries available in the system, used for address forms."
+          }
+        },
+        {
+          "name": "List cities by country",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/geo/cities?country=IT",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "geo",
+                "cities"
+              ],
+              "query": [
+                {
+                  "key": "country",
+                  "value": "IT",
+                  "description": "ISO 3166-1 alpha-2 country code"
+                }
+              ]
+            },
+            "description": "Returns cities for a specific country, used for address form autocomplete."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Appointments",
+      "description": "RSVP handling for appointments",
+      "item": [
+        {
+          "name": "RSVP to an appointment",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/appointments/rsvp?token=rsvp_abc123def456&r=accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "appointments",
+                "rsvp"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "rsvp_abc123def456",
+                  "description": "Unique RSVP token sent by email"
+                },
+                {
+                  "key": "r",
+                  "value": "accept",
+                  "description": "Attendee response"
+                }
+              ]
+            },
+            "description": "Handles an attendee RSVP via email link. Updates the database and returns an HTML confirmation page. No auth required — the token acts as a secure one-time credential."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Marketing Tracking",
+      "description": "Email click/open/unsubscribe tracking pixels",
+      "item": [
+        {
+          "name": "Track email link click",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/track/click?log=clog_01JX4K&url=https%3A%2F%2Facme.com%2Flanding",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "track",
+                "click"
+              ],
+              "query": [
+                {
+                  "key": "log",
+                  "value": "clog_01JX4K",
+                  "description": "Campaign log ID to update"
+                },
+                {
+                  "key": "url",
+                  "value": "https%3A%2F%2Facme.com%2Flanding",
+                  "description": "Destination URL (URL-encoded, http/https only)"
+                }
+              ]
+            },
+            "description": "Records a click on a campaign email link and redirects the user to the destination URL. Only schema `http`/`https` URLs are accepted (open redirect protection)."
+          }
+        },
+        {
+          "name": "Track email open (pixel)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/track/open?log=clog_01JX4K",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "track",
+                "open"
+              ],
+              "query": [
+                {
+                  "key": "log",
+                  "value": "clog_01JX4K",
+                  "description": "Campaign log ID"
+                }
+              ]
+            },
+            "description": "Records an email open via a 1×1 tracking pixel. Returns a transparent GIF (43 bytes). First-open only."
+          }
+        },
+        {
+          "name": "Unsubscribe from marketing",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/unsubscribe?token=unsub_xyz789abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "unsubscribe"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "unsub_xyz789abc",
+                  "description": "Unique unsubscribe token"
+                }
+              ]
+            },
+            "description": "Handles unsubscription via a secure token in the email. Sets `marketingConsent = false` and logs the event. Returns an HTML confirmation page."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Webhooks",
+      "description": "Inbound webhooks from Stripe and Resend",
+      "item": [
+        {
+          "name": "Stripe webhook",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "stripe-signature",
+                "value": "t=1715760000,v1=abc123...",
+                "description": "Stripe HMAC signature header"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/stripe",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "webhooks",
+                "stripe"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Receives Stripe events and updates subscriptions in the database. Verifies HMAC signature via `STRIPE_WEBHOOK_SECRET`. Implements idempotency. Handles: `checkout.session.completed`, `customer.subscription.*`, `invoice.payment_succeeded`, `invoice.payment_failed`."
+          }
+        },
+        {
+          "name": "Resend email events webhook",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/resend",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "webhooks",
+                "resend"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Receives delivery events from Resend (`email.sent`, `email.delivered`, `email.bounced`, `email.complained`) and updates campaign logs."
+          }
+        },
+        {
+          "name": "Inbound email webhook",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/webhooks/email-inbound",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "webhooks",
+                "email-inbound"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"\",\n  \"to\": [],\n  \"subject\": \"\",\n  \"text\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Receives inbound emails forwarded by Resend. Identifies the ticket from the `To` field (e.g. `ticket-TKT0042@reply.flux.io`) and appends the content as a ticket comment."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cron Jobs",
+      "description": "Scheduled internal jobs (protected by CRON_SECRET)",
+      "item": [
+        {
+          "name": "Campaign scheduler",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{cronSecret}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cron/campaign-scheduler",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cron",
+                "campaign-scheduler"
+              ]
+            },
+            "description": "Checks for campaigns whose `scheduledAt` has passed and dispatches them. Runs every 5 minutes."
+          }
+        },
+        {
+          "name": "Email send worker",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{cronSecret}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cron/email-worker",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cron",
+                "email-worker"
+              ]
+            },
+            "description": "Processes the email send queue (batch from campaigns). Sends pending messages via Resend and updates logs. Runs every minute."
+          }
+        },
+        {
+          "name": "Task due reminders",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{cronSecret}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cron/task-reminders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cron",
+                "task-reminders"
+              ]
+            },
+            "description": "Sends notifications for tasks due within 24 hours. Runs every hour."
+          }
+        },
+        {
+          "name": "Auto-close resolved tickets",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{cronSecret}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cron/ticket-autoclose",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cron",
+                "ticket-autoclose"
+              ]
+            },
+            "description": "Closes tickets in `resolved` status that have had no client reply for more than 7 days. Runs once daily."
+          }
+        },
+        {
+          "name": "Ticket SLA check",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{cronSecret}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/cron/ticket-sla-check",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "cron",
+                "ticket-sla-check"
+              ]
+            },
+            "description": "Checks tickets about to breach (or already breaching) configured SLAs and alerts agents. Runs every 15 minutes."
+          }
+        }
+      ]
+    },
+    {
+      "name": "CRM Import API",
+      "description": "Programmatic import of CRM records via REST",
+      "item": [
+        {
+          "name": "Create a lead",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crm/leads",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crm",
+                "leads"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Anna\",\n  \"lastName\": \"Bianchi\",\n  \"email\": \"anna@startup.io\",\n  \"phone\": \"+39 02 1234567\",\n  \"mobile\": \"\",\n  \"companyName\": \"StartupIO\",\n  \"jobTitle\": \"\",\n  \"status\": \"new\",\n  \"source\": \"website\",\n  \"rating\": \"hot\",\n  \"notes\": \"\",\n  \"tags\": [],\n  \"onDuplicate\": \"skip\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates a single lead with full validation. Deduplication by email (case-insensitive). With `onDuplicate: skip` (default) returns `skipped`; with `update` updates the existing record; with `error` returns HTTP 409."
+          }
+        },
+        {
+          "name": "Bulk import leads",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crm/leads/bulk",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crm",
+                "leads",
+                "bulk"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"records\": [],\n  \"onDuplicate\": \"skip\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Imports up to 500 leads in a single request. Same fields as the single endpoint."
+          }
+        },
+        {
+          "name": "Create a contact",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crm/contacts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crm",
+                "contacts"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Mario\",\n  \"lastName\": \"Rossi\",\n  \"email\": \"mario@acme.it\",\n  \"phone\": \"\",\n  \"mobile\": \"\",\n  \"jobTitle\": \"\",\n  \"companyId\": \"cmp_01JX\",\n  \"status\": \"active\",\n  \"source\": \"\",\n  \"leadScore\": 0,\n  \"tags\": [],\n  \"onDuplicate\": \"skip\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates a single contact. Deduplication by email. Supports `onDuplicate: skip | update | error`."
+          }
+        },
+        {
+          "name": "Bulk import contacts",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crm/contacts/bulk",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crm",
+                "contacts",
+                "bulk"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"records\": [],\n  \"onDuplicate\": \"skip\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Imports up to 500 contacts. Deduplication by email."
+          }
+        },
+        {
+          "name": "Create a company",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crm/companies",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crm",
+                "companies"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Srl\",\n  \"industry\": \"Manufacturing\",\n  \"website\": \"https://acme.it\",\n  \"type\": \"prospect\",\n  \"employeeCount\": 250,\n  \"annualRevenue\": \"5000000.00\",\n  \"mainPhone\": \"+39 02 9876543\",\n  \"mainEmail\": \"info@acme.it\",\n  \"vatNumber\": \"IT02345678901\",\n  \"sdiCode\": \"XXXXXXX\",\n  \"tags\": [],\n  \"onDuplicate\": \"skip\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates a single company. Deduplication by name (case-insensitive). Supports `onDuplicate: skip | update | error`."
+          }
+        },
+        {
+          "name": "Bulk import companies",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crm/companies/bulk",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crm",
+                "companies",
+                "bulk"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"records\": [],\n  \"onDuplicate\": \"skip\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Imports up to 500 companies. Deduplication by name."
+          }
+        },
+        {
+          "name": "Create an activity",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crm/activities",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crm",
+                "activities"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"call\",\n  \"content\": \"Product presentation call\",\n  \"date\": \"2026-05-15T14:30:00.000Z\",\n  \"durationMinutes\": 45,\n  \"participants\": \"mario@acme.it\",\n  \"leadId\": \"lead_01JX\",\n  \"contactId\": \"cnt_01JX\",\n  \"companyId\": \"cmp_01JX\",\n  \"dealId\": \"deal_01JX\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Creates a single activity (note, call, meeting, email) linked to at least one CRM entity. Activities are not deduplicated."
+          }
+        },
+        {
+          "name": "Bulk import activities",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{apiKey}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/crm/activities/bulk",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "crm",
+                "activities",
+                "bulk"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"records\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Imports up to 500 activities. Activities are never deduplicated — every valid record always creates a new DB row."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,10 +1,13 @@
-import NextAuth from "next-auth";
-import { authConfig } from "./auth.config";
 import { NextResponse } from "next/server";
-import { extractSubdomainFromHost } from "./lib/subdomain";
 
-// Edge-compatible in-memory rate limiter
-// Key: IP + path → { count, resetAt }
+import NextAuth from "next-auth";
+
+import { authConfig } from "./auth.config";
+
+// Edge-compatible in-memory rate limiter (per-process).
+// WARNING: On serverless/multi-instance deployments each invocation runs in a
+// fresh process, so this store is reset on every cold start.  For real
+// distributed rate-limiting, replace with a Redis / Vercel KV backed counter.
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 function rateLimit(ip: string, path: string, limit: number, windowMs: number): boolean {
@@ -14,72 +17,33 @@ function rateLimit(ip: string, path: string, limit: number, windowMs: number): b
 
   if (!entry || now > entry.resetAt) {
     rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
-    return true; // allowed
+    return true;
   }
 
-  if (entry.count >= limit) return false; // blocked
+  if (entry.count >= limit) return false;
 
   entry.count++;
-  return true; // allowed
+  return true;
 }
 
 const { auth } = NextAuth(authConfig);
 
 export const proxy = auth((req) => {
-  const host = req.headers.get("host") ?? "";
-  let subdomain = extractSubdomainFromHost(host);
-
-  // Test-mode override: read __tenant_override cookie when on a Vercel preview URL
-  // (wildcard subdomains are unavailable on vercel.app). Requires ENABLE_TENANT_OVERRIDE=true.
-  if (!subdomain && process.env.ENABLE_TENANT_OVERRIDE === "true") {
-    const override = req.cookies.get("__tenant_override")?.value;
-    if (override) subdomain = override;
-  }
-
-  const isLoggedIn = !!req.auth?.user;
-
-  // ── Tenant subdomain routing ──────────────────────────────────────────────
-  if (subdomain) {
-    const { pathname } = req.nextUrl;
-
-    // /admin is only accessible from the main domain
-    if (pathname.startsWith("/admin")) {
-      const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? "localhost:3000";
-      const protocol = req.headers.get("x-forwarded-proto") ?? "http";
-      return NextResponse.redirect(new URL("/", `${protocol}://${rootDomain}`));
-    }
-
-    // API routes handle multi-tenancy via getDb() reading the host header — no rewrite needed.
-    if (pathname.startsWith("/api/")) return;
-
-    // Root "/" → tenant landing page (sign-in splash).
-    if (pathname === "/" || pathname === "") {
-      const url = req.nextUrl.clone();
-      url.pathname = `/tenant/${subdomain}`;
-      return NextResponse.rewrite(url);
-    }
-
-    // Dashboard routes require authentication on the tenant subdomain.
-    // Redirect unauthenticated users to the tenant's own login page so that
-    // after login they land back on the correct subdomain (not the main domain).
-    if (pathname.startsWith("/dashboard")) {
-      if (!isLoggedIn) {
-        return NextResponse.redirect(new URL("/auth/v1/login", req.url));
-      }
-    }
-
-    // All other subdomain paths (/auth/*, etc.) pass through.
-    // getDb() reads the host header for tenant-scoped DB access.
-    return;
-  }
-
-  // ── Main domain: rate-limit + auth/RBAC ──────────────────────────────────
   const { nextUrl } = req;
   const pathname = nextUrl.pathname;
 
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const isLoggedIn = !!req.auth?.user;
+  const activeTenantId = (req.auth?.user as { activeTenantId?: string | null } | undefined)?.activeTenantId;
 
-  // Login endpoint: max 10 attempts per minute
+  // On Vercel, x-vercel-forwarded-for is set by the infrastructure and cannot be
+  // spoofed by clients. Fall back to the rightmost X-Forwarded-For entry (appended
+  // by the trusted edge proxy) rather than the leftmost (which is client-supplied).
+  const ip =
+    req.headers.get("x-vercel-forwarded-for") ??
+    req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ??
+    "unknown";
+
+  // ── Rate-limit credentials login ─────────────────────────────────────────────
   if (pathname === "/api/auth/callback/credentials") {
     if (!rateLimit(ip, "login", 10, 60_000)) {
       return new Response(JSON.stringify({ error: "Too many requests. Please wait." }), {
@@ -89,11 +53,27 @@ export const proxy = auth((req) => {
     }
   }
 
-  // ── Auth route protection ─────────────────────────────────────────────────
+  // ── Rate-limit admin login ────────────────────────────────────────────────────
+  // Server action POSTs to /admin/login carry a Next-Action header; rate-limit them
+  // separately from GETs so the login page itself remains accessible.
+  if (pathname === "/admin/login" && req.method === "POST") {
+    if (!rateLimit(ip, "admin-login", 5, 60_000)) {
+      return new Response(JSON.stringify({ error: "Too many requests. Please wait." }), {
+        status: 429,
+        headers: { "Content-Type": "application/json", "Retry-After": "60" },
+      });
+    }
+  }
+
+  // ── Public routes ─────────────────────────────────────────────────────────────
+  // Quote preview pages accessible without auth
+  if (pathname.startsWith("/q/") || pathname.startsWith("/api/quotes/public")) {
+    return;
+  }
+
   const isOnLogin =
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/auth/v1/login") ||
-    pathname.startsWith("/auth/v2/login");
+    pathname.startsWith("/auth/v1/login") || pathname.startsWith("/auth/v2/login") || pathname.startsWith("/login");
+
   const isOnPublicAuth =
     pathname.startsWith("/auth/v1/forgot-password") ||
     pathname.startsWith("/auth/v1/reset-password") ||
@@ -101,51 +81,107 @@ export const proxy = auth((req) => {
     pathname.startsWith("/auth/v1/register") ||
     pathname.startsWith("/auth/v2/register");
 
-  // Public quote preview pages (no auth required)
-  if (pathname.startsWith("/q/") || pathname.startsWith("/api/quotes/public")) {
-    return;
-  }
+  if (isOnPublicAuth) return;
 
-  if (isOnLogin || isOnPublicAuth) {
-    if (isLoggedIn && isOnLogin) {
-      // Main domain: send admin users to verify their identity first.
-      // The admin layout redirects to /admin/tenants once the session cookie is set.
-      return Response.redirect(new URL("/admin/login", nextUrl));
+  if (isOnLogin) {
+    if (isLoggedIn) {
+      return Response.redirect(new URL("/select-tenant", nextUrl));
     }
     return;
   }
 
-  // CRM dashboard is tenant-only — redirect main-domain visitors to admin panel.
+  // ── Tenant selection page ─────────────────────────────────────────────────────
+  if (pathname.startsWith("/select-tenant")) {
+    if (!isLoggedIn) {
+      return Response.redirect(new URL("/auth/v1/login", nextUrl));
+    }
+    return;
+  }
+
+  // ── CRM dashboard: requires auth + active tenant ──────────────────────────────
   if (pathname.startsWith("/dashboard")) {
     if (!isLoggedIn) {
       return Response.redirect(new URL("/auth/v1/login", nextUrl));
     }
-    return Response.redirect(new URL("/admin/tenants", nextUrl));
+
+    if (!activeTenantId) {
+      return Response.redirect(new URL("/select-tenant", nextUrl));
+    }
+
+    // Inject tenant context as an internal header — never trusted from the client
+    const res = NextResponse.next();
+    res.headers.set("x-tenant-id", activeTenantId);
+    return res;
   }
 
-  // Root "/" on main domain: admin panel if logged in, otherwise login.
+  // ── Root "/" redirect ─────────────────────────────────────────────────────────
   if (pathname === "/") {
-    return Response.redirect(
-      new URL(isLoggedIn ? "/admin/login" : "/auth/v1/login", nextUrl),
-    );
+    if (!isLoggedIn) return Response.redirect(new URL("/auth/v1/login", nextUrl));
+    if (activeTenantId) return Response.redirect(new URL("/dashboard/crm", nextUrl));
+    return Response.redirect(new URL("/select-tenant", nextUrl));
   }
 
-  // Inject pathname so admin layouts can detect /admin/login without a separate header package.
+  // ── Admin panel ───────────────────────────────────────────────────────────────
   if (pathname.startsWith("/admin")) {
     const res = NextResponse.next();
     res.headers.set("x-pathname", pathname);
     return res;
   }
 
+  // ── Tenant-scoped API routes ──────────────────────────────────────────────────
+  // For session-authenticated requests, inject the active tenant from the JWT so
+  // getDb() resolves to the correct per-tenant database instead of platformDb.
+  // Routes that operate across all tenants (cron, webhooks) or are truly public
+  // (geo, currency, public quotes) are intentionally excluded.
+  if (pathname.startsWith("/api/") && !isPublicApiPath(pathname)) {
+    if (isLoggedIn && activeTenantId) {
+      const res = NextResponse.next();
+      res.headers.set("x-tenant-id", activeTenantId);
+      return res;
+    }
+    // API-key authenticated requests have no JWT session, so no tenant header is
+    // set here.  Those routes must resolve the tenant from request parameters and
+    // call createTenantDb() directly rather than relying on getDb().
+    return;
+  }
+
   return;
 });
+
+/**
+ * API routes that must NOT receive the x-tenant-id injection:
+ * - /api/auth/*      NextAuth callbacks — handled by NextAuth itself
+ * - /api/cron/*      Cron jobs iterate all tenants via platformDb (by design)
+ * - /api/webhooks/*  Stripe / Resend webhooks identify the tenant from payload
+ * - /api/track/*     Email open/click tracking — no user session
+ * - /api/unsubscribe Email unsubscribe — no user session
+ * - /api/geo/*       Static reference data, no tenant concept
+ * - /api/currency/*  Exchange rate cache, no tenant concept
+ * - /api/quotes/public  Public quote preview, no auth required
+ * - /api/appointments/rsvp  External RSVP link — no session
+ */
+function isPublicApiPath(pathname: string): boolean {
+  const PUBLIC_PREFIXES = [
+    "/api/auth/",
+    "/api/cron/",
+    "/api/webhooks/",
+    "/api/track/",
+    "/api/unsubscribe",
+    "/api/geo/",
+    "/api/currency/",
+    "/api/quotes/public",
+    "/api/appointments/rsvp",
+  ];
+  return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+}
 
 export default proxy;
 
 export const config = {
   matcher: [
-    // Rate-limit the credentials login endpoint even though other api/auth routes are excluded
+    // Rate-limit the credentials login endpoint
     "/api/auth/callback/credentials",
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.png$).*)",
+    // Exclude static assets, images, and the public Postman collection
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.png$|admin/api-docs/postman-collection\\.json).*)",
   ],
 };

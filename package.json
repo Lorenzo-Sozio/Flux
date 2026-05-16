@@ -15,7 +15,8 @@
     "migrate:automation-logs": "node src/scripts/migrate-automation-logs.mjs",
     "migrate:condition-expression": "node src/scripts/migrate-condition-expression.mjs",
     "migrate:tenants": "npx tsx scripts/migrate-all-tenants.ts",
-    "migrate:tenants:dry": "npx tsx scripts/migrate-all-tenants.ts --dry-run"
+    "migrate:tenants:dry": "npx tsx scripts/migrate-all-tenants.ts --dry-run",
+    "generate:postman": "npx tsx scripts/generate-postman-collection.ts"
   },
   "lint-staged": {
     "*.{js,ts,jsx,tsx}": [

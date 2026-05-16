@@ -1,27 +1,30 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 const COOKIE_NAME = "admin_sess";
 const TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 
 function sign(payload: string): string {
-  return createHmac("sha256", process.env.AUTH_SECRET ?? "")
-    .update(payload)
-    .digest("hex");
+  // Prefer a dedicated secret so the admin session key can be rotated independently
+  // of AUTH_SECRET (which also signs NextAuth JWTs and Next.js internals).
+  const key = process.env.ADMIN_SESSION_SECRET ?? process.env.AUTH_SECRET ?? "";
+  return createHmac("sha256", key).update(payload).digest("hex");
 }
 
-function makeValue(userId: string): string {
+// Cookie format: {userId}|{role}|{issuedAt}|{hmac}
+function makeValue(userId: string, role: string): string {
   const issuedAt = Date.now().toString();
-  const payload = `${userId}|${issuedAt}`;
+  const payload = `${userId}|${role}|${issuedAt}`;
   return `${payload}|${sign(payload)}`;
 }
 
-function parseValue(value: string): { userId: string } | null {
+function parseValue(value: string): { userId: string; role: string } | null {
   const parts = value.split("|");
-  if (parts.length !== 3) return null;
+  if (parts.length !== 4) return null;
 
-  const [userId, issuedAt, sig] = parts;
-  const payload = `${userId}|${issuedAt}`;
+  const [userId, role, issuedAt, sig] = parts;
+  const payload = `${userId}|${role}|${issuedAt}`;
   const expectedSig = sign(payload);
 
   try {
@@ -35,12 +38,12 @@ function parseValue(value: string): { userId: string } | null {
   const ts = parseInt(issuedAt, 10);
   if (Number.isNaN(ts) || Date.now() - ts > TTL_MS) return null;
 
-  return { userId };
+  return { userId, role };
 }
 
-export async function setAdminSession(userId: string): Promise<void> {
+export async function setAdminSession(userId: string, role: string): Promise<void> {
   const store = await cookies();
-  store.set(COOKIE_NAME, makeValue(userId), {
+  store.set(COOKIE_NAME, makeValue(userId, role), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
@@ -49,7 +52,7 @@ export async function setAdminSession(userId: string): Promise<void> {
   });
 }
 
-export async function getAdminSession(): Promise<{ userId: string } | null> {
+export async function getAdminSession(): Promise<{ userId: string; role: string } | null> {
   const store = await cookies();
   const cookie = store.get(COOKIE_NAME);
   if (!cookie) return null;
@@ -58,8 +61,6 @@ export async function getAdminSession(): Promise<{ userId: string } | null> {
 
 export async function clearAdminSession(): Promise<void> {
   const store = await cookies();
-  // Must match the same path used in setAdminSession so the browser targets
-  // the correct path-scoped cookie (a bare delete() targets path "/" by default).
   store.set(COOKIE_NAME, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

@@ -1,12 +1,13 @@
 /**
- * Lookup a tenant by subdomain from the platform DB.
+ * Tenant lookup helpers for the platform DB.
  * Server-only. Results are cached in-memory with a 5-minute TTL to avoid
  * hitting the platform DB on every request.
  *
- * Call invalidateTenantCache(subdomain) after creating or updating a tenant
+ * Call invalidateTenantCache(id) after creating or updating a tenant
  * so the new record is picked up immediately.
  */
 import { eq } from "drizzle-orm";
+
 import { platformDb } from "@/db";
 import { tenants } from "@/db/schema";
 
@@ -19,23 +20,22 @@ interface CacheEntry {
   expiresAt: number;
 }
 
-const cache = new Map<string, CacheEntry>();
+const cacheById = new Map<string, CacheEntry>();
 
-export async function getTenantBySubdomain(
-  subdomain: string,
-): Promise<Tenant | null> {
+/** Primary runtime lookup — used by getDb() via x-tenant-id header. */
+export async function getTenantById(id: string): Promise<Tenant | null> {
   const now = Date.now();
-  const hit = cache.get(subdomain);
+  const hit = cacheById.get(id);
   if (hit && now < hit.expiresAt) return hit.tenant;
 
   const tenant = await platformDb.query.tenants.findFirst({
-    where: eq(tenants.subdomain, subdomain),
+    where: eq(tenants.id, id),
   });
 
-  cache.set(subdomain, { tenant: tenant ?? null, expiresAt: now + TTL_MS });
+  cacheById.set(id, { tenant: tenant ?? null, expiresAt: now + TTL_MS });
   return tenant ?? null;
 }
 
-export function invalidateTenantCache(subdomain: string): void {
-  cache.delete(subdomain);
+export function invalidateTenantCache(id: string): void {
+  cacheById.delete(id);
 }

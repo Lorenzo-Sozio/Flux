@@ -4,15 +4,11 @@
  * Call these at the top of any mutation action.
  */
 import { auth } from "@/auth";
-import { getCurrentSubdomain } from "@/lib/tenant-context";
-import { getTenantBySubdomain } from "@/lib/get-tenant";
-import {
-  getEntitlements,
-  EntitlementError,
-  requireModule,
-  assertLimit,
-} from "@/lib/billing/licensing";
-import type { PlanModule, PlanLimits } from "@/lib/billing/plans-config";
+import { getAdminSession } from "@/lib/admin-session";
+import { assertLimit, EntitlementError, getEntitlements, requireModule } from "@/lib/billing/licensing";
+import type { PlanLimits, PlanModule } from "@/lib/billing/plans-config";
+import { getTenantById } from "@/lib/get-tenant";
+import { getCurrentTenantId } from "@/lib/tenant-context";
 
 export class ForbiddenError extends Error {
   constructor(message = "You do not have permission to perform this action.") {
@@ -46,7 +42,8 @@ export async function requireWriteAccess() {
 
 /**
  * Requires "admin" or "owner" role.
- * Used for privileged operations: user management, webhooks, custom fields, settings.
+ * Used for privileged CRM operations within a tenant: user management, webhooks, custom fields, settings.
+ * Does NOT verify the admin panel 2FA cookie — use requireAdminPanelAccess() for /admin/* server actions.
  */
 export async function requireAdminAccess() {
   const session = await getSessionOrThrow();
@@ -58,14 +55,27 @@ export async function requireAdminAccess() {
 }
 
 /**
+ * Verifies the admin_sess HMAC cookie (independent of the customer NextAuth session).
+ * Use this in every /admin/* server action.
+ * Returns { user: { id, role } } so callers can log the acting admin's identity.
+ */
+export async function requireAdminPanelAccess(): Promise<{ user: { id: string; role: string } }> {
+  const adminSession = await getAdminSession();
+  if (!adminSession || (adminSession.role !== "admin" && adminSession.role !== "owner")) {
+    throw new ForbiddenError("Admin panel authentication required. Please log in at /admin/login.");
+  }
+  return { user: { id: adminSession.userId, role: adminSession.role } };
+}
+
+/**
  * Returns the current tenant's entitlements.
- * Throws if no tenant context is found (i.e., called from main domain).
+ * Returns null when called outside a tenant context (e.g., admin panel).
  */
 export async function getTenantEntitlements() {
-  const subdomain = await getCurrentSubdomain();
-  if (!subdomain) return null;
+  const tenantId = await getCurrentTenantId();
+  if (!tenantId) return null;
 
-  const tenant = await getTenantBySubdomain(subdomain);
+  const tenant = await getTenantById(tenantId);
   if (!tenant) return null;
 
   return getEntitlements(tenant.id);
@@ -77,17 +87,13 @@ export async function getTenantEntitlements() {
  */
 export async function requireActiveSubscription() {
   const ent = await getTenantEntitlements();
-  if (!ent) return; // main domain — no subscription context
+  if (!ent) return; // outside tenant context — no subscription check
 
   if (ent.isSuspended) {
-    throw new ForbiddenError(
-      "Your account is suspended. Please contact support to reactivate.",
-    );
+    throw new ForbiddenError("Your account is suspended. Please contact support to reactivate.");
   }
   if (!ent.isActive) {
-    throw new ForbiddenError(
-      "Your subscription is inactive. Please update your billing details.",
-    );
+    throw new ForbiddenError("Your subscription is inactive. Please update your billing details.");
   }
 }
 
@@ -96,10 +102,10 @@ export async function requireActiveSubscription() {
  * Usage: await requirePlanModule("marketing");
  */
 export async function requirePlanModule(module: PlanModule) {
-  const subdomain = await getCurrentSubdomain();
-  if (!subdomain) return; // main domain
+  const tenantId = await getCurrentTenantId();
+  if (!tenantId) return; // outside tenant context
 
-  const tenant = await getTenantBySubdomain(subdomain);
+  const tenant = await getTenantById(tenantId);
   if (!tenant) return;
 
   await requireModule(tenant.id, module);
@@ -110,10 +116,10 @@ export async function requirePlanModule(module: PlanModule) {
  * Usage: await requirePlanLimit("maxRecords", currentCount);
  */
 export async function requirePlanLimit(metric: keyof PlanLimits, currentValue: number) {
-  const subdomain = await getCurrentSubdomain();
-  if (!subdomain) return;
+  const tenantId = await getCurrentTenantId();
+  if (!tenantId) return; // outside tenant context
 
-  const tenant = await getTenantBySubdomain(subdomain);
+  const tenant = await getTenantById(tenantId);
   if (!tenant) return;
 
   await assertLimit(tenant.id, metric, currentValue);

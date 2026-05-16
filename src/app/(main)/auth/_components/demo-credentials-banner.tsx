@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { KeyRound, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -12,7 +12,12 @@ interface Props {
 }
 
 export function DemoCredentialsBanner({ onFill }: Props) {
+  const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState<"email" | "password" | null>(null);
+
+  useEffect(() => { setMounted(true); }, []);
+
+  if (!mounted) return null;
 
   const copy = (value: string, field: "email" | "password") => {
     navigator.clipboard.writeText(value);

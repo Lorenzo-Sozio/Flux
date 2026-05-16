@@ -1,46 +1,48 @@
-import type { NextAuthConfig } from "next-auth"
-import { extractSubdomainFromHost } from "./lib/subdomain"
+import type { NextAuthConfig } from "next-auth";
 
 export const authConfig = {
   session: { strategy: "jwt" },
   pages: {
-    signIn: "/login",
+    signIn: "/auth/v1/login",
   },
   providers: [],
   callbacks: {
     authorized({ auth, request }) {
-      const host = request.headers.get("host") ?? request.nextUrl.host
-      const subdomain = extractSubdomainFromHost(host)
+      const isLoggedIn = !!auth?.user;
+      const { nextUrl } = request;
 
-      // Tenant subdomain requests are handled by the proxy — let them through.
-      if (subdomain) return true
+      // Admin routes use their own independent auth system (admin_sess cookie).
+      // NextAuth must not intercept or redirect these paths.
+      if (nextUrl.pathname.startsWith("/admin")) return true;
 
-      const isLoggedIn = !!auth?.user
-      const { nextUrl } = request
-      const isOnLogin = nextUrl.pathname.startsWith("/login") || nextUrl.pathname.startsWith("/auth/v1/login")
+      const isOnLogin =
+        nextUrl.pathname.startsWith("/auth/v1/login") ||
+        nextUrl.pathname.startsWith("/auth/v2/login") ||
+        nextUrl.pathname.startsWith("/login");
 
       if (isOnLogin) {
-        // Already logged in on main domain → go to admin panel.
-        if (isLoggedIn) return Response.redirect(new URL("/admin/tenants", nextUrl))
-        return true
+        if (isLoggedIn) return Response.redirect(new URL("/select-tenant", nextUrl));
+        return true;
       }
 
-      if (!isLoggedIn) return false
-      return true
+      if (!isLoggedIn) return false;
+      return true;
     },
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id
-        token.role = (user as any).role
+        token.id = user.id;
+        token.role = (user as { role?: string }).role;
       }
-      return token
+      return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id as string
-        (session.user as any).role = token.role as string
+        session.user.id = token.id as string;
+        (session.user as { role?: string }).role = token.role as string;
+        session.user.activeTenantId = token.activeTenantId ?? null;
+        session.user.tenantRole = token.tenantRole ?? null;
       }
-      return session
+      return session;
     },
   },
-} satisfies NextAuthConfig
+} satisfies NextAuthConfig;

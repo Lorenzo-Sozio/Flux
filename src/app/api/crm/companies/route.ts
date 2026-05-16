@@ -3,15 +3,24 @@ import { type NextRequest, NextResponse } from "next/server";
 import { ilike } from "drizzle-orm";
 
 import { dispatchWebhook } from "@/actions/webhooks";
+import { createTenantDb } from "@/db";
 import { companies } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
 import { buildCompanyPayload, parseOnDuplicate, validateCompanyInput } from "@/lib/api-import-validators";
-import { getDb } from "@/lib/tenant-context";
+import { getTenantById } from "@/lib/get-tenant";
+import { decryptDbUrl } from "@/lib/tenant-db";
 
 export async function POST(req: NextRequest) {
   const authResult = await authenticateApiRequest(req);
   if (!authResult) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  if (!authResult.tenantId) {
+    return NextResponse.json(
+      { error: "Tenant context required. Supply X-Tenant-ID header with a valid tenant ID." },
+      { status: 400 },
+    );
   }
 
   let body: unknown;
@@ -27,7 +36,9 @@ export async function POST(req: NextRequest) {
   }
 
   const onDuplicate = parseOnDuplicate(body as Record<string, unknown>);
-  const db = await getDb();
+  const tenant = await getTenantById(authResult.tenantId);
+  if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+  const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
 
   const [existing] = await db.select({ id: companies.id }).from(companies).where(ilike(companies.name, data.name));
 

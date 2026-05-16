@@ -1,37 +1,67 @@
 "use server";
 
-import { signIn, signOut } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
-import {
-  notifications,
-  passwordResetTokens,
-  userInvitations,
-  users,
-} from "@/db/schema";
-import { sendInvitationEmail, sendPasswordResetEmail } from "@/lib/email";
-import bcrypt from "bcryptjs";
-import { and, eq, gt } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+
+import bcrypt from "bcryptjs";
+import { and, eq, gt, isNull } from "drizzle-orm";
+
+import { auth, signIn, signOut } from "@/auth";
+import { platformDb } from "@/db";
+import { notifications, passwordResetTokens, tenantMembers, tenants, userInvitations, users } from "@/db/schema";
+import { sendInvitationEmail, sendPasswordResetEmail } from "@/lib/email";
+import { getDb } from "@/lib/tenant-context";
 
 // ─── Logout ─────────────────────────────────────────────────────────────────
 export async function logoutAction() {
   await signOut({ redirectTo: "/auth/v1/login" });
 }
 
-// ─── Register ────────────────────────────────────────────────────────────────
-export async function registerAction(data: {
+// ─── Switch Active Tenant ─────────────────────────────────────────────────────
+// Validates membership server-side. The caller (TenantSwitcher client component)
+// must then call session.update({ activeTenantId }) to persist the change in JWT.
+export async function validateTenantSwitchAction(tenantId: string): Promise<{
+  ok: boolean;
+  tenantName?: string;
+  error?: string;
+}> {
+  const session = await auth();
+  if (!session?.user?.id) return { ok: false, error: "Not authenticated." };
 
-  name?: string;
-  email: string;
-  password: string;
-}) {
+  const membership = await platformDb.query.tenantMembers.findFirst({
+    where: and(eq(tenantMembers.userId, session.user.id), eq(tenantMembers.tenantId, tenantId)),
+  });
+
+  if (!membership) return { ok: false, error: "You are not a member of this workspace." };
+
+  const [tenant] = await platformDb.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId));
+
+  return { ok: true, tenantName: tenant?.name };
+}
+
+// ─── Get Tenant Memberships ───────────────────────────────────────────────────
+export async function getTenantMembershipsAction() {
+  const session = await auth();
+  if (!session?.user?.id) return [];
+
+  return platformDb
+    .select({
+      tenantId: tenantMembers.tenantId,
+      role: tenantMembers.role,
+      tenantName: tenants.name,
+      tenantSubdomain: tenants.subdomain,
+      tenantSettings: tenants.settings,
+    })
+    .from(tenantMembers)
+    .innerJoin(tenants, eq(tenantMembers.tenantId, tenants.id))
+    .where(eq(tenantMembers.userId, session.user.id));
+}
+
+// ─── Register ────────────────────────────────────────────────────────────────
+export async function registerAction(data: { name?: string; email: string; password: string }) {
   const db = await getDb();
   const { name, email, password } = data;
 
-  const [existing] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, email));
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
 
   if (existing) {
     return { error: "An account with this email already exists." };
@@ -63,18 +93,13 @@ export async function registerAction(data: {
 // ─── Forgot Password ─────────────────────────────────────────────────────────
 export async function forgotPasswordAction(email: string) {
   const db = await getDb();
-  const [user] = await db
-    .select({ id: users.id, email: users.email })
-    .from(users)
-    .where(eq(users.email, email));
+  const [user] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.email, email));
 
   // Return success even if user not found (prevents email enumeration)
   if (!user) return { success: true };
 
   // Delete existing tokens for this email
-  await db
-    .delete(passwordResetTokens)
-    .where(eq(passwordResetTokens.identifier, email));
+  await db.delete(passwordResetTokens).where(eq(passwordResetTokens.identifier, email));
 
   const token = crypto.randomUUID();
   const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
@@ -87,12 +112,7 @@ export async function forgotPasswordAction(email: string) {
 }
 
 // ─── Reset Password ───────────────────────────────────────────────────────────
-export async function resetPasswordAction(data: {
-
-  email: string;
-  token: string;
-  password: string;
-}) {
+export async function resetPasswordAction(data: { email: string; token: string; password: string }) {
   const db = await getDb();
   const { email, token, password } = data;
 
@@ -104,7 +124,7 @@ export async function resetPasswordAction(data: {
         eq(passwordResetTokens.identifier, email),
         eq(passwordResetTokens.token, token),
         gt(passwordResetTokens.expires, new Date()),
-      )
+      ),
     );
 
   if (!resetToken) {
@@ -116,16 +136,13 @@ export async function resetPasswordAction(data: {
   await db.update(users).set({ password: hashedPassword }).where(eq(users.email, email));
 
   // Invalidate the token
-  await db
-    .delete(passwordResetTokens)
-    .where(eq(passwordResetTokens.identifier, email));
+  await db.delete(passwordResetTokens).where(eq(passwordResetTokens.identifier, email));
 
   return { success: true };
 }
 
 // ─── Invite User ──────────────────────────────────────────────────────────────
 export async function inviteUserAction(data: {
-
   email: string;
   role: string;
   invitedById: string;
@@ -135,19 +152,14 @@ export async function inviteUserAction(data: {
   const { email, role, invitedById, invitedByName } = data;
 
   // Check user doesn't already exist
-  const [existing] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.email, email));
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
 
   if (existing) {
     return { error: "This email is already registered." };
   }
 
   // Revoke existing pending invitations
-  await db
-    .delete(userInvitations)
-    .where(and(eq(userInvitations.email, email), eq(userInvitations.acceptedAt, null as any)));
+  await db.delete(userInvitations).where(and(eq(userInvitations.email, email), isNull(userInvitations.acceptedAt)));
 
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
@@ -176,24 +188,14 @@ export async function inviteUserAction(data: {
 }
 
 // ─── Accept Invitation ────────────────────────────────────────────────────────
-export async function acceptInvitationAction(data: {
-
-  token: string;
-  name: string;
-  password: string;
-}) {
+export async function acceptInvitationAction(data: { token: string; name: string; password: string }) {
   const db = await getDb();
   const { token, name, password } = data;
 
   const [invitation] = await db
     .select()
     .from(userInvitations)
-    .where(
-      and(
-        eq(userInvitations.token, token),
-        gt(userInvitations.expiresAt, new Date()),
-      )
-    );
+    .where(and(eq(userInvitations.token, token), gt(userInvitations.expiresAt, new Date())));
 
   if (!invitation) {
     return { error: "Invalid or expired invitation." };
@@ -213,10 +215,7 @@ export async function acceptInvitationAction(data: {
   });
 
   // Mark invitation as accepted
-  await db
-    .update(userInvitations)
-    .set({ acceptedAt: new Date() })
-    .where(eq(userInvitations.id, invitation.id));
+  await db.update(userInvitations).set({ acceptedAt: new Date() }).where(eq(userInvitations.id, invitation.id));
 
   return { success: true, email: invitation.email };
 }
@@ -262,43 +261,27 @@ export async function getPendingInvitationsAction() {
   return await db
     .select()
     .from(userInvitations)
-    .where(
-      and(
-        eq(userInvitations.acceptedAt, null as any),
-        gt(userInvitations.expiresAt, new Date()),
-      )
-    );
+    .where(and(isNull(userInvitations.acceptedAt), gt(userInvitations.expiresAt, new Date())));
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 export async function getNotificationsAction(userId: string) {
   const db = await getDb();
-  return await db
-    .select()
-    .from(notifications)
-    .where(eq(notifications.userId, userId))
-    .orderBy(notifications.createdAt);
+  return await db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(notifications.createdAt);
 }
 
 export async function markNotificationReadAction(notificationId: string) {
   const db = await getDb();
-  await db
-    .update(notifications)
-    .set({ isRead: true })
-    .where(eq(notifications.id, notificationId));
+  await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, notificationId));
 }
 
 export async function markAllNotificationsReadAction(userId: string) {
   const db = await getDb();
-  await db
-    .update(notifications)
-    .set({ isRead: true })
-    .where(eq(notifications.userId, userId));
+  await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, userId));
   revalidatePath("/dashboard");
 }
 
 export async function createNotificationAction(data: {
-
   userId: string;
   type: string;
   title: string;
@@ -318,11 +301,7 @@ export async function createNotificationsBatch(
 }
 
 // ─── Change Own Password ──────────────────────────────────────────────────────
-export async function changePasswordAction(data: {
-
-  currentPassword: string;
-  newPassword: string;
-}) {
+export async function changePasswordAction(data: { currentPassword: string; newPassword: string }) {
   const db = await getDb();
   const { auth } = await import("@/auth");
   const session = await auth();
@@ -353,10 +332,7 @@ export async function adminSendPasswordResetAction(targetUserId: string) {
   await requireAdminAccess();
   const db = await getDb();
 
-  const [user] = await db
-    .select({ id: users.id, email: users.email })
-    .from(users)
-    .where(eq(users.id, targetUserId));
+  const [user] = await db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, targetUserId));
 
   if (!user?.email) return { error: "User not found." };
 

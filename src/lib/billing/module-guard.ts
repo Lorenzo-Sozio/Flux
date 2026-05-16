@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
-import { getTenantBySubdomain } from "@/lib/get-tenant";
-import { getCurrentSubdomain } from "@/lib/tenant-context";
+import { getTenantById } from "@/lib/get-tenant";
+import { getCurrentTenantId } from "@/lib/tenant-context";
 
 import { getEntitlements } from "./licensing";
 import type { PlanModule } from "./plans-config";
@@ -11,13 +11,13 @@ import type { PlanModule } from "./plans-config";
  * tenant's plan does not include the required module.
  * Redirects to the billing page with an `upgrade` query param so the UI can
  * surface the right message.
- * No-ops when called outside a subdomain tenant context.
+ * No-ops when called outside a tenant context.
  */
 export async function requireModuleAccess(module: PlanModule): Promise<void> {
-  const subdomain = await getCurrentSubdomain();
-  if (!subdomain) return;
+  const tenantId = await getCurrentTenantId();
+  if (!tenantId) return;
 
-  const tenant = await getTenantBySubdomain(subdomain);
+  const tenant = await getTenantById(tenantId);
   if (!tenant) return;
 
   const ent = await getEntitlements(tenant.id);

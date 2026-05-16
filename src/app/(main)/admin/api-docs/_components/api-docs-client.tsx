@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   AlertCircle,
@@ -13,6 +13,8 @@ import {
   Clock,
   Code2,
   Copy,
+  Download,
+  ExternalLink,
   FileText,
   Globe,
   Info,
@@ -92,7 +94,7 @@ const GROUPS: ApiGroup[] = [
     bg: "bg-cyan-50",
     border: "border-cyan-200",
     description:
-      "Flux CRM è un'applicazione multi-tenant: ogni organizzazione ha il proprio database isolato. Il tenant viene identificato automaticamente dall'header Host di ogni richiesta HTTP estraendo il sottodominio — non è necessario alcun parametro esplicito nel body o negli header. Formato URL: https://{tenant}.fluxcrm.com/api/... dove {tenant} è lo slug dell'organizzazione. Ambienti supportati: produzione (acme.fluxcrm.com → tenant «acme»), Vercel preview (acme---project-abc.vercel.app → tenant «acme») e sviluppo locale (acme.localhost:3000 → tenant «acme»). Se non è presente alcun sottodominio (dominio radice), viene usato il database della piattaforma. Se il sottodominio non corrisponde a nessun tenant registrato, la richiesta fallisce con HTTP 500 (TENANT_NOT_FOUND). Override per ambienti di test: se la variabile d'ambiente ENABLE_TENANT_OVERRIDE=true è attiva, è possibile forzare il tenant impostando il cookie __tenant_override=<subdomain> — utile su URL Vercel preview dove i sottodomini wildcard non sono disponibili. ownerId nei record CRM: con autenticazione via sessione, l'ID utente della sessione viene automaticamente impostato come ownerId del record creato. Con API key (flusso machine-to-machine), ownerId rimane null — il record viene inserito senza proprietario assegnato.",
+      "Flux CRM è un'applicazione multi-tenant a dominio singolo: ogni organizzazione ha il proprio database isolato e tutti i tenant condividono lo stesso dominio (app.fluxcrm.com). Il tenant attivo viene identificato dal JWT di sessione (campo activeTenantId) — il middleware inietta l'header interno x-tenant-id dopo aver verificato la firma del token, rendendo impossibile la falsificazione lato client. Dopo il login, se l'utente appartiene a un solo workspace viene selezionato automaticamente; se appartiene a più workspace viene mostrata la pagina /select-tenant. Il cambio workspace aggiorna il JWT tramite session.update(). Se il tenant non viene trovato la richiesta fallisce con HTTP 500 (TENANT_NOT_FOUND). ownerId nei record CRM: con autenticazione via sessione, l'ID utente della sessione viene automaticamente impostato come ownerId del record creato.",
     isInfoOnly: true,
     endpoints: [],
   },
@@ -2762,6 +2764,143 @@ function ErrorCodesSection() {
   );
 }
 
+// ─── Postman Toolbar ───────────────────────────────────────────────────────────
+
+function PostmanToolbar() {
+  const [collectionUrl, setCollectionUrl] = useState<string>("/admin/api-docs/postman-collection.json");
+  const [nativeUrl, setNativeUrl] = useState<string>("");
+  const [webUrl, setWebUrl] = useState<string>("");
+  const [isLocalhost, setIsLocalhost] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const base = window.location.origin;
+    const col = `${base}/admin/api-docs/postman-collection.json`;
+    setCollectionUrl(col);
+    // postman:// URI opens the desktop app and fetches the collection locally
+    // — works even on localhost, requires Postman desktop to be installed.
+    setNativeUrl(`postman://app/collections/import?url=${encodeURIComponent(col)}`);
+    // Web URL only works when the server is publicly accessible (not localhost).
+    setWebUrl(`https://app.getpostman.com/run-collection?url=${encodeURIComponent(col)}`);
+    setIsLocalhost(window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  }, []);
+
+  function copyCollectionUrl() {
+    navigator.clipboard.writeText(collectionUrl).catch((_err) => {
+      // silently ignore clipboard permission errors
+    });
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <div className="mt-5 rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50 to-indigo-50 p-4">
+      <div className="flex flex-wrap items-start gap-4">
+        {/* Left: title + description */}
+        <div className="min-w-48 flex-1">
+          <p className="font-semibold text-gray-900 text-sm">Testa in Postman</p>
+          <p className="mt-0.5 text-gray-500 text-xs leading-relaxed">
+            Importa la collezione pre-configurata con variabili{" "}
+            <code className="rounded bg-white px-1 py-0.5 text-[10px] text-blue-700">{"{{baseUrl}}"}</code>,{" "}
+            <code className="rounded bg-white px-1 py-0.5 text-[10px] text-blue-700">{"{{apiKey}}"}</code> e{" "}
+            <code className="rounded bg-white px-1 py-0.5 text-[10px] text-blue-700">{"{{cronSecret}}"}</code> già
+            impostate.
+          </p>
+        </div>
+
+        {/* Right: action buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Primary: open Postman desktop via postman:// URI scheme — works on localhost */}
+          {nativeUrl && (
+            <a
+              href={nativeUrl}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-[#FF6C37] px-4 py-2 font-semibold text-white text-xs shadow-sm transition-opacity hover:opacity-90"
+              title="Apre l'app desktop Postman e importa la collezione"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+              Import in Postman
+            </a>
+          )}
+
+          {/* Secondary: Postman web — only useful when server is publicly accessible */}
+          {webUrl && !isLocalhost && (
+            <a
+              href={webUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#FF6C37]/40 bg-white px-3 py-2 font-medium text-[#FF6C37] text-xs shadow-sm transition-colors hover:bg-orange-50"
+              title="Apre Postman Web (richiede URL pubblico)"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Postman Web
+            </a>
+          )}
+
+          {/* Download Postman Collection */}
+          <a
+            href="/admin/api-docs/postman-collection.json"
+            download="flux-crm-postman-collection.json"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 font-medium text-gray-700 text-xs shadow-sm transition-colors hover:bg-gray-50"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download
+          </a>
+
+          {/* Download OpenAPI Spec */}
+          <a
+            href="/admin/api-docs/openapi.json"
+            download="flux-crm-openapi.json"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 font-medium text-gray-700 text-xs shadow-sm transition-colors hover:bg-gray-50"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            OpenAPI
+          </a>
+
+          {/* Copy collection URL */}
+          <button
+            type="button"
+            onClick={copyCollectionUrl}
+            title="Copia URL della collezione"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 font-medium text-gray-700 text-xs shadow-sm transition-colors hover:bg-gray-50"
+          >
+            {copied ? (
+              <>
+                <Check className="h-3.5 w-3.5 text-emerald-600" />
+                <span className="text-emerald-600">Copiato!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="h-3.5 w-3.5" />
+                URL
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Collection URL + localhost hint */}
+      <div className="mt-3 space-y-1.5">
+        <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-white/60 px-3 py-2">
+          <Globe className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+          <code className="flex-1 truncate font-mono text-[10px] text-blue-700">{collectionUrl}</code>
+          <span className="shrink-0 rounded bg-blue-100 px-1.5 py-0.5 font-semibold text-[9px] text-blue-600 uppercase tracking-wide">
+            Public
+          </span>
+        </div>
+        {isLocalhost && (
+          <p className="flex items-center gap-1.5 text-[10px] text-amber-600">
+            <Info className="h-3 w-3 shrink-0" />
+            <span>
+              Localhost rilevato — <strong>Import in Postman</strong> usa l'app desktop (che può raggiungere localhost).
+              Il pulsante <em>Postman Web</em> è nascosto perché richiede un URL pubblico.
+            </span>
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export function ApiDocsClient() {
@@ -2915,6 +3054,8 @@ export function ApiDocsClient() {
                   </span>
                 ))}
               </div>
+
+              <PostmanToolbar />
             </div>
           </div>
         </div>

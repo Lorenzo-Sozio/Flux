@@ -6,48 +6,29 @@
  * Requires platform admin/owner session (no tenant subdomain needed).
  */
 
-import { auth } from "@/auth";
-import { eq, desc, and, gte, lte, count, sql, isNotNull, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+
+import { and, desc, eq, or } from "drizzle-orm";
+
 import { platformDb } from "@/db";
-import {
-  tenants,
-  billingPlans,
-  billingSubscriptions,
-  billingTenantAddons,
-  billingUsageStats,
-} from "@/db/schema";
+import { billingPlans, billingSubscriptions, billingTenantAddons, tenants } from "@/db/schema";
+import { requireAdminPanelAccess } from "@/lib/auth-guard";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-import { getStripe } from "@/lib/billing/stripe";
-import {
-  invalidateEntitlementCache,
-  logEntitlementChange,
-} from "@/lib/billing/licensing";
+
+import { invalidateEntitlementCache, logEntitlementChange } from "@/lib/billing/licensing";
 import { PLAN_CONFIGS } from "@/lib/billing/plans-config";
-
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-
-async function requirePlatformAdmin() {
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Not authenticated");
-  const role = (session.user as { role?: string }).role;
-  if (role !== "admin" && role !== "owner") throw new Error("Platform admin required");
-  return session;
-}
+import { getStripe } from "@/lib/billing/stripe";
 
 // ─── Plans CRUD ───────────────────────────────────────────────────────────────
 
 export async function listPlans() {
-  await requirePlatformAdmin();
-  return platformDb
-    .select()
-    .from(billingPlans)
-    .orderBy(billingPlans.sortOrder);
+  await requireAdminPanelAccess();
+  return platformDb.select().from(billingPlans).orderBy(billingPlans.sortOrder);
 }
 
 export async function getPlan(id: string) {
-  await requirePlatformAdmin();
+  await requireAdminPanelAccess();
   return platformDb.query.billingPlans.findFirst({
     where: eq(billingPlans.id, id),
   });
@@ -71,8 +52,8 @@ export interface UpsertPlanInput {
   extraUserPriceMonthly: number;
   extraUserPriceAnnual: number;
   trialDays: number;
-  limits: string;          // JSON string
-  enabledModules: string;  // JSON string array
+  limits: string; // JSON string
+  enabledModules: string; // JSON string array
   supportTier: string;
   hasWhiteLabel: boolean;
   hasSandbox: boolean;
@@ -83,7 +64,7 @@ export interface UpsertPlanInput {
 }
 
 export async function createPlan(input: UpsertPlanInput) {
-  await requirePlatformAdmin();
+  await requireAdminPanelAccess();
   const [plan] = await platformDb
     .insert(billingPlans)
     .values({ ...input, maxUsers: input.maxUsers ?? null })
@@ -94,7 +75,7 @@ export async function createPlan(input: UpsertPlanInput) {
 }
 
 export async function updatePlan(id: string, input: Partial<UpsertPlanInput>) {
-  await requirePlatformAdmin();
+  await requireAdminPanelAccess();
   await platformDb
     .update(billingPlans)
     .set({ ...input, updatedAt: new Date() })
@@ -104,12 +85,9 @@ export async function updatePlan(id: string, input: Partial<UpsertPlanInput>) {
 }
 
 export async function deletePlan(id: string) {
-  await requirePlatformAdmin();
+  await requireAdminPanelAccess();
   // Soft delete
-  await platformDb
-    .update(billingPlans)
-    .set({ isActive: false, updatedAt: new Date() })
-    .where(eq(billingPlans.id, id));
+  await platformDb.update(billingPlans).set({ isActive: false, updatedAt: new Date() }).where(eq(billingPlans.id, id));
   revalidatePath("/admin/plans");
 }
 
@@ -119,7 +97,7 @@ export async function deletePlan(id: string) {
  * by checking name existence first.
  */
 export async function seedDefaultPlans() {
-  await requirePlatformAdmin();
+  await requireAdminPanelAccess();
 
   for (const [, cfg] of Object.entries(PLAN_CONFIGS)) {
     const existing = await platformDb.query.billingPlans.findFirst({
@@ -155,11 +133,8 @@ export async function seedDefaultPlans() {
 
 // ─── Subscription management ──────────────────────────────────────────────────
 
-export async function listSubscriptions(filters?: {
-  status?: string;
-  planId?: string;
-}) {
-  await requirePlatformAdmin();
+export async function listSubscriptions(filters?: { status?: string; planId?: string }) {
+  await requireAdminPanelAccess();
 
   const conditions = [];
   if (filters?.status) conditions.push(eq(billingSubscriptions.status, filters.status));
@@ -183,7 +158,7 @@ export async function listSubscriptions(filters?: {
 }
 
 export async function getTenantSubscription(tenantId: string) {
-  await requirePlatformAdmin();
+  await requireAdminPanelAccess();
   return platformDb.query.billingSubscriptions.findFirst({
     where: eq(billingSubscriptions.tenantId, tenantId),
     with: { plan: true, addons: true },
@@ -192,7 +167,7 @@ export async function getTenantSubscription(tenantId: string) {
 
 /** Manual admin upgrade/downgrade (immediate, no proration via Stripe). */
 export async function manualChangePlan(tenantId: string, planId: string, triggeredBy: string) {
-  await requirePlatformAdmin();
+  await requireAdminPanelAccess();
 
   const previous = await platformDb.query.billingSubscriptions.findFirst({
     where: eq(billingSubscriptions.tenantId, tenantId),
@@ -230,7 +205,7 @@ export async function manualChangePlan(tenantId: string, planId: string, trigger
 
 /** Suspends a tenant (blocks all access, keeps data). */
 export async function suspendTenant(tenantId: string, adminId: string) {
-  await requirePlatformAdmin();
+  await requireAdminPanelAccess();
 
   const previous = await platformDb.query.billingSubscriptions.findFirst({
     where: eq(billingSubscriptions.tenantId, tenantId),
@@ -256,7 +231,7 @@ export async function suspendTenant(tenantId: string, adminId: string) {
 
 /** Reactivates a suspended tenant to their previous plan or free. */
 export async function reactivateTenant(tenantId: string, adminId: string) {
-  await requirePlatformAdmin();
+  await requireAdminPanelAccess();
 
   const sub = await platformDb.query.billingSubscriptions.findFirst({
     where: eq(billingSubscriptions.tenantId, tenantId),
@@ -302,7 +277,7 @@ export async function reactivateTenant(tenantId: string, adminId: string) {
 
 /** Downgrades a tenant to Free plan (clears Stripe subscription, removes add-ons). */
 export async function downgradeToFree(tenantId: string, adminId: string) {
-  await requirePlatformAdmin();
+  await requireAdminPanelAccess();
 
   const sub = await platformDb.query.billingSubscriptions.findFirst({
     where: eq(billingSubscriptions.tenantId, tenantId),
@@ -310,7 +285,11 @@ export async function downgradeToFree(tenantId: string, adminId: string) {
 
   // Cancel Stripe subscription if it exists
   if (sub?.stripeSubscriptionId) {
-    await getStripe().subscriptions.cancel(sub.stripeSubscriptionId).catch(() => {});
+    await getStripe()
+      .subscriptions.cancel(sub.stripeSubscriptionId)
+      .catch(() => {
+        /* best-effort: local record is authoritative */
+      });
   }
 
   // Remove all active add-ons
@@ -354,7 +333,7 @@ export async function downgradeToFree(tenantId: string, adminId: string) {
  * Handles free-plan downgrade vs. paid plan change.
  */
 export async function adminSetTenantPlan(tenantId: string, planId: string) {
-  const session = await requirePlatformAdmin();
+  const session = await requireAdminPanelAccess();
 
   if (!UUID_RE.test(tenantId)) throw new Error("Invalid tenant ID format");
   if (!UUID_RE.test(planId)) throw new Error("Invalid plan ID format");
@@ -384,7 +363,11 @@ export async function adminSetTenantPlan(tenantId: string, planId: string) {
   } else if (plan.name === "free") {
     // Cancel any active Stripe subscription
     if (previousSub.stripeSubscriptionId) {
-      await getStripe().subscriptions.cancel(previousSub.stripeSubscriptionId).catch(() => {});
+      await getStripe()
+        .subscriptions.cancel(previousSub.stripeSubscriptionId)
+        .catch(() => {
+          /* best-effort: local record is authoritative */
+        });
     }
     // Remove active add-ons
     await platformDb
@@ -439,7 +422,7 @@ export async function adminSetTenantPlan(tenantId: string, planId: string) {
  * If no Stripe subscription exists, resets to free.
  */
 export async function adminSyncTenantSubscription(tenantId: string) {
-  const session = await requirePlatformAdmin();
+  const session = await requireAdminPanelAccess();
 
   if (!UUID_RE.test(tenantId)) throw new Error("Invalid tenant ID format");
 
@@ -465,14 +448,9 @@ export async function adminSyncTenantSubscription(tenantId: string) {
       updatedAt: new Date(),
     };
     if (sub) {
-      await platformDb
-        .update(billingSubscriptions)
-        .set(resetValues)
-        .where(eq(billingSubscriptions.tenantId, tenantId));
+      await platformDb.update(billingSubscriptions).set(resetValues).where(eq(billingSubscriptions.tenantId, tenantId));
     } else {
-      await platformDb
-        .insert(billingSubscriptions)
-        .values({ tenantId, status: "free" });
+      await platformDb.insert(billingSubscriptions).values({ tenantId, status: "free" });
     }
 
     invalidateEntitlementCache(tenantId);
@@ -497,24 +475,21 @@ export async function adminSyncTenantSubscription(tenantId: string) {
   const priceId = stripeSub.items.data[0]?.price?.id;
   if (priceId) {
     const matched = await platformDb.query.billingPlans.findFirst({
-      where: or(
-        eq(billingPlans.stripePriceMonthlyId, priceId),
-        eq(billingPlans.stripePriceAnnualId, priceId),
-      ),
+      where: or(eq(billingPlans.stripePriceMonthlyId, priceId), eq(billingPlans.stripePriceAnnualId, priceId)),
     });
     if (matched) planId = matched.id;
   }
 
   // Map Stripe status → our status
   const statusMap: Record<string, string> = {
-    active:             "active",
-    trialing:           "trialing",
-    past_due:           "past_due",
-    canceled:           "canceled",
-    unpaid:             "past_due",
-    incomplete:         "past_due",
+    active: "active",
+    trialing: "trialing",
+    past_due: "past_due",
+    canceled: "canceled",
+    unpaid: "past_due",
+    incomplete: "past_due",
     incomplete_expired: "canceled",
-    paused:             "suspended",
+    paused: "suspended",
   };
   const newStatus = statusMap[stripeSub.status] ?? stripeSub.status;
 
@@ -534,14 +509,10 @@ export async function adminSyncTenantSubscription(tenantId: string) {
       status: newStatus,
       billingCycle,
       quantity: stripeSub.items.data[0]?.quantity ?? 1,
-      currentPeriodStart: raw.current_period_start
-        ? new Date(raw.current_period_start * 1000) : null,
-      currentPeriodEnd: raw.current_period_end
-        ? new Date(raw.current_period_end * 1000) : null,
-      trialEnd: stripeSub.trial_end
-        ? new Date(stripeSub.trial_end * 1000) : null,
-      canceledAt: stripeSub.canceled_at
-        ? new Date(stripeSub.canceled_at * 1000) : null,
+      currentPeriodStart: raw.current_period_start ? new Date(raw.current_period_start * 1000) : null,
+      currentPeriodEnd: raw.current_period_end ? new Date(raw.current_period_end * 1000) : null,
+      trialEnd: stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000) : null,
+      canceledAt: stripeSub.canceled_at ? new Date(stripeSub.canceled_at * 1000) : null,
       gracePeriodEnd: null,
       updatedAt: new Date(),
     })
@@ -564,7 +535,7 @@ export async function adminSyncTenantSubscription(tenantId: string) {
 // ─── Reporting metrics ────────────────────────────────────────────────────────
 
 export async function getAdminMetrics() {
-  await requirePlatformAdmin();
+  await requireAdminPanelAccess();
 
   const allSubs = await platformDb
     .select({
@@ -589,19 +560,27 @@ export async function getAdminMetrics() {
   const perPlan: Record<string, { count: number; mrr: number }> = {};
 
   for (const sub of allSubs) {
-    if (sub.status === "canceled") { canceledCount++; continue; }
-    if (sub.status === "suspended") { suspendedCount++; continue; }
-    if (sub.status === "trialing") { trialCount++; continue; } // trials have not paid; exclude from MRR
-    if (sub.status === "past_due") { pastDueCount++; }
+    if (sub.status === "canceled") {
+      canceledCount++;
+      continue;
+    }
+    if (sub.status === "suspended") {
+      suspendedCount++;
+      continue;
+    }
+    if (sub.status === "trialing") {
+      trialCount++;
+      continue;
+    } // trials have not paid; exclude from MRR
+    if (sub.status === "past_due") {
+      pastDueCount++;
+    }
     // Only active and past_due subs count toward MRR (revenue already billed/owed)
     if (["active", "past_due"].includes(sub.status)) {
       activeCount++;
       const plan = sub.planId ? planMap[sub.planId] : null;
       if (plan) {
-        const pricePerUser =
-          sub.billingCycle === "annual"
-            ? plan.pricePerUserAnnual
-            : plan.pricePerUserMonthly;
+        const pricePerUser = sub.billingCycle === "annual" ? plan.pricePerUserAnnual : plan.pricePerUserMonthly;
         const subMrr = pricePerUser * sub.quantity;
         mrr += subMrr;
 
@@ -619,10 +598,10 @@ export async function getAdminMetrics() {
   const arpu = activeCount > 0 ? Math.round(mrr / activeCount) : 0;
 
   return {
-    mrr,          // cents
-    arr,          // cents
-    arpu,         // cents
-    churnRate,    // percent
+    mrr, // cents
+    arr, // cents
+    arpu, // cents
+    churnRate, // percent
     activeCount,
     trialCount,
     pastDueCount,
