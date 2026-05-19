@@ -24,6 +24,7 @@ const EMPTY_METRICS = {
   pastDueCount: 0,
   suspendedCount: 0,
   canceledCount: 0,
+  freeCount: 0,
   totalTenants: 0,
   perPlan: {},
 };
@@ -78,13 +79,14 @@ export default async function AdminBillingPage() {
         trialCount={metrics.trialCount}
         pastDueCount={metrics.pastDueCount}
         suspendedCount={metrics.suspendedCount}
+        freeCount={metrics.freeCount}
         totalTenants={metrics.totalTenants}
       />
 
       <Tabs defaultValue="all">
         <TabsList>
           <TabsTrigger value="all">All ({subscriptions.length})</TabsTrigger>
-          <TabsTrigger value="active">Active ({metrics.activeCount})</TabsTrigger>
+          <TabsTrigger value="active">Active ({metrics.activeCount + metrics.trialCount})</TabsTrigger>
           <TabsTrigger value="issues">Issues ({metrics.pastDueCount + metrics.suspendedCount})</TabsTrigger>
         </TabsList>
 

@@ -10,15 +10,17 @@
  *
  * The scheduler should pass the header: Authorization: Bearer <CRON_SECRET>
  */
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/tenant-context";
-import { verifyCronRequest } from "@/lib/cron-auth";
-import { users } from "@/db/schema";
+import { type NextRequest, NextResponse } from "next/server";
+
 import { eq } from "drizzle-orm";
-import { getTasksDueToday } from "@/actions/tasks";
+
 import { getActivitiesDueToday } from "@/actions/activities";
 import { createNotificationAction } from "@/actions/auth";
-import { sendTaskDueEmail, sendActivityReminderEmail } from "@/lib/email";
+import { getTasksDueToday } from "@/actions/tasks";
+import { users } from "@/db/schema";
+import { verifyCronRequest } from "@/lib/cron-auth";
+import { sendActivityReminderEmail, sendTaskDueEmail } from "@/lib/email";
+import { getDb } from "@/lib/tenant-context";
 
 export async function GET(req: NextRequest) {
   const authError = verifyCronRequest(req);
@@ -33,10 +35,7 @@ export async function GET(req: NextRequest) {
     const userId = task.assigneeId ?? task.ownerId;
     if (!userId) continue;
 
-    const [user] = await db
-      .select({ email: users.email, name: users.name })
-      .from(users)
-      .where(eq(users.id, userId));
+    const [user] = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, userId));
 
     if (!user) continue;
 

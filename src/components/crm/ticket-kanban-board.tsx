@@ -1,22 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+
 import Link from "next/link";
+
+import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
+import { AlertCircle, Mail, MessageCircle, MessageSquare, Phone, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd";
+
 import { updateTicketStatusAction } from "@/actions/support";
+import { CreateTicketButton } from "@/components/crm/create-ticket-button";
+import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
-import { CreateTicketButton } from "@/components/crm/create-ticket-button";
-import {
-  Mail,
-  MessageCircle,
-  Phone,
-  Users,
-  MessageSquare,
-  AlertCircle,
-} from "lucide-react";
 
 type Ticket = {
   id: string;
@@ -32,38 +28,62 @@ type Ticket = {
 };
 
 const COLUMN_CONFIG = [
-  { id: "open",        color: "bg-blue-50 dark:bg-blue-950/30",     textColor: "text-blue-700 dark:text-blue-300",    borderColor: "#3b82f6" },
-  { id: "in_progress", color: "bg-amber-50 dark:bg-amber-950/30",   textColor: "text-amber-700 dark:text-amber-300",  borderColor: "#f59e0b" },
-  { id: "waiting",     color: "bg-orange-50 dark:bg-orange-950/30", textColor: "text-orange-700 dark:text-orange-300", borderColor: "#f97316" },
-  { id: "resolved",    color: "bg-green-50 dark:bg-green-950/30",   textColor: "text-green-700 dark:text-green-300",  borderColor: "#22c55e" },
-  { id: "closed",      color: "bg-gray-50 dark:bg-gray-900/30",     textColor: "text-gray-600 dark:text-gray-400",    borderColor: "#6b7280" },
+  {
+    id: "open",
+    color: "bg-blue-50 dark:bg-blue-950/30",
+    textColor: "text-blue-700 dark:text-blue-300",
+    borderColor: "#3b82f6",
+  },
+  {
+    id: "in_progress",
+    color: "bg-amber-50 dark:bg-amber-950/30",
+    textColor: "text-amber-700 dark:text-amber-300",
+    borderColor: "#f59e0b",
+  },
+  {
+    id: "waiting",
+    color: "bg-orange-50 dark:bg-orange-950/30",
+    textColor: "text-orange-700 dark:text-orange-300",
+    borderColor: "#f97316",
+  },
+  {
+    id: "resolved",
+    color: "bg-green-50 dark:bg-green-950/30",
+    textColor: "text-green-700 dark:text-green-300",
+    borderColor: "#22c55e",
+  },
+  {
+    id: "closed",
+    color: "bg-gray-50 dark:bg-gray-900/30",
+    textColor: "text-gray-600 dark:text-gray-400",
+    borderColor: "#6b7280",
+  },
 ] as const;
 
 const PRIORITY_BORDER: Record<string, string> = {
   urgent: "#ef4444",
-  high:   "#f97316",
+  high: "#f97316",
   normal: "#3b82f6",
-  low:    "#9ca3af",
+  low: "#9ca3af",
 };
 
 const CHANNEL_ICONS: Record<string, React.ReactNode> = {
-  email:  <Mail className="h-3 w-3" />,
-  chat:   <MessageCircle className="h-3 w-3" />,
-  phone:  <Phone className="h-3 w-3" />,
+  email: <Mail className="h-3 w-3" />,
+  chat: <MessageCircle className="h-3 w-3" />,
+  phone: <Phone className="h-3 w-3" />,
   social: <Users className="h-3 w-3" />,
 };
 
-function TicketKanbanCard({
-  ticket,
-  isDragging,
-}: {
-  ticket: Ticket;
-  isDragging: boolean;
-}) {
+function TicketKanbanCard({ ticket, isDragging }: { ticket: Ticket; isDragging: boolean }) {
   const priorityBorder = PRIORITY_BORDER[ticket.priority] ?? PRIORITY_BORDER.normal;
   const msgCount = ticket.messages?.length ?? 0;
   const initials = ticket.assignee?.name
-    ? ticket.assignee.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
+    ? ticket.assignee.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase()
+        .slice(0, 2)
     : null;
 
   return (
@@ -91,11 +111,7 @@ function TicketKanbanCard({
       </Link>
 
       {/* Customer */}
-      {ticket.contact?.name && (
-        <p className="text-xs text-muted-foreground truncate">
-          {ticket.contact.name}
-        </p>
-      )}
+      {ticket.contact?.name && <p className="text-xs text-muted-foreground truncate">{ticket.contact.name}</p>}
 
       {/* Footer: channel + messages + assignee */}
       <div className="flex items-center justify-between mt-1">
@@ -123,13 +139,7 @@ function TicketKanbanCard({
   );
 }
 
-export function TicketKanbanBoard({
-  initialTickets,
-  canEdit = true,
-}: {
-  initialTickets: Ticket[];
-  canEdit?: boolean;
-}) {
+export function TicketKanbanBoard({ initialTickets, canEdit = true }: { initialTickets: Ticket[]; canEdit?: boolean }) {
   const t = useTranslations("support.tickets");
   const COLUMNS = COLUMN_CONFIG.map((col) => ({
     ...col,
@@ -138,8 +148,12 @@ export function TicketKanbanBoard({
   const [isMounted, setIsMounted] = useState(false);
   const [tickets, setTickets] = useState(initialTickets);
 
-  useEffect(() => { setIsMounted(true); }, []);
-  useEffect(() => { setTickets(initialTickets); }, [initialTickets]);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  useEffect(() => {
+    setTickets(initialTickets);
+  }, [initialTickets]);
 
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
@@ -149,9 +163,7 @@ export function TicketKanbanBoard({
     const newStatus = destination.droppableId;
 
     // Optimistic update
-    setTickets((prev) =>
-      prev.map((t) => (t.id === draggableId ? { ...t, status: newStatus } : t))
-    );
+    setTickets((prev) => prev.map((t) => (t.id === draggableId ? { ...t, status: newStatus } : t)));
 
     try {
       await updateTicketStatusAction(draggableId, newStatus);
@@ -165,82 +177,69 @@ export function TicketKanbanBoard({
   return (
     <DragDropContext onDragEnd={onDragEnd}>
       <div className="h-full flex gap-3 overflow-x-auto pb-4">
-          {COLUMNS.map((col) => {
-            const colTickets = tickets.filter((t) => t.status === col.id);
+        {COLUMNS.map((col) => {
+          const colTickets = tickets.filter((t) => t.status === col.id);
 
-            return (
-              <div
-                key={col.id}
-                className={`flex-1 min-w-[240px] flex flex-col rounded-xl border ${col.color} overflow-hidden shadow-sm`}
-              >
-                {/* Column header */}
-                <div className="px-3 py-2.5 border-b bg-background/60 backdrop-blur-sm flex items-center justify-between shrink-0">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="w-2 h-2 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: col.borderColor }}
-                    />
-                    <h3 className={`text-xs font-bold uppercase tracking-wide ${col.textColor}`}>
-                      {col.label}
-                    </h3>
-                  </div>
-                  <Badge variant="secondary" className="rounded-full h-5 text-[10px] px-2">
-                    {colTickets.length}
-                  </Badge>
+          return (
+            <div
+              key={col.id}
+              className={`flex-1 min-w-[240px] flex flex-col rounded-xl border ${col.color} overflow-hidden shadow-sm`}
+            >
+              {/* Column header */}
+              <div className="px-3 py-2.5 border-b bg-background/60 backdrop-blur-sm flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: col.borderColor }} />
+                  <h3 className={`text-xs font-bold uppercase tracking-wide ${col.textColor}`}>{col.label}</h3>
                 </div>
+                <Badge variant="secondary" className="rounded-full h-5 text-[10px] px-2">
+                  {colTickets.length}
+                </Badge>
+              </div>
 
-                {/* Droppable area */}
-                <Droppable droppableId={col.id}>
-                  {(provided, snapshot) => (
-                    <div
-                      {...provided.droppableProps}
-                      ref={provided.innerRef}
-                      className={`flex-1 overflow-y-auto p-2 flex flex-col gap-2 transition-colors min-h-[80px] ${
-                        snapshot.isDraggingOver ? "bg-primary/5" : "bg-transparent"
-                      }`}
-                    >
-                      {colTickets.map((ticket, index) => (
-                        <Draggable
-                          key={ticket.id}
-                          draggableId={ticket.id}
-                          index={index}
-                          isDragDisabled={!canEdit}
-                        >
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              style={{ ...provided.draggableProps.style }}
-                            >
-                              <TicketKanbanCard
-                                ticket={ticket}
-                                isDragging={snapshot.isDragging}
-                              />
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
-                      {provided.placeholder}
+              {/* Droppable area */}
+              <Droppable droppableId={col.id}>
+                {(provided, snapshot) => (
+                  <div
+                    {...provided.droppableProps}
+                    ref={provided.innerRef}
+                    className={`flex-1 overflow-y-auto p-2 flex flex-col gap-2 transition-colors min-h-[80px] ${
+                      snapshot.isDraggingOver ? "bg-primary/5" : "bg-transparent"
+                    }`}
+                  >
+                    {colTickets.map((ticket, index) => (
+                      <Draggable key={ticket.id} draggableId={ticket.id} index={index} isDragDisabled={!canEdit}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            {...provided.dragHandleProps}
+                            style={{ ...provided.draggableProps.style }}
+                          >
+                            <TicketKanbanCard ticket={ticket} isDragging={snapshot.isDragging} />
+                          </div>
+                        )}
+                      </Draggable>
+                    ))}
+                    {provided.placeholder}
 
-                      {colTickets.length === 0 && !snapshot.isDraggingOver && (
-                        <div className="flex-1 flex items-center justify-center py-6">
-                          <p className="text-xs text-muted-foreground italic">{t("emptyColumn")}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </Droppable>
-
-                {/* Add ticket button (Open column only) */}
-                {col.id === "open" && canEdit && (
-                  <div className="p-2 border-t bg-background/40 shrink-0">
-                    <CreateTicketButton variant="ghost" />
+                    {colTickets.length === 0 && !snapshot.isDraggingOver && (
+                      <div className="flex-1 flex items-center justify-center py-6">
+                        <p className="text-xs text-muted-foreground italic">{t("emptyColumn")}</p>
+                      </div>
+                    )}
                   </div>
                 )}
-              </div>
-            );
-          })}
+              </Droppable>
+
+              {/* Add ticket button (Open column only) */}
+              {col.id === "open" && canEdit && (
+                <div className="p-2 border-t bg-background/40 shrink-0">
+                  <CreateTicketButton variant="ghost" />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </DragDropContext>
   );

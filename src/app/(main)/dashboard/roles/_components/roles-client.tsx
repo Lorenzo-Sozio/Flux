@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+
+import { Crown, Eye, Pencil, Shield } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { Shield, Crown, Pencil, Eye } from "lucide-react";
 
 import { updateUserRoleAction } from "@/actions/auth";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
@@ -14,7 +16,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
 interface User {
@@ -91,10 +92,7 @@ function UserCard({
   const isOwner = user.role === "owner";
   // owners can change anyone except themselves; admins can only change non-owner/non-admin users
   const canChange =
-    !isSelf &&
-    !isOwner &&
-    (currentUserRole === "owner" ||
-      (currentUserRole === "admin" && user.role !== "admin"));
+    !isSelf && !isOwner && (currentUserRole === "owner" || (currentUserRole === "admin" && user.role !== "admin"));
 
   const initials = (user.name ?? user.email ?? "?")
     .split(" ")
@@ -123,15 +121,17 @@ function UserCard({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              {(currentUserRole === "owner" ? (["owner", ...ASSIGNABLE_ROLES] as RoleId[]) : ASSIGNABLE_ROLES).map((r) => (
-                <DropdownMenuItem
-                  key={r}
-                  onSelect={() => onRoleChange(user.id, r)}
-                  className={user.role === r ? "bg-muted" : ""}
-                >
-                  <RoleBadge role={r} />
-                </DropdownMenuItem>
-              ))}
+              {(currentUserRole === "owner" ? (["owner", ...ASSIGNABLE_ROLES] as RoleId[]) : ASSIGNABLE_ROLES).map(
+                (r) => (
+                  <DropdownMenuItem
+                    key={r}
+                    onSelect={() => onRoleChange(user.id, r)}
+                    className={user.role === r ? "bg-muted" : ""}
+                  >
+                    <RoleBadge role={r} />
+                  </DropdownMenuItem>
+                ),
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
@@ -153,9 +153,7 @@ export function RolesClient({ users: initialUsers, currentUserId, currentUserRol
     startTransition(async () => {
       try {
         await updateUserRoleAction(userId, newRole);
-        setUsers((prev) =>
-          prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u))
-        );
+        setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
         toast.success(t("roleUpdated"));
       } catch {
         toast.error(t("roleUpdateFailed"));
@@ -188,7 +186,9 @@ export function RolesClient({ users: initialUsers, currentUserId, currentUserRol
               <Card key={role.id} className="border">
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base flex items-center gap-2">
-                    <span className={`inline-flex items-center gap-1.5 text-sm font-semibold px-2.5 py-1 rounded-full ${role.color}`}>
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-sm font-semibold px-2.5 py-1 rounded-full ${role.color}`}
+                    >
                       <Icon className="h-3.5 w-3.5" />
                       {t(`roleLabel.${role.id}`)}
                     </span>
@@ -222,7 +222,9 @@ export function RolesClient({ users: initialUsers, currentUserId, currentUserRol
             return (
               <div key={role.id}>
                 <div className="flex items-center gap-2 mb-3">
-                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${role.color}`}>
+                  <span
+                    className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${role.color}`}
+                  >
                     <Icon className="h-3 w-3" />
                     {t(`roleLabel.${role.id}`)}
                   </span>

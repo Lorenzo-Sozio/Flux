@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
+
 import Link from "next/link";
+
 import {
   ArrowRight,
   BarChart3,
@@ -18,15 +20,11 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -380,9 +378,7 @@ export default function AdminHelpPage() {
       s.title.toLowerCase().includes(q) ||
       s.subtitle.toLowerCase().includes(q) ||
       s.description.toLowerCase().includes(q) ||
-      s.topics.some(
-        (t) => t.q.toLowerCase().includes(q) || t.a.toLowerCase().includes(q),
-      )
+      s.topics.some((t) => t.q.toLowerCase().includes(q) || t.a.toLowerCase().includes(q))
     );
   });
 
@@ -396,7 +392,6 @@ export default function AdminHelpPage() {
 
   return (
     <div className="flex min-h-full gap-6">
-
       {/* ── TOC Sidebar ──────────────────────────────────────────────────────── */}
       <aside className="hidden w-56 shrink-0 xl:block">
         <div className="sticky top-4 space-y-3">
@@ -438,7 +433,6 @@ export default function AdminHelpPage() {
 
       {/* ── Main Content ─────────────────────────────────────────────────────── */}
       <div className="min-w-0 flex-1 space-y-6 pb-16">
-
         {/* Header */}
         <div className="flex items-start gap-4 rounded-xl border bg-gradient-to-br from-primary/5 to-primary/0 p-6">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10">
@@ -447,7 +441,8 @@ export default function AdminHelpPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Documentazione Amministratore</h1>
             <p className="mt-1 text-muted-foreground">
-              Guida completa alla configurazione e gestione della piattaforma: tenant, fatturazione, piani e integrazione Stripe.
+              Guida completa alla configurazione e gestione della piattaforma: tenant, fatturazione, piani e
+              integrazione Stripe.
             </p>
           </div>
         </div>
@@ -466,9 +461,7 @@ export default function AdminHelpPage() {
         {/* Quick links */}
         {!search && (
           <div>
-            <p className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Sezioni principali
-            </p>
+            <p className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">Sezioni principali</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
               {sections.map((s) => {
                 const Icon = s.icon;
@@ -497,12 +490,8 @@ export default function AdminHelpPage() {
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center py-20 text-center">
             <Search className="mb-4 h-10 w-10 text-muted-foreground/30" />
-            <p className="font-medium text-muted-foreground">
-              Nessun risultato per &ldquo;{search}&rdquo;
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Prova con un termine diverso.
-            </p>
+            <p className="font-medium text-muted-foreground">Nessun risultato per &ldquo;{search}&rdquo;</p>
+            <p className="mt-1 text-sm text-muted-foreground">Prova con un termine diverso.</p>
           </div>
         ) : (
           filtered.map((section) => {
@@ -511,16 +500,13 @@ export default function AdminHelpPage() {
               <section
                 key={section.id}
                 id={section.id}
-                ref={(el) => { sectionRefs.current[section.id] = el; }}
+                ref={(el) => {
+                  sectionRefs.current[section.id] = el;
+                }}
                 className="scroll-mt-6"
               >
                 <Card className={cn("overflow-hidden border", section.border)}>
-                  <CardHeader
-                    className={cn(
-                      "flex flex-row items-center gap-4 border-b pb-4",
-                      section.bg,
-                    )}
-                  >
+                  <CardHeader className={cn("flex flex-row items-center gap-4 border-b pb-4", section.bg)}>
                     <div
                       className={cn(
                         "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border",
@@ -556,18 +542,12 @@ export default function AdminHelpPage() {
                   <CardContent className="p-0">
                     <div className="flex items-start gap-3 border-b bg-muted/20 px-6 py-4">
                       <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                      <p className="text-sm leading-relaxed text-muted-foreground">
-                        {section.description}
-                      </p>
+                      <p className="text-sm leading-relaxed text-muted-foreground">{section.description}</p>
                     </div>
 
                     <Accordion type="multiple" className="divide-y">
                       {section.topics.map((topic, i) => (
-                        <AccordionItem
-                          key={i}
-                          value={`${section.id}-${i}`}
-                          className="border-0 px-6"
-                        >
+                        <AccordionItem key={i} value={`${section.id}-${i}`} className="border-0 px-6">
                           <AccordionTrigger className="py-4 text-left text-sm font-medium hover:no-underline">
                             {topic.q}
                           </AccordionTrigger>
@@ -588,7 +568,8 @@ export default function AdminHelpPage() {
         <div className="rounded-xl border bg-muted/30 p-6 text-center">
           <p className="text-sm font-medium">Hai bisogno di assistenza tecnica?</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Controlla i log applicativi, la console Drizzle Studio e il dashboard Stripe per diagnosticare i problemi più comuni.
+            Controlla i log applicativi, la console Drizzle Studio e il dashboard Stripe per diagnosticare i problemi
+            più comuni.
           </p>
         </div>
       </div>

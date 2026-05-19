@@ -15,6 +15,7 @@ import {
   Users,
   Volume2,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import {
   createGroupConversation,
@@ -44,7 +45,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useTranslations } from "next-intl";
 import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -396,8 +396,12 @@ export function ChatClient({ userId }: { userId: string }) {
                               {t("muteFor")}
                             </DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => handleMute(conv.id, 60)}>{t("mute1h")}</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleMute(conv.id, 8 * 60)}>{t("mute8h")}</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleMute(conv.id, 24 * 60)}>{t("mute24h")}</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleMute(conv.id, 8 * 60)}>
+                              {t("mute8h")}
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleMute(conv.id, 24 * 60)}>
+                              {t("mute24h")}
+                            </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleMute(conv.id, 999_999_999)}>
                               {t("muteForever")}
                             </DropdownMenuItem>
@@ -469,7 +473,9 @@ export function ChatClient({ userId }: { userId: string }) {
               <div className="min-w-0">
                 <p className="font-semibold text-sm leading-tight">{convName(activeConv, myId)}</p>
                 {activeConv.type === "group" && (
-                  <p className="text-xs text-muted-foreground">{t("membersCount", { count: activeConv.members.length })}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("membersCount", { count: activeConv.members.length })}
+                  </p>
                 )}
               </div>
             </div>
@@ -506,7 +512,9 @@ export function ChatClient({ userId }: { userId: string }) {
                         >
                           {msg.content}
                         </div>
-                        <p className="text-[10px] text-muted-foreground mt-0.5 px-0.5">{formatTime(msg.createdAt, t("yesterday"))}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 px-0.5">
+                          {formatTime(msg.createdAt, t("yesterday"))}
+                        </p>
                       </div>
                     </div>
                   );
@@ -577,7 +585,11 @@ export function ChatClient({ userId }: { userId: string }) {
             <DialogTitle>{t("newGroupTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <Input placeholder={t("groupNamePlaceholder")} value={groupName} onChange={(e) => setGroupName(e.target.value)} />
+            <Input
+              placeholder={t("groupNamePlaceholder")}
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+            />
             <p className="text-xs font-medium text-muted-foreground uppercase">{t("selectMembers")}</p>
             <ScrollArea className="max-h-56">
               <div className="space-y-1">

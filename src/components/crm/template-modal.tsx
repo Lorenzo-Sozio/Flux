@@ -1,23 +1,25 @@
 "use client";
 
 import { useState } from "react";
+
+import { toast } from "sonner";
+
+import { createEmailTemplate, updateEmailTemplate } from "@/actions/marketing";
+import { RichTextEditor } from "@/components/crm/rich-text-editor";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { toast } from "sonner";
-import { createEmailTemplate, updateEmailTemplate } from "@/actions/marketing";
-import { Badge } from "@/components/ui/badge";
-import { RichTextEditor } from "@/components/crm/rich-text-editor";
+import { Textarea } from "@/components/ui/textarea";
 
 interface TemplateModalProps {
   template?: {
@@ -125,7 +127,9 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
 
       <DialogContent className="!max-w-7xl w-[90vw] max-h-[95vh] flex flex-col p-0">
         <DialogHeader className="px-8 py-6 border-b flex-shrink-0">
-          <DialogTitle className="text-2xl">{template ? "Edit Email Template" : "Create New Email Template"}</DialogTitle>
+          <DialogTitle className="text-2xl">
+            {template ? "Edit Email Template" : "Create New Email Template"}
+          </DialogTitle>
           <DialogDescription>
             Design a professional email template with HTML support and dynamic placeholders.
           </DialogDescription>
@@ -135,7 +139,9 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
           {/* Basic Info - Compact Grid */}
           <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-semibold">Template Name *</Label>
+              <Label htmlFor="name" className="text-sm font-semibold">
+                Template Name *
+              </Label>
               <Input
                 id="name"
                 placeholder="e.g., Welcome Email"
@@ -147,7 +153,9 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category" className="text-sm font-semibold">Category</Label>
+              <Label htmlFor="category" className="text-sm font-semibold">
+                Category
+              </Label>
               <select
                 id="category"
                 value={formData.category}
@@ -163,7 +171,9 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
             </div>
 
             <div className="space-y-2 xl:col-span-2">
-              <Label htmlFor="subject" className="text-sm font-semibold">Subject Line *</Label>
+              <Label htmlFor="subject" className="text-sm font-semibold">
+                Subject Line *
+              </Label>
               <Input
                 id="subject"
                 placeholder="e.g., Welcome to Flux, {firstName}!"
@@ -175,7 +185,10 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
             </div>
 
             <div className="flex items-end">
-              <Label htmlFor="isHtml" className="text-sm cursor-pointer flex items-center gap-2 bg-blue-50 dark:bg-blue-950 p-3 rounded-md border border-blue-200 dark:border-blue-800 w-full justify-center">
+              <Label
+                htmlFor="isHtml"
+                className="text-sm cursor-pointer flex items-center gap-2 bg-blue-50 dark:bg-blue-950 p-3 rounded-md border border-blue-200 dark:border-blue-800 w-full justify-center"
+              >
                 <input
                   id="isHtml"
                   type="checkbox"
@@ -190,7 +203,9 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description" className="text-sm font-semibold">Description (Internal Notes)</Label>
+            <Label htmlFor="description" className="text-sm font-semibold">
+              Description (Internal Notes)
+            </Label>
             <Textarea
               id="description"
               placeholder="Internal notes about this template, usage guidelines, target audience..."
@@ -240,9 +255,15 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
           <div className="flex-1 overflow-auto border rounded-lg flex flex-col">
             <Tabs defaultValue="visual" value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
               <TabsList className="w-full justify-start rounded-none border-b bg-muted/50">
-                <TabsTrigger value="visual" className="text-sm font-semibold">✏️ Visual Editor</TabsTrigger>
-                <TabsTrigger value="editor" className="text-sm font-semibold">📝 HTML Source</TabsTrigger>
-                <TabsTrigger value="preview" className="text-sm font-semibold">👁️ Preview</TabsTrigger>
+                <TabsTrigger value="visual" className="text-sm font-semibold">
+                  ✏️ Visual Editor
+                </TabsTrigger>
+                <TabsTrigger value="editor" className="text-sm font-semibold">
+                  📝 HTML Source
+                </TabsTrigger>
+                <TabsTrigger value="preview" className="text-sm font-semibold">
+                  👁️ Preview
+                </TabsTrigger>
               </TabsList>
 
               {/* Visual (TipTap) Editor */}
@@ -267,14 +288,18 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
               </TabsContent>
 
               {/* Preview */}
-              <TabsContent value="preview" className="flex-1 overflow-auto p-8 bg-gradient-to-b from-muted/20 to-muted/40">
+              <TabsContent
+                value="preview"
+                className="flex-1 overflow-auto p-8 bg-gradient-to-b from-muted/20 to-muted/40"
+              >
                 <div className="max-w-3xl mx-auto">
-                  <div className="bg-white rounded-lg shadow-lg p-8 font-sans text-sm"
+                  <div
+                    className="bg-white rounded-lg shadow-lg p-8 font-sans text-sm"
                     dangerouslySetInnerHTML={{
                       __html: formData.body
                         .replace(/\{\{nome\}\}/gi, "Mario")
                         .replace(/\{\{cognome\}\}/gi, "Rossi")
-                        .replace(/\{\{email\}\}/gi, "mario.rossi@example.com")
+                        .replace(/\{\{email\}\}/gi, "mario.rossi@example.com"),
                     }}
                   />
                 </div>
@@ -285,7 +310,11 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
           {/* Footer Info */}
           <div className="flex items-center justify-between text-sm">
             <div className="text-muted-foreground">
-              💡 Available placeholders: <code className="bg-muted px-2 py-1 rounded text-xs font-mono">firstName</code> <code className="bg-muted px-2 py-1 rounded text-xs font-mono">lastName</code> <code className="bg-muted px-2 py-1 rounded text-xs font-mono">email</code> <code className="bg-muted px-2 py-1 rounded text-xs font-mono">companyName</code> <code className="bg-muted px-2 py-1 rounded text-xs font-mono">phone</code>
+              💡 Available placeholders: <code className="bg-muted px-2 py-1 rounded text-xs font-mono">firstName</code>{" "}
+              <code className="bg-muted px-2 py-1 rounded text-xs font-mono">lastName</code>{" "}
+              <code className="bg-muted px-2 py-1 rounded text-xs font-mono">email</code>{" "}
+              <code className="bg-muted px-2 py-1 rounded text-xs font-mono">companyName</code>{" "}
+              <code className="bg-muted px-2 py-1 rounded text-xs font-mono">phone</code>
             </div>
           </div>
 

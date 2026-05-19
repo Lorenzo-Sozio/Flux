@@ -1,7 +1,9 @@
-import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
-import * as schema from '../db/schema';
-import * as dotenv from 'dotenv';
+import { neon } from "@neondatabase/serverless";
+import * as dotenv from "dotenv";
+import { drizzle } from "drizzle-orm/neon-http";
+
+import * as schema from "../db/schema";
+
 dotenv.config();
 
 const sql = neon(process.env.DATABASE_URL!);
@@ -12,7 +14,7 @@ async function run() {
   try {
     const owner = await db.select().from(schema.users).limit(1);
     const ownerId = owner[0].id;
-    
+
     await db.insert(schema.leads).values({
       firstName: "Test",
       lastName: "User",
@@ -20,7 +22,7 @@ async function run() {
       ownerId: ownerId,
     });
     console.log("Success");
-  } catch(e) {
+  } catch (e) {
     console.error("DB Error:", e);
   }
 }

@@ -57,12 +57,7 @@ export function FunnelChart({ stages, conversionRates }: { stages: Stage[]; conv
 
 export function PeriodSelector({ current, base }: { current: number; base: string }) {
   const t = useTranslations("analytics.funnel");
-  const options = [
-    { value: 30 },
-    { value: 90 },
-    { value: 180 },
-    { value: 365 },
-  ];
+  const options = [{ value: 30 }, { value: 90 }, { value: 180 }, { value: 365 }];
 
   return (
     <div className="flex gap-1 rounded-lg border p-1">

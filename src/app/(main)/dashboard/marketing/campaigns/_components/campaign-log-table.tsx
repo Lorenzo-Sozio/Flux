@@ -1,16 +1,23 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
+
 import { format } from "date-fns";
 import {
-  Send, Eye, MousePointerClick, AlertCircle, UserMinus,
-  Clock, CheckCircle2, MessageCircleWarning, Search,
+  AlertCircle,
+  CheckCircle2,
+  Clock,
+  Eye,
+  MessageCircleWarning,
+  MousePointerClick,
+  Search,
+  Send,
+  UserMinus,
 } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,24 +38,28 @@ export interface LogRow {
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<string, { label: string; className: string; icon: React.ElementType }> = {
-  queued:       { label: "Queued",       className: "border-slate-300  text-slate-600",                       icon: Clock },
-  sent:         { label: "Sent",         className: "border-blue-300   text-blue-700   bg-blue-50",           icon: Send },
-  opened:       { label: "Opened",       className: "border-violet-300 text-violet-700 bg-violet-50",         icon: Eye },
-  clicked:      { label: "Clicked",      className: "border-green-300  text-green-700  bg-green-50",          icon: MousePointerClick },
-  bounced:      { label: "Bounced",      className: "border-amber-300  text-amber-700  bg-amber-50",          icon: AlertCircle },
-  complained:   { label: "Complained",   className: "border-red-300    text-red-700    bg-red-50",            icon: MessageCircleWarning },
-  unsubscribed: { label: "Unsubscribed", className: "border-orange-300 text-orange-700 bg-orange-50",         icon: UserMinus },
-  failed:       { label: "Failed",       className: "border-red-400    text-red-800    bg-red-50",            icon: AlertCircle },
+  queued: { label: "Queued", className: "border-slate-300  text-slate-600", icon: Clock },
+  sent: { label: "Sent", className: "border-blue-300   text-blue-700   bg-blue-50", icon: Send },
+  opened: { label: "Opened", className: "border-violet-300 text-violet-700 bg-violet-50", icon: Eye },
+  clicked: { label: "Clicked", className: "border-green-300  text-green-700  bg-green-50", icon: MousePointerClick },
+  bounced: { label: "Bounced", className: "border-amber-300  text-amber-700  bg-amber-50", icon: AlertCircle },
+  complained: {
+    label: "Complained",
+    className: "border-red-300    text-red-700    bg-red-50",
+    icon: MessageCircleWarning,
+  },
+  unsubscribed: { label: "Unsubscribed", className: "border-orange-300 text-orange-700 bg-orange-50", icon: UserMinus },
+  failed: { label: "Failed", className: "border-red-400    text-red-800    bg-red-50", icon: AlertCircle },
 };
 
 const TABS: { value: string; label: string }[] = [
-  { value: "all",         label: "All" },
-  { value: "sent",        label: "Sent" },
-  { value: "opened",      label: "Opened" },
-  { value: "clicked",     label: "Clicked" },
-  { value: "bounced",     label: "Bounced" },
-  { value: "unsubscribed",label: "Unsub" },
-  { value: "failed",      label: "Failed" },
+  { value: "all", label: "All" },
+  { value: "sent", label: "Sent" },
+  { value: "opened", label: "Opened" },
+  { value: "clicked", label: "Clicked" },
+  { value: "bounced", label: "Bounced" },
+  { value: "unsubscribed", label: "Unsub" },
+  { value: "failed", label: "Failed" },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -60,7 +71,7 @@ interface Props {
 
 export function CampaignLogTable({ logs, total }: Props) {
   const [activeTab, setActiveTab] = useState("all");
-  const [search, setSearch]       = useState("");
+  const [search, setSearch] = useState("");
 
   const filtered = useMemo(() => {
     let rows = logs;
@@ -74,9 +85,7 @@ export function CampaignLogTable({ logs, total }: Props) {
     if (search.trim()) {
       const q = search.toLowerCase();
       rows = rows.filter(
-        (r) =>
-          r.recipientName.toLowerCase().includes(q) ||
-          r.recipientEmail.toLowerCase().includes(q),
+        (r) => r.recipientName.toLowerCase().includes(q) || r.recipientEmail.toLowerCase().includes(q),
       );
     }
     return rows;
@@ -122,9 +131,11 @@ export function CampaignLogTable({ logs, total }: Props) {
             >
               {t.label}
               {count > 0 && (
-                <span className={`text-[10px] tabular-nums rounded-full px-1.5 py-0.5 leading-none ${
-                  isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-                }`}>
+                <span
+                  className={`text-[10px] tabular-nums rounded-full px-1.5 py-0.5 leading-none ${
+                    isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                  }`}
+                >
                   {count}
                 </span>
               )}
@@ -197,14 +208,18 @@ export function CampaignLogTable({ logs, total }: Props) {
                       <span className="text-violet-600 font-medium">
                         {format(new Date(log.openedAt), "MMM d, HH:mm")}
                       </span>
-                    ) : "—"}
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell className="text-xs">
                     {log.clickedAt ? (
                       <span className="text-green-600 font-medium">
                         {format(new Date(log.clickedAt), "MMM d, HH:mm")}
                       </span>
-                    ) : "—"}
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                 </TableRow>
               );

@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
+
 import { listSavedReports } from "@/actions/report-builder";
+import { auth } from "@/auth";
 import { ENTITY_CONFIGS } from "@/lib/report-builder-config";
+
 import { ReportBuilderClient } from "./_components/report-builder-client";
 
 export default async function ReportBuilderPage() {
@@ -14,10 +16,7 @@ export default async function ReportBuilderPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <ReportBuilderClient
-        entityConfigs={ENTITY_CONFIGS}
-        savedReports={saved}
-      />
+      <ReportBuilderClient entityConfigs={ENTITY_CONFIGS} savedReports={saved} />
     </div>
   );
 }

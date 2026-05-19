@@ -12,12 +12,14 @@
  *  - 10 MB max size
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+
+import { mkdir, writeFile } from "fs/promises";
+import { extname, join } from "path";
+
 import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
 import { documents } from "@/db/schema";
-import { writeFile, mkdir } from "fs/promises";
-import { join, extname } from "path";
+import { getDb } from "@/lib/tenant-context";
 
 const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
 
@@ -59,9 +61,7 @@ function verifyMagicBytes(buf: Buffer, mimeType: string): boolean {
 
     case "image/png":
       // 89 50 4E 47 0D 0A 1A 0A
-      return (
-        buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47
-      );
+      return buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
 
     case "image/gif":
       // GIF87a or GIF89a
@@ -69,10 +69,7 @@ function verifyMagicBytes(buf: Buffer, mimeType: string): boolean {
 
     case "image/webp":
       // RIFF....WEBP
-      return (
-        buf.subarray(0, 4).toString("ascii") === "RIFF" &&
-        buf.subarray(8, 12).toString("ascii") === "WEBP"
-      );
+      return buf.subarray(0, 4).toString("ascii") === "RIFF" && buf.subarray(8, 12).toString("ascii") === "WEBP";
 
     // OOXML formats (docx / xlsx / pptx) are ZIP archives
     case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
@@ -117,7 +114,7 @@ export async function POST(req: NextRequest) {
 
   const file = formData.get("file") as File | null;
   const entityType = (formData.get("entityType") as string | null)?.trim();
-  const entityId   = (formData.get("entityId")   as string | null)?.trim();
+  const entityId = (formData.get("entityId") as string | null)?.trim();
 
   // ── Validate inputs ─────────────────────────────────────────────────────────
   if (!file) {
@@ -138,12 +135,9 @@ export async function POST(req: NextRequest) {
 
   // ── MIME type check ─────────────────────────────────────────────────────────
   const declaredMime = file.type.toLowerCase().split(";")[0].trim();
-  const allowedExts  = ALLOWED[declaredMime];
+  const allowedExts = ALLOWED[declaredMime];
   if (!allowedExts) {
-    return NextResponse.json(
-      { error: `File type "${declaredMime}" is not allowed.` },
-      { status: 415 }
-    );
+    return NextResponse.json({ error: `File type "${declaredMime}" is not allowed.` }, { status: 415 });
   }
 
   // ── Extension check (cross-validate against MIME) ───────────────────────────
@@ -151,26 +145,26 @@ export async function POST(req: NextRequest) {
   if (!allowedExts.includes(originalExt)) {
     return NextResponse.json(
       { error: `Extension "${originalExt}" does not match the declared file type.` },
-      { status: 415 }
+      { status: 415 },
     );
   }
 
   // ── Magic bytes check ────────────────────────────────────────────────────────
-  const bytes  = await file.arrayBuffer();
+  const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
   if (!verifyMagicBytes(buffer, declaredMime)) {
     return NextResponse.json(
       { error: "File content does not match the declared type (magic bytes mismatch)." },
-      { status: 415 }
+      { status: 415 },
     );
   }
 
   // ── Store file OUTSIDE /public using a UUID filename ────────────────────────
   // UUID-based name prevents directory traversal and filename collisions.
-  const storageId   = crypto.randomUUID();
-  const storageName = `${storageId}${originalExt}`;          // e.g. "uuid.pdf"
-  const storagePath = join("uploads", storageName);           // relative
-  const diskPath    = join(process.cwd(), storagePath);
+  const storageId = crypto.randomUUID();
+  const storageName = `${storageId}${originalExt}`; // e.g. "uuid.pdf"
+  const storagePath = join("uploads", storageName); // relative
+  const diskPath = join(process.cwd(), storagePath);
 
   try {
     await mkdir(join(process.cwd(), "uploads"), { recursive: true });
@@ -186,13 +180,13 @@ export async function POST(req: NextRequest) {
     const [doc] = await db
       .insert(documents)
       .values({
-        name:       file.name,          // original display name
-        url:        storagePath,        // relative disk path (NOT a public URL)
-        mimeType:   declaredMime,
-        size:       file.size,
+        name: file.name, // original display name
+        url: storagePath, // relative disk path (NOT a public URL)
+        mimeType: declaredMime,
+        size: file.size,
         entityType,
         entityId,
-        ownerId:    userId,
+        ownerId: userId,
       })
       .returning();
 

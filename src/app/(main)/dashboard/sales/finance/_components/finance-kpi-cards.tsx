@@ -3,9 +3,9 @@
 import { DollarSign, GitPullRequest, Target, TrendingUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import type { FinanceDashboardData } from "@/actions/finance";
 import { MetricCard } from "@/components/crm/metric-card";
 import { useCurrency } from "@/hooks/use-currency";
-import type { FinanceDashboardData } from "@/actions/finance";
 
 export function FinanceKPICards({ data }: { data: FinanceDashboardData }) {
   const { formatAmount } = useCurrency();

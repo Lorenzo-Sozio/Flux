@@ -4,11 +4,11 @@ import { eq } from "drizzle-orm";
 import Papa from "papaparse";
 
 import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
 import { companies, contacts } from "@/db/schema";
+import { checkRateLimit } from "@/lib/rate-limiter";
+import { getDb } from "@/lib/tenant-context";
 
-// Rate limit: max 3 imports per 10 minutes per user
-const importLimits = new Map<string, { count: number; resetAt: number }>();
+const MAX_IMPORT_ROWS = 5_000;
 
 export async function POST(req: NextRequest) {
   const db = await getDb();
@@ -17,17 +17,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Rate limiting
-  const key = session.user.id;
-  const now = Date.now();
-  const rl = importLimits.get(key);
-  if (rl && now < rl.resetAt && rl.count >= 3) {
-    return NextResponse.json({ error: "Too many imports. Try again later." }, { status: 429 });
-  }
-  if (!rl || now > rl.resetAt) {
-    importLimits.set(key, { count: 1, resetAt: now + 10 * 60 * 1000 });
-  } else {
-    rl.count++;
+  // Distributed rate limit: max 3 imports per 10 minutes per user, backed by platform DB.
+  const allowed = await checkRateLimit(`import_contacts:${session.user.id}`, 3, 10 * 60_000);
+  if (!allowed) {
+    return NextResponse.json({ error: "Too many imports. Try again in 10 minutes." }, { status: 429 });
   }
 
   const formData = await req.formData();
@@ -45,6 +38,13 @@ export async function POST(req: NextRequest) {
 
   if (errors.length > 0) {
     return NextResponse.json({ error: "CSV parse error", details: errors }, { status: 400 });
+  }
+
+  if (data.length > MAX_IMPORT_ROWS) {
+    return NextResponse.json(
+      { error: `Import exceeds the maximum of ${MAX_IMPORT_ROWS} rows. Split the file and re-upload.` },
+      { status: 400 },
+    );
   }
 
   let created = 0;

@@ -8,7 +8,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, desc, eq, or } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 
 import { platformDb } from "@/db";
 import { billingPlans, billingSubscriptions, billingTenantAddons, tenants } from "@/db/schema";
@@ -17,7 +17,7 @@ import { requireAdminPanelAccess } from "@/lib/auth-guard";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 import { invalidateEntitlementCache, logEntitlementChange } from "@/lib/billing/licensing";
-import { PLAN_CONFIGS } from "@/lib/billing/plans-config";
+import { ADDON_CONFIGS, type AddonType, PLAN_CONFIGS } from "@/lib/billing/plans-config";
 import { getStripe } from "@/lib/billing/stripe";
 
 // ─── Plans CRUD ───────────────────────────────────────────────────────────────
@@ -537,25 +537,46 @@ export async function adminSyncTenantSubscription(tenantId: string) {
 export async function getAdminMetrics() {
   await requireAdminPanelAccess();
 
-  const allSubs = await platformDb
-    .select({
-      status: billingSubscriptions.status,
-      planId: billingSubscriptions.planId,
-      billingCycle: billingSubscriptions.billingCycle,
-      quantity: billingSubscriptions.quantity,
-      currency: billingSubscriptions.currency,
-    })
-    .from(billingSubscriptions);
+  // Fetch subscriptions, plan definitions, and active add-ons in parallel.
+  const [allSubs, plans, activeAddons] = await Promise.all([
+    platformDb
+      .select({
+        status: billingSubscriptions.status,
+        planId: billingSubscriptions.planId,
+        billingCycle: billingSubscriptions.billingCycle,
+        quantity: billingSubscriptions.quantity,
+      })
+      .from(billingSubscriptions),
 
-  const plans = await platformDb.select().from(billingPlans);
+    platformDb.select().from(billingPlans),
+
+    // Add-on MRR: join with the parent subscription to resolve billing cycle,
+    // restricted to subscriptions that are still generating revenue.
+    platformDb
+      .select({
+        addonType: billingTenantAddons.addonType,
+        quantity: billingTenantAddons.quantity,
+        billingCycle: billingSubscriptions.billingCycle,
+      })
+      .from(billingTenantAddons)
+      .innerJoin(billingSubscriptions, eq(billingTenantAddons.tenantId, billingSubscriptions.tenantId))
+      .where(
+        and(eq(billingTenantAddons.status, "active"), inArray(billingSubscriptions.status, ["active", "past_due"])),
+      ),
+  ]);
+
   const planMap = Object.fromEntries(plans.map((p) => [p.id, p]));
 
   let mrr = 0;
+  // activeCount: only status="active" — does NOT include past_due.
+  // past_due still contributes to MRR (revenue is billed/owed) but must not
+  // inflate the "Active" tenant counter shown in the dashboard.
   let activeCount = 0;
   let trialCount = 0;
   let pastDueCount = 0;
   let suspendedCount = 0;
   let canceledCount = 0;
+  let freeCount = 0;
 
   const perPlan: Record<string, { count: number; mrr: number }> = {};
 
@@ -571,13 +592,17 @@ export async function getAdminMetrics() {
     if (sub.status === "trialing") {
       trialCount++;
       continue;
-    } // trials have not paid; exclude from MRR
-    if (sub.status === "past_due") {
-      pastDueCount++;
     }
-    // Only active and past_due subs count toward MRR (revenue already billed/owed)
-    if (["active", "past_due"].includes(sub.status)) {
-      activeCount++;
+    if (sub.status === "free") {
+      freeCount++;
+      continue;
+    }
+
+    if (sub.status === "past_due") pastDueCount++;
+    if (sub.status === "active") activeCount++;
+
+    // Both active and past_due contribute to MRR (already billed or overdue).
+    if (sub.status === "active" || sub.status === "past_due") {
       const plan = sub.planId ? planMap[sub.planId] : null;
       if (plan) {
         const pricePerUser = sub.billingCycle === "annual" ? plan.pricePerUserAnnual : plan.pricePerUserMonthly;
@@ -592,10 +617,26 @@ export async function getAdminMetrics() {
     }
   }
 
+  // Add-on MRR: priceAnnual / priceMonthly are monthly-equivalent cents.
+  for (const addon of activeAddons) {
+    const config = ADDON_CONFIGS[addon.addonType as AddonType];
+    if (!config) continue;
+    const addonPrice = addon.billingCycle === "annual" ? config.priceAnnual : config.priceMonthly;
+    mrr += addonPrice * addon.quantity;
+  }
+
   const arr = mrr * 12;
   const totalTenants = allSubs.length;
-  const churnRate = totalTenants > 0 ? Math.round((canceledCount / totalTenants) * 100) : 0;
-  const arpu = activeCount > 0 ? Math.round(mrr / activeCount) : 0;
+
+  // Churn rate: fraction of *paid* subscribers who canceled.
+  // Excludes free tenants (never paid) from the denominator so the metric
+  // reflects actual revenue churn, not growth-stage conversion funnels.
+  const paidEver = activeCount + pastDueCount + trialCount + suspendedCount + canceledCount;
+  const churnRate = paidEver > 0 ? Math.round((canceledCount / paidEver) * 100) : 0;
+
+  // ARPU: MRR divided by all currently-paying accounts (active + past_due).
+  const payingCount = activeCount + pastDueCount;
+  const arpu = payingCount > 0 ? Math.round(mrr / payingCount) : 0;
 
   return {
     mrr, // cents
@@ -607,6 +648,7 @@ export async function getAdminMetrics() {
     pastDueCount,
     suspendedCount,
     canceledCount,
+    freeCount,
     totalTenants,
     perPlan,
   };

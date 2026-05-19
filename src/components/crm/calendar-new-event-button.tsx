@@ -1,22 +1,19 @@
 "use client";
 
 import { useState, useTransition } from "react";
+
 import { useRouter } from "next/navigation";
-import { Plus, Loader2, CheckSquare, Phone, Users } from "lucide-react";
-import { toast } from "sonner";
+
+import { CheckSquare, Loader2, Phone, Plus, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { toast } from "sonner";
+
+import { createActivity } from "@/actions/activities";
+import { createTask } from "@/actions/tasks";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { createTask } from "@/actions/tasks";
-import { createActivity } from "@/actions/activities";
 
 interface Props {
   defaultDate?: string; // yyyy-MM-dd for pre-filling the date
@@ -31,9 +28,7 @@ export function CalendarNewEventButton({ defaultDate }: Props) {
   const [isPending, startTransition] = useTransition();
   const [eventType, setEventType] = useState<EventType>("task");
   const [title, setTitle] = useState("");
-  const [dateTime, setDateTime] = useState(
-    defaultDate ? `${defaultDate}T09:00` : ""
-  );
+  const [dateTime, setDateTime] = useState(defaultDate ? `${defaultDate}T09:00` : "");
   const [priority, setPriority] = useState("normal");
 
   const reset = () => {
@@ -45,8 +40,14 @@ export function CalendarNewEventButton({ defaultDate }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) { toast.error(t("newEventDialog.titleRequired")); return; }
-    if (!dateTime) { toast.error(t("newEventDialog.dateRequired")); return; }
+    if (!title.trim()) {
+      toast.error(t("newEventDialog.titleRequired"));
+      return;
+    }
+    if (!dateTime) {
+      toast.error(t("newEventDialog.dateRequired"));
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -73,9 +74,9 @@ export function CalendarNewEventButton({ defaultDate }: Props) {
   };
 
   const TYPE_CONFIG: Record<EventType, { label: string; icon: React.ReactNode; color: string }> = {
-    task:    { label: t("typeTask"),    icon: <CheckSquare className="h-4 w-4" />, color: "bg-blue-500" },
-    meeting: { label: t("typeMeeting"), icon: <Users className="h-4 w-4" />,       color: "bg-violet-500" },
-    call:    { label: t("typeCall"),    icon: <Phone className="h-4 w-4" />,        color: "bg-emerald-500" },
+    task: { label: t("typeTask"), icon: <CheckSquare className="h-4 w-4" />, color: "bg-blue-500" },
+    meeting: { label: t("typeMeeting"), icon: <Users className="h-4 w-4" />, color: "bg-violet-500" },
+    call: { label: t("typeCall"), icon: <Phone className="h-4 w-4" />, color: "bg-emerald-500" },
   };
 
   return (
@@ -85,7 +86,13 @@ export function CalendarNewEventButton({ defaultDate }: Props) {
         {t("newEvent")}
       </Button>
 
-      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) reset();
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("newEvent")}</DialogTitle>
@@ -94,7 +101,7 @@ export function CalendarNewEventButton({ defaultDate }: Props) {
           <form onSubmit={handleSubmit} className="space-y-4 py-2">
             {/* Event type selector */}
             <div className="grid grid-cols-3 gap-2">
-              {(Object.entries(TYPE_CONFIG) as [EventType, typeof TYPE_CONFIG[EventType]][]).map(([type, cfg]) => (
+              {(Object.entries(TYPE_CONFIG) as [EventType, (typeof TYPE_CONFIG)[EventType]][]).map(([type, cfg]) => (
                 <button
                   key={type}
                   type="button"
@@ -120,7 +127,11 @@ export function CalendarNewEventButton({ defaultDate }: Props) {
                 id="new-event-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder={eventType === "task" ? t("newEventDialog.titlePlaceholderTask") : t("newEventDialog.titlePlaceholderOther")}
+                placeholder={
+                  eventType === "task"
+                    ? t("newEventDialog.titlePlaceholderTask")
+                    : t("newEventDialog.titlePlaceholderOther")
+                }
                 autoFocus
               />
             </div>

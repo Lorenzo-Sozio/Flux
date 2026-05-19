@@ -1,12 +1,11 @@
 "use client";
 
 import React, { useEffect, useState, useTransition } from "react";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { toast } from "sonner";
 import {
   ArrowLeft,
   Building2,
@@ -14,44 +13,35 @@ import {
   CheckCircle2,
   Clock,
   DollarSign,
+  Loader2,
   Package,
   Plus,
+  ShoppingCart,
   Trash2,
   User,
-  ShoppingCart,
-  Loader2,
 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
-import { useCurrency } from "@/hooks/use-currency";
-import {
-  getOrderById,
   addOrderItem,
+  deleteOrder,
+  getOrderById,
+  type OrderStatus,
   removeOrderItem,
   updateOrderStatus,
-  deleteOrder,
-  type OrderStatus,
 } from "@/actions/orders";
 import { getProducts } from "@/actions/products";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCurrency } from "@/hooks/use-currency";
+import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -59,17 +49,20 @@ type OrderDetail = Awaited<ReturnType<typeof getOrderById>>;
 type Product = Awaited<ReturnType<typeof getProducts>>[number];
 
 const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
-  draft:      { label: "Draft",      class: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
+  draft: { label: "Draft", class: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
   processing: { label: "Processing", class: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
-  completed:  { label: "Completed",  class: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
-  cancelled:  { label: "Cancelled",  class: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
+  completed: {
+    label: "Completed",
+    class: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  },
+  cancelled: { label: "Cancelled", class: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
 };
 
 // ── Add item dialog ───────────────────────────────────────────────────────────
 
 const addItemSchema = z.object({
   productId: z.string().min(1, "Select a product"),
-  quantity:  z.coerce.number().int().min(1),
+  quantity: z.coerce.number().int().min(1),
   unitPrice: z.coerce.number().min(0),
 });
 
@@ -80,8 +73,8 @@ function AddItemDialog({
   products: Product[];
   onAdded: (item: { productId: string; quantity: number; unitPrice: number }) => void;
 }) {
-  const [open, setOpen]       = useState(false);
-  const [saving, setSaving]   = useState(false);
+  const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
   const active = products.filter((p) => p.isActive);
 
   const form = useForm<z.infer<typeof addItemSchema>>({
@@ -111,7 +104,15 @@ function AddItemDialog({
       <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => setOpen(true)}>
         <Plus className="h-3.5 w-3.5" /> Add Item
       </Button>
-      <Dialog open={open} onOpenChange={(v) => { if (!saving) { setOpen(v); if (!v) form.reset(); } }}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          if (!saving) {
+            setOpen(v);
+            if (!v) form.reset();
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-sm p-0 gap-0">
           <DialogHeader className="px-5 pt-5 pb-4 border-b">
             <DialogTitle>Add Line Item</DialogTitle>
@@ -127,7 +128,8 @@ function AddItemDialog({
                   <SelectContent>
                     {active.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.name}{p.sku ? ` — ${p.sku}` : ""}
+                        {p.name}
+                        {p.sku ? ` — ${p.sku}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -148,7 +150,9 @@ function AddItemDialog({
               </div>
             </div>
             <DialogFooter className="px-5 py-4 border-t bg-muted/10">
-              <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
+                Cancel
+              </Button>
               <Button type="submit" disabled={saving} className="gap-2">
                 {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                 Add
@@ -165,13 +169,13 @@ function AddItemDialog({
 
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
-  const router  = useRouter();
+  const router = useRouter();
   const [, startTransition] = useTransition();
   const { formatAmount } = useCurrency();
 
-  const [order,    setOrder]    = useState<OrderDetail>(null);
+  const [order, setOrder] = useState<OrderDetail>(null);
   const [products, setProducts] = useState<Product[]>([]);
-  const [loading,  setLoading]  = useState(true);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     Promise.all([getOrderById(id), getProducts()]).then(([o, p]) => {
@@ -184,7 +188,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const handleStatusChange = (status: OrderStatus) => {
     startTransition(async () => {
       await updateOrderStatus(id, status);
-      setOrder((prev) => prev ? { ...prev, status } : prev);
+      setOrder((prev) => (prev ? { ...prev, status } : prev));
       toast.success("Status updated.");
     });
   };
@@ -233,20 +237,25 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       <div className="text-center py-20">
         <ShoppingCart className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
         <p className="text-muted-foreground mb-4">Order not found</p>
-        <Button asChild><Link href="/dashboard/sales/orders">Back to Orders</Link></Button>
+        <Button asChild>
+          <Link href="/dashboard/sales/orders">Back to Orders</Link>
+        </Button>
       </div>
     );
   }
 
   const statusCfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.draft;
-  const customer  = order.contactFirstName
+  const customer = order.contactFirstName
     ? `${order.contactFirstName} ${order.contactLastName ?? ""}`.trim()
-    : order.companyName ?? null;
+    : (order.companyName ?? null);
 
   return (
     <div className="p-6 space-y-5">
       {/* Back nav */}
-      <Link href="/dashboard/sales/orders" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+      <Link
+        href="/dashboard/sales/orders"
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+      >
         <ArrowLeft className="h-4 w-4" /> All Orders
       </Link>
 
@@ -254,22 +263,29 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       <div className="flex items-start justify-between gap-4">
         <div>
           <span className="font-mono text-xs font-semibold text-muted-foreground">{order.orderNumber}</span>
-          <h1 className="text-2xl font-bold tracking-tight mt-0.5">
-            {customer ?? "Order Details"}
-          </h1>
+          <h1 className="text-2xl font-bold tracking-tight mt-0.5">{customer ?? "Order Details"}</h1>
           <div className="flex items-center gap-2 mt-2">
             <Badge variant="outline" className={cn("text-xs", statusCfg.class)}>
               {statusCfg.label}
             </Badge>
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              {new Date(order.orderDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+              {new Date(order.orderDate).toLocaleDateString("en-GB", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
             </span>
           </div>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Button variant="outline" size="sm" className="text-destructive hover:text-destructive gap-1.5" onClick={handleDelete}>
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-destructive hover:text-destructive gap-1.5"
+            onClick={handleDelete}
+          >
             <Trash2 className="h-3.5 w-3.5" /> Delete
           </Button>
         </div>
@@ -315,7 +331,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{item.quantity}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{formatAmount(Number(item.unitPrice))}</td>
-                        <td className="px-4 py-3 text-right tabular-nums font-semibold">{formatAmount(Number(item.totalPrice))}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                          {formatAmount(Number(item.totalPrice))}
+                        </td>
                         <td className="px-4 py-3">
                           <button
                             type="button"
@@ -328,7 +346,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       </tr>
                     ))}
                     <tr className="border-t bg-muted/20">
-                      <td colSpan={3} className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">Total</td>
+                      <td colSpan={3} className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
+                        Total
+                      </td>
                       <td className="px-4 py-3 text-right text-base font-bold tabular-nums">
                         {formatAmount(Number(order.totalAmount))}
                       </td>
@@ -357,7 +377,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(STATUS_CONFIG).map(([v, cfg]) => (
-                      <SelectItem key={v} value={v} className="text-xs">{cfg.label}</SelectItem>
+                      <SelectItem key={v} value={v} className="text-xs">
+                        {cfg.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -406,12 +428,30 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               {/* Dates */}
               <div className="border-t pt-3 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground flex items-center gap-1"><Clock className="h-3 w-3" />Order date</span>
-                  <span>{new Date(order.orderDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Order date
+                  </span>
+                  <span>
+                    {new Date(order.orderDate).toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground flex items-center gap-1"><CheckCircle2 className="h-3 w-3" />Created</span>
-                  <span>{new Date(order.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Created
+                  </span>
+                  <span>
+                    {new Date(order.createdAt).toLocaleDateString("en-GB", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </span>
                 </div>
               </div>
             </CardContent>

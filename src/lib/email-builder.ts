@@ -13,8 +13,15 @@
 // ─── Block types ──────────────────────────────────────────────────────────────
 
 export type BlockType =
-  | "heading" | "text" | "image" | "button"
-  | "divider" | "spacer" | "two_column" | "footer" | "html";
+  | "heading"
+  | "text"
+  | "image"
+  | "button"
+  | "divider"
+  | "spacer"
+  | "two_column"
+  | "footer"
+  | "html";
 
 export type TextAlign = "left" | "center" | "right";
 
@@ -99,8 +106,15 @@ export interface HtmlProps {
 }
 
 export type BlockProps =
-  | HeadingProps | TextProps | ImageProps | ButtonProps
-  | DividerProps | SpacerProps | TwoColumnProps | FooterProps | HtmlProps;
+  | HeadingProps
+  | TextProps
+  | ImageProps
+  | ButtonProps
+  | DividerProps
+  | SpacerProps
+  | TwoColumnProps
+  | FooterProps
+  | HtmlProps;
 
 export interface Block {
   id: string;
@@ -227,23 +241,14 @@ export function emptyDesign(): EmailDesign {
   return {
     version: 1,
     settings: { ...DEFAULT_SETTINGS },
-    blocks: [
-      newBlock("heading"),
-      newBlock("text"),
-      newBlock("button"),
-      newBlock("footer"),
-    ],
+    blocks: [newBlock("heading"), newBlock("text"), newBlock("button"), newBlock("footer")],
   };
 }
 
 // ─── HTML Compiler ────────────────────────────────────────────────────────────
 
 function esc(s: string) {
-  return String(s)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function fontSizeForLevel(level: "h1" | "h2" | "h3") {
@@ -423,7 +428,7 @@ ${rows}
 
 export function estimateHtmlSize(html: string): { bytes: number; kb: number; warning: boolean } {
   const bytes = new TextEncoder().encode(html).length;
-  const kb = Math.round(bytes / 1024 * 10) / 10;
+  const kb = Math.round((bytes / 1024) * 10) / 10;
   return { bytes, kb, warning: kb > 80 };
 }
 

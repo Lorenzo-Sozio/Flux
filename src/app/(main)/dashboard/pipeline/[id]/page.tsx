@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
-import { createActivity, deleteActivity, getActivitiesByDeal } from "@/actions/activities";
+import { createActivity, getActivitiesByDeal } from "@/actions/activities";
 import { getCompanies, getContacts } from "@/actions/crm";
 import { getDealComments } from "@/actions/deal-comments";
 import { getDealById, getPipelineData, updateDeal } from "@/actions/pipeline";
@@ -24,6 +24,7 @@ import { getQuotesByDeal } from "@/actions/quotes";
 import { createTask, deleteTask, getAllUsers, getTasksByDeal, updateTaskStatus } from "@/actions/tasks";
 import { auth } from "@/auth";
 import { ActivityModal } from "@/components/crm/activity-modal";
+import { ActivityTimeline } from "@/components/crm/activity-timeline";
 import { CreateQuoteButton } from "@/components/crm/create-quote-button";
 import { DealEditButton } from "@/components/crm/deal-edit-button";
 import { DocumentPanel } from "@/components/crm/document-panel";
@@ -34,8 +35,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { getDb } from "@/lib/tenant-context";
 import { products } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 import { CommentsThread } from "./_components/comments-thread";
 import { DealAmount } from "./_components/deal-amount";
@@ -123,7 +124,6 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     lost: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
   };
 
-  const activityIcons: Record<string, string> = { note: "📝", call: "📞", meeting: "👥", email: "📧" };
   const priorityColors: Record<string, string> = {
     high: "text-red-500",
     normal: "text-yellow-500",
@@ -310,7 +310,6 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 <option value="note">{tD("activityTypes.note")}</option>
                 <option value="call">{tD("activityTypes.call")}</option>
                 <option value="meeting">{tD("activityTypes.meeting")}</option>
-                <option value="email">{tD("activityTypes.email")}</option>
               </select>
               <Textarea
                 name="content"
@@ -322,39 +321,11 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               </Button>
             </form>
 
-            {activitiesList.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">{t("noActivitiesYet")}</p>
-            ) : (
-              <div className="space-y-3 pt-1">
-                {activitiesList.map((act) => (
-                  <div key={act.id} className="flex gap-3 text-sm">
-                    <span className="text-base mt-0.5 shrink-0">{activityIcons[act.type] ?? "📌"}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="leading-snug">{act.content}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {act.ownerName && <span>{act.ownerName} · </span>}
-                        <FormattedDate date={act.createdAt} />
-                      </p>
-                    </div>
-                    <ActivityModal mode="edit" activity={act} revalidatePathStr={revalidatePath_} />
-                    <form
-                      action={async () => {
-                        "use server";
-                        await deleteActivity(act.id, revalidatePath_);
-                      }}
-                    >
-                      <button
-                        type="submit"
-                        className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                        title="Delete"
-                      >
-                        <Trash2Icon className="w-3.5 h-3.5" />
-                      </button>
-                    </form>
-                  </div>
-                ))}
-              </div>
-            )}
+            <ActivityTimeline
+              activities={activitiesList}
+              revalidatePathStr={revalidatePath_}
+              noActivitiesLabel={t("noActivitiesYet")}
+            />
           </CardContent>
         </Card>
 

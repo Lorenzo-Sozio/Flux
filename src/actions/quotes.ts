@@ -1,17 +1,19 @@
 "use server";
 
-import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
-import { quotes, quoteItems, quoteActivities, deals, companies, products, users } from "@/db/schema";
-import { eq, desc, and, inArray } from "drizzle-orm";
-import { createNotificationAction, createNotificationsBatch } from "@/actions/auth";
-import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
-import { z } from "zod";
-import { sendEmail } from "@/lib/email-provider";
-import crypto from "crypto";
-import { CreateQuoteSchema, UpdateQuoteSchema } from "@/actions/quotes-validation";
 import { revalidatePath } from "next/cache";
-import { getExchangeRates, convertToEur } from "@/lib/exchange-rates";
+
+import crypto from "crypto";
+import { and, desc, eq, inArray } from "drizzle-orm";
+import type { z } from "zod";
+
+import { createNotificationAction, createNotificationsBatch } from "@/actions/auth";
+import { CreateQuoteSchema, UpdateQuoteSchema } from "@/actions/quotes-validation";
+import { auth } from "@/auth";
+import { companies, deals, products, quoteActivities, quoteItems, quotes, users } from "@/db/schema";
+import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
+import { sendEmail } from "@/lib/email-provider";
+import { convertToEur, getExchangeRates } from "@/lib/exchange-rates";
+import { getDb } from "@/lib/tenant-context";
 
 // --- HELPERS ---
 
@@ -21,7 +23,7 @@ function calculateLineTotal(quantity: number, unitPrice: number, discountPercent
   const subtotalAfterDiscount = subtotal - discountAmount;
   const taxAmount = (subtotalAfterDiscount * taxPercent) / 100;
   const totalPrice = subtotalAfterDiscount + taxAmount;
-  
+
   return {
     discountAmount,
     taxAmount,
@@ -43,7 +45,7 @@ async function logQuoteActivity(
   userId?: string,
   email?: string,
   ipAddress?: string,
-  userAgent?: string
+  userAgent?: string,
 ) {
   const db = await getDb();
   await db.insert(quoteActivities).values({
@@ -94,7 +96,7 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
         item.quantity,
         item.unitPrice,
         item.discountPercent || 0,
-        item.taxPercent || 0
+        item.taxPercent || 0,
       );
       subtotal += totalPrice;
       return { ...item, discountAmount, taxAmount, totalPrice };
@@ -191,9 +193,7 @@ export async function getQuoteById(quoteId: string) {
 
     // Check permission: owner, deal owner, or admin
     const isAuthorized =
-      session.user.id === quote.ownerId ||
-      session.user.id === quote.deal.ownerId ||
-      session.user.role === "admin";
+      session.user.id === quote.ownerId || session.user.id === quote.deal.ownerId || session.user.role === "admin";
 
     if (!isAuthorized) {
       throw new Error("Unauthorized");
@@ -278,7 +278,7 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
           item.quantity,
           item.unitPrice,
           item.discountPercent || 0,
-          item.taxPercent || 0
+          item.taxPercent || 0,
         );
         subtotal += totalPrice;
         return { ...item, discountAmount, taxAmount, totalPrice };
@@ -377,12 +377,7 @@ export async function deleteQuoteAction(quoteId: string) {
   }
 }
 
-export async function sendQuoteEmailAction(
-  quoteId: string,
-  toEmail: string,
-  subject: string,
-  message: string
-) {
+export async function sendQuoteEmailAction(quoteId: string, toEmail: string, subject: string, message: string) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -408,10 +403,7 @@ export async function sendQuoteEmailAction(
     }
 
     // Generate public view token for quote (simplified: use quoteId + timestamp)
-    const viewToken = crypto
-      .createHash("sha256")
-      .update(`${quoteId}:${Date.now()}`)
-      .digest("hex");
+    const viewToken = crypto.createHash("sha256").update(`${quoteId}:${Date.now()}`).digest("hex");
 
     const quoteViewUrl = `${process.env.NEXTAUTH_URL}/quotes/${quoteId}?token=${viewToken}`;
 
@@ -453,11 +445,7 @@ export async function markQuoteAsViewedAction(quoteId: string, email?: string, i
     }
 
     // Update viewed timestamp
-    const [updated] = await db
-      .update(quotes)
-      .set({ viewedAt: new Date() })
-      .where(eq(quotes.id, quoteId))
-      .returning();
+    const [updated] = await db.update(quotes).set({ viewedAt: new Date() }).where(eq(quotes.id, quoteId)).returning();
 
     // Log activity
     await logQuoteActivity(quoteId, "viewed", undefined, email, ipAddress);
@@ -477,10 +465,7 @@ export async function getAllQuotes(filters?: { status?: string; searchTerm?: str
       throw new Error("Unauthorized");
     }
 
-    const statusFilter =
-      filters?.status && filters.status !== "all"
-        ? eq(quotes.status, filters.status)
-        : undefined;
+    const statusFilter = filters?.status && filters.status !== "all" ? eq(quotes.status, filters.status) : undefined;
 
     const allQuotes = await db.query.quotes.findMany({
       where: statusFilter,
@@ -495,9 +480,7 @@ export async function getAllQuotes(filters?: { status?: string; searchTerm?: str
           q.quoteNumber.toLowerCase().includes(term) ||
           q.company?.name?.toLowerCase().includes(term) ||
           q.deal?.name?.toLowerCase().includes(term) ||
-          (q.contact
-            ? `${q.contact.firstName} ${q.contact.lastName}`.toLowerCase().includes(term)
-            : false)
+          (q.contact ? `${q.contact.firstName} ${q.contact.lastName}`.toLowerCase().includes(term) : false),
       );
     }
 
@@ -521,7 +504,10 @@ export async function requestApprovalAction(quoteId: string) {
     throw new Error("Unauthorized");
   }
 
-  const admins = await db.select({ id: users.id }).from(users).where(inArray(users.role, ["admin", "owner"]));
+  const admins = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(inArray(users.role, ["admin", "owner"]));
 
   await Promise.all([
     db.update(quotes).set({ status: "pending_approval", updatedAt: new Date() }).where(eq(quotes.id, quoteId)),
@@ -552,8 +538,15 @@ export async function approveQuoteAction(quoteId: string) {
   if (quote.status !== "pending_approval") throw new Error("Quote is not pending approval");
 
   await Promise.all([
-    db.update(quotes)
-      .set({ status: "draft", approvedById: session.user.id, approvedAt: new Date(), approvalNote: null, updatedAt: new Date() })
+    db
+      .update(quotes)
+      .set({
+        status: "draft",
+        approvedById: session.user.id,
+        approvedAt: new Date(),
+        approvalNote: null,
+        updatedAt: new Date(),
+      })
       .where(eq(quotes.id, quoteId)),
     logQuoteActivity(quoteId, "approved", session.user.id),
   ]);
@@ -581,7 +574,8 @@ export async function rejectQuoteAction(quoteId: string, note: string) {
   if (quote.status !== "pending_approval") throw new Error("Quote is not pending approval");
 
   await Promise.all([
-    db.update(quotes)
+    db
+      .update(quotes)
       .set({ status: "draft", approvalNote: note || null, updatedAt: new Date() })
       .where(eq(quotes.id, quoteId)),
     logQuoteActivity(quoteId, "rejected", session.user.id),
@@ -614,7 +608,14 @@ export async function getQuoteFormData() {
       .orderBy(desc(deals.createdAt)),
     db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(companies.name),
     db
-      .select({ id: products.id, name: products.name, price: products.price, taxPercent: products.taxPercent, unit: products.unit, category: products.category })
+      .select({
+        id: products.id,
+        name: products.name,
+        price: products.price,
+        taxPercent: products.taxPercent,
+        unit: products.unit,
+        category: products.category,
+      })
       .from(products)
       .where(eq(products.isActive, true))
       .orderBy(products.name),

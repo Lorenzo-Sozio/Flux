@@ -5,10 +5,10 @@ interface SLAGaugeProps {
 }
 
 const COLOR_MAP: Record<string, string> = {
-  green:  "#10b981",
+  green: "#10b981",
   yellow: "#f59e0b",
   orange: "#f97316",
-  red:    "#ef4444",
+  red: "#ef4444",
 };
 
 function resolveColor(percentage: number, override?: "green" | "yellow" | "orange" | "red"): string {

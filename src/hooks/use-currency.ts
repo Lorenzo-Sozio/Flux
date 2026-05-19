@@ -1,6 +1,6 @@
 "use client";
 
-import { useCurrencyContext, type ExchangeRates } from "@/contexts/currency-context";
+import { type ExchangeRates, useCurrencyContext } from "@/contexts/currency-context";
 
 export type { ExchangeRates };
 

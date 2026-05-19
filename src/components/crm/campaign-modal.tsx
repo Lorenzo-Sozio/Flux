@@ -1,52 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { toast } from "sonner";
-import {
-  Loader2,
-  Plus,
-  Pencil,
-  ExternalLink,
-  TargetIcon,
-  MailIcon,
-  CheckCircle2,
-  FileText,
-} from "lucide-react";
+
 import Link from "next/link";
 
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CheckCircle2, ExternalLink, FileText, Loader2, MailIcon, Pencil, Plus, TargetIcon } from "lucide-react";
+import { Controller, useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
+
 import { createMarketingCampaign, updateMarketingCampaign } from "@/actions/marketing";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
 const campaignSchema = z.object({
-  name:        z.string().min(1, "Campaign name is required"),
+  name: z.string().min(1, "Campaign name is required"),
   description: z.string().optional(),
-  status:      z.enum(["draft", "active", "completed"]).default("draft"),
-  templateId:  z.string().optional().nullable(),
+  status: z.enum(["draft", "active", "completed"]).default("draft"),
+  templateId: z.string().optional().nullable(),
 });
 type FormValues = z.infer<typeof campaignSchema>;
 
@@ -73,29 +53,36 @@ interface CampaignModalProps {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const CATEGORY_CONFIG: Record<string, { label: string; className: string }> = {
-  general:       { label: "General",       className: "border-slate-300 text-slate-600" },
-  welcome:       { label: "Welcome",       className: "border-green-300 text-green-700 bg-green-50" },
-  followup:      { label: "Follow-up",     className: "border-blue-300 text-blue-700 bg-blue-50" },
-  promotional:   { label: "Promotional",   className: "border-violet-300 text-violet-700 bg-violet-50" },
+  general: { label: "General", className: "border-slate-300 text-slate-600" },
+  welcome: { label: "Welcome", className: "border-green-300 text-green-700 bg-green-50" },
+  followup: { label: "Follow-up", className: "border-blue-300 text-blue-700 bg-blue-50" },
+  promotional: { label: "Promotional", className: "border-violet-300 text-violet-700 bg-violet-50" },
   transactional: { label: "Transactional", className: "border-amber-300 text-amber-700 bg-amber-50" },
 };
 
 const STATUS_OPTIONS = [
-  { value: "draft",     label: "Draft",     desc: "Not yet ready to send" },
-  { value: "active",    label: "Active",    desc: "Currently running" },
+  { value: "draft", label: "Draft", desc: "Not yet ready to send" },
+  { value: "active", label: "Active", desc: "Currently running" },
   { value: "completed", label: "Completed", desc: "Send finished" },
 ];
 
 // ── Field helper ───────────────────────────────────────────────────────────────
 function F({
-  label, error, required, children,
+  label,
+  error,
+  required,
+  children,
 }: {
-  label: string; error?: string; required?: boolean; children: React.ReactNode;
+  label: string;
+  error?: string;
+  required?: boolean;
+  children: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
       <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        {label}{required && <span className="ml-0.5 text-destructive">*</span>}
+        {label}
+        {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -111,21 +98,27 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
   const form = useForm<FormValues>({
     resolver: zodResolver(campaignSchema),
     defaultValues: {
-      name:       campaign?.name        ?? "",
+      name: campaign?.name ?? "",
       description: campaign?.description ?? "",
-      status:     (campaign?.status as FormValues["status"]) ?? "draft",
-      templateId: campaign?.templateId  ?? null,
+      status: (campaign?.status as FormValues["status"]) ?? "draft",
+      templateId: campaign?.templateId ?? null,
     },
   });
 
-  const { register, control, handleSubmit, watch, formState: { errors, isSubmitting } } = form;
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    formState: { errors, isSubmitting },
+  } = form;
   const e = errors;
 
   const selectedTemplateId = watch("templateId");
-  const selectedTemplate   = templates.find((t) => t.id === selectedTemplateId);
+  const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
 
   const tabErrors = {
-    details:  !!(e.name || e.description || e.status),
+    details: !!(e.name || e.description || e.status),
     template: !!e.templateId,
   };
 
@@ -156,12 +149,25 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
       size={isEditing ? "icon" : "default"}
       className={isEditing ? "h-8 w-8" : "gap-2"}
     >
-      {isEditing ? <Pencil className="h-3.5 w-3.5" /> : <><Plus className="h-4 w-4" />New Campaign</>}
+      {isEditing ? (
+        <Pencil className="h-3.5 w-3.5" />
+      ) : (
+        <>
+          <Plus className="h-4 w-4" />
+          New Campaign
+        </>
+      )}
     </Button>
   );
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) form.reset(); }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) form.reset();
+      }}
+    >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
 
       <DialogContent className="sm:max-w-[620px] max-h-[90vh] flex flex-col p-0 gap-0">
@@ -188,9 +194,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
                 <TabsTrigger value="template" className="relative flex-1 gap-1.5">
                   <MailIcon className="h-3.5 w-3.5" />
                   Email Template
-                  {selectedTemplate && (
-                    <span className="ml-1 h-1.5 w-1.5 rounded-full bg-green-500" />
-                  )}
+                  {selectedTemplate && <span className="ml-1 h-1.5 w-1.5 rounded-full bg-green-500" />}
                   <TabDot has={tabErrors.template} />
                 </TabsTrigger>
               </TabsList>
@@ -198,11 +202,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
               {/* ── Details Tab ───────────────────────────────────────────── */}
               <TabsContent value="details" className="space-y-5 mt-0">
                 <F label="Campaign Name" required error={e.name?.message}>
-                  <Input
-                    {...register("name")}
-                    placeholder="e.g. Q2 Product Launch, Summer Promo…"
-                    autoFocus
-                  />
+                  <Input {...register("name")} placeholder="e.g. Q2 Product Launch, Summer Promo…" autoFocus />
                 </F>
 
                 <F label="Description" error={e.description?.message}>
@@ -217,9 +217,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
                 <Separator />
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                    Status
-                  </Label>
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</Label>
                   <Controller
                     control={control}
                     name="status"
@@ -330,9 +328,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
                                     {catCfg.label}
                                   </Badge>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1 truncate pl-0">
-                                  Subject: {t.subject}
-                                </p>
+                                <p className="text-xs text-muted-foreground mt-1 truncate pl-0">Subject: {t.subject}</p>
                               </button>
                             );
                           })}
@@ -343,7 +339,9 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
                     {/* Selected template summary */}
                     {selectedTemplate && (
                       <div className="rounded-lg bg-muted/40 border px-4 py-3 space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Selected template</p>
+                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                          Selected template
+                        </p>
                         <p className="text-sm font-semibold">{selectedTemplate.name}</p>
                         <p className="text-xs text-muted-foreground">Subject: {selectedTemplate.subject}</p>
                       </div>

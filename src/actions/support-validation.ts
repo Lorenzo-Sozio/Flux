@@ -12,12 +12,30 @@ export const CreateTicketSchema = z.object({
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
   severity: z.enum(["low", "normal", "high", "critical"]).default("normal"),
   type: z.enum(TICKET_TYPE_VALUES).default("support"),
-  component: z.string().optional().transform((v) => v === "" ? undefined : v),
-  groupId: z.string().optional().transform((v) => v === "" ? undefined : v),
-  contactId: z.string().optional().transform((v) => v === "" ? undefined : v),
-  companyId: z.string().optional().transform((v) => v === "" ? undefined : v),
-  leadId: z.string().optional().transform((v) => v === "" ? undefined : v),
-  assigneeId: z.string().optional().transform((v) => v === "" ? undefined : v),
+  component: z
+    .string()
+    .optional()
+    .transform((v) => (v === "" ? undefined : v)),
+  groupId: z
+    .string()
+    .optional()
+    .transform((v) => (v === "" ? undefined : v)),
+  contactId: z
+    .string()
+    .optional()
+    .transform((v) => (v === "" ? undefined : v)),
+  companyId: z
+    .string()
+    .optional()
+    .transform((v) => (v === "" ? undefined : v)),
+  leadId: z
+    .string()
+    .optional()
+    .transform((v) => (v === "" ? undefined : v)),
+  assigneeId: z
+    .string()
+    .optional()
+    .transform((v) => (v === "" ? undefined : v)),
   tags: z.array(z.string()).default([]),
 });
 

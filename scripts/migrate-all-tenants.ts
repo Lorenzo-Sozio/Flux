@@ -13,12 +13,14 @@
  *   PLATFORM_ENCRYPTION_KEY  — 64-char hex key for decrypting tenant DB URLs
  */
 import "dotenv/config";
+
 import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
 import { pushSchema } from "drizzle-kit/api";
+import { drizzle } from "drizzle-orm/neon-http";
+
 import { tenants } from "../src/db/schema";
-import { decryptDbUrl } from "../src/lib/tenant-db";
 import * as tenantSchema from "../src/db/schema-tenant";
+import { decryptDbUrl } from "../src/lib/tenant-db";
 
 const isDryRun = process.argv.includes("--dry-run");
 const filterSubdomains = process.argv.slice(2).filter((a) => !a.startsWith("-"));
@@ -62,18 +64,22 @@ async function main() {
   const platformSql = neon(platformUrl);
   const platformDb = drizzle(platformSql, { schema: { tenants } });
 
-  const allTenants = await platformDb.select({
-    id: tenants.id,
-    subdomain: tenants.subdomain,
-    dbUrl: tenants.dbUrl,
-  }).from(tenants).orderBy(tenants.createdAt);
+  const allTenants = await platformDb
+    .select({
+      id: tenants.id,
+      subdomain: tenants.subdomain,
+      dbUrl: tenants.dbUrl,
+    })
+    .from(tenants)
+    .orderBy(tenants.createdAt);
 
-  const targets = filterSubdomains.length > 0
-    ? allTenants.filter((t) => filterSubdomains.includes(t.subdomain))
-    : allTenants;
+  const targets =
+    filterSubdomains.length > 0 ? allTenants.filter((t) => filterSubdomains.includes(t.subdomain)) : allTenants;
 
   if (targets.length === 0) {
-    console.log("No tenants found" + (filterSubdomains.length > 0 ? ` matching: ${filterSubdomains.join(", ")}` : "") + ".");
+    console.log(
+      "No tenants found" + (filterSubdomains.length > 0 ? ` matching: ${filterSubdomains.join(", ")}` : "") + ".",
+    );
     process.exit(0);
   }
 

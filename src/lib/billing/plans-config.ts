@@ -5,7 +5,7 @@
  */
 
 export type PlanLimits = {
-  maxUsers: number | null;           // null = unlimited
+  maxUsers: number | null; // null = unlimited
   apiCallsPerMonth: number | null;
   storageGb: number;
   automationRunsPerMonth: number | null;
@@ -14,31 +14,13 @@ export type PlanLimits = {
   maxIntegrations: number | null;
 };
 
-export type PlanModule =
-  | "crm"
-  | "sales"
-  | "marketing"
-  | "support"
-  | "automation"
-  | "reporting"
-  | "helpdesk";
+export type PlanModule = "crm" | "sales" | "marketing" | "support" | "automation" | "reporting" | "helpdesk";
 
 export type SupportTier = "community" | "email" | "priority" | "dedicated";
 
-export type SubscriptionStatus =
-  | "free"
-  | "trialing"
-  | "active"
-  | "past_due"
-  | "canceled"
-  | "suspended";
+export type SubscriptionStatus = "free" | "trialing" | "active" | "past_due" | "canceled" | "suspended";
 
-export type AddonType =
-  | "extra_users"
-  | "helpdesk"
-  | "advanced_reporting"
-  | "white_label"
-  | "sandbox";
+export type AddonType = "extra_users" | "helpdesk" | "advanced_reporting" | "white_label" | "sandbox";
 
 export type BillingCycle = "monthly" | "annual";
 
@@ -46,8 +28,8 @@ export interface PlanConfig {
   name: string;
   displayName: string;
   description: string;
-  pricePerUserMonthly: number;  // cents
-  pricePerUserAnnual: number;   // cents/month billed annually
+  pricePerUserMonthly: number; // cents
+  pricePerUserAnnual: number; // cents/month billed annually
   annualDiscountPercent: number;
   includedUsers: number;
   maxUsers: number | null;
@@ -99,8 +81,8 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
     name: "basic",
     displayName: "Basic",
     description: "For small teams ready to grow.",
-    pricePerUserMonthly: 1500,   // €15/user/month
-    pricePerUserAnnual: 1200,    // €12/user/month billed annually
+    pricePerUserMonthly: 1500, // €15/user/month
+    pricePerUserAnnual: 1200, // €12/user/month billed annually
     annualDiscountPercent: 20,
     includedUsers: 3,
     maxUsers: 10,
@@ -129,8 +111,8 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
     name: "professional",
     displayName: "Professional",
     description: "Full CRM suite for growing businesses.",
-    pricePerUserMonthly: 2500,   // €25/user/month
-    pricePerUserAnnual: 2000,    // €20/user/month billed annually
+    pricePerUserMonthly: 2500, // €25/user/month
+    pricePerUserAnnual: 2000, // €20/user/month billed annually
     annualDiscountPercent: 20,
     includedUsers: 5,
     maxUsers: 50,
@@ -159,8 +141,8 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
     name: "enterprise",
     displayName: "Enterprise",
     description: "Unlimited scale, white-label, and dedicated support.",
-    pricePerUserMonthly: 5000,   // €50/user/month
-    pricePerUserAnnual: 4000,    // €40/user/month billed annually
+    pricePerUserMonthly: 5000, // €50/user/month
+    pricePerUserAnnual: 4000, // €40/user/month billed annually
     annualDiscountPercent: 20,
     includedUsers: 10,
     maxUsers: null,
@@ -177,15 +159,7 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
       maxWorkspaces: 10,
       maxIntegrations: null,
     },
-    enabledModules: [
-      "crm",
-      "sales",
-      "marketing",
-      "support",
-      "automation",
-      "reporting",
-      "helpdesk",
-    ],
+    enabledModules: ["crm", "sales", "marketing", "support", "automation", "reporting", "helpdesk"],
     supportTier: "dedicated",
     hasWhiteLabel: true,
     hasSandbox: true,

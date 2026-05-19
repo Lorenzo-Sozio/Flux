@@ -1,8 +1,10 @@
-import { notFound } from "next/navigation";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+
 import { ChevronLeft } from "lucide-react";
-import { auth } from "@/auth";
+
 import { getQuoteById } from "@/actions/quotes";
+import { auth } from "@/auth";
 import { QuoteDetail } from "@/components/crm/quote-detail";
 
 interface Props {

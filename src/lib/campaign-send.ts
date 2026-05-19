@@ -1,15 +1,22 @@
 // NOT "use server" — this is a plain server-side lib callable from both
 // server actions (with auth) and API routes (cron, no session).
 
-import { and, eq, inArray, lte } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { getDb } from "@/lib/tenant-context";
+import { and, eq, inArray, lte } from "drizzle-orm";
+
 import {
-  campaignLogs, contacts, emailJobs, emailSuppressions,
-  emailTemplates, leads, marketingCampaigns,
+  campaignLogs,
+  contacts,
+  emailJobs,
+  emailSuppressions,
+  emailTemplates,
+  leads,
+  marketingCampaigns,
 } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
+import { signTrackingUrl } from "@/lib/tracking-token";
 
 const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 
@@ -18,7 +25,12 @@ type Recipient = { id: string; email: string | null; firstName: string; lastName
 function wrapLinksForTracking(html: string, logId: string): string {
   return html.replace(/href="(https?:\/\/[^"]+)"/gi, (match, url: string) => {
     if (url.includes("/api/track/") || url.includes("/api/unsubscribe")) return match;
-    const tracked = `${APP_URL}/api/track/click?log=${encodeURIComponent(logId)}&url=${encodeURIComponent(url)}`;
+    const sig = signTrackingUrl(logId, url);
+    const tracked =
+      `${APP_URL}/api/track/click` +
+      `?log=${encodeURIComponent(logId)}` +
+      `&url=${encodeURIComponent(url)}` +
+      `&sig=${encodeURIComponent(sig)}`;
     return `href="${tracked}"`;
   });
 }
@@ -31,17 +43,11 @@ export async function executeCampaignSend(data: {
   const db = await getDb();
   const { campaignId, recipientType, recipientIds } = data;
 
-  const [campaign] = await db
-    .select()
-    .from(marketingCampaigns)
-    .where(eq(marketingCampaigns.id, campaignId));
+  const [campaign] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, campaignId));
 
   if (!campaign?.templateId) return { error: "Campaign or template not found." };
 
-  const [template] = await db
-    .select()
-    .from(emailTemplates)
-    .where(eq(emailTemplates.id, campaign.templateId));
+  const [template] = await db.select().from(emailTemplates).where(eq(emailTemplates.id, campaign.templateId));
 
   if (!template) return { error: "Email template not found." };
 
@@ -72,8 +78,14 @@ export async function executeCampaignSend(data: {
   let skipped = 0;
 
   for (const recipient of recipients) {
-    if (!recipient.email) { skipped++; continue; }
-    if (suppressedEmails.has(recipient.email.toLowerCase())) { skipped++; continue; }
+    if (!recipient.email) {
+      skipped++;
+      continue;
+    }
+    if (suppressedEmails.has(recipient.email.toLowerCase())) {
+      skipped++;
+      continue;
+    }
 
     const [log] = await db
       .insert(campaignLogs)
@@ -133,7 +145,12 @@ export async function dispatchDueCampaigns(): Promise<Array<{ id: string; name: 
   await db
     .update(marketingCampaigns)
     .set({ status: "sending", updatedAt: new Date() })
-    .where(inArray(marketingCampaigns.id, due.map((c) => c.id)));
+    .where(
+      inArray(
+        marketingCampaigns.id,
+        due.map((c) => c.id),
+      ),
+    );
 
   const results: Array<{ id: string; name: string; result: unknown }> = [];
   for (const campaign of due) {

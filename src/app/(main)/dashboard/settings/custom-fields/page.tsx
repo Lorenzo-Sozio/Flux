@@ -1,6 +1,8 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+
 import { getCustomFieldDefinitions } from "@/actions/custom-fields";
+import { auth } from "@/auth";
+
 import { CustomFieldsClient } from "./_components/custom-fields-client";
 
 export default async function CustomFieldsPage() {

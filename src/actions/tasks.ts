@@ -7,7 +7,6 @@ import { alias } from "drizzle-orm/pg-core";
 
 import { createNotificationAction } from "@/actions/auth";
 import { dispatchWebhook } from "@/actions/webhooks";
-import { getDb } from "@/lib/tenant-context";
 import {
   activities,
   companies,
@@ -21,6 +20,7 @@ import {
   users,
 } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
+import { getDb } from "@/lib/tenant-context";
 
 export async function createTask(data: {
   title: string;

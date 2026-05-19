@@ -1,16 +1,18 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckSquare, CheckCircle2 } from "lucide-react";
+
 import Link from "next/link";
+
+import { CheckCircle2, CheckSquare } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
+
 import { updateTaskStatus } from "@/actions/tasks";
 import { FormattedTime } from "@/components/crm/formatted-time";
 import { cn } from "@/lib/utils";
 
-const PILL_STYLE =
-  "bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-200 border-l-blue-500";
+const PILL_STYLE = "bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-200 border-l-blue-500";
 
 export interface CalendarTaskEvent {
   id: string;
@@ -21,13 +23,7 @@ export interface CalendarTaskEvent {
   status: string;
 }
 
-export function CalendarTaskPill({
-  event,
-  compact = false,
-}: {
-  event: CalendarTaskEvent;
-  compact?: boolean;
-}) {
+export function CalendarTaskPill({ event, compact = false }: { event: CalendarTaskEvent; compact?: boolean }) {
   const t = useTranslations("calendar");
   const [done, setDone] = useState(event.status === "done");
   const [isPending, startTransition] = useTransition();
@@ -65,19 +61,13 @@ export function CalendarTaskPill({
         <CheckCircle2
           className={cn(
             "h-2.5 w-2.5 transition-colors",
-            done
-              ? "text-green-500"
-              : "text-muted-foreground/40 group-hover/pill:text-green-400",
+            done ? "text-green-500" : "text-muted-foreground/40 group-hover/pill:text-green-400",
           )}
         />
       </button>
 
       {/* Pill */}
-      <Link
-        href={event.link}
-        className="flex-1 min-w-0"
-        title={`${event.displayTitle} — ${event.entityName}`}
-      >
+      <Link href={event.link} className="flex-1 min-w-0" title={`${event.displayTitle} — ${event.entityName}`}>
         <div
           className={cn(
             "flex items-center gap-1.5 rounded border-l-[3px] px-1.5 py-1 text-xs leading-tight hover:opacity-80 transition-opacity",
@@ -91,9 +81,7 @@ export function CalendarTaskPill({
               <FormattedTime date={event.date} />
             </span>
           )}
-          <span className={cn("truncate font-medium", done && "line-through")}>
-            {event.displayTitle}
-          </span>
+          <span className={cn("truncate font-medium", done && "line-through")}>{event.displayTitle}</span>
         </div>
       </Link>
     </div>

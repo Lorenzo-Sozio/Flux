@@ -1,45 +1,48 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { signIn } from "next-auth/react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent } from "@/components/ui/card"
-import { toast } from "sonner"
-import { Spinner } from "@/components/ui/spinner"
+import { useState } from "react";
+
+import { useRouter } from "next/navigation";
+
+import { signIn } from "next-auth/react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 
 export function LoginForm() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    setLoading(true)
-    
-    const formData = new FormData(e.currentTarget)
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
-    
+    e.preventDefault();
+    setLoading(true);
+
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
     try {
       const res = await signIn("credentials", {
         email,
         password,
         redirect: false,
-      })
+      });
 
       if (res?.error) {
-        toast.error("Credenziali non valide")
+        toast.error("Credenziali non valide");
       } else {
-        toast.success("Accesso effettuato con successo")
-        window.location.href = "/" // hard reload to update session state across tree
+        toast.success("Accesso effettuato con successo");
+        window.location.href = "/"; // hard reload to update session state across tree
       }
     } catch (error) {
-      toast.error("Si è verificato un errore")
+      toast.error("Si è verificato un errore");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
@@ -50,8 +53,12 @@ export function LoginForm() {
         <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg">
           <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">🔐 Demo Credentials</p>
           <div className="space-y-1 text-xs text-blue-800 dark:text-blue-200 font-mono">
-            <p><strong>Email:</strong> admin@flux.local</p>
-            <p><strong>Password:</strong> admin</p>
+            <p>
+              <strong>Email:</strong> admin@flux.local
+            </p>
+            <p>
+              <strong>Password:</strong> admin
+            </p>
           </div>
         </div>
 
@@ -64,7 +71,7 @@ export function LoginForm() {
             <Label htmlFor="password">Password</Label>
             <Input id="password" name="password" type="password" required />
           </div>
-          
+
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? <Spinner className="mr-2 h-4 w-4" /> : null}
             Accedi
@@ -76,20 +83,18 @@ export function LoginForm() {
             <div className="w-full border-t border-zinc-200 dark:border-zinc-800" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="bg-white px-2 text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
-              Oppure continua con
-            </span>
+            <span className="bg-white px-2 text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">Oppure continua con</span>
           </div>
         </div>
 
-        <Button 
-          variant="outline" 
-          type="button" 
+        <Button
+          variant="outline"
+          type="button"
           className="w-full"
           disabled={googleLoading}
           onClick={() => {
-            setGoogleLoading(true)
-            signIn("google", { callbackUrl: "/" })
+            setGoogleLoading(true);
+            signIn("google", { callbackUrl: "/" });
           }}
         >
           {googleLoading ? (
@@ -119,5 +124,5 @@ export function LoginForm() {
         </Button>
       </CardContent>
     </Card>
-  )
+  );
 }

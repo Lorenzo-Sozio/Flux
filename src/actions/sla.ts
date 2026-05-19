@@ -1,12 +1,14 @@
 "use server";
 
-import { getDb } from "@/lib/tenant-context";
-import { slas } from "@/db/schema";
-import { eq } from "drizzle-orm";
-import { z } from "zod";
-import { requireAdminAccess } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
+
+import { eq } from "drizzle-orm";
+import type { z } from "zod";
+
 import { SlaSchema } from "@/actions/sla-validation";
+import { slas } from "@/db/schema";
+import { requireAdminAccess } from "@/lib/auth-guard";
+import { getDb } from "@/lib/tenant-context";
 
 export async function getAllSlas() {
   await requireAdminAccess();

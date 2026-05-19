@@ -1,31 +1,24 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { AlertCircle, CheckCircle, Info, ChevronDown } from 'lucide-react';
+import React, { useCallback, useMemo, useState } from "react";
+
+import { AlertCircle, CheckCircle, ChevronDown, Info } from "lucide-react";
+
 import {
-  validateExpression,
-  describeTree,
   compileExpression,
   createConditionLabel,
+  describeTree,
   tokenizeExpression,
   type ValidationError,
-} from '@/components/crm/automation/condition-parser';
-import { cn } from '@/lib/utils';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+  validateExpression,
+} from "@/components/crm/automation/condition-parser";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface Condition {
   field: string;
   operator: string;
   value?: string | number | boolean;
-  logic?: 'AND' | 'OR';
+  logic?: "AND" | "OR";
 }
 
 interface ConditionExpressionEditorProps {
@@ -37,32 +30,32 @@ interface ConditionExpressionEditorProps {
 
 /**
  * Genera automaticamente un'espressione logica dalle condizioni e dai loro operatori
- * 
+ *
  * Strategie di raggruppamento:
  * - Raggruppa sequenze di condizioni con lo STESSO operatore (AND o OR)
  * - Racchiudi ciascun gruppo tra parentesi
  * - Unisci i gruppi con il primo operatore diverso
- * 
+ *
  * Esempi:
  * - C0 AND C1 AND C2 → "C0 AND C1 AND C2" (no parentesi, tutti AND)
  * - C0 AND C1 OR C2 → "C0 AND C1 OR C2" (no parentesi, chiaro dalla logica)
  * - C0 OR C1 OR C2 AND C3 → "C0 OR C1 OR (C2 AND C3)" (parentesi attorno al gruppo finale diverso)
  */
 export function generateExpressionFromConditions(conditions: Condition[]): string {
-  if (conditions.length === 0) return '';
-  if (conditions.length === 1) return 'C0';
+  if (conditions.length === 0) return "";
+  if (conditions.length === 1) return "C0";
 
   // Accumula espressione da sinistra a destra
-  let expression = 'C0';
-  
+  let expression = "C0";
+
   for (let i = 1; i < conditions.length; i++) {
-    const prevLogic = conditions[i - 1]?.logic || 'AND';
-    const currentLogic = conditions[i]?.logic || 'AND';
-    
+    const prevLogic = conditions[i - 1]?.logic || "AND";
+    const currentLogic = conditions[i]?.logic || "AND";
+
     // Aggiungi condizione con il suo operatore
     expression += ` ${currentLogic} C${i}`;
   }
-  
+
   return expression;
 }
 
@@ -79,22 +72,22 @@ const SyntaxHighlighter: React.FC<{
   return (
     <div className="font-mono text-sm whitespace-pre-wrap break-words">
       {tokens.map((token, idx) => {
-        const isOperator = ['AND', 'OR', 'NOT'].includes(token);
-        const isParenthesis = token === '(' || token === ')';
+        const isOperator = ["AND", "OR", "NOT"].includes(token);
+        const isParenthesis = token === "(" || token === ")";
         const isCondition = token.match(/^C\d+$/);
 
         return (
           <span
             key={`${token}-${idx}`}
             className={cn(
-              'transition-colors',
-              isOperator && 'text-blue-600 font-semibold',
-              isParenthesis && 'text-amber-600 font-bold',
-              isCondition && 'text-green-600 font-medium',
-              !isOperator && !isParenthesis && !isCondition && 'text-gray-600'
+              "transition-colors",
+              isOperator && "text-blue-600 font-semibold",
+              isParenthesis && "text-amber-600 font-bold",
+              isCondition && "text-green-600 font-medium",
+              !isOperator && !isParenthesis && !isCondition && "text-gray-600",
             )}
           >
-            {token}{' '}
+            {token}{" "}
           </span>
         );
       })}
@@ -147,15 +140,15 @@ const ValidationFeedback: React.FC<{
         <div
           key={idx}
           className={cn(
-            'flex items-start gap-2 text-sm rounded-lg p-3 border',
-            error.severity === 'error'
-              ? 'text-red-700 bg-red-50 border-red-200'
-              : 'text-amber-700 bg-amber-50 border-amber-200'
+            "flex items-start gap-2 text-sm rounded-lg p-3 border",
+            error.severity === "error"
+              ? "text-red-700 bg-red-50 border-red-200"
+              : "text-amber-700 bg-amber-50 border-amber-200",
           )}
         >
           <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <div className="font-semibold">{error.type === 'syntax' ? 'Errore sintattico' : 'Errore logico'}</div>
+            <div className="font-semibold">{error.type === "syntax" ? "Errore sintattico" : "Errore logico"}</div>
             <div>{error.message}</div>
           </div>
         </div>
@@ -175,22 +168,22 @@ export const ConditionExpressionEditor: React.FC<ConditionExpressionEditorProps>
 }) => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showTree, setShowTree] = useState(false);
-  const [lastConditionHash, setLastConditionHash] = useState<string>('');
+  const [lastConditionHash, setLastConditionHash] = useState<string>("");
 
   // Crea etichette per le condizioni
   const conditionLabels = useMemo(
     () => conditions.map((c) => createConditionLabel(c.field, c.operator, c.value)),
-    [conditions]
+    [conditions],
   );
 
   // Auto-rigenera l'espressione quando cambiano le condizioni
   React.useEffect(() => {
     // Crea un hash semplice delle condizioni
     const hash = JSON.stringify(conditions);
-    
+
     // Se le condizioni sono cambiate AND l'espressione è vuota o semplice (no parentesi),
     // allora rigenera automaticamente
-    if (hash !== lastConditionHash && (!expression || !expression.includes('('))) {
+    if (hash !== lastConditionHash && (!expression || !expression.includes("("))) {
       const generated = generateExpressionFromConditions(conditions);
       if (generated && generated !== expression) {
         onChange(generated);
@@ -200,10 +193,7 @@ export const ConditionExpressionEditor: React.FC<ConditionExpressionEditorProps>
   }, [conditions, expression, onChange, lastConditionHash]);
 
   // Valida l'espressione
-  const validation = useMemo(
-    () => validateExpression(expression, conditions.length),
-    [expression, conditions.length]
-  );
+  const validation = useMemo(() => validateExpression(expression, conditions.length), [expression, conditions.length]);
 
   // Comunica al parent lo stato di validazione
   React.useEffect(() => {
@@ -215,7 +205,7 @@ export const ConditionExpressionEditor: React.FC<ConditionExpressionEditorProps>
     if (validation.tree) {
       return describeTree(validation.tree, conditionLabels);
     }
-    return '';
+    return "";
   }, [validation.tree, conditionLabels]);
 
   // Helper per inserire automaticamente parentesi
@@ -225,12 +215,12 @@ export const ConditionExpressionEditor: React.FC<ConditionExpressionEditorProps>
   }, [expression, onChange]);
 
   const insertAnd = useCallback(() => {
-    const newExpr = expression ? `${expression} AND ` : '';
+    const newExpr = expression ? `${expression} AND ` : "";
     onChange(newExpr);
   }, [expression, onChange]);
 
   const insertOr = useCallback(() => {
-    const newExpr = expression ? `${expression} OR ` : '';
+    const newExpr = expression ? `${expression} OR ` : "";
     onChange(newExpr);
   }, [expression, onChange]);
 
@@ -243,7 +233,7 @@ export const ConditionExpressionEditor: React.FC<ConditionExpressionEditorProps>
       const newExpr = expression ? `${expression} AND C${idx}` : `C${idx}`;
       onChange(newExpr);
     },
-    [expression, onChange]
+    [expression, onChange],
   );
 
   return (
@@ -254,32 +244,36 @@ export const ConditionExpressionEditor: React.FC<ConditionExpressionEditorProps>
         <div className="text-blue-900">
           <div className="font-semibold mb-1">Espressioni logiche complesse</div>
           <div className="text-xs space-y-1">
-            <div>• Usa <span className="font-mono">C0, C1, C2</span> per riferirsi alle condizioni</div>
-            <div>• Combina con <span className="font-mono">AND, OR, NOT</span></div>
-            <div>• Raggruppa con parentesi: <span className="font-mono">(C0 AND C1) OR C2</span></div>
-            <div>• Esempio: <span className="font-mono">(C0 OR C1) AND (C2 AND NOT C3)</span></div>
+            <div>
+              • Usa <span className="font-mono">C0, C1, C2</span> per riferirsi alle condizioni
+            </div>
+            <div>
+              • Combina con <span className="font-mono">AND, OR, NOT</span>
+            </div>
+            <div>
+              • Raggruppa con parentesi: <span className="font-mono">(C0 AND C1) OR C2</span>
+            </div>
+            <div>
+              • Esempio: <span className="font-mono">(C0 OR C1) AND (C2 AND NOT C3)</span>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Editor testuale */}
       <div className="space-y-2">
-        <label className="block text-sm font-semibold text-gray-700">
-          Espressione logica
-        </label>
+        <label className="block text-sm font-semibold text-gray-700">Espressione logica</label>
         <textarea
           value={expression}
           onChange={(e) => onChange(e.target.value)}
           className={cn(
-            'w-full font-mono text-sm p-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors',
-            validation.valid
-              ? 'border-green-300 focus:ring-green-500'
-              : 'border-red-300 focus:ring-red-500'
+            "w-full font-mono text-sm p-3 border rounded-lg focus:outline-none focus:ring-2 transition-colors",
+            validation.valid ? "border-green-300 focus:ring-green-500" : "border-red-300 focus:ring-red-500",
           )}
           placeholder="Esempio: (C0 AND C1) OR (C2 AND NOT C3)"
           rows={3}
         />
-        
+
         {/* Suggerimento con mapping delle condizioni */}
         {conditions.length > 0 && expression && (
           <div className="text-xs bg-amber-50 border border-amber-200 rounded p-2">
@@ -288,12 +282,15 @@ export const ConditionExpressionEditor: React.FC<ConditionExpressionEditorProps>
               {conditions.map((cond, idx) => {
                 const fieldLabel = cond.field;
                 const operatorLabel = cond.operator;
-                const valueLabel = cond.value ? ` "${cond.value}"` : '';
+                const valueLabel = cond.value ? ` "${cond.value}"` : "";
                 return (
                   <div key={idx}>
                     <span className="font-mono text-green-700 font-bold">C{idx}</span>
-                    {' = '}
-                    <span className="text-amber-900">{fieldLabel} {operatorLabel}{valueLabel}</span>
+                    {" = "}
+                    <span className="text-amber-900">
+                      {fieldLabel} {operatorLabel}
+                      {valueLabel}
+                    </span>
                   </div>
                 );
               })}
@@ -304,9 +301,7 @@ export const ConditionExpressionEditor: React.FC<ConditionExpressionEditorProps>
 
       {/* Anteprima sintattica */}
       <div className="space-y-2">
-        <label className="block text-sm font-semibold text-gray-700">
-          Anteprima evidenziazione
-        </label>
+        <label className="block text-sm font-semibold text-gray-700">Anteprima evidenziazione</label>
         <div className="bg-gray-100 border border-gray-300 rounded-lg p-3 overflow-x-auto">
           <SyntaxHighlighter expression={expression} errors={validation.errors} />
         </div>
@@ -358,9 +353,7 @@ export const ConditionExpressionEditor: React.FC<ConditionExpressionEditorProps>
       {/* Quick condizioni */}
       {conditions.length > 0 && (
         <div className="space-y-2">
-          <label className="block text-sm font-semibold text-gray-700">
-            Condizioni disponibili
-          </label>
+          <label className="block text-sm font-semibold text-gray-700">Condizioni disponibili</label>
           <div className="flex flex-wrap gap-2">
             {conditions.map((cond, idx) => (
               <TooltipProvider key={idx}>
@@ -392,16 +385,11 @@ export const ConditionExpressionEditor: React.FC<ConditionExpressionEditorProps>
       {validation.valid && validation.tree && (
         <Collapsible open={showTree} onOpenChange={setShowTree}>
           <CollapsibleTrigger className="text-sm font-semibold text-gray-700 flex items-center gap-2 hover:text-gray-900">
-            <ChevronDown
-              className={cn('w-4 h-4 transition-transform', showTree && 'rotate-180')}
-            />
+            <ChevronDown className={cn("w-4 h-4 transition-transform", showTree && "rotate-180")} />
             Anteprima albero logico
           </CollapsibleTrigger>
           <CollapsibleContent className="mt-3">
-            <LogicTreeViewer
-              conditionLabels={conditionLabels}
-              description={treeDescription}
-            />
+            <LogicTreeViewer conditionLabels={conditionLabels} description={treeDescription} />
           </CollapsibleContent>
         </Collapsible>
       )}

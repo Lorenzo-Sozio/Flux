@@ -4,8 +4,8 @@ import { and, eq, gte, inArray, isNotNull, lte, or } from "drizzle-orm";
 
 import { getAppointmentCalendarEvents } from "@/actions/appointments";
 import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
 import { activities, companies, contacts, deals, leads, taskAssignees, tasks, userGroupMembers } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 export type CalendarFilter = "all" | "mine" | "group";
 
@@ -80,7 +80,10 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
               inArray(tasks.assigneeId, filterIds),
               inArray(
                 tasks.id,
-                db.select({ taskId: taskAssignees.taskId }).from(taskAssignees).where(inArray(taskAssignees.userId, filterIds)),
+                db
+                  .select({ taskId: taskAssignees.taskId })
+                  .from(taskAssignees)
+                  .where(inArray(taskAssignees.userId, filterIds)),
               ),
             )
           : undefined,

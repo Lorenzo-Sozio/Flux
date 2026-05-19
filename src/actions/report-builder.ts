@@ -1,28 +1,55 @@
 "use server";
 
-import { and, asc, avg, count, desc, eq, gt, gte, ilike, isNotNull, isNull, lt, lte, max, min, ne, sql, sum } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
-import { getDb } from "@/lib/tenant-context";
+import {
+  and,
+  asc,
+  avg,
+  count,
+  desc,
+  eq,
+  gt,
+  gte,
+  ilike,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  max,
+  min,
+  ne,
+  sql,
+  sum,
+} from "drizzle-orm";
+
 import { activities, companies, contacts, deals, leads, quotes, savedReports, tasks } from "@/db/schema";
 import { requireAdminAccess } from "@/lib/auth-guard";
 import {
-  ENTITY_CONFIGS,
   type AggregationFn,
+  ENTITY_CONFIGS,
   type FieldDef,
   type FilterCondition,
   type ReportConfig,
   type ReportResult,
   type SavedReport,
 } from "@/lib/report-builder-config";
+import { getDb } from "@/lib/tenant-context";
 
 // Re-export types the client imports from this module path (type-only, erased at runtime).
 export type {
-  EntityConfig, FieldDef, FieldType,
-  FilterCondition, FilterOperator,
-  AggregationFn, ChartType, SortDir,
-  ReportConfig, ReportColumn, ReportResult,
+  AggregationFn,
+  ChartType,
+  EntityConfig,
+  FieldDef,
+  FieldType,
+  FilterCondition,
+  FilterOperator,
+  ReportColumn,
+  ReportConfig,
+  ReportResult,
   SavedReport,
+  SortDir,
 } from "@/lib/report-builder-config";
 
 // ── Column reference maps ──────────────────────────────────────────────────────
@@ -32,49 +59,91 @@ type ColMap = Record<string, any>;
 
 const COLS: Record<string, ColMap> = {
   deals: {
-    name: deals.name, amount: deals.amount, currency: deals.currency,
-    probability: deals.probability, status: deals.status, healthScore: deals.healthScore,
-    expectedCloseDate: deals.expectedCloseDate, createdAt: deals.createdAt,
+    name: deals.name,
+    amount: deals.amount,
+    currency: deals.currency,
+    probability: deals.probability,
+    status: deals.status,
+    healthScore: deals.healthScore,
+    expectedCloseDate: deals.expectedCloseDate,
+    createdAt: deals.createdAt,
   },
   contacts: {
-    firstName: contacts.firstName, lastName: contacts.lastName, email: contacts.email,
-    phone: contacts.phone, jobTitle: contacts.jobTitle, source: contacts.source,
-    status: contacts.status, leadScore: contacts.leadScore,
-    marketingConsent: contacts.marketingConsent, country: contacts.country,
+    firstName: contacts.firstName,
+    lastName: contacts.lastName,
+    email: contacts.email,
+    phone: contacts.phone,
+    jobTitle: contacts.jobTitle,
+    source: contacts.source,
+    status: contacts.status,
+    leadScore: contacts.leadScore,
+    marketingConsent: contacts.marketingConsent,
+    country: contacts.country,
     createdAt: contacts.createdAt,
   },
   companies: {
-    name: companies.name, industry: companies.industry, type: companies.type,
-    employeeCount: companies.employeeCount, annualRevenue: companies.annualRevenue,
-    country: companies.country, source: companies.source, status: companies.status,
+    name: companies.name,
+    industry: companies.industry,
+    type: companies.type,
+    employeeCount: companies.employeeCount,
+    annualRevenue: companies.annualRevenue,
+    country: companies.country,
+    source: companies.source,
+    status: companies.status,
     createdAt: companies.createdAt,
   },
   leads: {
-    firstName: leads.firstName, lastName: leads.lastName, email: leads.email,
-    companyName: leads.companyName, status: leads.status, source: leads.source,
-    rating: leads.rating, leadScore: leads.leadScore, isConverted: leads.isConverted,
-    industry: leads.industry, country: leads.country, createdAt: leads.createdAt,
+    firstName: leads.firstName,
+    lastName: leads.lastName,
+    email: leads.email,
+    companyName: leads.companyName,
+    status: leads.status,
+    source: leads.source,
+    rating: leads.rating,
+    leadScore: leads.leadScore,
+    isConverted: leads.isConverted,
+    industry: leads.industry,
+    country: leads.country,
+    createdAt: leads.createdAt,
   },
   quotes: {
-    quoteNumber: quotes.quoteNumber, status: quotes.status,
-    totalAmount: quotes.totalAmount, subtotal: quotes.subtotal,
-    currency: quotes.currency, issuedAt: quotes.issuedAt,
-    expiresAt: quotes.expiresAt, createdAt: quotes.createdAt,
+    quoteNumber: quotes.quoteNumber,
+    status: quotes.status,
+    totalAmount: quotes.totalAmount,
+    subtotal: quotes.subtotal,
+    currency: quotes.currency,
+    issuedAt: quotes.issuedAt,
+    expiresAt: quotes.expiresAt,
+    createdAt: quotes.createdAt,
   },
   activities: {
-    type: activities.type, content: activities.content, date: activities.date,
-    durationMinutes: activities.durationMinutes, createdAt: activities.createdAt,
+    type: activities.type,
+    content: activities.content,
+    date: activities.date,
+    durationMinutes: activities.durationMinutes,
+    createdAt: activities.createdAt,
   },
   tasks: {
-    title: tasks.title, status: tasks.status, priority: tasks.priority,
-    dueDate: tasks.dueDate, estimatedHours: tasks.estimatedHours,
-    actualHours: tasks.actualHours, progressPct: tasks.progressPct, createdAt: tasks.createdAt,
+    title: tasks.title,
+    status: tasks.status,
+    priority: tasks.priority,
+    dueDate: tasks.dueDate,
+    estimatedHours: tasks.estimatedHours,
+    actualHours: tasks.actualHours,
+    progressPct: tasks.progressPct,
+    createdAt: tasks.createdAt,
   },
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TABLES: Record<string, any> = {
-  deals, contacts, companies, leads, quotes, activities, tasks,
+  deals,
+  contacts,
+  companies,
+  leads,
+  quotes,
+  activities,
+  tasks,
 };
 
 // ── Filter builder ─────────────────────────────────────────────────────────────
@@ -87,17 +156,44 @@ function buildFilterConditions(colMap: ColMap, fieldDefs: FieldDef[], filters: F
     const def = fieldDefs.find((d) => d.key === f.field);
 
     switch (f.operator) {
-      case "eq":           return [eq(col, f.value)];
-      case "neq":          return [ne(col, f.value)];
-      case "contains":     return [ilike(col, `%${f.value}%`)];
-      case "not_contains": return [sql`NOT (${col} ILIKE ${`%${f.value}%`})`];
-      case "gt":           return [def?.type === "date" ? gt(col, new Date(f.value)) : gt(col, def?.type === "number" ? Number(f.value) : f.value)];
-      case "gte":          return [def?.type === "date" ? gte(col, new Date(f.value)) : gte(col, def?.type === "number" ? Number(f.value) : f.value)];
-      case "lt":           return [def?.type === "date" ? lt(col, new Date(f.value)) : lt(col, def?.type === "number" ? Number(f.value) : f.value)];
-      case "lte":          return [def?.type === "date" ? lte(col, new Date(f.value)) : lte(col, def?.type === "number" ? Number(f.value) : f.value)];
-      case "is_empty":     return [isNull(col)];
-      case "is_not_empty": return [isNotNull(col)];
-      default:             return [];
+      case "eq":
+        return [eq(col, f.value)];
+      case "neq":
+        return [ne(col, f.value)];
+      case "contains":
+        return [ilike(col, `%${f.value}%`)];
+      case "not_contains":
+        return [sql`NOT (${col} ILIKE ${`%${f.value}%`})`];
+      case "gt":
+        return [
+          def?.type === "date"
+            ? gt(col, new Date(f.value))
+            : gt(col, def?.type === "number" ? Number(f.value) : f.value),
+        ];
+      case "gte":
+        return [
+          def?.type === "date"
+            ? gte(col, new Date(f.value))
+            : gte(col, def?.type === "number" ? Number(f.value) : f.value),
+        ];
+      case "lt":
+        return [
+          def?.type === "date"
+            ? lt(col, new Date(f.value))
+            : lt(col, def?.type === "number" ? Number(f.value) : f.value),
+        ];
+      case "lte":
+        return [
+          def?.type === "date"
+            ? lte(col, new Date(f.value))
+            : lte(col, def?.type === "number" ? Number(f.value) : f.value),
+        ];
+      case "is_empty":
+        return [isNull(col)];
+      case "is_not_empty":
+        return [isNotNull(col)];
+      default:
+        return [];
     }
   });
 }
@@ -136,10 +232,7 @@ export async function runReport(config: ReportConfig): Promise<ReportResult> {
     if (aggCol && aggFn !== "count" && aggFieldDef?.aggregatable) {
       const numCol = sql`CAST(${aggCol} AS NUMERIC)`;
       selectObj._agg =
-        aggFn === "sum" ? sum(numCol)
-        : aggFn === "avg" ? avg(numCol)
-        : aggFn === "min" ? min(aggCol)
-        : max(aggCol);
+        aggFn === "sum" ? sum(numCol) : aggFn === "avg" ? avg(numCol) : aggFn === "min" ? min(aggCol) : max(aggCol);
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -155,9 +248,7 @@ export async function runReport(config: ReportConfig): Promise<ReportResult> {
     const columns = [
       { key: "_group", label: groupFieldDef?.label ?? config.groupBy ?? "Group" },
       { key: "_count", label: "Count" },
-      ...(selectObj._agg
-        ? [{ key: "_agg", label: `${aggFn.toUpperCase()} ${aggFieldDef?.label ?? ""}`.trim() }]
-        : []),
+      ...(selectObj._agg ? [{ key: "_agg", label: `${aggFn.toUpperCase()} ${aggFieldDef?.label ?? ""}`.trim() }] : []),
     ];
 
     return { rows, columns, total: rows.length };
@@ -165,9 +256,7 @@ export async function runReport(config: ReportConfig): Promise<ReportResult> {
 
   // ── List mode ──────────────────────────────────────────────────────────────
   const requestedFields = config.fields.filter((f) => colMap[f]);
-  const activeFields = requestedFields.length > 0
-    ? requestedFields
-    : fieldDefs.slice(0, 5).map((f) => f.key);
+  const activeFields = requestedFields.length > 0 ? requestedFields : fieldDefs.slice(0, 5).map((f) => f.key);
 
   const selectObj = Object.fromEntries(activeFields.map((f) => [f, colMap[f]]));
 
@@ -201,7 +290,7 @@ export async function listSavedReports(): Promise<SavedReport[]> {
 
 export async function saveReport(name: string, config: ReportConfig): Promise<SavedReport> {
   const session = await requireAdminAccess();
- const db = await getDb();
+  const db = await getDb();
   const [row] = await db
     .insert(savedReports)
     .values({ name, config: JSON.stringify(config), ownerId: session.user.id })

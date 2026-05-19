@@ -1,7 +1,10 @@
+import { redirect } from "next/navigation";
+
+import { getTranslations } from "next-intl/server";
+
 import { getAllSlas } from "@/actions/sla";
 import { auth } from "@/auth";
-import { redirect } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+
 import { SlaClient } from "./_components/sla-client";
 
 export default async function SlaPage() {

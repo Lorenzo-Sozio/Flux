@@ -1405,7 +1405,9 @@ export const tenantMembersRelations = relations(tenantMembers, ({ one }) => ({
  * limits and enabledModules are JSON stored as text.
  */
 export const billingPlans = pgTable("billing_plan", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   name: text("name").notNull().unique(), // slug: free | basic | professional | enterprise | custom
   displayName: text("display_name").notNull(),
   description: text("description"),
@@ -1432,7 +1434,7 @@ export const billingPlans = pgTable("billing_plan", {
   trialDays: integer("trial_days").default(0).notNull(),
 
   // JSON strings (parse at runtime)
-  limits: text("limits").notNull().default("{}"),          // PlanLimits
+  limits: text("limits").notNull().default("{}"), // PlanLimits
   enabledModules: text("enabled_modules").notNull().default('["crm"]'), // string[]
 
   supportTier: text("support_tier").default("community").notNull(),
@@ -1452,8 +1454,12 @@ export const billingPlans = pgTable("billing_plan", {
  * Active Stripe subscription per tenant (one active per tenant at most).
  */
 export const billingSubscriptions = pgTable("billing_subscription", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
   planId: text("plan_id").references(() => billingPlans.id),
 
   stripeSubscriptionId: text("stripe_subscription_id").unique(),
@@ -1482,8 +1488,12 @@ export const billingSubscriptions = pgTable("billing_subscription", {
  * Each maps to a separate Stripe subscription item.
  */
 export const billingTenantAddons = pgTable("billing_tenant_addon", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
 
   // extra_users | helpdesk | advanced_reporting | white_label | sandbox
   addonType: text("addon_type").notNull(),
@@ -1506,8 +1516,12 @@ export const billingTenantAddons = pgTable("billing_tenant_addon", {
 export const billingUsageStats = pgTable(
   "billing_usage_stat",
   {
-    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-    tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    tenantId: text("tenant_id")
+      .notNull()
+      .references(() => tenants.id, { onDelete: "cascade" }),
     metricType: text("metric_type").notNull(), // api_calls | storage_mb | automation_runs | active_users
     currentValue: integer("current_value").default(0).notNull(),
     periodStart: timestamp("period_start", { mode: "date" }).notNull(),
@@ -1534,8 +1548,12 @@ export const billingStripeEvents = pgTable("billing_stripe_event", {
  * Threshold alerts (usage approaching plan limit).
  */
 export const billingAlerts = pgTable("billing_alert", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
-  tenantId: text("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  tenantId: text("tenant_id")
+    .notNull()
+    .references(() => tenants.id, { onDelete: "cascade" }),
   metricType: text("metric_type").notNull(),
   thresholdPercent: integer("threshold_percent").notNull(), // 80 | 90 | 100
   sentAt: timestamp("sent_at", { mode: "date" }),
@@ -1546,12 +1564,14 @@ export const billingAlerts = pgTable("billing_alert", {
  * Immutable audit log of all entitlement changes.
  */
 export const billingAuditLog = pgTable("billing_audit_log", {
-  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   tenantId: text("tenant_id").notNull(),
   eventType: text("event_type").notNull(), // plan_changed | addon_added | addon_removed | suspended | reactivated
   previousValue: text("previous_value"), // JSON snapshot
-  newValue: text("new_value"),           // JSON snapshot
-  triggeredBy: text("triggered_by"),     // 'stripe_webhook' | 'admin:{userId}' | 'system'
+  newValue: text("new_value"), // JSON snapshot
+  triggeredBy: text("triggered_by"), // 'stripe_webhook' | 'admin:{userId}' | 'system'
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -1578,3 +1598,15 @@ export const companyCategoriesRelations = relations(companyCategories, ({ many }
 export const companyTypesRelations = relations(companyTypes, ({ many }) => ({
   companies: many(companies),
 }));
+
+// ─── PLATFORM RATE-LIMIT ENTRIES ──────────────────────────────────────────────
+// Distributed rate limiter state stored in the platform DB.
+// Shared across all server instances; survives cold starts.
+// Rows can be pruned at any time: DELETE FROM ratelimit_entry WHERE reset_at < NOW()
+
+export const rateLimitEntries = pgTable("ratelimit_entry", {
+  key: text("key").primaryKey().notNull(),
+  count: integer("count").notNull().default(1),
+  resetAt: timestamp("reset_at", { mode: "date" }).notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+});

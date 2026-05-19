@@ -5,11 +5,27 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 const COOKIE_NAME = "admin_sess";
 const TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 
+function getSigningKey(): string {
+  const dedicated = process.env.ADMIN_SESSION_SECRET;
+  if (dedicated) return dedicated;
+
+  // In production, a dedicated key is required so admin session cookies can be
+  // rotated independently of the NextAuth JWT secret.
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("ADMIN_SESSION_SECRET must be set in production. " + "Generate one with: openssl rand -base64 32");
+  }
+
+  // In development, fall back to AUTH_SECRET with a visible warning.
+  const fallback = process.env.AUTH_SECRET ?? "";
+  console.warn(
+    "[admin-session] ADMIN_SESSION_SECRET is not set — falling back to AUTH_SECRET. " +
+      "Set ADMIN_SESSION_SECRET in production.",
+  );
+  return fallback;
+}
+
 function sign(payload: string): string {
-  // Prefer a dedicated secret so the admin session key can be rotated independently
-  // of AUTH_SECRET (which also signs NextAuth JWTs and Next.js internals).
-  const key = process.env.ADMIN_SESSION_SECRET ?? process.env.AUTH_SECRET ?? "";
-  return createHmac("sha256", key).update(payload).digest("hex");
+  return createHmac("sha256", getSigningKey()).update(payload).digest("hex");
 }
 
 // Cookie format: {userId}|{role}|{issuedAt}|{hmac}

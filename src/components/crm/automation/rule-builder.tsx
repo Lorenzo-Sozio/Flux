@@ -522,7 +522,11 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                 onCheckedChange={console.error}
                                 className="pointer-events-none"
                               />
-                              {ev === "onCreate" ? "Record Created" : ev === "onUpdate" ? "Record Updated" : "SLA Breach"}
+                              {ev === "onCreate"
+                                ? "Record Created"
+                                : ev === "onUpdate"
+                                  ? "Record Updated"
+                                  : "SLA Breach"}
                             </button>
                           );
                         }}

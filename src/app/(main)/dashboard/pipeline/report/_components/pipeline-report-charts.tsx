@@ -1,17 +1,8 @@
 "use client";
 
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { useTranslations } from "next-intl";
+import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 type StageReport = {
@@ -63,7 +54,13 @@ export function PipelineReportCharts({ stageReport }: { stageReport: StageReport
                   <Cell key={i} fill={entry.fill} fillOpacity={0.85} />
                 ))}
               </Bar>
-              <Bar dataKey="weightedForecast" name={t("charts.weightedForecast")} fill="hsl(var(--primary))" fillOpacity={0.4} radius={[4, 4, 0, 0]} />
+              <Bar
+                dataKey="weightedForecast"
+                name={t("charts.weightedForecast")}
+                fill="hsl(var(--primary))"
+                fillOpacity={0.4}
+                radius={[4, 4, 0, 0]}
+              />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

@@ -1,27 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { updatePlatformUserRole, type PlatformUser } from "@/actions/platform-users";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+import { Save } from "lucide-react";
+import { toast } from "sonner";
+
+import { type PlatformUser, updatePlatformUserRole } from "@/actions/platform-users";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { toast } from "sonner";
-import { Save } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 function initials(name: string | null, email: string | null): string {
   const src = name ?? email ?? "?";
@@ -34,8 +23,8 @@ interface Props {
 }
 
 export function PlatformUsersClient({ users, currentUserId }: Props) {
-  const [roles, setRoles] = useState<Record<string, string>>(
-    () => Object.fromEntries(users.map((u) => [u.id, u.role])),
+  const [roles, setRoles] = useState<Record<string, string>>(() =>
+    Object.fromEntries(users.map((u) => [u.id, u.role])),
   );
   const [isPending, startTransition] = useTransition();
   const [saving, setSaving] = useState<string | null>(null);
@@ -87,16 +76,12 @@ export function PlatformUsersClient({ users, currentUserId }: Props) {
                   <div className="flex items-center gap-3">
                     <Avatar className="h-8 w-8">
                       <AvatarImage src={user.image ?? undefined} />
-                      <AvatarFallback className="text-xs bg-gray-100">
-                        {initials(user.name, user.email)}
-                      </AvatarFallback>
+                      <AvatarFallback className="text-xs bg-gray-100">{initials(user.name, user.email)}</AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">
                         {user.name ?? <span className="text-gray-400 italic">Nessun nome</span>}
-                        {isSelf && (
-                          <span className="ml-1.5 text-xs font-normal text-gray-400">(tu)</span>
-                        )}
+                        {isSelf && <span className="ml-1.5 text-xs font-normal text-gray-400">(tu)</span>}
                       </p>
                       <p className="text-xs text-gray-500 truncate">{user.email}</p>
                     </div>
@@ -116,9 +101,7 @@ export function PlatformUsersClient({ users, currentUserId }: Props) {
                         Google
                       </Badge>
                     )}
-                    {!user.hasPassword && !user.hasGoogle && (
-                      <span className="text-xs text-gray-400">—</span>
-                    )}
+                    {!user.hasPassword && !user.hasGoogle && <span className="text-xs text-gray-400">—</span>}
                   </div>
                 </TableCell>
 

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
-import { notifications } from "@/db/schema";
+
 import { desc, eq } from "drizzle-orm";
+
+import { auth } from "@/auth";
+import { notifications } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 /** Lightweight polling endpoint used by NotificationCenter every 60s. */
 export async function GET() {

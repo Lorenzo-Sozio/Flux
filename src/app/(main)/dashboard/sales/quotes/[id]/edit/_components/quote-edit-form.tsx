@@ -1,35 +1,24 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useFieldArray } from "react-hook-form";
-import { z } from "zod";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import React, { useMemo, useState } from "react";
 
-import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { updateQuoteAction, getQuoteById, getQuoteFormData } from "@/actions/quotes";
+import { useRouter } from "next/navigation";
+
+import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
+import { Loader2, Plus, Trash2 } from "lucide-react";
+import { useFieldArray, useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
+
+import { type getQuoteById, type getQuoteFormData, updateQuoteAction } from "@/actions/quotes";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 
 type Quote = Awaited<ReturnType<typeof getQuoteById>>;
 type FormDataType = Awaited<ReturnType<typeof getQuoteFormData>>;
@@ -51,7 +40,7 @@ const EditQuoteSchema = z.object({
         unitPrice: z.coerce.number().min(0),
         discountPercent: z.coerce.number().min(0).max(100).default(0),
         taxPercent: z.coerce.number().min(0).max(100).default(0),
-      })
+      }),
     )
     .min(1, "At least one item is required"),
 });
@@ -73,9 +62,7 @@ export function QuoteEditForm({ quote, formData }: Props) {
       dealId: quote.dealId ?? "",
       companyId: quote.companyId ?? "",
       contactId: quote.contactId ?? "",
-      expiresAt: quote.expiresAt
-        ? format(new Date(quote.expiresAt), "yyyy-MM-dd")
-        : "",
+      expiresAt: quote.expiresAt ? format(new Date(quote.expiresAt), "yyyy-MM-dd") : "",
       discountPercent: parseFloat(quote.discountPercent ?? "0"),
       taxPercent: parseFloat(quote.taxPercent ?? "0"),
       notes: quote.notes ?? "",
@@ -153,10 +140,8 @@ export function QuoteEditForm({ quote, formData }: Props) {
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <div className="flex flex-col lg:flex-row gap-6 items-start">
-
           {/* Left column: Deal, Adjustments, Notes */}
           <div className="w-full lg:w-1/3 flex flex-col gap-6">
-
             {/* Deal + Customer */}
             <Card>
               <CardHeader className="pb-3">
@@ -170,7 +155,9 @@ export function QuoteEditForm({ quote, formData }: Props) {
                   name="dealId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Deal <span className="text-destructive">*</span></FormLabel>
+                      <FormLabel>
+                        Deal <span className="text-destructive">*</span>
+                      </FormLabel>
                       <FormControl>
                         <SearchableSelect
                           options={formData.deals.map((d) => ({
@@ -197,7 +184,9 @@ export function QuoteEditForm({ quote, formData }: Props) {
                   name="companyId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Company <span className="text-destructive">*</span></FormLabel>
+                      <FormLabel>
+                        Company <span className="text-destructive">*</span>
+                      </FormLabel>
                       <FormControl>
                         <SearchableSelect
                           options={formData.companies.map((c) => ({
@@ -313,7 +302,6 @@ export function QuoteEditForm({ quote, formData }: Props) {
 
           {/* Right column: Line Items + Total Preview + Submit */}
           <div className="w-full lg:w-2/3 flex flex-col gap-6">
-
             {/* Line Items */}
             <Card>
               <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
@@ -325,7 +313,14 @@ export function QuoteEditForm({ quote, formData }: Props) {
                   variant="outline"
                   size="sm"
                   onClick={() =>
-                    append({ productId: "", description: "", quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 0 })
+                    append({
+                      productId: "",
+                      description: "",
+                      quantity: 1,
+                      unitPrice: 0,
+                      discountPercent: 0,
+                      taxPercent: 0,
+                    })
                   }
                 >
                   <Plus className="mr-2 h-3.5 w-3.5" />
@@ -509,7 +504,11 @@ export function QuoteEditForm({ quote, formData }: Props) {
                   <div className="flex justify-between text-sm text-amber-600">
                     <span>Discount ({discountPct}%)</span>
                     <span className="tabular-nums">
-                      −${totals.discountAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      −$
+                      {totals.discountAmount.toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </span>
                   </div>
                 )}
@@ -517,7 +516,8 @@ export function QuoteEditForm({ quote, formData }: Props) {
                   <div className="flex justify-between text-sm text-slate-600">
                     <span>Tax ({taxPct}%)</span>
                     <span className="tabular-nums">
-                      +${totals.taxAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      +$
+                      {totals.taxAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 )}

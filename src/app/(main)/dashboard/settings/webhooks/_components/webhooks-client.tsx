@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+
+import { CheckCircle, Copy, Plus, Trash2, Webhook } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Plus, Trash2, Webhook, Copy, CheckCircle } from "lucide-react";
+import { toast } from "sonner";
+
 import { createWebhook, deleteWebhook, updateWebhook } from "@/actions/webhooks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,22 +25,28 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type WebhookEventKey =
-  | "contactCreated" | "contactUpdated" | "contactDeleted"
-  | "leadCreated" | "leadConverted"
-  | "dealCreated" | "dealStageChanged" | "dealWon" | "dealLost"
+  | "contactCreated"
+  | "contactUpdated"
+  | "contactDeleted"
+  | "leadCreated"
+  | "leadConverted"
+  | "dealCreated"
+  | "dealStageChanged"
+  | "dealWon"
+  | "dealLost"
   | "taskCompleted";
 
 const AVAILABLE_EVENTS: { value: string; key: WebhookEventKey }[] = [
-  { value: "contact.created",   key: "contactCreated" },
-  { value: "contact.updated",   key: "contactUpdated" },
-  { value: "contact.deleted",   key: "contactDeleted" },
-  { value: "lead.created",      key: "leadCreated" },
-  { value: "lead.converted",    key: "leadConverted" },
-  { value: "deal.created",      key: "dealCreated" },
-  { value: "deal.stage_changed",key: "dealStageChanged" },
-  { value: "deal.won",          key: "dealWon" },
-  { value: "deal.lost",         key: "dealLost" },
-  { value: "task.completed",    key: "taskCompleted" },
+  { value: "contact.created", key: "contactCreated" },
+  { value: "contact.updated", key: "contactUpdated" },
+  { value: "contact.deleted", key: "contactDeleted" },
+  { value: "lead.created", key: "leadCreated" },
+  { value: "lead.converted", key: "leadConverted" },
+  { value: "deal.created", key: "dealCreated" },
+  { value: "deal.stage_changed", key: "dealStageChanged" },
+  { value: "deal.won", key: "dealWon" },
+  { value: "deal.lost", key: "dealLost" },
+  { value: "task.completed", key: "taskCompleted" },
 ];
 
 type WebhookType = {
@@ -46,9 +54,10 @@ type WebhookType = {
   name: string;
   url: string;
   events: string[];
-  secret: string | null;
   isActive: boolean;
   createdAt: Date;
+  // secret is no longer returned by getWebhooks() — use getWebhookSecret(id) when needed
+  secret?: string | null;
 };
 
 interface Props {
@@ -98,7 +107,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
   const handleToggleActive = async (wh: WebhookType) => {
     try {
       await updateWebhook(wh.id, { isActive: !wh.isActive });
-      setWebhooks((prev) => prev.map((w) => w.id === wh.id ? { ...w, isActive: !wh.isActive } : w));
+      setWebhooks((prev) => prev.map((w) => (w.id === wh.id ? { ...w, isActive: !wh.isActive } : w)));
     } catch {
       toast.error(t("updateFailed"));
     }
@@ -137,9 +146,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
             <Webhook className="h-5 w-5" />
             {t("activeTitle", { count: webhooks.length })}
           </CardTitle>
-          <CardDescription>
-            {t("activeDescription")}
-          </CardDescription>
+          <CardDescription>{t("activeDescription")}</CardDescription>
         </CardHeader>
         <CardContent>
           {webhooks.length === 0 ? (
@@ -161,9 +168,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
                   <TableRow key={wh.id}>
                     <TableCell className="font-medium">{wh.name}</TableCell>
                     <TableCell>
-                      <code className="text-xs text-muted-foreground truncate max-w-xs block">
-                        {wh.url}
-                      </code>
+                      <code className="text-xs text-muted-foreground truncate max-w-xs block">{wh.url}</code>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -197,10 +202,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Switch
-                        checked={wh.isActive}
-                        onCheckedChange={() => handleToggleActive(wh)}
-                      />
+                      <Switch checked={wh.isActive} onCheckedChange={() => handleToggleActive(wh)} />
                     </TableCell>
                     <TableCell>
                       <Button
@@ -248,10 +250,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
               <div className="grid grid-cols-2 gap-2 rounded-lg border p-3">
                 {AVAILABLE_EVENTS.map((ev) => (
                   <label key={ev.value} className="flex items-center gap-2 cursor-pointer text-sm">
-                    <Checkbox
-                      checked={form.events.includes(ev.value)}
-                      onCheckedChange={() => toggleEvent(ev.value)}
-                    />
+                    <Checkbox checked={form.events.includes(ev.value)} onCheckedChange={() => toggleEvent(ev.value)} />
                     {t(`webhookEvents.${ev.key}`)}
                   </label>
                 ))}
@@ -259,7 +258,9 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>{tc("cancel")}</Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              {tc("cancel")}
+            </Button>
             <Button onClick={handleAdd} disabled={isPending}>
               {isPending ? t("dialog.creating") : t("dialog.createWebhook")}
             </Button>

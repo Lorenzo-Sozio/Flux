@@ -27,7 +27,7 @@
  * }
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 
 import type { InboundAttachment } from "@/lib/ticket-from-email";
 import { processInboundEmail } from "@/lib/ticket-from-email";
@@ -43,12 +43,9 @@ function parseAttachments(raw: unknown): InboundAttachment[] {
     // Cloudmailin uses content / content_type / file_name
     // Mailgun uses  content-type / name / data (base64)
     // SendGrid uses type / filename / content (base64)
-    const filename: string =
-      item.filename ?? item.file_name ?? item.name ?? "attachment";
-    const contentType: string =
-      item.content_type ?? item["content-type"] ?? item.type ?? "application/octet-stream";
-    const base64: string =
-      item.content ?? item.data ?? item.body ?? "";
+    const filename: string = item.filename ?? item.file_name ?? item.name ?? "attachment";
+    const contentType: string = item.content_type ?? item["content-type"] ?? item.type ?? "application/octet-stream";
+    const base64: string = item.content ?? item.data ?? item.body ?? "";
 
     if (!base64) continue;
 

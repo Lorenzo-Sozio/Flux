@@ -14,22 +14,16 @@
  *  - invoice.payment_failed              → set past_due, start grace period
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+
 import { eq, or } from "drizzle-orm";
-import { getStripe } from "@/lib/billing/stripe";
-import type { Stripe } from "@/lib/billing/stripe";
+
 import { platformDb } from "@/db";
-import {
-  billingSubscriptions,
-  billingPlans,
-  billingStripeEvents,
-  billingTenantAddons,
-} from "@/db/schema";
-import {
-  invalidateEntitlementCache,
-  logEntitlementChange,
-} from "@/lib/billing/licensing";
+import { billingPlans, billingStripeEvents, billingSubscriptions, billingTenantAddons } from "@/db/schema";
+import { invalidateEntitlementCache, logEntitlementChange } from "@/lib/billing/licensing";
 import { GRACE_PERIOD_DAYS } from "@/lib/billing/plans-config";
+import type { Stripe } from "@/lib/billing/stripe";
+import { getStripe } from "@/lib/billing/stripe";
 
 export const runtime = "nodejs";
 
@@ -89,10 +83,7 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[stripe-webhook] Error processing ${event.type}:`, message);
 
-    await platformDb
-      .update(billingStripeEvents)
-      .set({ error: message })
-      .where(eq(billingStripeEvents.id, event.id));
+    await platformDb.update(billingStripeEvents).set({ error: message }).where(eq(billingStripeEvents.id, event.id));
 
     // Return 500 so Stripe retries
     return NextResponse.json({ error: "Processing failed" }, { status: 500 });
@@ -138,8 +129,7 @@ async function onCheckoutCompleted(session: Stripe.Checkout.Session): Promise<vo
 
   // The subscription.created event will carry the full data;
   // here we just ensure the stripeCustomerId is persisted.
-  const customerId =
-    typeof session.customer === "string" ? session.customer : session.customer?.id;
+  const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
 
   if (customerId) {
     const existing = await platformDb.query.billingSubscriptions.findFirst({
@@ -167,19 +157,14 @@ async function onSubscriptionUpserted(subscription: Stripe.Subscription): Promis
     const priceId = subscription.items.data[0]?.price?.id;
     if (priceId) {
       const planByPrice = await platformDb.query.billingPlans.findFirst({
-        where: or(
-          eq(billingPlans.stripePriceMonthlyId, priceId),
-          eq(billingPlans.stripePriceAnnualId, priceId),
-        ),
+        where: or(eq(billingPlans.stripePriceMonthlyId, priceId), eq(billingPlans.stripePriceAnnualId, priceId)),
       });
       if (planByPrice) planId = planByPrice.id;
     }
   }
 
   const customerId =
-    typeof subscription.customer === "string"
-      ? subscription.customer
-      : subscription.customer?.id ?? null;
+    typeof subscription.customer === "string" ? subscription.customer : (subscription.customer?.id ?? null);
 
   // Map Stripe status to our status
   const statusMap: Record<string, string> = {
@@ -218,12 +203,8 @@ async function onSubscriptionUpserted(subscription: Stripe.Subscription): Promis
       currentPeriodEnd: (subscription as unknown as { current_period_end: number }).current_period_end
         ? new Date((subscription as unknown as { current_period_end: number }).current_period_end * 1000)
         : null,
-      trialEnd: subscription.trial_end
-        ? new Date(subscription.trial_end * 1000)
-        : null,
-      canceledAt: subscription.canceled_at
-        ? new Date(subscription.canceled_at * 1000)
-        : null,
+      trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+      canceledAt: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
       gracePeriodEnd: null, // reset on update
       updatedAt: new Date(),
     })
@@ -284,8 +265,7 @@ async function onSubscriptionDeleted(subscription: Stripe.Subscription): Promise
 }
 
 async function onPaymentSucceeded(invoice: Stripe.Invoice): Promise<void> {
-  const customerId =
-    typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+  const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
   if (!customerId) return;
 
   const sub = await platformDb.query.billingSubscriptions.findFirst({
@@ -313,8 +293,7 @@ async function onPaymentSucceeded(invoice: Stripe.Invoice): Promise<void> {
 }
 
 async function onPaymentFailed(invoice: Stripe.Invoice): Promise<void> {
-  const customerId =
-    typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+  const customerId = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
   if (!customerId) return;
 
   const sub = await platformDb.query.billingSubscriptions.findFirst({

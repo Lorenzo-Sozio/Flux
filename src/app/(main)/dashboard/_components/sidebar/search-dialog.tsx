@@ -3,7 +3,6 @@
 import * as React from "react";
 
 import { useRouter } from "next/navigation";
-import { useTranslations } from "next-intl";
 
 import { Command as CommandPrimitive } from "cmdk";
 import {
@@ -18,6 +17,7 @@ import {
   ShoppingCart,
   Users,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -57,10 +57,7 @@ export function SearchDialog() {
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  const ENTITY_CONFIG: Record<
-    string,
-    { icon: React.ReactNode; badge: string; badgeClass: string; href: string }
-  > = {
+  const ENTITY_CONFIG: Record<string, { icon: React.ReactNode; badge: string; badgeClass: string; href: string }> = {
     contact: {
       icon: <Contact className="h-4 w-4" />,
       badge: t("badges.contact"),
@@ -107,22 +104,22 @@ export function SearchDialog() {
 
   const QUICK_LINKS: { label: string; entity: string }[] = [
     { label: t("groups.contacts"), entity: "contact" },
-    { label: t("groups.leads"),    entity: "lead" },
+    { label: t("groups.leads"), entity: "lead" },
     { label: t("groups.companies"), entity: "company" },
-    { label: t("groups.deals"),    entity: "deal" },
-    { label: t("groups.tickets"),  entity: "ticket" },
-    { label: t("groups.quotes"),   entity: "quote" },
-    { label: t("groups.orders"),   entity: "order" },
+    { label: t("groups.deals"), entity: "deal" },
+    { label: t("groups.tickets"), entity: "ticket" },
+    { label: t("groups.quotes"), entity: "quote" },
+    { label: t("groups.orders"), entity: "order" },
   ];
 
   const groups: { key: keyof SearchResults; label: string }[] = [
-    { key: "contacts",  label: t("groups.contacts") },
-    { key: "leads",     label: t("groups.leads") },
+    { key: "contacts", label: t("groups.contacts") },
+    { key: "leads", label: t("groups.leads") },
     { key: "companies", label: t("groups.companies") },
-    { key: "deals",     label: t("groups.deals") },
-    { key: "tickets",   label: t("groups.tickets") },
-    { key: "quotes",    label: t("groups.quotes") },
-    { key: "orders",    label: t("groups.orders") },
+    { key: "deals", label: t("groups.deals") },
+    { key: "tickets", label: t("groups.tickets") },
+    { key: "quotes", label: t("groups.quotes") },
+    { key: "orders", label: t("groups.orders") },
   ];
 
   React.useEffect(() => {
@@ -265,12 +262,9 @@ export function SearchDialog() {
               <CommandEmpty>
                 <div className="py-8">
                   <p className="text-sm text-muted-foreground">
-                    {t("noResults")}{" "}
-                    <span className="font-medium text-foreground">&ldquo;{query}&rdquo;</span>
+                    {t("noResults")} <span className="font-medium text-foreground">&ldquo;{query}&rdquo;</span>
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground/60">
-                    {t("noResultsTip")}
-                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground/60">{t("noResultsTip")}</p>
                 </div>
               </CommandEmpty>
             )}
@@ -279,7 +273,9 @@ export function SearchDialog() {
             {hasResults && (
               <>
                 <div className="flex items-center justify-between px-4 pt-3 pb-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("resultsHeading")}</p>
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    {t("resultsHeading")}
+                  </p>
                   <span className="text-xs text-muted-foreground">{t("foundCount", { count: totalCount })}</span>
                 </div>
                 {groups.map((group, idx) => {

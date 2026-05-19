@@ -4,10 +4,43 @@ import NextAuth from "next-auth";
 
 import { authConfig } from "./auth.config";
 
-// Edge-compatible in-memory rate limiter (per-process).
-// WARNING: On serverless/multi-instance deployments each invocation runs in a
-// fresh process, so this store is reset on every cold start.  For real
-// distributed rate-limiting, replace with a Redis / Vercel KV backed counter.
+// ─── CSP builder ─────────────────────────────────────────────────────────────
+
+/**
+ * Builds a per-request Content-Security-Policy string using a cryptographic
+ * nonce. 'unsafe-inline' is intentionally absent from script-src; all
+ * controlled inline scripts (ThemeBootScript, etc.) must carry the nonce.
+ * 'strict-dynamic' allows Next.js to load its own chunks without explicit listing.
+ */
+function buildCsp(nonce: string): string {
+  const isDev = process.env.NODE_ENV !== "production";
+
+  return [
+    "default-src 'self'",
+    // 'strict-dynamic' lets nonce-bearing scripts load further scripts (Next.js chunks).
+    // 'unsafe-eval' is added only in development where webpack hot reload needs it.
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+    // CSS cannot execute code; unsafe-inline is acceptable here.
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "frame-src 'none'",
+    "frame-ancestors 'none'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+  ].join("; ");
+}
+
+// ─── Edge-compatible in-process rate limiter ──────────────────────────────────
+//
+// WARNING: This store is per-process and resets on cold starts.
+// On multi-instance / serverless deployments it provides per-replica protection
+// only. For strict distributed enforcement, replace with Vercel KV or Upstash
+// Redis. Deeper server-action-level rate limiting (OTP, imports) uses the
+// platform Postgres DB and is not affected by this limitation.
+
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
 
 function rateLimit(ip: string, path: string, limit: number, windowMs: number): boolean {
@@ -26,6 +59,8 @@ function rateLimit(ip: string, path: string, limit: number, windowMs: number): b
   return true;
 }
 
+// ─── Middleware ───────────────────────────────────────────────────────────────
+
 const { auth } = NextAuth(authConfig);
 
 export const proxy = auth((req) => {
@@ -35,9 +70,32 @@ export const proxy = auth((req) => {
   const isLoggedIn = !!req.auth?.user;
   const activeTenantId = (req.auth?.user as { activeTenantId?: string | null } | undefined)?.activeTenantId;
 
-  // On Vercel, x-vercel-forwarded-for is set by the infrastructure and cannot be
-  // spoofed by clients. Fall back to the rightmost X-Forwarded-For entry (appended
-  // by the trusted edge proxy) rather than the leftmost (which is client-supplied).
+  // Generate a per-request cryptographic nonce for the Content-Security-Policy.
+  // Using randomUUID() — available in both Edge and Node.js runtimes.
+  const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
+  const csp = buildCsp(nonce);
+
+  /**
+   * Creates a NextResponse.next() that:
+   *  1. Injects request headers readable by server components via headers().
+   *  2. Sets the Content-Security-Policy response header for browser enforcement.
+   *
+   * extraRequestHeaders: additional k/v pairs to set on the forwarded request.
+   */
+  function passThrough(extraRequestHeaders: Record<string, string> = {}): NextResponse {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-nonce", nonce);
+    for (const [k, v] of Object.entries(extraRequestHeaders)) {
+      requestHeaders.set(k, v);
+    }
+    const res = NextResponse.next({ request: { headers: requestHeaders } });
+    res.headers.set("Content-Security-Policy", csp);
+    return res;
+  }
+
+  // On Vercel, x-vercel-forwarded-for is infrastructure-set and cannot be
+  // spoofed by clients. Fall back to the rightmost X-Forwarded-For entry
+  // (appended by the trusted edge proxy) rather than the leftmost (client-supplied).
   const ip =
     req.headers.get("x-vercel-forwarded-for") ??
     req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ??
@@ -68,7 +126,7 @@ export const proxy = auth((req) => {
   // ── Public routes ─────────────────────────────────────────────────────────────
   // Quote preview pages accessible without auth
   if (pathname.startsWith("/q/") || pathname.startsWith("/api/quotes/public")) {
-    return;
+    return passThrough();
   }
 
   const isOnLogin =
@@ -81,13 +139,13 @@ export const proxy = auth((req) => {
     pathname.startsWith("/auth/v1/register") ||
     pathname.startsWith("/auth/v2/register");
 
-  if (isOnPublicAuth) return;
+  if (isOnPublicAuth) return passThrough();
 
   if (isOnLogin) {
     if (isLoggedIn) {
       return Response.redirect(new URL("/select-tenant", nextUrl));
     }
-    return;
+    return passThrough();
   }
 
   // ── Tenant selection page ─────────────────────────────────────────────────────
@@ -95,7 +153,7 @@ export const proxy = auth((req) => {
     if (!isLoggedIn) {
       return Response.redirect(new URL("/auth/v1/login", nextUrl));
     }
-    return;
+    return passThrough();
   }
 
   // ── CRM dashboard: requires auth + active tenant ──────────────────────────────
@@ -108,10 +166,8 @@ export const proxy = auth((req) => {
       return Response.redirect(new URL("/select-tenant", nextUrl));
     }
 
-    // Inject tenant context as an internal header — never trusted from the client
-    const res = NextResponse.next();
-    res.headers.set("x-tenant-id", activeTenantId);
-    return res;
+    // Inject tenant context as an internal request header — never trusted from the client.
+    return passThrough({ "x-tenant-id": activeTenantId });
   }
 
   // ── Root "/" redirect ─────────────────────────────────────────────────────────
@@ -123,9 +179,7 @@ export const proxy = auth((req) => {
 
   // ── Admin panel ───────────────────────────────────────────────────────────────
   if (pathname.startsWith("/admin")) {
-    const res = NextResponse.next();
-    res.headers.set("x-pathname", pathname);
-    return res;
+    return passThrough({ "x-pathname": pathname });
   }
 
   // ── Tenant-scoped API routes ──────────────────────────────────────────────────
@@ -135,17 +189,15 @@ export const proxy = auth((req) => {
   // (geo, currency, public quotes) are intentionally excluded.
   if (pathname.startsWith("/api/") && !isPublicApiPath(pathname)) {
     if (isLoggedIn && activeTenantId) {
-      const res = NextResponse.next();
-      res.headers.set("x-tenant-id", activeTenantId);
-      return res;
+      return passThrough({ "x-tenant-id": activeTenantId });
     }
     // API-key authenticated requests have no JWT session, so no tenant header is
     // set here.  Those routes must resolve the tenant from request parameters and
     // call createTenantDb() directly rather than relying on getDb().
-    return;
+    return passThrough();
   }
 
-  return;
+  return passThrough();
 });
 
 /**

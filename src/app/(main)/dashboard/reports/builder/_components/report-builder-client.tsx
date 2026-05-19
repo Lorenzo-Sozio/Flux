@@ -1,57 +1,86 @@
 "use client";
 
 import { useState, useTransition } from "react";
+
 import { useRouter } from "next/navigation";
+
+import { BarChart2, ChevronDown, Download, Loader2, Play, Plus, Save, TableIcon, Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
-  BarChart, Bar, LineChart, Line, AreaChart, Area,
-  PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import {
-  BarChart2, ChevronDown, Download, Loader2, Play, Plus,
-  Save, TableIcon, Trash2, X,
-} from "lucide-react";
 
 import {
-  type EntityConfig, type ReportConfig, type ReportResult, type FilterCondition,
-  type FilterOperator, type ChartType, type SavedReport,
-  runReport, saveReport, deleteSavedReport,
+  type ChartType,
+  deleteSavedReport,
+  type EntityConfig,
+  type FilterCondition,
+  type FilterOperator,
+  type ReportConfig,
+  type ReportResult,
+  runReport,
+  type SavedReport,
+  saveReport,
 } from "@/actions/report-builder";
-
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const CHART_COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#06b6d4","#f97316","#84cc16"];
+const CHART_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#f97316", "#84cc16"];
 
 const OPERATOR_LABELS: Record<FilterOperator, string> = {
-  eq: "=", neq: "≠", contains: "contains", not_contains: "not contains",
-  gt: ">", gte: "≥", lt: "<", lte: "≤",
-  is_empty: "is empty", is_not_empty: "is not empty",
+  eq: "=",
+  neq: "≠",
+  contains: "contains",
+  not_contains: "not contains",
+  gt: ">",
+  gte: "≥",
+  lt: "<",
+  lte: "≤",
+  is_empty: "is empty",
+  is_not_empty: "is not empty",
 };
 
 const OPERATORS_BY_TYPE: Record<string, FilterOperator[]> = {
-  text:    ["contains","not_contains","eq","neq","is_empty","is_not_empty"],
-  number:  ["eq","neq","gt","gte","lt","lte","is_empty","is_not_empty"],
-  date:    ["gt","gte","lt","lte","is_empty","is_not_empty"],
-  boolean: ["eq","is_empty","is_not_empty"],
-  enum:    ["eq","neq","is_empty","is_not_empty"],
+  text: ["contains", "not_contains", "eq", "neq", "is_empty", "is_not_empty"],
+  number: ["eq", "neq", "gt", "gte", "lt", "lte", "is_empty", "is_not_empty"],
+  date: ["gt", "gte", "lt", "lte", "is_empty", "is_not_empty"],
+  boolean: ["eq", "is_empty", "is_not_empty"],
+  enum: ["eq", "neq", "is_empty", "is_not_empty"],
 };
 
 const CHART_ICONS: Record<ChartType, string> = {
-  table: "⊞", bar: "▋", line: "∿", area: "◬", pie: "◑",
+  table: "⊞",
+  bar: "▋",
+  line: "∿",
+  area: "◬",
+  pie: "◑",
 };
 
 function defaultConfig(entity: string): ReportConfig {
@@ -95,7 +124,11 @@ function FilterValueInput({ filter, index, fields, onUpdate }: FilterValueInputP
           <SelectValue placeholder="Value" />
         </SelectTrigger>
         <SelectContent>
-          {def.enumValues.map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+          {def.enumValues.map((v) => (
+            <SelectItem key={v} value={v}>
+              {v}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
     );
@@ -208,7 +241,10 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
   }
 
   function handleSave() {
-    if (!reportName.trim()) { toast.error(t("enterName")); return; }
+    if (!reportName.trim()) {
+      toast.error(t("enterName"));
+      return;
+    }
     startTransition(async () => {
       try {
         const r = await saveReport(reportName.trim(), config);
@@ -243,12 +279,14 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
     if (!result) return;
     const header = result.columns.map((c) => `"${c.label}"`).join(",");
     const rows = result.rows.map((row) =>
-      result.columns.map((c) => {
-        const v = row[c.key];
-        if (v == null) return "";
-        if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v)) return `"${new Date(v).toISOString()}"`;
-        return `"${String(v).replace(/"/g, '""')}"`;
-      }).join(",")
+      result.columns
+        .map((c) => {
+          const v = row[c.key];
+          if (v == null) return "";
+          if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v)) return `"${new Date(v).toISOString()}"`;
+          return `"${String(v).replace(/"/g, '""')}"`;
+        })
+        .join(","),
     );
     const csv = [header, ...rows].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -277,8 +315,18 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
       return (
         <ResponsiveContainer width="100%" height={280}>
           <PieChart>
-            <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={100} label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}>
-              {data.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
+            <Pie
+              data={data}
+              dataKey="count"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              outerRadius={100}
+              label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+            >
+              {data.map((_, i) => (
+                <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+              ))}
             </Pie>
             <Tooltip />
           </PieChart>
@@ -286,9 +334,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
       );
     }
 
-    const ChartComp = config.chartType === "bar" ? BarChart
-      : config.chartType === "line" ? LineChart
-      : AreaChart;
+    const ChartComp = config.chartType === "bar" ? BarChart : config.chartType === "line" ? LineChart : AreaChart;
 
     return (
       <ResponsiveContainer width="100%" height={280}>
@@ -298,9 +344,29 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
           <YAxis tick={{ fontSize: 11 }} />
           <Tooltip />
           <Legend />
-          {config.chartType === "bar" && <Bar dataKey={dataKey} name={dataLabel} fill={CHART_COLORS[0]} radius={[4,4,0,0]} />}
-          {config.chartType === "line" && <Line type="monotone" dataKey={dataKey} name={dataLabel} stroke={CHART_COLORS[0]} strokeWidth={2} dot={false} />}
-          {config.chartType === "area" && <Area type="monotone" dataKey={dataKey} name={dataLabel} stroke={CHART_COLORS[0]} fill={`${CHART_COLORS[0]}33`} strokeWidth={2} />}
+          {config.chartType === "bar" && (
+            <Bar dataKey={dataKey} name={dataLabel} fill={CHART_COLORS[0]} radius={[4, 4, 0, 0]} />
+          )}
+          {config.chartType === "line" && (
+            <Line
+              type="monotone"
+              dataKey={dataKey}
+              name={dataLabel}
+              stroke={CHART_COLORS[0]}
+              strokeWidth={2}
+              dot={false}
+            />
+          )}
+          {config.chartType === "area" && (
+            <Area
+              type="monotone"
+              dataKey={dataKey}
+              name={dataLabel}
+              stroke={CHART_COLORS[0]}
+              fill={`${CHART_COLORS[0]}33`}
+              strokeWidth={2}
+            />
+          )}
         </ChartComp>
       </ResponsiveContainer>
     );
@@ -315,7 +381,9 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
         <div className="flex items-center gap-2">
           <BarChart2 className="h-5 w-5 text-primary" />
           <h1 className="text-xl font-bold tracking-tight">{t("title")}</h1>
-          <Badge variant="secondary" className="text-xs">{t("adminBadge")}</Badge>
+          <Badge variant="secondary" className="text-xs">
+            {t("adminBadge")}
+          </Badge>
         </div>
 
         {/* Saved reports */}
@@ -331,7 +399,11 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
                 {saved.map((r) => (
-                  <DropdownMenuItem key={r.id} className="flex items-center justify-between gap-2 pr-1" onSelect={(e) => e.preventDefault()}>
+                  <DropdownMenuItem
+                    key={r.id}
+                    className="flex items-center justify-between gap-2 pr-1"
+                    onSelect={(e) => e.preventDefault()}
+                  >
                     <button type="button" className="flex-1 text-left text-sm truncate" onClick={() => loadReport(r)}>
                       {r.name}
                     </button>
@@ -352,10 +424,8 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
-
         {/* ── Config panel ── */}
         <div className="w-72 shrink-0 border-r overflow-y-auto p-4 space-y-5">
-
           {/* Entity */}
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("dataSource")}</p>
@@ -365,7 +435,9 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
               </SelectTrigger>
               <SelectContent>
                 {Object.entries(entityConfigs).map(([key, ec]) => (
-                  <SelectItem key={key} value={key}>{ec.label}</SelectItem>
+                  <SelectItem key={key} value={key}>
+                    {ec.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -377,7 +449,10 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
           {!config.groupBy && (
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {t("columns")} {config.fields.length > 0 && <span className="text-primary">{t("columnsSelected", { count: config.fields.length })}</span>}
+                {t("columns")}{" "}
+                {config.fields.length > 0 && (
+                  <span className="text-primary">{t("columnsSelected", { count: config.fields.length })}</span>
+                )}
               </p>
               <div className="space-y-1">
                 {fields.map((f) => (
@@ -406,9 +481,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                 <Plus className="h-3 w-3 mr-1" /> {t("addFilter")}
               </Button>
             </div>
-            {config.filters.length === 0 && (
-              <p className="text-xs text-muted-foreground">{t("noFilters")}</p>
-            )}
+            {config.filters.length === 0 && <p className="text-xs text-muted-foreground">{t("noFilters")}</p>}
             {config.filters.map((f, i) => {
               const def = fields.find((d) => d.key === f.field);
               const ops = OPERATORS_BY_TYPE[def?.type ?? "text"] ?? ["eq"];
@@ -420,10 +493,18 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {fields.map((d) => <SelectItem key={d.key} value={d.key}>{d.label}</SelectItem>)}
+                        {fields.map((d) => (
+                          <SelectItem key={d.key} value={d.key}>
+                            {d.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
-                    <button type="button" onClick={() => removeFilter(i)} className="text-muted-foreground hover:text-destructive shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => removeFilter(i)}
+                      className="text-muted-foreground hover:text-destructive shrink-0"
+                    >
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
@@ -432,7 +513,11 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {ops.map((op) => <SelectItem key={op} value={op}>{OPERATOR_LABELS[op]}</SelectItem>)}
+                      {ops.map((op) => (
+                        <SelectItem key={op} value={op}>
+                          {OPERATOR_LABELS[op]}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FilterValueInput filter={f} index={i} fields={fields} onUpdate={updateFilter} />
@@ -455,7 +540,11 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">{t("groupByNone")}</SelectItem>
-                {groupableFields.map((f) => <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>)}
+                {groupableFields.map((f) => (
+                  <SelectItem key={f.key} value={f.key}>
+                    {f.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
 
@@ -469,7 +558,11 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {["count","sum","avg","min","max"].map((fn) => <SelectItem key={fn} value={fn}>{fn.toUpperCase()}</SelectItem>)}
+                    {["count", "sum", "avg", "min", "max"].map((fn) => (
+                      <SelectItem key={fn} value={fn}>
+                        {fn.toUpperCase()}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 {config.aggregation !== "count" && (
@@ -481,7 +574,11 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                       <SelectValue placeholder="Field" />
                     </SelectTrigger>
                     <SelectContent>
-                      {aggrFields.map((f) => <SelectItem key={f.key} value={f.key}>{f.label}</SelectItem>)}
+                      {aggrFields.map((f) => (
+                        <SelectItem key={f.key} value={f.key}>
+                          {f.label}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}
@@ -495,7 +592,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("visualization")}</p>
             <div className="grid grid-cols-5 gap-1">
-              {(["table","bar","line","area","pie"] as ChartType[]).map((ct) => (
+              {(["table", "bar", "line", "area", "pie"] as ChartType[]).map((ct) => (
                 <button
                   key={ct}
                   type="button"
@@ -530,11 +627,18 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                   <SelectContent>
                     {(config.fields.length > 0 ? config.fields : fields.map((f) => f.key)).map((k) => {
                       const label = fields.find((f) => f.key === k)?.label ?? k;
-                      return <SelectItem key={k} value={k}>{label}</SelectItem>;
+                      return (
+                        <SelectItem key={k} value={k}>
+                          {label}
+                        </SelectItem>
+                      );
                     })}
                   </SelectContent>
                 </Select>
-                <Select value={config.sortDir ?? "desc"} onValueChange={(v) => setConfig((c) => ({ ...c, sortDir: v as "asc"|"desc" }))}>
+                <Select
+                  value={config.sortDir ?? "desc"}
+                  onValueChange={(v) => setConfig((c) => ({ ...c, sortDir: v as "asc" | "desc" }))}
+                >
                   <SelectTrigger className="h-8 text-xs w-20">
                     <SelectValue />
                   </SelectTrigger>
@@ -551,7 +655,9 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                   min={1}
                   max={1000}
                   value={config.limit}
-                  onChange={(e) => setConfig((c) => ({ ...c, limit: Math.min(1000, Math.max(1, parseInt(e.target.value) || 200)) }))}
+                  onChange={(e) =>
+                    setConfig((c) => ({ ...c, limit: Math.min(1000, Math.max(1, parseInt(e.target.value) || 200)) }))
+                  }
                   className="h-8 text-xs"
                 />
               </div>
@@ -567,7 +673,6 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
 
         {/* ── Results panel ── */}
         <div className="flex-1 overflow-auto p-6 space-y-5">
-
           {!result ? (
             <div className="flex flex-col items-center justify-center h-full text-center gap-3 py-16">
               <BarChart2 className="h-14 w-14 text-muted-foreground/20" />
@@ -603,12 +708,11 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm text-muted-foreground">
-                      {entityConfigs[config.entity]?.label} by {entityConfigs[config.entity]?.fields.find((f) => f.key === config.groupBy)?.label}
+                      {entityConfigs[config.entity]?.label} by{" "}
+                      {entityConfigs[config.entity]?.fields.find((f) => f.key === config.groupBy)?.label}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    {renderChart()}
-                  </CardContent>
+                  <CardContent>{renderChart()}</CardContent>
                 </Card>
               )}
 
@@ -626,7 +730,10 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                         <thead>
                           <tr className="border-b bg-muted/40">
                             {result.columns.map((col) => (
-                              <th key={col.key} className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap">
+                              <th
+                                key={col.key}
+                                className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap"
+                              >
                                 {col.label}
                               </th>
                             ))}
@@ -639,7 +746,8 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                                 const v = row[col.key];
                                 let display: string;
                                 if (v == null) display = "—";
-                                else if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v)) display = new Date(v).toLocaleDateString();
+                                else if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v))
+                                  display = new Date(v).toLocaleDateString();
                                 else if (typeof v === "boolean") display = v ? "Yes" : "No";
                                 else display = String(v);
                                 return (

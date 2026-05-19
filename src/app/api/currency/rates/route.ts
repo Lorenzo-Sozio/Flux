@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getExchangeRates, convertFromEur } from "@/lib/exchange-rates";
+import { type NextRequest, NextResponse } from "next/server";
+
+import { convertFromEur, getExchangeRates } from "@/lib/exchange-rates";
 
 export const revalidate = 0;
 
@@ -25,10 +26,7 @@ export async function GET(req: NextRequest) {
     if (requestedCurrency && requestedCurrency !== "EUR") {
       const rate = rates[requestedCurrency.toLowerCase()];
       if (!rate) {
-        return NextResponse.json(
-          { error: `Currency ${requestedCurrency} not found in rates` },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: `Currency ${requestedCurrency} not found in rates` }, { status: 400 });
       }
     }
 
@@ -81,9 +79,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ amount: converted, from, to, rate: converted / amount });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Conversion failed" },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Conversion failed" }, { status: 503 });
   }
 }

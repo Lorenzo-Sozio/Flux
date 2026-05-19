@@ -1,24 +1,22 @@
 import Link from "next/link";
 
-import { getLeads, getAllUsers, getCompanyCategories, getCompanyTypes } from "@/actions/crm";
-import { getCustomFilters } from "@/actions/filters";
-import { getCustomFieldDefinitions } from "@/actions/custom-fields";
-import { toFieldMetaMap, LEAD_FIELDS, customFieldsToMetaMap } from "@/lib/filter-engine";
-import { decodeFilter, countActive } from "@/lib/filter-types";
-import { FilterBuilder } from "@/components/crm/filter-builder";
-import { ImportExportButtons } from "@/components/crm/import-export-buttons";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { LeadModal } from "./_components/lead-modal";
-import { LeadsTable } from "./_components/leads-table";
-import { auth } from "@/auth";
 import { getTranslations } from "next-intl/server";
 
-export default async function LeadsPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string>>;
-}) {
+import { getAllUsers, getCompanyCategories, getCompanyTypes, getLeads } from "@/actions/crm";
+import { getCustomFieldDefinitions } from "@/actions/custom-fields";
+import { getCustomFilters } from "@/actions/filters";
+import { auth } from "@/auth";
+import { FilterBuilder } from "@/components/crm/filter-builder";
+import { ImportExportButtons } from "@/components/crm/import-export-buttons";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { customFieldsToMetaMap, LEAD_FIELDS, toFieldMetaMap } from "@/lib/filter-engine";
+import { countActive, decodeFilter } from "@/lib/filter-types";
+
+import { LeadModal } from "./_components/lead-modal";
+import { LeadsTable } from "./_components/leads-table";
+
+export default async function LeadsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const params = await searchParams;
   const encoded = params.filter ?? null;
 
@@ -62,7 +60,9 @@ export default async function LeadsPage({
           {activeCount > 0 && (
             <Badge variant="outline" className="text-xs gap-1">
               {tc("filtersActive", { count: activeCount })}
-              <Link href="/dashboard/leads" className="ml-1 hover:text-destructive">✕</Link>
+              <Link href="/dashboard/leads" className="ml-1 hover:text-destructive">
+                ✕
+              </Link>
             </Badge>
           )}
         </div>

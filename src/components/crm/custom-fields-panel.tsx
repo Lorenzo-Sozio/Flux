@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
+
+import { Loader2, Save, Settings2 } from "lucide-react";
+import { toast } from "sonner";
+
+import type { EntityType } from "@/actions/custom-fields";
+import { upsertCustomFieldValue } from "@/actions/custom-fields";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Settings2, Save, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { upsertCustomFieldValue } from "@/actions/custom-fields";
-import type { EntityType } from "@/actions/custom-fields";
 
 type FieldDef = {
   id: string;
@@ -38,8 +40,7 @@ export function CustomFieldsPanel({ entityType, entityId, definitions, values }:
 
   if (definitions.length === 0) return null;
 
-  const setVal = (id: string, v: string) =>
-    setFieldValues((prev) => ({ ...prev, [id]: v }));
+  const setVal = (id: string, v: string) => setFieldValues((prev) => ({ ...prev, [id]: v }));
 
   const handleSave = async () => {
     setSaving(true);
@@ -144,9 +145,7 @@ export function CustomFieldsPanel({ entityType, entityId, definitions, values }:
                         className="cursor-pointer text-xs h-5"
                         onClick={() => {
                           const current = value ? value.split(",").filter(Boolean) : [];
-                          const next = selected
-                            ? current.filter((v) => v !== opt)
-                            : [...current, opt];
+                          const next = selected ? current.filter((v) => v !== opt) : [...current, opt];
                           setVal(def.id, next.join(","));
                         }}
                       >
@@ -161,11 +160,7 @@ export function CustomFieldsPanel({ entityType, entityId, definitions, values }:
         })}
 
         <Button size="sm" onClick={handleSave} disabled={saving} className="w-full mt-2">
-          {saving ? (
-            <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Save className="mr-2 h-3.5 w-3.5" />
-          )}
+          {saving ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
           Save Custom Fields
         </Button>
       </CardContent>

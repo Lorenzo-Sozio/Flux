@@ -1,52 +1,39 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useEffect, useState, useTransition } from "react";
+
+import { BarChart2, CreditCard, Infinity, Layers, Loader2, Star, Tag, Zap } from "lucide-react";
+import { toast } from "sonner";
+
+import type { UpsertPlanInput } from "@/actions/admin-billing";
+import { createPlan, updatePlan } from "@/actions/admin-billing";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { toast } from "sonner";
-import { createPlan, updatePlan } from "@/actions/admin-billing";
-import type { UpsertPlanInput } from "@/actions/admin-billing";
-import type { PlanModule, PlanLimits } from "@/lib/billing/plans-config";
-import {
-  Tag,
-  CreditCard,
-  Layers,
-  BarChart2,
-  Star,
-  Zap,
-  Infinity,
-  Loader2,
-} from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import type { PlanLimits, PlanModule } from "@/lib/billing/plans-config";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const ALL_MODULES: { id: PlanModule; label: string; description: string }[] = [
-  { id: "crm",        label: "CRM",        description: "Contacts & companies" },
-  { id: "sales",      label: "Sales",      description: "Pipeline & deals" },
-  { id: "marketing",  label: "Marketing",  description: "Campaigns & lists" },
-  { id: "support",    label: "Support",    description: "Tickets & SLA" },
+  { id: "crm", label: "CRM", description: "Contacts & companies" },
+  { id: "sales", label: "Sales", description: "Pipeline & deals" },
+  { id: "marketing", label: "Marketing", description: "Campaigns & lists" },
+  { id: "support", label: "Support", description: "Tickets & SLA" },
   { id: "automation", label: "Automation", description: "Rules & workflows" },
-  { id: "reporting",  label: "Reporting",  description: "Analytics & dashboards" },
-  { id: "helpdesk",   label: "Helpdesk",   description: "Advanced ticket management" },
+  { id: "reporting", label: "Reporting", description: "Analytics & dashboards" },
+  { id: "helpdesk", label: "Helpdesk", description: "Advanced ticket management" },
 ];
 
 const SUPPORT_TIERS = [
-  { value: "community", label: "Community",  description: "Forum & docs only" },
-  { value: "email",     label: "Email",      description: "Business hours support" },
-  { value: "priority",  label: "Priority",   description: "24-hour response SLA" },
-  { value: "dedicated", label: "Dedicated",  description: "Named account manager" },
+  { value: "community", label: "Community", description: "Forum & docs only" },
+  { value: "email", label: "Email", description: "Business hours support" },
+  { value: "priority", label: "Priority", description: "24-hour response SLA" },
+  { value: "dedicated", label: "Dedicated", description: "Named account manager" },
 ];
 
 const DEFAULT_LIMITS: PlanLimits = {
@@ -67,25 +54,35 @@ const toCents = (v: string | number) => Math.round(Number(v) * 100);
 const toEuros = (cents: number) => (cents / 100).toFixed(2);
 
 function parseLimits(json: string): PlanLimits {
-  try { return { ...DEFAULT_LIMITS, ...JSON.parse(json) }; }
-  catch { return { ...DEFAULT_LIMITS }; }
+  try {
+    return { ...DEFAULT_LIMITS, ...JSON.parse(json) };
+  } catch {
+    return { ...DEFAULT_LIMITS };
+  }
 }
 
 function parseModules(json: string): PlanModule[] {
   try {
     const p = JSON.parse(json);
     return Array.isArray(p) ? p : DEFAULT_MODULES;
-  } catch { return DEFAULT_MODULES; }
+  } catch {
+    return DEFAULT_MODULES;
+  }
 }
 
 interface LimitState {
-  maxUsers: string;              maxUsersUnlimited: boolean;
-  apiCallsPerMonth: string;      apiCallsUnlimited: boolean;
+  maxUsers: string;
+  maxUsersUnlimited: boolean;
+  apiCallsPerMonth: string;
+  apiCallsUnlimited: boolean;
   storageGb: string;
-  automationRunsPerMonth: string; automationUnlimited: boolean;
-  maxRecords: string;            maxRecordsUnlimited: boolean;
+  automationRunsPerMonth: string;
+  automationUnlimited: boolean;
+  maxRecords: string;
+  maxRecordsUnlimited: boolean;
   maxWorkspaces: string;
-  maxIntegrations: string;       maxIntegrationsUnlimited: boolean;
+  maxIntegrations: string;
+  maxIntegrationsUnlimited: boolean;
 }
 
 function toLimitState(l: PlanLimits): LimitState {
@@ -107,13 +104,13 @@ function toLimitState(l: PlanLimits): LimitState {
 
 function toLimitsJson(s: LimitState): string {
   return JSON.stringify({
-    maxUsers:              s.maxUsersUnlimited    ? null : Number(s.maxUsers) || 0,
-    apiCallsPerMonth:      s.apiCallsUnlimited    ? null : Number(s.apiCallsPerMonth) || 0,
-    storageGb:             Number(s.storageGb) || 0,
+    maxUsers: s.maxUsersUnlimited ? null : Number(s.maxUsers) || 0,
+    apiCallsPerMonth: s.apiCallsUnlimited ? null : Number(s.apiCallsPerMonth) || 0,
+    storageGb: Number(s.storageGb) || 0,
     automationRunsPerMonth: s.automationUnlimited ? null : Number(s.automationRunsPerMonth) || 0,
-    maxRecords:            s.maxRecordsUnlimited  ? null : Number(s.maxRecords) || 0,
-    maxWorkspaces:         Number(s.maxWorkspaces) || 1,
-    maxIntegrations:       s.maxIntegrationsUnlimited ? null : Number(s.maxIntegrations) || 0,
+    maxRecords: s.maxRecordsUnlimited ? null : Number(s.maxRecords) || 0,
+    maxWorkspaces: Number(s.maxWorkspaces) || 1,
+    maxIntegrations: s.maxIntegrationsUnlimited ? null : Number(s.maxIntegrations) || 0,
   } satisfies PlanLimits);
 }
 
@@ -132,26 +129,26 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
   const [pending, startTransition] = useTransition();
 
   // — General —
-  const [name,        setName]        = useState(plan?.name ?? "");
+  const [name, setName] = useState(plan?.name ?? "");
   const [displayName, setDisplayName] = useState(plan?.displayName ?? "");
   const [description, setDescription] = useState(plan?.description ?? "");
-  const [sortOrder,   setSortOrder]   = useState(String(plan?.sortOrder ?? 0));
-  const [isActive,    setIsActive]    = useState(plan?.isActive ?? true);
-  const [isPublic,    setIsPublic]    = useState(plan?.isPublic ?? true);
-  const [isCustom,    setIsCustom]    = useState(plan?.isCustom ?? false);
+  const [sortOrder, setSortOrder] = useState(String(plan?.sortOrder ?? 0));
+  const [isActive, setIsActive] = useState(plan?.isActive ?? true);
+  const [isPublic, setIsPublic] = useState(plan?.isPublic ?? true);
+  const [isCustom, setIsCustom] = useState(plan?.isCustom ?? false);
 
   // — Pricing —
   const [priceMonthly, setPriceMonthly] = useState(toEuros(plan?.pricePerUserMonthly ?? 0));
-  const [priceAnnual,  setPriceAnnual]  = useState(toEuros(plan?.pricePerUserAnnual  ?? 0));
-  const [discount,     setDiscount]     = useState(String(plan?.annualDiscountPercent ?? 20));
-  const [autoCalc,     setAutoCalc]     = useState(false);
-  const [trialDays,    setTrialDays]    = useState(String(plan?.trialDays ?? 0));
-  const [includedUsers,setIncludedUsers]= useState(String(plan?.includedUsers ?? 1));
-  const [minUsers,     setMinUsers]     = useState(String(plan?.minUsers ?? 1));
-  const [maxUsersVal,  setMaxUsersVal]  = useState(plan?.maxUsers != null ? String(plan.maxUsers) : "");
+  const [priceAnnual, setPriceAnnual] = useState(toEuros(plan?.pricePerUserAnnual ?? 0));
+  const [discount, setDiscount] = useState(String(plan?.annualDiscountPercent ?? 20));
+  const [autoCalc, setAutoCalc] = useState(false);
+  const [trialDays, setTrialDays] = useState(String(plan?.trialDays ?? 0));
+  const [includedUsers, setIncludedUsers] = useState(String(plan?.includedUsers ?? 1));
+  const [minUsers, setMinUsers] = useState(String(plan?.minUsers ?? 1));
+  const [maxUsersVal, setMaxUsersVal] = useState(plan?.maxUsers != null ? String(plan.maxUsers) : "");
   const [maxUnlimited, setMaxUnlimited] = useState(plan?.maxUsers === null);
   const [extraMonthly, setExtraMonthly] = useState(toEuros(plan?.extraUserPriceMonthly ?? 0));
-  const [extraAnnual,  setExtraAnnual]  = useState(toEuros(plan?.extraUserPriceAnnual  ?? 0));
+  const [extraAnnual, setExtraAnnual] = useState(toEuros(plan?.extraUserPriceAnnual ?? 0));
 
   // — Modules —
   const [modules, setModules] = useState<Set<PlanModule>>(
@@ -164,20 +161,25 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
   );
 
   // — Features —
-  const [supportTier,   setSupportTier]   = useState(plan?.supportTier ?? "email");
+  const [supportTier, setSupportTier] = useState(plan?.supportTier ?? "email");
   const [hasWhiteLabel, setHasWhiteLabel] = useState(plan?.hasWhiteLabel ?? false);
-  const [hasSandbox,    setHasSandbox]    = useState(plan?.hasSandbox ?? false);
+  const [hasSandbox, setHasSandbox] = useState(plan?.hasSandbox ?? false);
 
   // — Stripe —
-  const [stripeProductId,             setStripeProductId]             = useState(plan?.stripeProductId ?? "");
-  const [stripePriceMonthlyId,        setStripePriceMonthlyId]        = useState(plan?.stripePriceMonthlyId ?? "");
-  const [stripePriceAnnualId,         setStripePriceAnnualId]         = useState(plan?.stripePriceAnnualId ?? "");
-  const [stripeExtraUserMonthlyPriceId, setStripeExtraUserMonthlyPriceId] = useState(plan?.stripeExtraUserMonthlyPriceId ?? "");
-  const [stripeExtraUserAnnualPriceId,  setStripeExtraUserAnnualPriceId]  = useState(plan?.stripeExtraUserAnnualPriceId ?? "");
+  const [stripeProductId, setStripeProductId] = useState(plan?.stripeProductId ?? "");
+  const [stripePriceMonthlyId, setStripePriceMonthlyId] = useState(plan?.stripePriceMonthlyId ?? "");
+  const [stripePriceAnnualId, setStripePriceAnnualId] = useState(plan?.stripePriceAnnualId ?? "");
+  const [stripeExtraUserMonthlyPriceId, setStripeExtraUserMonthlyPriceId] = useState(
+    plan?.stripeExtraUserMonthlyPriceId ?? "",
+  );
+  const [stripeExtraUserAnnualPriceId, setStripeExtraUserAnnualPriceId] = useState(
+    plan?.stripeExtraUserAnnualPriceId ?? "",
+  );
 
   useEffect(() => {
     if (!autoCalc) return;
-    const m = Number(priceMonthly), d = Number(discount);
+    const m = Number(priceMonthly),
+      d = Number(discount);
     if (!isNaN(m) && !isNaN(d)) setPriceAnnual((m * (1 - d / 100)).toFixed(2));
   }, [priceMonthly, discount, autoCalc]);
 
@@ -205,13 +207,13 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
       stripeExtraUserMonthlyPriceId: stripeExtraUserMonthlyPriceId || undefined,
       stripeExtraUserAnnualPriceId: stripeExtraUserAnnualPriceId || undefined,
       pricePerUserMonthly: toCents(priceMonthly),
-      pricePerUserAnnual:  toCents(priceAnnual),
+      pricePerUserAnnual: toCents(priceAnnual),
       annualDiscountPercent: Number(discount),
       includedUsers: Number(includedUsers),
-      maxUsers: maxUnlimited ? null : (Number(maxUsersVal) || null),
+      maxUsers: maxUnlimited ? null : Number(maxUsersVal) || null,
       minUsers: Number(minUsers),
       extraUserPriceMonthly: toCents(extraMonthly),
-      extraUserPriceAnnual:  toCents(extraAnnual),
+      extraUserPriceAnnual: toCents(extraAnnual),
       trialDays: Number(trialDays),
       limits: toLimitsJson(limits),
       enabledModules: JSON.stringify(Array.from(modules)),
@@ -241,23 +243,39 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
   }
 
   const monthlyNum = Number(priceMonthly) || 0;
-  const annualNum  = Number(priceAnnual)  || 0;
-  const savings    = monthlyNum > 0 ? Math.round(((monthlyNum - annualNum) / monthlyNum) * 100) : 0;
+  const annualNum = Number(priceAnnual) || 0;
+  const savings = monthlyNum > 0 ? Math.round(((monthlyNum - annualNum) / monthlyNum) * 100) : 0;
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-
       {/* ── Scrollable body ── */}
       <div className="flex-1 overflow-y-auto px-6 py-4">
         <Tabs defaultValue="general">
-
           <TabsList className="w-full mb-5">
-            <TabsTrigger value="general"  className="flex-1 gap-1.5"><Tag        className="h-3.5 w-3.5" />General</TabsTrigger>
-            <TabsTrigger value="pricing"  className="flex-1 gap-1.5"><CreditCard className="h-3.5 w-3.5" />Pricing</TabsTrigger>
-            <TabsTrigger value="modules"  className="flex-1 gap-1.5"><Layers     className="h-3.5 w-3.5" />Modules</TabsTrigger>
-            <TabsTrigger value="limits"   className="flex-1 gap-1.5"><BarChart2  className="h-3.5 w-3.5" />Limits</TabsTrigger>
-            <TabsTrigger value="features" className="flex-1 gap-1.5"><Star       className="h-3.5 w-3.5" />Features</TabsTrigger>
-            <TabsTrigger value="stripe"   className="flex-1 gap-1.5"><Zap        className="h-3.5 w-3.5" />Stripe</TabsTrigger>
+            <TabsTrigger value="general" className="flex-1 gap-1.5">
+              <Tag className="h-3.5 w-3.5" />
+              General
+            </TabsTrigger>
+            <TabsTrigger value="pricing" className="flex-1 gap-1.5">
+              <CreditCard className="h-3.5 w-3.5" />
+              Pricing
+            </TabsTrigger>
+            <TabsTrigger value="modules" className="flex-1 gap-1.5">
+              <Layers className="h-3.5 w-3.5" />
+              Modules
+            </TabsTrigger>
+            <TabsTrigger value="limits" className="flex-1 gap-1.5">
+              <BarChart2 className="h-3.5 w-3.5" />
+              Limits
+            </TabsTrigger>
+            <TabsTrigger value="features" className="flex-1 gap-1.5">
+              <Star className="h-3.5 w-3.5" />
+              Features
+            </TabsTrigger>
+            <TabsTrigger value="stripe" className="flex-1 gap-1.5">
+              <Zap className="h-3.5 w-3.5" />
+              Stripe
+            </TabsTrigger>
           </TabsList>
 
           {/* ─── General ─────────────────────────────────────────────────── */}
@@ -293,12 +311,7 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
               </F>
             </div>
             <F label="Sort order">
-              <Input
-                type="number"
-                value={sortOrder}
-                onChange={(e) => setSortOrder(e.target.value)}
-                min={0}
-              />
+              <Input type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} min={0} />
             </F>
             <div /> {/* spacer */}
             <div className="col-span-2 space-y-2">
@@ -353,20 +366,16 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
             <F label="Trial period">
               <SuffixInput value={trialDays} onChange={setTrialDays} suffix="days" type="number" min={0} />
             </F>
-
             {monthlyNum > 0 && annualNum > 0 && (
               <div className="col-span-2 rounded-md bg-muted px-4 py-2.5 text-sm text-muted-foreground">
-                Annual billing saves{" "}
-                <span className="font-semibold text-foreground">{savings}%</span>
-                {" "}— €{((monthlyNum - annualNum) * 12).toFixed(2)} per user per year.
+                Annual billing saves <span className="font-semibold text-foreground">{savings}%</span> — €
+                {((monthlyNum - annualNum) * 12).toFixed(2)} per user per year.
               </div>
             )}
-
             <div className="col-span-2">
               <Separator className="my-1" />
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-3 mb-3">User seats</p>
             </div>
-
             <F label="Included users">
               <Input type="number" value={includedUsers} onChange={(e) => setIncludedUsers(e.target.value)} min={1} />
             </F>
@@ -391,7 +400,6 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
               />
             </div>
             <div /> {/* spacer */}
-
             <F label="Extra user / month">
               <EuroInput value={extraMonthly} onChange={setExtraMonthly} placeholder="15.00" />
             </F>
@@ -414,17 +422,24 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
                     type="button"
                     onClick={() => toggleModule(mod.id)}
                     className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left transition-all ${
-                      active
-                        ? "border-primary bg-primary/5 ring-1 ring-primary"
-                        : "border-border hover:bg-muted/50"
+                      active ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-muted/50"
                     }`}
                   >
-                    <div className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
-                      active ? "border-primary bg-primary" : "border-muted-foreground/40"
-                    }`}>
+                    <div
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
+                        active ? "border-primary bg-primary" : "border-muted-foreground/40"
+                      }`}
+                    >
                       {active && (
                         <svg viewBox="0 0 10 10" className="h-3 w-3 text-primary-foreground">
-                          <path d="M2 5l2.5 2.5L8 3" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                          <path
+                            d="M2 5l2.5 2.5L8 3"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            fill="none"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
                         </svg>
                       )}
                     </div>
@@ -445,34 +460,60 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
           <TabsContent value="limits" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
             <LimitField
               label="Max users"
-              value={limits.maxUsers} unlimited={limits.maxUsersUnlimited} unit="users"
-              onValue={(v) => patchLimit("maxUsers", v)} onUnlimited={(v) => patchLimit("maxUsersUnlimited", v)}
+              value={limits.maxUsers}
+              unlimited={limits.maxUsersUnlimited}
+              unit="users"
+              onValue={(v) => patchLimit("maxUsers", v)}
+              onUnlimited={(v) => patchLimit("maxUsersUnlimited", v)}
             />
             <LimitField
               label="API calls / month"
-              value={limits.apiCallsPerMonth} unlimited={limits.apiCallsUnlimited} unit="calls"
-              onValue={(v) => patchLimit("apiCallsPerMonth", v)} onUnlimited={(v) => patchLimit("apiCallsUnlimited", v)}
+              value={limits.apiCallsPerMonth}
+              unlimited={limits.apiCallsUnlimited}
+              unit="calls"
+              onValue={(v) => patchLimit("apiCallsPerMonth", v)}
+              onUnlimited={(v) => patchLimit("apiCallsUnlimited", v)}
             />
             <F label="Storage">
-              <SuffixInput value={limits.storageGb} onChange={(v) => patchLimit("storageGb", v)} suffix="GB" type="number" min={0} />
+              <SuffixInput
+                value={limits.storageGb}
+                onChange={(v) => patchLimit("storageGb", v)}
+                suffix="GB"
+                type="number"
+                min={0}
+              />
             </F>
             <LimitField
               label="Automation runs / month"
-              value={limits.automationRunsPerMonth} unlimited={limits.automationUnlimited} unit="runs"
-              onValue={(v) => patchLimit("automationRunsPerMonth", v)} onUnlimited={(v) => patchLimit("automationUnlimited", v)}
+              value={limits.automationRunsPerMonth}
+              unlimited={limits.automationUnlimited}
+              unit="runs"
+              onValue={(v) => patchLimit("automationRunsPerMonth", v)}
+              onUnlimited={(v) => patchLimit("automationUnlimited", v)}
             />
             <LimitField
               label="Max records"
-              value={limits.maxRecords} unlimited={limits.maxRecordsUnlimited} unit="records"
-              onValue={(v) => patchLimit("maxRecords", v)} onUnlimited={(v) => patchLimit("maxRecordsUnlimited", v)}
+              value={limits.maxRecords}
+              unlimited={limits.maxRecordsUnlimited}
+              unit="records"
+              onValue={(v) => patchLimit("maxRecords", v)}
+              onUnlimited={(v) => patchLimit("maxRecordsUnlimited", v)}
             />
             <F label="Workspaces">
-              <Input type="number" value={limits.maxWorkspaces} onChange={(e) => patchLimit("maxWorkspaces", e.target.value)} min={1} />
+              <Input
+                type="number"
+                value={limits.maxWorkspaces}
+                onChange={(e) => patchLimit("maxWorkspaces", e.target.value)}
+                min={1}
+              />
             </F>
             <LimitField
               label="Integrations"
-              value={limits.maxIntegrations} unlimited={limits.maxIntegrationsUnlimited} unit="integrations"
-              onValue={(v) => patchLimit("maxIntegrations", v)} onUnlimited={(v) => patchLimit("maxIntegrationsUnlimited", v)}
+              value={limits.maxIntegrations}
+              unlimited={limits.maxIntegrationsUnlimited}
+              unit="integrations"
+              onValue={(v) => patchLimit("maxIntegrations", v)}
+              onUnlimited={(v) => patchLimit("maxIntegrationsUnlimited", v)}
             />
           </TabsContent>
 
@@ -518,32 +559,60 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
             </p>
             <div className="col-span-2">
               <F label="Product ID">
-                <Input value={stripeProductId} onChange={(e) => setStripeProductId(e.target.value)} placeholder="prod_…" className="font-mono text-sm" />
+                <Input
+                  value={stripeProductId}
+                  onChange={(e) => setStripeProductId(e.target.value)}
+                  placeholder="prod_…"
+                  className="font-mono text-sm"
+                />
               </F>
             </div>
             <F label="Monthly price ID">
-              <Input value={stripePriceMonthlyId} onChange={(e) => setStripePriceMonthlyId(e.target.value)} placeholder="price_…" className="font-mono text-sm" />
+              <Input
+                value={stripePriceMonthlyId}
+                onChange={(e) => setStripePriceMonthlyId(e.target.value)}
+                placeholder="price_…"
+                className="font-mono text-sm"
+              />
             </F>
             <F label="Annual price ID">
-              <Input value={stripePriceAnnualId} onChange={(e) => setStripePriceAnnualId(e.target.value)} placeholder="price_…" className="font-mono text-sm" />
+              <Input
+                value={stripePriceAnnualId}
+                onChange={(e) => setStripePriceAnnualId(e.target.value)}
+                placeholder="price_…"
+                className="font-mono text-sm"
+              />
             </F>
             <F label="Extra user monthly price ID">
-              <Input value={stripeExtraUserMonthlyPriceId} onChange={(e) => setStripeExtraUserMonthlyPriceId(e.target.value)} placeholder="price_…" className="font-mono text-sm" />
+              <Input
+                value={stripeExtraUserMonthlyPriceId}
+                onChange={(e) => setStripeExtraUserMonthlyPriceId(e.target.value)}
+                placeholder="price_…"
+                className="font-mono text-sm"
+              />
             </F>
             <F label="Extra user annual price ID">
-              <Input value={stripeExtraUserAnnualPriceId} onChange={(e) => setStripeExtraUserAnnualPriceId(e.target.value)} placeholder="price_…" className="font-mono text-sm" />
+              <Input
+                value={stripeExtraUserAnnualPriceId}
+                onChange={(e) => setStripeExtraUserAnnualPriceId(e.target.value)}
+                placeholder="price_…"
+                className="font-mono text-sm"
+              />
             </F>
           </TabsContent>
-
         </Tabs>
       </div>
 
       {/* ── Footer ── */}
       <div className="px-6 py-4 border-t bg-muted/30 flex items-center justify-between gap-3">
         <span className="text-sm text-muted-foreground">
-          {isEdit
-            ? <>Editing <span className="font-medium text-foreground">{plan?.displayName}</span></>
-            : "New plan will be created immediately."}
+          {isEdit ? (
+            <>
+              Editing <span className="font-medium text-foreground">{plan?.displayName}</span>
+            </>
+          ) : (
+            "New plan will be created immediately."
+          )}
         </span>
         <div className="flex gap-2">
           {onCancel && (
@@ -566,9 +635,7 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
 function F({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        {label}
-      </Label>
+      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</Label>
       {children}
     </div>
   );
@@ -577,16 +644,27 @@ function F({ label, children }: { label: string; children: React.ReactNode }) {
 // ─── Euro input ───────────────────────────────────────────────────────────────
 
 function EuroInput({
-  value, onChange, placeholder, disabled,
+  value,
+  onChange,
+  placeholder,
+  disabled,
 }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; disabled?: boolean;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
 }) {
   return (
     <div className="relative">
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground select-none">€</span>
       <Input
-        type="number" value={value} onChange={(e) => onChange(e.target.value)}
-        min={0} step="0.01" placeholder={placeholder} disabled={disabled}
+        type="number"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        min={0}
+        step="0.01"
+        placeholder={placeholder}
+        disabled={disabled}
         className={`pl-7 ${disabled ? "bg-muted text-muted-foreground" : ""}`}
       />
     </div>
@@ -596,16 +674,29 @@ function EuroInput({
 // ─── Suffix input ─────────────────────────────────────────────────────────────
 
 function SuffixInput({
-  value, onChange, suffix, type = "text", min, max,
+  value,
+  onChange,
+  suffix,
+  type = "text",
+  min,
+  max,
 }: {
-  value: string; onChange: (v: string) => void; suffix: string;
-  type?: string; min?: number; max?: number;
+  value: string;
+  onChange: (v: string) => void;
+  suffix: string;
+  type?: string;
+  min?: number;
+  max?: number;
 }) {
   return (
     <div className="relative">
       <Input
-        type={type} value={value} onChange={(e) => onChange(e.target.value)}
-        min={min} max={max} className="pr-10"
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        min={min}
+        max={max}
+        className="pr-10"
       />
       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground select-none">
         {suffix}
@@ -636,10 +727,19 @@ function UnlimitedButton({ active, onClick }: { active: boolean; onClick: () => 
 // ─── Limit field ──────────────────────────────────────────────────────────────
 
 function LimitField({
-  label, value, unlimited, unit, onValue, onUnlimited,
+  label,
+  value,
+  unlimited,
+  unit,
+  onValue,
+  onUnlimited,
 }: {
-  label: string; value: string; unlimited: boolean; unit: string;
-  onValue: (v: string) => void; onUnlimited: (v: boolean) => void;
+  label: string;
+  value: string;
+  unlimited: boolean;
+  unit: string;
+  onValue: (v: string) => void;
+  onUnlimited: (v: boolean) => void;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -649,8 +749,11 @@ function LimitField({
       </div>
       <div className="relative">
         <Input
-          type="number" value={value} onChange={(e) => onValue(e.target.value)}
-          min={0} disabled={unlimited}
+          type="number"
+          value={value}
+          onChange={(e) => onValue(e.target.value)}
+          min={0}
+          disabled={unlimited}
           placeholder={unlimited ? "Unlimited" : ""}
           className={`pr-20 ${unlimited ? "bg-muted text-muted-foreground" : ""}`}
         />
@@ -667,9 +770,15 @@ function LimitField({
 // ─── Toggle row ───────────────────────────────────────────────────────────────
 
 function ToggleRow({
-  label, description, checked, onChange,
+  label,
+  description,
+  checked,
+  onChange,
 }: {
-  label: string; description: string; checked: boolean; onChange: (v: boolean) => void;
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
 }) {
   return (
     <div className="flex items-center justify-between rounded-lg border px-4 py-3">

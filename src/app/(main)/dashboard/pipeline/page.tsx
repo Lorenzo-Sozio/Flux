@@ -1,7 +1,8 @@
-import { getPipelineData } from "@/actions/pipeline";
 import { getCompanies, getContacts } from "@/actions/crm";
-import { PipelineBoard } from "./components/pipeline-board";
+import { getPipelineData } from "@/actions/pipeline";
 import { auth } from "@/auth";
+
+import { PipelineBoard } from "./components/pipeline-board";
 
 export default async function PipelinePage() {
   const session = await auth();
@@ -9,11 +10,7 @@ export default async function PipelinePage() {
   const canEdit = role !== "viewer";
   const canManageStages = role === "admin" || role === "owner";
 
-  const [data, companies, contacts] = await Promise.all([
-    getPipelineData(),
-    getCompanies(),
-    getContacts(),
-  ]);
+  const [data, companies, contacts] = await Promise.all([getPipelineData(), getCompanies(), getContacts()]);
 
   return (
     <div className="p-4 sm:p-6 md:p-8 h-full bg-muted/10">

@@ -5,13 +5,15 @@
  * DELETE ?id=xxx                          — delete a document (owner only)
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
-import { documents } from "@/db/schema";
+import { type NextRequest, NextResponse } from "next/server";
+
 import { and, eq } from "drizzle-orm";
 import { unlink } from "fs/promises";
 import { join } from "path";
+
+import { auth } from "@/auth";
+import { documents } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 const VALID_ENTITY_TYPES = new Set(["contact", "lead", "company", "deal", "ticket"]);
 
@@ -23,7 +25,7 @@ export async function GET(req: NextRequest) {
   }
 
   const entityType = req.nextUrl.searchParams.get("entityType");
-  const entityId   = req.nextUrl.searchParams.get("entityId");
+  const entityId = req.nextUrl.searchParams.get("entityId");
 
   if (!entityType || !VALID_ENTITY_TYPES.has(entityType)) {
     return NextResponse.json({ error: "Invalid entity type." }, { status: 400 });

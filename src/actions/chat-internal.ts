@@ -1,15 +1,11 @@
 "use server";
 
-import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
-import {
-  dmConversations,
-  dmConversationMembers,
-  dmMessages,
-  users,
-} from "@/db/schema";
 import { and, desc, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
+
 import { createNotificationAction } from "@/actions/auth";
+import { auth } from "@/auth";
+import { dmConversationMembers, dmConversations, dmMessages, users } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 type SessionUser = { id: string; name?: string | null; email?: string | null };
 
@@ -33,8 +29,8 @@ export async function getConversations() {
   const myMemberships = await db
     .select({
       conversationId: dmConversationMembers.conversationId,
-      lastReadAt:     dmConversationMembers.lastReadAt,
-      mutedUntil:     dmConversationMembers.mutedUntil,
+      lastReadAt: dmConversationMembers.lastReadAt,
+      mutedUntil: dmConversationMembers.mutedUntil,
     })
     .from(dmConversationMembers)
     .where(eq(dmConversationMembers.userId, me.id));
@@ -45,10 +41,10 @@ export async function getConversations() {
   const memberMap = new Map(myMemberships.map((m) => [m.conversationId, m]));
 
   const convos = await db.query.dmConversations.findMany({
-    where:   inArray(dmConversations.id, convIds),
+    where: inArray(dmConversations.id, convIds),
     orderBy: desc(dmConversations.updatedAt),
     with: {
-      members:  { with: { user: true } },
+      members: { with: { user: true } },
       messages: { orderBy: desc(dmMessages.createdAt), limit: 1 },
     },
   });
@@ -85,8 +81,8 @@ export async function getTotalUnreadCount(): Promise<number> {
   const memberships = await db
     .select({
       conversationId: dmConversationMembers.conversationId,
-      lastReadAt:     dmConversationMembers.lastReadAt,
-      mutedUntil:     dmConversationMembers.mutedUntil,
+      lastReadAt: dmConversationMembers.lastReadAt,
+      mutedUntil: dmConversationMembers.mutedUntil,
     })
     .from(dmConversationMembers)
     .where(eq(dmConversationMembers.userId, me.id));
@@ -123,10 +119,7 @@ export async function getOrCreateDirectConversation(otherUserId: string) {
       .select({ conversationId: dmConversationMembers.conversationId })
       .from(dmConversationMembers)
       .where(
-        and(
-          inArray(dmConversationMembers.conversationId, myConvIds),
-          eq(dmConversationMembers.userId, otherUserId),
-        ),
+        and(inArray(dmConversationMembers.conversationId, myConvIds), eq(dmConversationMembers.userId, otherUserId)),
       );
 
     for (const { conversationId } of shared) {
@@ -155,9 +148,7 @@ export async function createGroupConversation(name: string, memberIds: string[])
   if (allIds.length < 2) throw new Error("Group needs at least 2 members");
 
   const [conv] = await db.insert(dmConversations).values({ type: "group", name }).returning();
-  await db.insert(dmConversationMembers).values(
-    allIds.map((userId) => ({ conversationId: conv.id, userId })),
-  );
+  await db.insert(dmConversationMembers).values(allIds.map((userId) => ({ conversationId: conv.id, userId })));
   return conv;
 }
 
@@ -212,15 +203,15 @@ export async function sendMessage(conversationId: string, content: string) {
     .where(and(eq(dmConversationMembers.conversationId, conversationId), ne(dmConversationMembers.userId, me.id)));
 
   const senderName = me.name ?? me.email ?? "Someone";
-  const preview    = trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed;
+  const preview = trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed;
 
   for (const { userId } of otherMembers) {
     createNotificationAction({
       userId,
-      type:    "chat_message",
-      title:   `New message from ${senderName}`,
+      type: "chat_message",
+      title: `New message from ${senderName}`,
       message: preview,
-      link:    undefined,
+      link: undefined,
     }).catch(() => {});
   }
 

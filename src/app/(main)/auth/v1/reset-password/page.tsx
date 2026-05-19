@@ -1,5 +1,7 @@
 import Link from "next/link";
+
 import { Command } from "lucide-react";
+
 import { ResetPasswordForm } from "../../_components/reset-password-form";
 
 interface Props {

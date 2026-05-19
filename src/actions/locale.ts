@@ -1,7 +1,8 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { locales, LOCALE_COOKIE, defaultLocale, type Locale } from "@/i18n/config";
+
+import { defaultLocale, LOCALE_COOKIE, type Locale, locales } from "@/i18n/config";
 
 export async function setLocale(locale: string): Promise<void> {
   const safe: Locale = locales.includes(locale as Locale) ? (locale as Locale) : defaultLocale;

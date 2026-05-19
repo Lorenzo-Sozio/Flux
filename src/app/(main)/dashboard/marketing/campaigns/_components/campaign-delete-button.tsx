@@ -1,10 +1,12 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { TrashIcon } from "lucide-react";
-import { deleteMarketingCampaign } from "@/actions/marketing";
-import { toast } from "sonner";
 import { useState } from "react";
+
+import { TrashIcon } from "lucide-react";
+import { toast } from "sonner";
+
+import { deleteMarketingCampaign } from "@/actions/marketing";
+import { Button } from "@/components/ui/button";
 
 interface CampaignDeleteButtonProps {
   campaignId: string;
@@ -15,7 +17,7 @@ export function CampaignDeleteButton({ campaignId }: CampaignDeleteButtonProps) 
 
   async function handleDelete() {
     if (!confirm("Are you sure you want to delete this campaign?")) return;
-    
+
     setLoading(true);
     try {
       await deleteMarketingCampaign(campaignId);

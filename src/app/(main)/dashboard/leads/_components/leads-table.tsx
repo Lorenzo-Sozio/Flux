@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 
 import Link from "next/link";
-import { useTranslations } from "next-intl";
 
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { bulkAssignLeads, bulkDeleteLeads, bulkUpdateLeadStatus } from "@/actions/bulk";
@@ -146,11 +146,7 @@ export function LeadsTable({ leads, users, canEdit, activeCount, categories = []
           <TableRow>
             {canEdit && (
               <TableHead className="w-10">
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={toggleAll}
-                  aria-label="Select all"
-                />
+                <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
               </TableHead>
             )}
             <TableHead>{t("columns.name")}</TableHead>
@@ -166,10 +162,7 @@ export function LeadsTable({ leads, users, canEdit, activeCount, categories = []
         </TableHeader>
         <TableBody>
           {leads.map((lead) => (
-            <TableRow
-              key={lead.id}
-              className={`hover:bg-muted/40 ${selected.has(lead.id) ? "bg-primary/5" : ""}`}
-            >
+            <TableRow key={lead.id} className={`hover:bg-muted/40 ${selected.has(lead.id) ? "bg-primary/5" : ""}`}>
               {canEdit && (
                 <TableCell>
                   <Checkbox
@@ -190,7 +183,9 @@ export function LeadsTable({ leads, users, canEdit, activeCount, categories = []
               <TableCell className="capitalize">{lead.status}</TableCell>
               <TableCell>
                 {lead.rating && (
-                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded capitalize ${RATING_COLORS[lead.rating] ?? ""}`}>
+                  <span
+                    className={`text-xs font-medium px-1.5 py-0.5 rounded capitalize ${RATING_COLORS[lead.rating] ?? ""}`}
+                  >
                     {t(`ratings.${lead.rating as "hot" | "warm" | "cold"}`)}
                   </span>
                 )}

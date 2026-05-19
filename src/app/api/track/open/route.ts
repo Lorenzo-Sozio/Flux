@@ -3,16 +3,15 @@
  * Called when the tracking pixel in a campaign email is loaded.
  * URL: /api/track/open?log=<campaignLogId>
  */
-import { NextRequest, NextResponse } from "next/server";
-import { getDb } from "@/lib/tenant-context";
-import { campaignLogs } from "@/db/schema";
+import { type NextRequest, NextResponse } from "next/server";
+
 import { and, eq, isNull, notInArray } from "drizzle-orm";
 
+import { campaignLogs } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
+
 // 1x1 transparent GIF
-const PIXEL = Buffer.from(
-  "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
-  "base64"
-);
+const PIXEL = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
 
 // Statuses that block advancing to "opened"
 const PROTECTED_STATUSES = ["opened", "clicked", "unsubscribed", "bounced", "complained"];
@@ -27,12 +26,7 @@ export async function GET(req: NextRequest) {
     // 1. Advance status to "opened" only when not already at a higher state
     db.update(campaignLogs)
       .set({ status: "opened", openedAt: now })
-      .where(
-        and(
-          eq(campaignLogs.id, logId),
-          notInArray(campaignLogs.status, PROTECTED_STATUSES),
-        ),
-      )
+      .where(and(eq(campaignLogs.id, logId), notInArray(campaignLogs.status, PROTECTED_STATUSES)))
       .catch((err) => console.error("[track/open] status advance failed", { logId, err }));
 
     // 2. Backfill openedAt when it is still null (e.g. status is already "clicked"

@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+
+import { ExternalLink, File, FileImage, FileText, Loader2, Paperclip, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
-import {
-  File, FileImage, FileText, Loader2, Paperclip, Trash2, Upload, ExternalLink,
-} from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 
 type Document = {
   id: string;
@@ -55,7 +55,9 @@ export function DocumentManager({ entityType, entityId }: Props) {
     }
   }, [entityType, entityId]);
 
-  useEffect(() => { fetchDocs(); }, [fetchDocs]);
+  useEffect(() => {
+    fetchDocs();
+  }, [fetchDocs]);
 
   const uploadFile = async (file: File) => {
     if (file.size > 10 * 1024 * 1024) {
@@ -72,7 +74,10 @@ export function DocumentManager({ entityType, entityId }: Props) {
       const res = await fetch("/api/documents/upload", { method: "POST", body: form });
       const data = await res.json();
 
-      if (!res.ok) { toast.error(data.error ?? "Upload failed."); return; }
+      if (!res.ok) {
+        toast.error(data.error ?? "Upload failed.");
+        return;
+      }
 
       setDocs((prev) => [...prev, data.document]);
       toast.success(`"${file.name}" uploaded.`);
@@ -116,13 +121,12 @@ export function DocumentManager({ entityType, entityId }: Props) {
             Attachments
             {docs.length > 0 && <Badge variant="secondary">{docs.length}</Badge>}
           </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-          >
-            {uploading ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Upload className="mr-2 h-3.5 w-3.5" />}
+          <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
+            {uploading ? (
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Upload className="mr-2 h-3.5 w-3.5" />
+            )}
             Upload
           </Button>
           <input ref={fileRef} type="file" className="hidden" onChange={handleFileChange} />
@@ -131,7 +135,10 @@ export function DocumentManager({ entityType, entityId }: Props) {
       <CardContent className="space-y-2">
         {/* Drop Zone */}
         <div
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => fileRef.current?.click()}
@@ -162,7 +169,12 @@ export function DocumentManager({ entityType, entityId }: Props) {
                     {fmtSize(doc.size)} · {new Date(doc.createdAt).toLocaleDateString()}
                   </p>
                 </div>
-                <a href={doc.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground">
+                <a
+                  href={doc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-muted-foreground hover:text-foreground"
+                >
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
                 <button

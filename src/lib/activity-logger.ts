@@ -1,21 +1,41 @@
 "use server";
 
-import { getDb } from "@/lib/tenant-context";
-import { userActivityLogs } from "@/db/schema";
-import { auth } from "@/auth";
 import { headers } from "next/headers";
+
+import { auth } from "@/auth";
+import { userActivityLogs } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 export type ActivityAction =
   | "login"
-  | "create_lead"   | "update_lead"   | "delete_lead"   | "convert_lead"
-  | "create_contact"| "update_contact"| "delete_contact"
-  | "create_company"| "update_company"| "delete_company"
-  | "create_deal"   | "update_deal"   | "delete_deal"   | "win_deal" | "lose_deal"
-  | "create_task"   | "complete_task" | "delete_task"
-  | "create_quote"  | "send_quote"    | "accept_quote"  | "delete_quote"
-  | "create_ticket" | "resolve_ticket"| "close_ticket"
+  | "create_lead"
+  | "update_lead"
+  | "delete_lead"
+  | "convert_lead"
+  | "create_contact"
+  | "update_contact"
+  | "delete_contact"
+  | "create_company"
+  | "update_company"
+  | "delete_company"
+  | "create_deal"
+  | "update_deal"
+  | "delete_deal"
+  | "win_deal"
+  | "lose_deal"
+  | "create_task"
+  | "complete_task"
+  | "delete_task"
+  | "create_quote"
+  | "send_quote"
+  | "accept_quote"
+  | "delete_quote"
+  | "create_ticket"
+  | "resolve_ticket"
+  | "close_ticket"
   | "launch_campaign"
-  | "create_automation" | "trigger_automation";
+  | "create_automation"
+  | "trigger_automation";
 
 /**
  * Logs a user activity to the audit trail.
@@ -40,10 +60,7 @@ export async function logActivity(
     }
 
     const hdrs = await headers().catch(() => null);
-    const ipAddress =
-      hdrs?.get("x-forwarded-for")?.split(",")[0]?.trim() ??
-      hdrs?.get("x-real-ip") ??
-      null;
+    const ipAddress = hdrs?.get("x-forwarded-for")?.split(",")[0]?.trim() ?? hdrs?.get("x-real-ip") ?? null;
 
     const db = await getDb();
     await db.insert(userActivityLogs).values({

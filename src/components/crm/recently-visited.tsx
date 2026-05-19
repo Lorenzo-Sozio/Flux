@@ -1,8 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { History, User, Building2, UserCheck, Kanban, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+
 import Link from "next/link";
+
+import { Building2, History, Kanban, Trash2, User, UserCheck } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -13,14 +16,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+
 import type { HistoryItem } from "./record-visit";
 
 const STORAGE_KEY = "flux_crm_history";
 
-const TYPE_CONFIG: Record<
-  HistoryItem["type"],
-  { label: string; icon: React.ElementType; color: string }
-> = {
+const TYPE_CONFIG: Record<HistoryItem["type"], { label: string; icon: React.ElementType; color: string }> = {
   contact: {
     label: "Contact",
     icon: User,
@@ -132,9 +133,7 @@ export function RecentlyVisited() {
                       <p className="text-sm font-medium truncate">{item.name}</p>
                       <p className="text-[10px] text-muted-foreground">{cfg.label}</p>
                     </div>
-                    <span className="text-[10px] text-muted-foreground shrink-0">
-                      {timeAgo(item.visitedAt)}
-                    </span>
+                    <span className="text-[10px] text-muted-foreground shrink-0">{timeAgo(item.visitedAt)}</span>
                   </Link>
                 );
               })}

@@ -1,8 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { toast } from "sonner";
+
 import { Download, Upload } from "lucide-react";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,17 +20,20 @@ import { Label } from "@/components/ui/label";
 const IMPORT_HINTS: Record<string, { required: string; optional: string; dedup: string }> = {
   contacts: {
     required: "firstName, lastName",
-    optional: "email, phone, company, jobTitle, city, country, source, tags (;-separated), notes, marketingConsent (yes/no)",
+    optional:
+      "email, phone, company, jobTitle, city, country, source, tags (;-separated), notes, marketingConsent (yes/no)",
     dedup: "email",
   },
   leads: {
     required: "firstName, lastName",
-    optional: "email, phone, companyName, jobTitle, city, country, source, rating (hot/warm/cold), tags (;-separated), notes",
+    optional:
+      "email, phone, companyName, jobTitle, city, country, source, rating (hot/warm/cold), tags (;-separated), notes",
     dedup: "email",
   },
   companies: {
     required: "name",
-    optional: "industry, website, type, city, country, mainEmail, mainPhone, vatNumber, sdiCode, source, tags (;-separated)",
+    optional:
+      "industry, website, type, city, country, mainEmail, mainPhone, vatNumber, sdiCode, source, tags (;-separated)",
     dedup: "name",
   },
 };
@@ -78,7 +83,7 @@ export function ImportExportButtons({ entityType, onImportSuccess }: Props) {
       toast.success(
         `Import complete: ${data.created} created, ${data.skipped} skipped${
           data.duplicates?.length > 0 ? ` (${data.duplicates.length} duplicates)` : ""
-        }.`
+        }.`,
       );
       setImportOpen(false);
       onImportSuccess?.(data);
@@ -109,7 +114,9 @@ export function ImportExportButtons({ entityType, onImportSuccess }: Props) {
                 <p>
                   <strong>Required:</strong>{" "}
                   {IMPORT_HINTS[entityType]?.required.split(", ").map((c) => (
-                    <code key={c} className="mx-0.5 bg-muted px-1 rounded text-xs">{c}</code>
+                    <code key={c} className="mx-0.5 bg-muted px-1 rounded text-xs">
+                      {c}
+                    </code>
                   ))}
                 </p>
                 <p>
@@ -124,13 +131,7 @@ export function ImportExportButtons({ entityType, onImportSuccess }: Props) {
           <div className="space-y-3">
             <div>
               <Label htmlFor="csv-file">CSV File</Label>
-              <Input
-                id="csv-file"
-                type="file"
-                accept=".csv"
-                ref={fileRef}
-                className="mt-1.5 cursor-pointer"
-              />
+              <Input id="csv-file" type="file" accept=".csv" ref={fileRef} className="mt-1.5 cursor-pointer" />
             </div>
           </div>
           <DialogFooter>

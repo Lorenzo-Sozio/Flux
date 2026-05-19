@@ -1,38 +1,21 @@
 "use client";
 
 import React, { useState } from "react";
+
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useFieldArray } from "react-hook-form";
-import { z } from "zod";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Loader2, Plus, Trash2 } from "lucide-react";
+import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import type { z } from "zod";
+
 import { createQuoteAction } from "@/actions/quotes";
 import { CreateQuoteSchema } from "@/actions/quotes-validation";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 
 type FormValues = z.infer<typeof CreateQuoteSchema>;
 
@@ -131,9 +114,7 @@ export function CreateQuoteModal({
             {/* Items Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  Line Items
-                </h3>
+                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Line Items</h3>
                 <Button
                   type="button"
                   variant="outline"
@@ -155,10 +136,7 @@ export function CreateQuoteModal({
               </div>
 
               {fields.map((field, index) => (
-                <div
-                  key={field.id}
-                  className="border rounded-lg p-4 space-y-3 bg-muted/20"
-                >
+                <div key={field.id} className="border rounded-lg p-4 space-y-3 bg-muted/20">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                       Item {index + 1}
@@ -241,11 +219,7 @@ export function CreateQuoteModal({
                       <FormItem>
                         <FormLabel className="text-xs">Description</FormLabel>
                         <FormControl>
-                          <Input
-                            placeholder="Item description"
-                            className="h-8 text-sm"
-                            {...field}
-                          />
+                          <Input placeholder="Item description" className="h-8 text-sm" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -330,9 +304,7 @@ export function CreateQuoteModal({
 
             {/* Quote-level adjustments */}
             <div className="space-y-3 border-t pt-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Quote Adjustments
-              </h3>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Quote Adjustments</h3>
               <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
@@ -420,11 +392,7 @@ export function CreateQuoteModal({
 
             {/* Actions */}
             <div className="flex gap-2 justify-end pt-2 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isLoading}>

@@ -8,13 +8,13 @@
  * - Exponential: 1s, 2s, 4s, 8s, 16s (default per robustezza)
  */
 
-export type BackoffStrategy = "linear" | "exponential"
+export type BackoffStrategy = "linear" | "exponential";
 
 export interface RetryConfig {
-  maxRetries: number
-  initialDelayMs: number
-  maxDelayMs: number
-  strategy: BackoffStrategy
+  maxRetries: number;
+  initialDelayMs: number;
+  maxDelayMs: number;
+  strategy: BackoffStrategy;
 }
 
 /**
@@ -22,36 +22,36 @@ export interface RetryConfig {
  */
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxRetries: 3,
-  initialDelayMs: 1000,    // 1 secondo
-  maxDelayMs: 30000,       // 30 secondi max
+  initialDelayMs: 1000, // 1 secondo
+  maxDelayMs: 30000, // 30 secondi max
   strategy: "exponential",
-}
+};
 
 /**
  * Calcola il delay per il tentativo N
  */
 export function calculateBackoffDelay(
-  attempt: number,     // 0-indexed
+  attempt: number, // 0-indexed
   config: RetryConfig,
 ): number {
-  let delay: number
+  let delay: number;
 
   if (config.strategy === "linear") {
-    delay = config.initialDelayMs * (attempt + 1)
+    delay = config.initialDelayMs * (attempt + 1);
   } else {
     // exponential: 2^attempt * initialDelay
-    delay = config.initialDelayMs * Math.pow(2, attempt)
+    delay = config.initialDelayMs * 2 ** attempt;
   }
 
   // Cap al maxDelay
-  return Math.min(delay, config.maxDelayMs)
+  return Math.min(delay, config.maxDelayMs);
 }
 
 /**
  * Sleep helper
  */
 export function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -76,8 +76,8 @@ export async function executeWithRetry<T>(
   fn: () => Promise<T>,
   config: RetryConfig = DEFAULT_RETRY_CONFIG,
 ): Promise<T> {
-  const { result } = await executeWithRetryTracked(fn, config)
-  return result
+  const { result } = await executeWithRetryTracked(fn, config);
+  return result;
 }
 
 /**
@@ -88,34 +88,32 @@ export async function executeWithRetryTracked<T>(
   fn: () => Promise<T>,
   config: RetryConfig = DEFAULT_RETRY_CONFIG,
 ): Promise<{ result: T; attempts: number }> {
-  let lastError: Error | undefined
-  let attempts = 0
+  let lastError: Error | undefined;
+  let attempts = 0;
 
   for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
     try {
-      const result = await fn()
-      return { result, attempts }
+      const result = await fn();
+      return { result, attempts };
     } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err))
-      attempts = attempt + 1
+      lastError = err instanceof Error ? err : new Error(String(err));
+      attempts = attempt + 1;
 
       if (attempt === config.maxRetries) {
-        break
+        break;
       }
 
-      const delayMs = calculateBackoffDelay(attempt, config)
+      const delayMs = calculateBackoffDelay(attempt, config);
       console.warn(
         `[RetryEngine] Attempt ${attempt + 1}/${config.maxRetries + 1} failed. ` +
-        `Retrying in ${delayMs}ms... Error: ${lastError.message}`,
-      )
+          `Retrying in ${delayMs}ms... Error: ${lastError.message}`,
+      );
 
-      await sleep(delayMs)
+      await sleep(delayMs);
     }
   }
 
-  throw new Error(
-    `Failed after ${config.maxRetries + 1} attempts. Last error: ${lastError?.message}`,
-  )
+  throw new Error(`Failed after ${config.maxRetries + 1} attempts. Last error: ${lastError?.message}`);
 }
 
 /**
@@ -133,34 +131,34 @@ export async function executeWithRetryTracked<T>(
  * - Validation errors
  */
 export function isRetriableError(err: unknown): boolean {
-  if (!(err instanceof Error)) return true // Default: retry unknown errors
+  if (!(err instanceof Error)) return true; // Default: retry unknown errors
 
-  const message = err.message.toLowerCase()
+  const message = err.message.toLowerCase();
 
   // HTTP-specific errors
   if (message.includes("http")) {
     // Retriable HTTP errors
     if (
-      message.includes("500") ||  // Internal Server Error
-      message.includes("502") ||  // Bad Gateway
-      message.includes("503") ||  // Service Unavailable
-      message.includes("504") ||  // Gateway Timeout
-      message.includes("429") ||  // Too Many Requests
+      message.includes("500") || // Internal Server Error
+      message.includes("502") || // Bad Gateway
+      message.includes("503") || // Service Unavailable
+      message.includes("504") || // Gateway Timeout
+      message.includes("429") || // Too Many Requests
       message.includes("timeout") ||
       message.includes("econnrefused") ||
       message.includes("enotfound")
     ) {
-      return true
+      return true;
     }
 
     // Non-retriable HTTP errors
     if (
-      message.includes("400") ||  // Bad Request
-      message.includes("401") ||  // Unauthorized
-      message.includes("403") ||  // Forbidden
-      message.includes("404")     // Not Found
+      message.includes("400") || // Bad Request
+      message.includes("401") || // Unauthorized
+      message.includes("403") || // Forbidden
+      message.includes("404") // Not Found
     ) {
-      return false
+      return false;
     }
   }
 
@@ -171,9 +169,9 @@ export function isRetriableError(err: unknown): boolean {
     message.includes("socket hang up") ||
     message.includes("network")
   ) {
-    return true
+    return true;
   }
 
   // Per default, retry
-  return true
+  return true;
 }

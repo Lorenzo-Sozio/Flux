@@ -1,6 +1,8 @@
 import Link from "next/link";
+
 import { Command } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+
 import { RegisterForm } from "../../_components/register-form";
 import { GoogleButton } from "../../_components/social-auth/google-button";
 

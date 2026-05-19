@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { getAllUsers } from "@/actions/crm";
 import { getGroupsForSelect } from "@/actions/user-groups";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -32,16 +33,11 @@ interface Props {
   placeholder?: string;
 }
 
-type UserOption  = { id: string; name: string | null; email: string | null };
+type UserOption = { id: string; name: string | null; email: string | null };
 type GroupOption = { id: string; name: string; color: string; memberCount: number };
 
-export function AssigneeSelect({
-  value,
-  onChange,
-  disabled,
-  placeholder = "— Unassigned —",
-}: Props) {
-  const [users,  setUsers]  = useState<UserOption[]>([]);
+export function AssigneeSelect({ value, onChange, disabled, placeholder = "— Unassigned —" }: Props) {
+  const [users, setUsers] = useState<UserOption[]>([]);
   const [groups, setGroups] = useState<GroupOption[]>([]);
 
   useEffect(() => {

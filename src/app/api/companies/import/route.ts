@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 import Papa from "papaparse";
 
 import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
 import { companies } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 const importLimits = new Map<string, { count: number; resetAt: number }>();
 

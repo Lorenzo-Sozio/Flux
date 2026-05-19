@@ -1,44 +1,32 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, Controller } from "react-hook-form";
-import { z } from "zod";
-import { toast } from "sonner";
 import {
-  PencilIcon,
-  PlusIcon,
-  Loader2Icon,
-  FileTextIcon,
-  PhoneIcon,
-  UsersIcon,
-  MailIcon,
   BellIcon,
   ClockIcon,
+  FileTextIcon,
   LinkIcon,
+  Loader2Icon,
+  MailIcon,
+  PencilIcon,
+  PhoneIcon,
+  PlusIcon,
+  UsersIcon,
 } from "lucide-react";
+import { Controller, useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
 
+import { createActivity, updateActivity } from "@/actions/activities";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { createActivity, updateActivity } from "@/actions/activities";
 
 // ─── Schema ────────────────────────────────────────────────────────────────────
 
@@ -59,10 +47,22 @@ type ActivityFormValues = z.infer<typeof activitySchema>;
 // ─── Config ────────────────────────────────────────────────────────────────────
 
 const TYPE_CONFIG = {
-  note:    { label: "Note",    icon: FileTextIcon, color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  call:    { label: "Call",    icon: PhoneIcon,    color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300" },
-  meeting: { label: "Meeting", icon: UsersIcon,    color: "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300" },
-  email:   { label: "Email",   icon: MailIcon,     color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" },
+  note: {
+    label: "Note",
+    icon: FileTextIcon,
+    color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  },
+  call: {
+    label: "Call",
+    icon: PhoneIcon,
+    color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
+  },
+  meeting: {
+    label: "Meeting",
+    icon: UsersIcon,
+    color: "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300",
+  },
+  email: { label: "Email", icon: MailIcon, color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" },
 } as const;
 
 const REMINDER_OPTIONS = [
@@ -71,18 +71,18 @@ const REMINDER_OPTIONS = [
   { label: "30 min before", value: "30" },
   { label: "1 hour before", value: "60" },
   { label: "2 hours before", value: "120" },
-  { label: "1 day before",  value: "1440" },
+  { label: "1 day before", value: "1440" },
 ];
 
 const DURATION_OPTIONS = [
-  { label: "—",         value: "__none__" },
-  { label: "15 min",   value: "15" },
-  { label: "30 min",   value: "30" },
-  { label: "45 min",   value: "45" },
-  { label: "1 hour",   value: "60" },
-  { label: "1.5 hours",value: "90" },
-  { label: "2 hours",  value: "120" },
-  { label: "3 hours",  value: "180" },
+  { label: "—", value: "__none__" },
+  { label: "15 min", value: "15" },
+  { label: "30 min", value: "30" },
+  { label: "45 min", value: "45" },
+  { label: "1 hour", value: "60" },
+  { label: "1.5 hours", value: "90" },
+  { label: "2 hours", value: "120" },
+  { label: "3 hours", value: "180" },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -179,8 +179,8 @@ export function ActivityModal(props: Props) {
           data.entityType && data.entityType !== "none" && data.entityId
             ? { [`${data.entityType}Id`]: data.entityId }
             : cp.entityType && cp.entityId
-            ? { [`${cp.entityType}Id`]: cp.entityId }
-            : {};
+              ? { [`${cp.entityType}Id`]: cp.entityId }
+              : {};
 
         await createActivity({
           ...payload,
@@ -227,12 +227,16 @@ export function ActivityModal(props: Props) {
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
           <div className="px-6 py-5 space-y-5">
-
             {/* ── Activity type selector ───────────────────────────── */}
             <div className="space-y-2">
               <Label>Type</Label>
               <div className="grid grid-cols-4 gap-2">
-                {(Object.entries(TYPE_CONFIG) as [keyof typeof TYPE_CONFIG, typeof TYPE_CONFIG[keyof typeof TYPE_CONFIG]][]).map(([type, cfg]) => {
+                {(
+                  Object.entries(TYPE_CONFIG) as [
+                    keyof typeof TYPE_CONFIG,
+                    (typeof TYPE_CONFIG)[keyof typeof TYPE_CONFIG],
+                  ][]
+                ).map(([type, cfg]) => {
                   const Icon = cfg.icon;
                   const active = selectedType === type;
                   return (
@@ -288,7 +292,9 @@ export function ActivityModal(props: Props) {
                         </SelectTrigger>
                         <SelectContent>
                           {DURATION_OPTIONS.map((o) => (
-                            <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                            <SelectItem key={o.value} value={o.value}>
+                              {o.label}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -300,14 +306,25 @@ export function ActivityModal(props: Props) {
 
             {/* ── Content ──────────────────────────────────────────── */}
             <div className="space-y-2">
-              <Label>{selectedType === "note" ? "Note" : selectedType === "call" ? "Call summary" : selectedType === "meeting" ? "Agenda / Summary" : "Email subject / notes"}</Label>
+              <Label>
+                {selectedType === "note"
+                  ? "Note"
+                  : selectedType === "call"
+                    ? "Call summary"
+                    : selectedType === "meeting"
+                      ? "Agenda / Summary"
+                      : "Email subject / notes"}
+              </Label>
               <Textarea
                 {...form.register("content")}
                 placeholder={
-                  selectedType === "note" ? "Write your note…"
-                  : selectedType === "call" ? "What was discussed?"
-                  : selectedType === "meeting" ? "Agenda, decisions, follow-ups…"
-                  : "Email subject or summary…"
+                  selectedType === "note"
+                    ? "Write your note…"
+                    : selectedType === "call"
+                      ? "What was discussed?"
+                      : selectedType === "meeting"
+                        ? "Agenda, decisions, follow-ups…"
+                        : "Email subject or summary…"
                 }
                 className="min-h-[100px] resize-none"
               />
@@ -323,17 +340,13 @@ export function ActivityModal(props: Props) {
                   <UsersIcon className="h-3.5 w-3.5 text-muted-foreground" />
                   Participants
                 </Label>
-                <Input
-                  {...form.register("participants")}
-                  placeholder="Mario Rossi, mario@example.com…"
-                />
+                <Input {...form.register("participants")} placeholder="Mario Rossi, mario@example.com…" />
                 <p className="text-[11px] text-muted-foreground">Separate names or emails with commas</p>
               </div>
             )}
 
             {/* ── Entity link (create mode, no pre-linked entity) ── */}
-            {!isEdit &&
-              !(props as CreateProps).entityId && (
+            {!isEdit && !(props as CreateProps).entityId && (
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <LinkIcon className="h-3.5 w-3.5 text-muted-foreground" />
@@ -386,14 +399,15 @@ export function ActivityModal(props: Props) {
                     </SelectTrigger>
                     <SelectContent>
                       {REMINDER_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 )}
               />
             </div>
-
           </div>
 
           <DialogFooter className="px-6 py-4 border-t bg-muted/10">

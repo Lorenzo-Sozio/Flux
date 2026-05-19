@@ -4,34 +4,24 @@ const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
 
 /** @type {import('next').NextConfig} */
 
+// NOTE: Content-Security-Policy is intentionally absent here.
+// It is generated per-request in src/proxy.ts (middleware) with a unique
+// cryptographic nonce so that 'unsafe-inline' can be removed from script-src.
+// Any CSP set here would use a static value and lack nonce support.
 const securityHeaders = [
   // Prevent browsers from MIME-sniffing a response away from the declared Content-Type
   { key: "X-Content-Type-Options", value: "nosniff" },
   // Block the page from being embedded in an <iframe> (clickjacking protection)
   { key: "X-Frame-Options", value: "DENY" },
-  // Force HTTPS for 1 year, including subdomains
-  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+  // Force HTTPS for 2 years, include subdomains, and opt into HSTS preload list.
+  // Before adding 'preload', ensure all subdomains serve HTTPS: https://hstspreload.org
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
   // Disable Referer header when navigating to a different origin
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   // Restrict browser features not needed by this app
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), interest-cohort=()" },
-  // Basic CSP: allow same-origin resources and trusted CDNs; tighten as needed
-  {
-    key: "Content-Security-Policy",
-    value: [
-      "default-src 'self'",
-      // Next.js inline scripts require 'unsafe-inline' — narrow with nonces in production
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
-      "font-src 'self' data:",
-      "connect-src 'self'",
-      "frame-src 'none'",
-      "object-src 'none'",
-      "base-uri 'self'",
-      "form-action 'self'",
-    ].join("; "),
-  },
+  // Prevents Flash / PDF plugins from loading cross-domain content
+  { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
 ];
 
 const nextConfig = {

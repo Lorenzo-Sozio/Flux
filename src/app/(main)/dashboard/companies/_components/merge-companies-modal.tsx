@@ -1,8 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { MergeEntityModal, type MergeField } from "@/components/crm/merge-entity-modal";
+
 import { getCompanyForMerge, mergeCompanies } from "@/actions/crm";
+import { MergeEntityModal, type MergeField } from "@/components/crm/merge-entity-modal";
 
 type CompanyData = NonNullable<Awaited<ReturnType<typeof getCompanyForMerge>>>;
 
@@ -46,10 +47,7 @@ export function MergeCompaniesModal({ keepId, mergeId, open, onOpenChange }: Pro
       getDisplayName={(c) => c.name}
       reassignedDescription={(keep, merge) => (
         <>
-          {t("reassignedStart")}{" "}
-          <strong>{merge.name}</strong>{" "}
-          {t("reassignedMiddle")}{" "}
-          <strong>{keep.name}</strong>
+          {t("reassignedStart")} <strong>{merge.name}</strong> {t("reassignedMiddle")} <strong>{keep.name}</strong>
           {t("reassignedEnd")}
         </>
       )}

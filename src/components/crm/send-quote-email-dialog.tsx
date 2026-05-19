@@ -1,28 +1,17 @@
 import React, { useState } from "react";
+
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import { z } from "zod";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+
+import { sendQuoteEmailAction } from "@/actions/quotes";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { sendQuoteEmailAction } from "@/actions/quotes";
 
 const SendQuoteEmailSchema = z.object({
   toEmail: z.string().email("Invalid email address"),
@@ -37,12 +26,7 @@ interface SendQuoteEmailDialogProps {
   onSuccess?: () => void;
 }
 
-export function SendQuoteEmailDialog({
-  open,
-  onOpenChange,
-  quoteId,
-  onSuccess,
-}: SendQuoteEmailDialogProps) {
+export function SendQuoteEmailDialog({ open, onOpenChange, quoteId, onSuccess }: SendQuoteEmailDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof SendQuoteEmailSchema>>({
@@ -74,9 +58,7 @@ export function SendQuoteEmailDialog({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Send Quote via Email</DialogTitle>
-          <DialogDescription>
-            Send this quote to your customer for review and approval
-          </DialogDescription>
+          <DialogDescription>Send this quote to your customer for review and approval</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -88,11 +70,7 @@ export function SendQuoteEmailDialog({
                 <FormItem>
                   <FormLabel>Recipient Email</FormLabel>
                   <FormControl>
-                    <Input
-                      type="email"
-                      placeholder="customer@example.com"
-                      {...field}
-                    />
+                    <Input type="email" placeholder="customer@example.com" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -106,10 +84,7 @@ export function SendQuoteEmailDialog({
                 <FormItem>
                   <FormLabel>Email Subject</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="Your Quote"
-                      {...field}
-                    />
+                    <Input placeholder="Your Quote" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -123,11 +98,7 @@ export function SendQuoteEmailDialog({
                 <FormItem>
                   <FormLabel>Message (Optional)</FormLabel>
                   <FormControl>
-                    <Textarea
-                      placeholder="Add a personal message to include in the email..."
-                      {...field}
-                      rows={4}
-                    />
+                    <Textarea placeholder="Add a personal message to include in the email..." {...field} rows={4} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -135,11 +106,7 @@ export function SendQuoteEmailDialog({
             />
 
             <div className="flex gap-2 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isLoading}>

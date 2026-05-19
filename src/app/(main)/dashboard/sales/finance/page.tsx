@@ -1,8 +1,9 @@
 import Link from "next/link";
 
+import { getTranslations } from "next-intl/server";
+
 import { getFinanceDashboard } from "@/actions/finance";
 import { Button } from "@/components/ui/button";
-import { getTranslations } from "next-intl/server";
 
 import { CashFlowOverview } from "./_components/cash-flow-overview";
 import { FinanceKPICards } from "./_components/finance-kpi-cards";

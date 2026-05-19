@@ -1,10 +1,12 @@
 "use server";
 
-import { getDb } from "@/lib/tenant-context";
-import { dealComments, users } from "@/db/schema";
-import { eq, asc, and, or } from "drizzle-orm";
-import { requireWriteAccess } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
+
+import { and, asc, eq, or } from "drizzle-orm";
+
+import { dealComments, users } from "@/db/schema";
+import { requireWriteAccess } from "@/lib/auth-guard";
+import { getDb } from "@/lib/tenant-context";
 
 export type DealComment = {
   id: string;
@@ -42,7 +44,7 @@ export async function getDealComments(dealId: string): Promise<DealComment[]> {
 
 export async function addDealComment(dealId: string, content: string, parentId?: string) {
   const session = await requireWriteAccess();
- const db = await getDb();
+  const db = await getDb();
   if (!content.trim()) throw new Error("Comment cannot be empty");
   await db.insert(dealComments).values({
     dealId,
@@ -55,7 +57,7 @@ export async function addDealComment(dealId: string, content: string, parentId?:
 
 export async function editDealComment(commentId: string, content: string, dealId: string) {
   const session = await requireWriteAccess();
- const db = await getDb();
+  const db = await getDb();
   if (!content.trim()) throw new Error("Comment cannot be empty");
   const updated = await db
     .update(dealComments)
@@ -68,7 +70,7 @@ export async function editDealComment(commentId: string, content: string, dealId
 
 export async function deleteDealComment(commentId: string, dealId: string) {
   const session = await requireWriteAccess();
- const db = await getDb();
+  const db = await getDb();
   const isPrivileged = session.user.role === "admin" || session.user.role === "owner";
   const deleted = await db
     .delete(dealComments)

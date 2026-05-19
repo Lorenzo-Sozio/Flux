@@ -9,10 +9,11 @@
  * existing ones. Aborts if the push would cause data loss.
  */
 import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
-import { pushSchema } from "drizzle-kit/api";
-import * as schema from "../db/schema-tenant";
 import * as dotenv from "dotenv";
+import { pushSchema } from "drizzle-kit/api";
+import { drizzle } from "drizzle-orm/neon-http";
+
+import * as schema from "../db/schema-tenant";
 
 dotenv.config();
 

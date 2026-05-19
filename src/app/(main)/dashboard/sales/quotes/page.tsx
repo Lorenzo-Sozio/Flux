@@ -1,25 +1,28 @@
 "use client";
 
-import React, { useState, useMemo, useTransition, useEffect, useCallback } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import React, { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+
+import Link from "next/link";
+
+import { format } from "date-fns";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  CheckCircle2,
+  Clock,
+  Eye,
+  FileText,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Printer,
+  Search,
+  Send,
+  Trash2,
+  TrendingUp,
+} from "lucide-react";
+import { useTranslations } from "next-intl";
+import { toast } from "sonner";
+
+import { deleteQuoteAction, getAllQuotes } from "@/actions/quotes";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,22 +33,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { format } from "date-fns";
-import {
-  Plus,
-  Search,
-  MoreHorizontal,
-  Eye,
-  Send,
-  Pencil,
-  Printer,
-  Trash2,
-  FileText,
-  TrendingUp,
-  CheckCircle2,
-  Clock,
-} from "lucide-react";
-import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,14 +43,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getAllQuotes, deleteQuoteAction } from "@/actions/quotes";
-import { QUOTE_STATUS_CONFIG } from "@/lib/quote-status";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
-import { useTranslations } from "next-intl";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { QUOTE_STATUS_CONFIG } from "@/lib/quote-status";
 
 type Quote = Awaited<ReturnType<typeof getAllQuotes>>[number];
-
 
 export default function QuotesPage() {
   const t = useTranslations("quotes");
@@ -86,7 +75,9 @@ export default function QuotesPage() {
     }
   }, [statusFilter]);
 
-  useEffect(() => { fetchQuotes(); }, [fetchQuotes]);
+  useEffect(() => {
+    fetchQuotes();
+  }, [fetchQuotes]);
 
   const filteredQuotes = useMemo(() => {
     if (!searchTerm) return quotes;
@@ -96,20 +87,18 @@ export default function QuotesPage() {
         q.quoteNumber.toLowerCase().includes(term) ||
         q.company?.name?.toLowerCase().includes(term) ||
         q.deal?.name?.toLowerCase().includes(term) ||
-        (q.contact
-          ? `${q.contact.firstName} ${q.contact.lastName}`.toLowerCase().includes(term)
-          : false)
+        (q.contact ? `${q.contact.firstName} ${q.contact.lastName}`.toLowerCase().includes(term) : false),
     );
   }, [quotes, searchTerm]);
 
   const stats = useMemo(
     () => ({
-      total:      quotes.length,
-      sent:       quotes.filter((q) => q.status === "sent" || q.status === "viewed").length,
-      accepted:   quotes.filter((q) => q.status === "accepted").length,
+      total: quotes.length,
+      sent: quotes.filter((q) => q.status === "sent" || q.status === "viewed").length,
+      accepted: quotes.filter((q) => q.status === "accepted").length,
       totalValue: quotes.reduce((sum, q) => sum + parseFloat(q.totalAmount ?? "0"), 0),
     }),
-    [quotes]
+    [quotes],
   );
 
   function handleDelete() {
@@ -133,9 +122,7 @@ export default function QuotesPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {t("quoteNumber")}
-          </p>
+          <p className="text-sm text-muted-foreground mt-1">{t("quoteNumber")}</p>
         </div>
         <Link href="/dashboard/sales/quotes/new">
           <Button>
@@ -151,7 +138,9 @@ export default function QuotesPage() {
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{tc("total")} {t("title")}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  {tc("total")} {t("title")}
+                </p>
                 <p className="text-2xl font-bold mt-1">{stats.total}</p>
               </div>
               <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center">
@@ -165,7 +154,9 @@ export default function QuotesPage() {
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("statuses.sent")}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  {t("statuses.sent")}
+                </p>
                 <p className="text-2xl font-bold mt-1 text-blue-600">{stats.sent}</p>
               </div>
               <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center">
@@ -179,7 +170,9 @@ export default function QuotesPage() {
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t("statuses.accepted")}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  {t("statuses.accepted")}
+                </p>
                 <p className="text-2xl font-bold mt-1 text-green-600">{stats.accepted}</p>
               </div>
               <div className="h-10 w-10 rounded-full bg-green-50 flex items-center justify-center">
@@ -193,7 +186,9 @@ export default function QuotesPage() {
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{tc("value")} {tc("total")}</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  {tc("value")} {tc("total")}
+                </p>
                 <p className="text-2xl font-bold mt-1">
                   ${stats.totalValue.toLocaleString("en-US", { maximumFractionDigits: 0 })}
                 </p>
@@ -215,9 +210,7 @@ export default function QuotesPage() {
                 {isLoading ? t("title") : `${filteredQuotes.length} ${t("title")}`}
               </CardTitle>
               {searchTerm && (
-                <CardDescription className="text-xs mt-0.5">
-                  Searching for &ldquo;{searchTerm}&rdquo;
-                </CardDescription>
+                <CardDescription className="text-xs mt-0.5">Searching for &ldquo;{searchTerm}&rdquo;</CardDescription>
               )}
             </div>
             <div className="flex gap-2 flex-1 sm:flex-none sm:min-w-[420px]">
@@ -261,9 +254,7 @@ export default function QuotesPage() {
               <FileText className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
               <p className="font-medium text-muted-foreground">{t("noQuotes")}</p>
               <p className="text-sm text-muted-foreground/70 mt-1 mb-5">
-                {searchTerm || statusFilter !== "all"
-                  ? tc("clearFilters")
-                  : t("newQuote")}
+                {searchTerm || statusFilter !== "all" ? tc("clearFilters") : t("newQuote")}
               </p>
               {!searchTerm && statusFilter === "all" && (
                 <Link href="/dashboard/sales/quotes/new">
@@ -296,29 +287,20 @@ export default function QuotesPage() {
                       ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim()
                       : null;
                     const isExpired =
-                      quote.expiresAt &&
-                      quote.status !== "accepted" &&
-                      new Date(quote.expiresAt) < new Date();
+                      quote.expiresAt && quote.status !== "accepted" && new Date(quote.expiresAt) < new Date();
 
                     return (
                       <TableRow key={quote.id} className="group hover:bg-muted/30 transition-colors">
                         <TableCell className="font-mono text-sm font-medium">
-                          <Link
-                            href={`/dashboard/sales/quotes/${quote.id}`}
-                            className="text-primary hover:underline"
-                          >
+                          <Link href={`/dashboard/sales/quotes/${quote.id}`} className="text-primary hover:underline">
                             {quote.quoteNumber}
                           </Link>
                         </TableCell>
                         <TableCell>
                           <div className="font-medium text-sm leading-tight">{quote.company?.name ?? "—"}</div>
-                          {contactName && (
-                            <div className="text-xs text-muted-foreground mt-0.5">{contactName}</div>
-                          )}
+                          {contactName && <div className="text-xs text-muted-foreground mt-0.5">{contactName}</div>}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {quote.deal?.name ?? "—"}
-                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{quote.deal?.name ?? "—"}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={`text-xs font-medium ${statusCfg.className}`}>
                             {statusCfg.label}
@@ -377,9 +359,7 @@ export default function QuotesPage() {
                                   </DropdownMenuItem>
                                 </>
                               )}
-                              <DropdownMenuItem
-                                onClick={() => window.open(`/api/quotes/${quote.id}`, "_blank")}
-                              >
+                              <DropdownMenuItem onClick={() => window.open(`/api/quotes/${quote.id}`, "_blank")}>
                                 <Printer className="mr-2 h-3.5 w-3.5" />
                                 Print / PDF
                               </DropdownMenuItem>
@@ -414,8 +394,7 @@ export default function QuotesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>{t("deleteQuote")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {tc("confirmDelete")}{" "}
-              <span className="font-semibold">{deleteTarget?.quoteNumber}</span>
+              {tc("confirmDelete")} <span className="font-semibold">{deleteTarget?.quoteNumber}</span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

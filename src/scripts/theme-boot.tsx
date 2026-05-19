@@ -8,7 +8,7 @@
  */
 import { PREFERENCE_DEFAULTS, PREFERENCE_PERSISTENCE } from "@/lib/preferences/preferences-config";
 
-export function ThemeBootScript() {
+export function ThemeBootScript({ nonce }: { nonce?: string }) {
   const persistence = JSON.stringify({
     theme_mode: PREFERENCE_PERSISTENCE.theme_mode,
     theme_preset: PREFERENCE_PERSISTENCE.theme_preset,
@@ -109,5 +109,5 @@ export function ThemeBootScript() {
   `;
 
   /* biome-ignore lint/security/noDangerouslySetInnerHtml: required for pre-hydration boot script */
-  return <script dangerouslySetInnerHTML={{ __html: code }} />;
+  return <script nonce={nonce} dangerouslySetInnerHTML={{ __html: code }} />;
 }

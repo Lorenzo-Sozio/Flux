@@ -1,21 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+
+import { Eye, EyeOff, Loader2, Mail, Save, Send, Server, Settings2, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Loader2, Send, Save, Eye, EyeOff, Server, Zap, Mail, Settings2 } from "lucide-react";
+import { toast } from "sonner";
+
+import { getEmailSettings, saveEmailSettings, testEmailConnection } from "@/actions/email-settings";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { getEmailSettings, saveEmailSettings, testEmailConnection } from "@/actions/email-settings";
 
 type Provider = "resend" | "smtp";
 
@@ -88,8 +84,7 @@ export default function EmailSettingsPage() {
     });
   }, []);
 
-  const set = (field: keyof Settings, value: any) =>
-    setSettings((s) => ({ ...s, [field]: value }));
+  const set = (field: keyof Settings, value: any) => setSettings((s) => ({ ...s, [field]: value }));
 
   const handleSave = async () => {
     setSaving(true);
@@ -213,11 +208,7 @@ export default function EmailSettingsPage() {
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     tabIndex={-1}
                   >
-                    {showApiKey ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                    {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
                 <p className="text-xs text-muted-foreground">{t("apiKeyHint")}</p>
@@ -296,11 +287,7 @@ export default function EmailSettingsPage() {
                       className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       tabIndex={-1}
                     >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
                 </div>
@@ -308,16 +295,13 @@ export default function EmailSettingsPage() {
 
               {/* Common configurations list */}
               <div className="rounded-md border bg-muted/30 p-3 w-full">
-                <p className="text-xs font-semibold text-foreground mb-2">
-                  {t("commonConfigs")}
-                </p>
+                <p className="text-xs font-semibold text-foreground mb-2">{t("commonConfigs")}</p>
                 <ul className="space-y-1.5 text-xs text-muted-foreground">
                   {COMMON_SMTP_CONFIGS.map((cfg) => (
                     <li key={cfg.label} className="flex items-start gap-1.5">
                       <Server className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground/70" />
                       <span>
-                        <strong className="text-foreground/90">{cfg.label}:</strong>{" "}
-                        {cfg.host} : {cfg.port}
+                        <strong className="text-foreground/90">{cfg.label}:</strong> {cfg.host} : {cfg.port}
                         {cfg.note ? ` (${cfg.note})` : ""}
                       </span>
                     </li>
@@ -386,17 +370,8 @@ export default function EmailSettingsPage() {
               placeholder="your@email.com"
               className="flex-1 w-full"
             />
-            <Button
-              variant="outline"
-              onClick={handleTest}
-              disabled={testing}
-              className="gap-2 shrink-0"
-            >
-              {testing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
+            <Button variant="outline" onClick={handleTest} disabled={testing} className="gap-2 shrink-0">
+              {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               {t("sendTest")}
             </Button>
           </div>
@@ -407,11 +382,7 @@ export default function EmailSettingsPage() {
       {/* Save button */}
       <div className="flex justify-end w-full">
         <Button onClick={handleSave} disabled={saving} className="gap-2 min-w-[120px]">
-          {saving ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Save className="h-4 w-4" />
-          )}
+          {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {t("saveSettings")}
         </Button>
       </div>

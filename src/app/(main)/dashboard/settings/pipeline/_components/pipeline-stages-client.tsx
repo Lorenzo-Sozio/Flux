@@ -1,26 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+
+import { ChevronDown, ChevronUp, GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Plus, Pencil, Trash2, ChevronUp, ChevronDown, GripVertical } from "lucide-react";
-import {
-  createPipelineStage,
-  updatePipelineStage,
-  deletePipelineStage,
-} from "@/actions/pipeline";
+import { toast } from "sonner";
+
+import { createPipelineStage, deletePipelineStage, updatePipelineStage } from "@/actions/pipeline";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 
 type Stage = {
   id: string;
@@ -133,10 +125,7 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
     setStages(updated);
 
     try {
-      await Promise.all([
-        updatePipelineStage(a.id, { order: a.order }),
-        updatePipelineStage(b.id, { order: b.order }),
-      ]);
+      await Promise.all([updatePipelineStage(a.id, { order: a.order }), updatePipelineStage(b.id, { order: b.order })]);
     } catch {
       setStages([...initialStages].sort((x, y) => x.order - y.order));
       toast.error(t("updateFailed"));
@@ -159,9 +148,7 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
       <Card>
         <CardHeader>
           <CardTitle>{t("title")}</CardTitle>
-          <CardDescription>
-            {t("stageCount", { count: stages.length })}
-          </CardDescription>
+          <CardDescription>{t("stageCount", { count: stages.length })}</CardDescription>
         </CardHeader>
         <CardContent>
           {stages.length === 0 ? (
@@ -237,7 +224,9 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
           </DialogHeader>
           <StageFormFields form={form} onChange={setForm} t={t} />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>{tc("cancel")}</Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              {tc("cancel")}
+            </Button>
             <Button onClick={handleAdd} disabled={isPending || !form.name.trim()}>
               {isPending ? t("dialog.creating") : t("dialog.createStage")}
             </Button>
@@ -246,14 +235,21 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
       </Dialog>
 
       {/* Edit dialog */}
-      <Dialog open={!!editStage} onOpenChange={(v) => { if (!v) setEditStage(null); }}>
+      <Dialog
+        open={!!editStage}
+        onOpenChange={(v) => {
+          if (!v) setEditStage(null);
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>{t("dialog.editTitle")}</DialogTitle>
           </DialogHeader>
           <StageFormFields form={form} onChange={setForm} t={t} />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditStage(null)}>{tc("cancel")}</Button>
+            <Button variant="outline" onClick={() => setEditStage(null)}>
+              {tc("cancel")}
+            </Button>
             <Button onClick={handleEdit} disabled={isPending || !form.name.trim()}>
               {isPending ? t("dialog.saving") : t("dialog.saveChanges")}
             </Button>
@@ -303,7 +299,9 @@ function StageFormFields({
             min={0}
             max={100}
             value={form.defaultProbability}
-            onChange={(e) => onChange({ ...form, defaultProbability: Math.min(100, Math.max(0, Number(e.target.value))) })}
+            onChange={(e) =>
+              onChange({ ...form, defaultProbability: Math.min(100, Math.max(0, Number(e.target.value))) })
+            }
           />
         </div>
       </div>

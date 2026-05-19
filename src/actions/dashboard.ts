@@ -2,7 +2,6 @@
 
 import { and, desc, eq, gte, isNotNull, lt, sql } from "drizzle-orm";
 
-import { getDb } from "@/lib/tenant-context";
 import {
   activities,
   companies,
@@ -15,6 +14,7 @@ import {
   tickets,
   users,
 } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 export async function getDashboardStats() {
   const db = await getDb();

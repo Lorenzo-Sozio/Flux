@@ -1,6 +1,6 @@
 /**
  * Advanced Condition Logic Parser
- * 
+ *
  * Supporta espressioni logiche complesse con parentesi:
  * - (A AND B) OR (C AND D)
  * - NOT A OR (B AND (C OR D))
@@ -8,8 +8,8 @@
  */
 
 export interface ParsedCondition {
-  type: 'operator' | 'condition' | 'group';
-  operator?: 'AND' | 'OR' | 'NOT';
+  type: "operator" | "condition" | "group";
+  operator?: "AND" | "OR" | "NOT";
   conditions?: ParsedCondition[];
   conditionId?: number; // Riferimento all'indice nella conditions array
   value?: string; // Testo originale della condizione
@@ -22,10 +22,10 @@ export interface ValidationResult {
 }
 
 export interface ValidationError {
-  type: 'syntax' | 'logic' | 'reference';
+  type: "syntax" | "logic" | "reference";
   message: string;
   position?: number;
-  severity: 'error' | 'warning';
+  severity: "error" | "warning";
 }
 
 /**
@@ -35,7 +35,7 @@ export interface ValidationError {
 export function tokenizeExpression(expr: string): string[] {
   return expr
     .split(/(\(|\)|AND|OR|NOT)\s*/g)
-    .filter((token) => token && token.trim() !== '')
+    .filter((token) => token && token.trim() !== "")
     .map((token) => token.trim());
 }
 
@@ -47,16 +47,16 @@ export function validateParentheses(expr: string): ValidationError[] {
   let depth = 0;
 
   for (let i = 0; i < expr.length; i++) {
-    if (expr[i] === '(') {
+    if (expr[i] === "(") {
       depth++;
-    } else if (expr[i] === ')') {
+    } else if (expr[i] === ")") {
       depth--;
       if (depth < 0) {
         errors.push({
-          type: 'syntax',
-          message: 'Parentesi chiusa non corrispondente',
+          type: "syntax",
+          message: "Parentesi chiusa non corrispondente",
           position: i,
-          severity: 'error',
+          severity: "error",
         });
         depth = 0;
       }
@@ -65,9 +65,9 @@ export function validateParentheses(expr: string): ValidationError[] {
 
   if (depth > 0) {
     errors.push({
-      type: 'syntax',
+      type: "syntax",
       message: `${depth} parentesi aperta non chiusa`,
-      severity: 'error',
+      severity: "error",
     });
   }
 
@@ -78,10 +78,7 @@ export function validateParentheses(expr: string): ValidationError[] {
  * Valida i riferimenti alle condizioni
  * Esempio: "(C0 AND C1) OR C2" con 3 condizioni è valido
  */
-export function validateConditionReferences(
-  expr: string,
-  conditionCount: number
-): ValidationError[] {
+export function validateConditionReferences(expr: string, conditionCount: number): ValidationError[] {
   const errors: ValidationError[] = [];
   const conditionPattern = /C(\d+)/g;
   let match;
@@ -90,10 +87,10 @@ export function validateConditionReferences(
     const index = parseInt(match[1], 10);
     if (index >= conditionCount) {
       errors.push({
-        type: 'reference',
+        type: "reference",
         message: `Riferimento a condizione C${index} non valido (hai solo ${conditionCount} condizioni)`,
         position: match.index,
-        severity: 'error',
+        severity: "error",
       });
     }
   }
@@ -107,15 +104,15 @@ export function validateConditionReferences(
  */
 class ConditionParser {
   private tokens: string[];
-  private pos: number = 0;
+  private pos = 0;
   private errors: ValidationError[] = [];
 
   constructor(tokens: string[]) {
-    this.tokens = tokens.filter((t) => t !== '');
+    this.tokens = tokens.filter((t) => t !== "");
   }
 
   private currentToken(): string {
-    return this.tokens[this.pos] || '';
+    return this.tokens[this.pos] || "";
   }
 
   private advance(): void {
@@ -125,12 +122,12 @@ class ConditionParser {
   private parseOr(): ParsedCondition {
     let left = this.parseAnd();
 
-    while (this.currentToken() === 'OR') {
+    while (this.currentToken() === "OR") {
       this.advance();
       const right = this.parseAnd();
       left = {
-        type: 'operator',
-        operator: 'OR',
+        type: "operator",
+        operator: "OR",
         conditions: [left, right],
       };
     }
@@ -141,12 +138,12 @@ class ConditionParser {
   private parseAnd(): ParsedCondition {
     let left = this.parseNot();
 
-    while (this.currentToken() === 'AND') {
+    while (this.currentToken() === "AND") {
       this.advance();
       const right = this.parseNot();
       left = {
-        type: 'operator',
-        operator: 'AND',
+        type: "operator",
+        operator: "AND",
         conditions: [left, right],
       };
     }
@@ -155,12 +152,12 @@ class ConditionParser {
   }
 
   private parseNot(): ParsedCondition {
-    if (this.currentToken() === 'NOT') {
+    if (this.currentToken() === "NOT") {
       this.advance();
       const operand = this.parsePrimary();
       return {
-        type: 'operator',
-        operator: 'NOT',
+        type: "operator",
+        operator: "NOT",
         conditions: [operand],
       };
     }
@@ -169,22 +166,22 @@ class ConditionParser {
   }
 
   private parsePrimary(): ParsedCondition {
-    if (this.currentToken() === '(') {
+    if (this.currentToken() === "(") {
       this.advance();
       const expr = this.parseOr();
 
-      if (this.currentToken() !== ')') {
+      if (this.currentToken() !== ")") {
         this.errors.push({
-          type: 'syntax',
+          type: "syntax",
           message: 'Parentesi non bilanciata - manca ")"',
-          severity: 'error',
+          severity: "error",
         });
       } else {
         this.advance();
       }
 
       return {
-        type: 'group',
+        type: "group",
         value: `(...)`,
         conditions: [expr],
       };
@@ -196,21 +193,21 @@ class ConditionParser {
       const conditionId = parseInt(token.substring(1), 10);
       this.advance();
       return {
-        type: 'condition',
+        type: "condition",
         conditionId,
         value: token,
       };
     }
 
     this.errors.push({
-      type: 'syntax',
+      type: "syntax",
       message: `Token non riconosciuto: "${token}". Usa C0, C1, ... per le condizioni.`,
-      severity: 'error',
+      severity: "error",
     });
     this.advance();
 
     return {
-      type: 'condition',
+      type: "condition",
       value: token,
     };
   }
@@ -220,9 +217,9 @@ class ConditionParser {
 
     if (this.pos < this.tokens.length) {
       this.errors.push({
-        type: 'syntax',
+        type: "syntax",
         message: `Token inatteso: "${this.currentToken()}"`,
-        severity: 'error',
+        severity: "error",
       });
     }
 
@@ -233,10 +230,7 @@ class ConditionParser {
 /**
  * Valida un'intera espressione logica
  */
-export function validateExpression(
-  expr: string,
-  conditionCount: number
-): ValidationResult {
+export function validateExpression(expr: string, conditionCount: number): ValidationResult {
   const errors: ValidationError[] = [];
 
   // 1. Valida parentesi
@@ -256,7 +250,7 @@ export function validateExpression(
   }
 
   return {
-    valid: errors.filter((e) => e.severity === 'error').length === 0,
+    valid: errors.filter((e) => e.severity === "error").length === 0,
     errors: errors.sort((a, b) => (a.position ?? 0) - (b.position ?? 0)),
     tree,
   };
@@ -266,15 +260,15 @@ export function validateExpression(
  * Converte l'albero di parsing in una descrizione leggibile
  */
 export function describeTree(tree: ParsedCondition, conditionLabels?: string[]): string {
-  if (tree.type === 'condition') {
+  if (tree.type === "condition") {
     if (conditionLabels && tree.conditionId !== undefined) {
       return conditionLabels[tree.conditionId] || `Condizione ${tree.conditionId}`;
     }
-    return tree.value || '';
+    return tree.value || "";
   }
 
-  if (tree.type === 'operator') {
-    if (tree.operator === 'NOT' && tree.conditions) {
+  if (tree.type === "operator") {
+    if (tree.operator === "NOT" && tree.conditions) {
       return `NOT (${describeTree(tree.conditions[0], conditionLabels)})`;
     }
 
@@ -285,11 +279,11 @@ export function describeTree(tree: ParsedCondition, conditionLabels?: string[]):
     }
   }
 
-  if (tree.type === 'group' && tree.conditions) {
+  if (tree.type === "group" && tree.conditions) {
     return `(${describeTree(tree.conditions[0], conditionLabels)})`;
   }
 
-  return '';
+  return "";
 }
 
 /**
@@ -297,26 +291,26 @@ export function describeTree(tree: ParsedCondition, conditionLabels?: string[]):
  */
 export function compileExpression(tree: ParsedCondition): (values: boolean[]) => boolean {
   return (values: boolean[]): boolean => {
-    if (tree.type === 'condition') {
+    if (tree.type === "condition") {
       const idx = tree.conditionId ?? 0;
       return values[idx] ?? false;
     }
 
-    if (tree.type === 'operator') {
-      if (tree.operator === 'NOT' && tree.conditions) {
+    if (tree.type === "operator") {
+      if (tree.operator === "NOT" && tree.conditions) {
         return !compileExpression(tree.conditions[0])(values);
       }
 
-      if (tree.operator === 'AND' && tree.conditions) {
+      if (tree.operator === "AND" && tree.conditions) {
         return tree.conditions.every((cond) => compileExpression(cond)(values));
       }
 
-      if (tree.operator === 'OR' && tree.conditions) {
+      if (tree.operator === "OR" && tree.conditions) {
         return tree.conditions.some((cond) => compileExpression(cond)(values));
       }
     }
 
-    if (tree.type === 'group' && tree.conditions) {
+    if (tree.type === "group" && tree.conditions) {
       return compileExpression(tree.conditions[0])(values);
     }
 
@@ -327,18 +321,14 @@ export function compileExpression(tree: ParsedCondition): (values: boolean[]) =>
 /**
  * Helper: Crea etichette per le condizioni (es: "Status is 'open'")
  */
-export function createConditionLabel(
-  field: string,
-  operator: string,
-  value?: string | number | boolean
-): string {
+export function createConditionLabel(field: string, operator: string, value?: string | number | boolean): string {
   const operatorLabels: Record<string, string> = {
-    equals: 'è',
-    not_equals: 'non è',
-    greater_than: 'è maggiore di',
-    less_than: 'è minore di',
-    contains: 'contiene',
-    is_empty: 'è vuoto',
+    equals: "è",
+    not_equals: "non è",
+    greater_than: "è maggiore di",
+    less_than: "è minore di",
+    contains: "contiene",
+    is_empty: "è vuoto",
   };
 
   const op = operatorLabels[operator] || operator;

@@ -1,18 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { useRouter } from "next/navigation";
+
+import { GitMerge, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { GitMerge, Loader2 } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type Source = "keep" | "merge";
 
@@ -104,15 +101,15 @@ export function MergeEntityModal<T extends object>({
     }
   }
 
-  const diffFields = keepEntity && mergeEntity
-    ? fields.filter((f) => getDisplayValue(keepEntity, f) !== getDisplayValue(mergeEntity, f))
-    : [];
-  const sameFields = keepEntity && mergeEntity
-    ? fields.filter((f) => getDisplayValue(keepEntity, f) === getDisplayValue(mergeEntity, f))
-    : [];
-  const identicalWithValue = keepEntity
-    ? sameFields.filter((f) => getHasValue(keepEntity, f))
-    : [];
+  const diffFields =
+    keepEntity && mergeEntity
+      ? fields.filter((f) => getDisplayValue(keepEntity, f) !== getDisplayValue(mergeEntity, f))
+      : [];
+  const sameFields =
+    keepEntity && mergeEntity
+      ? fields.filter((f) => getDisplayValue(keepEntity, f) === getDisplayValue(mergeEntity, f))
+      : [];
+  const identicalWithValue = keepEntity ? sameFields.filter((f) => getHasValue(keepEntity, f)) : [];
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -144,9 +141,7 @@ export function MergeEntityModal<T extends object>({
 
             {diffFields.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground mb-2">
-                  {t("clickToSelect")}
-                </p>
+                <p className="text-xs font-medium text-muted-foreground mb-2">{t("clickToSelect")}</p>
                 {diffFields.map((field) => (
                   <div key={field.key} className="grid grid-cols-[140px_1fr_1fr] gap-3 items-start py-1.5">
                     <span className="text-xs text-muted-foreground pt-1">{field.label}</span>
@@ -164,7 +159,9 @@ export function MergeEntityModal<T extends object>({
                               : "border-transparent hover:border-muted-foreground/30 text-muted-foreground"
                           }`}
                         >
-                          {getHasValue(entity, field) ? getDisplayValue(entity, field) : (
+                          {getHasValue(entity, field) ? (
+                            getDisplayValue(entity, field)
+                          ) : (
                             <span className="text-xs italic text-muted-foreground/50">{t("empty")}</span>
                           )}
                         </button>

@@ -13,6 +13,7 @@ import {
   type ValidationError,
   validateContactInput,
 } from "@/lib/api-import-validators";
+import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
@@ -35,6 +36,15 @@ export async function POST(req: NextRequest) {
       { error: "Tenant context required. Supply X-Tenant-ID header with a valid tenant ID." },
       { status: 400 },
     );
+  }
+
+  try {
+    await checkAndTrackApiCall(authResult.tenantId);
+  } catch (err) {
+    if (err instanceof EntitlementError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    throw err;
   }
 
   let body: unknown;

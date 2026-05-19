@@ -1,46 +1,36 @@
 "use client";
 
 import { useState, useTransition } from "react";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm, useFieldArray } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { toast } from "sonner";
-import { useTranslations } from "next-intl";
-import {
-  ShoppingCart,
-  Plus,
-  Trash2,
-  Search,
-  Loader2,
-  ExternalLink,
-  TrendingUp,
-  Clock,
-  CheckCircle2,
-} from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  Loader2,
+  Plus,
+  Search,
+  ShoppingCart,
+  Trash2,
+  TrendingUp,
+} from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useFieldArray, useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
+
+import { createOrder, deleteOrder, type OrderStatus, updateOrderStatus } from "@/actions/orders";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCurrency } from "@/hooks/use-currency";
-import { createOrder, updateOrderStatus, deleteOrder, type OrderStatus } from "@/actions/orders";
+import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -81,23 +71,27 @@ type Product = {
 // ── Status CSS classes (no labels — translated in render) ─────────────────────
 
 const STATUS_CLASS: Record<string, string> = {
-  draft:      "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
+  draft: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
   processing: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
-  completed:  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-  cancelled:  "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
+  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  cancelled: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300",
 };
 
 // ── New order form schema ─────────────────────────────────────────────────────
 
 const newOrderSchema = z.object({
-  status:    z.enum(["draft", "processing", "completed", "cancelled"]).default("draft"),
-  currency:  z.string().default("EUR"),
+  status: z.enum(["draft", "processing", "completed", "cancelled"]).default("draft"),
+  currency: z.string().default("EUR"),
   orderDate: z.string().optional(),
-  items: z.array(z.object({
-    productId: z.string().min(1, "Select a product"),
-    quantity:  z.coerce.number().int().min(1),
-    unitPrice: z.coerce.number().min(0),
-  })).min(1, "Add at least one item"),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().min(1, "Select a product"),
+        quantity: z.coerce.number().int().min(1),
+        unitPrice: z.coerce.number().min(0),
+      }),
+    )
+    .min(1, "Add at least one item"),
 });
 type NewOrderValues = z.infer<typeof newOrderSchema>;
 
@@ -107,25 +101,19 @@ function formatDate(date: Date | string) {
 
 // ── New Order Dialog ──────────────────────────────────────────────────────────
 
-function NewOrderDialog({
-  products,
-  onCreated,
-}: {
-  products: Product[];
-  onCreated: (order: Order) => void;
-}) {
+function NewOrderDialog({ products, onCreated }: { products: Product[]; onCreated: (order: Order) => void }) {
   const t = useTranslations("orders");
   const tc = useTranslations("common");
   const { formatAmount, currency } = useCurrency();
-  const [open, setOpen]             = useState(false);
+  const [open, setOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const activeProducts = products.filter((p) => p.isActive);
 
   const form = useForm<NewOrderValues>({
     resolver: zodResolver(newOrderSchema),
     defaultValues: {
-      status:    "draft",
-      currency:  currency ?? "EUR",
+      status: "draft",
+      currency: currency ?? "EUR",
       orderDate: new Date().toISOString().slice(0, 10),
       items: [{ productId: "", quantity: 1, unitPrice: 0 }],
     },
@@ -167,7 +155,15 @@ function NewOrderDialog({
         <Plus className="h-4 w-4" /> {t("newOrder")}
       </Button>
 
-      <Dialog open={open} onOpenChange={(v) => { if (!submitting) { setOpen(v); if (!v) form.reset(); } }}>
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          if (!submitting) {
+            setOpen(v);
+            if (!v) form.reset();
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-[560px] p-0 gap-0">
           <DialogHeader className="px-6 pt-6 pb-4 border-b">
             <DialogTitle className="flex items-center gap-2">
@@ -181,16 +177,15 @@ function NewOrderDialog({
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>{t("dialog.status")}</Label>
-                  <Select
-                    value={form.watch("status")}
-                    onValueChange={(v) => form.setValue("status", v as any)}
-                  >
+                  <Select value={form.watch("status")} onValueChange={(v) => form.setValue("status", v as any)}>
                     <SelectTrigger className="h-9">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {STATUS_KEYS.map((v) => (
-                        <SelectItem key={v} value={v}>{t(`statuses.${v}` as any)}</SelectItem>
+                        <SelectItem key={v} value={v}>
+                          {t(`statuses.${v}` as any)}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -202,7 +197,9 @@ function NewOrderDialog({
               </div>
 
               <div className="space-y-2">
-                <Label>{t("dialog.lineItems")} <span className="text-destructive">*</span></Label>
+                <Label>
+                  {t("dialog.lineItems")} <span className="text-destructive">*</span>
+                </Label>
                 <div className="space-y-2">
                   {fields.map((field, idx) => (
                     <div key={field.id} className="grid grid-cols-[1fr_80px_100px_32px] gap-2 items-start">
@@ -217,7 +214,8 @@ function NewOrderDialog({
                           <SelectContent>
                             {activeProducts.map((p) => (
                               <SelectItem key={p.id} value={p.id}>
-                                {p.name}{p.sku ? ` (${p.sku})` : ""}
+                                {p.name}
+                                {p.sku ? ` (${p.sku})` : ""}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -308,9 +306,9 @@ export function OrdersClient({
   const { formatAmount } = useCurrency();
   const router = useRouter();
   const [, startTransition] = useTransition();
-  const [orders, setOrders]   = useState(initial);
-  const [stats]               = useState(initialStats);
-  const [search, setSearch]   = useState("");
+  const [orders, setOrders] = useState(initial);
+  const [stats] = useState(initialStats);
+  const [search, setSearch] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
 
   const filtered = orders.filter((o) => {
@@ -319,7 +317,7 @@ export function OrdersClient({
       !q ||
       o.orderNumber.toLowerCase().includes(q) ||
       (o.companyName ?? "").toLowerCase().includes(q) ||
-      (`${o.contactFirstName ?? ""} ${o.contactLastName ?? ""}`.trim()).toLowerCase().includes(q);
+      `${o.contactFirstName ?? ""} ${o.contactLastName ?? ""}`.trim().toLowerCase().includes(q);
     const matchStatus = filterStatus === "all" || o.status === filterStatus;
     return matchSearch && matchStatus;
   });
@@ -327,7 +325,7 @@ export function OrdersClient({
   const handleStatusChange = (id: string, status: OrderStatus) => {
     startTransition(async () => {
       await updateOrderStatus(id, status);
-      setOrders((prev) => prev.map((o) => o.id === id ? { ...o, status } : o));
+      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
       toast.success(tc("updateSuccess"));
     });
   };
@@ -342,10 +340,28 @@ export function OrdersClient({
   };
 
   const STAT_CARDS = [
-    { labelKey: "stats.totalOrders", value: stats.total,     filter: "all",        icon: ShoppingCart, color: "text-primary" },
-    { labelKey: "stats.processing",  value: stats.processing, filter: "processing", icon: Clock,        color: "text-blue-500" },
-    { labelKey: "stats.completed",   value: stats.completed,  filter: "completed",  icon: CheckCircle2, color: "text-emerald-500" },
-    { labelKey: "stats.revenue",     value: formatAmount(stats.revenue ?? 0), filter: null, icon: TrendingUp, color: "text-violet-500" },
+    { labelKey: "stats.totalOrders", value: stats.total, filter: "all", icon: ShoppingCart, color: "text-primary" },
+    {
+      labelKey: "stats.processing",
+      value: stats.processing,
+      filter: "processing",
+      icon: Clock,
+      color: "text-blue-500",
+    },
+    {
+      labelKey: "stats.completed",
+      value: stats.completed,
+      filter: "completed",
+      icon: CheckCircle2,
+      color: "text-emerald-500",
+    },
+    {
+      labelKey: "stats.revenue",
+      value: formatAmount(stats.revenue ?? 0),
+      filter: null,
+      icon: TrendingUp,
+      color: "text-violet-500",
+    },
   ] as const;
 
   const STATUS_KEYS = ["draft", "processing", "completed", "cancelled"] as const;
@@ -401,7 +417,9 @@ export function OrdersClient({
           <SelectContent>
             <SelectItem value="all">{t("allStatuses")}</SelectItem>
             {STATUS_KEYS.map((v) => (
-              <SelectItem key={v} value={v}>{t(`statuses.${v}` as any)}</SelectItem>
+              <SelectItem key={v} value={v}>
+                {t(`statuses.${v}` as any)}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -426,9 +444,7 @@ export function OrdersClient({
                 <td colSpan={6} className="py-14 text-center">
                   <ShoppingCart className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-muted-foreground text-sm">
-                    {search || filterStatus !== "all"
-                      ? t("noOrdersSearch")
-                      : t("noOrdersYet")}
+                    {search || filterStatus !== "all" ? t("noOrdersSearch") : t("noOrdersYet")}
                   </p>
                 </td>
               </tr>
@@ -436,15 +452,17 @@ export function OrdersClient({
               filtered.map((order) => {
                 const statusClass = STATUS_CLASS[order.status] ?? STATUS_CLASS.draft;
                 const statusLabel = t(`statuses.${order.status as "draft" | "processing" | "completed" | "cancelled"}`);
-                const customer =
-                  order.contactFirstName
-                    ? `${order.contactFirstName} ${order.contactLastName ?? ""}`.trim()
-                    : order.companyName ?? "—";
+                const customer = order.contactFirstName
+                  ? `${order.contactFirstName} ${order.contactLastName ?? ""}`.trim()
+                  : (order.companyName ?? "—");
 
                 return (
                   <tr key={order.id} className="hover:bg-muted/30 transition-colors group">
                     <td className="px-4 py-3">
-                      <Link href={`/dashboard/sales/orders/${order.id}`} className="font-mono text-xs font-semibold hover:text-primary transition-colors">
+                      <Link
+                        href={`/dashboard/sales/orders/${order.id}`}
+                        className="font-mono text-xs font-semibold hover:text-primary transition-colors"
+                      >
                         {order.orderNumber}
                       </Link>
                     </td>
@@ -469,7 +487,9 @@ export function OrdersClient({
                         </SelectTrigger>
                         <SelectContent>
                           {STATUS_KEYS.map((v) => (
-                            <SelectItem key={v} value={v} className="text-xs">{t(`statuses.${v}` as any)}</SelectItem>
+                            <SelectItem key={v} value={v} className="text-xs">
+                              {t(`statuses.${v}` as any)}
+                            </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

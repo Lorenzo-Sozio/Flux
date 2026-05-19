@@ -23,7 +23,7 @@ export function verifyUnsubscribeToken(token: string): { email: string; logId: s
     const expected = createHmac("sha256", secret).update(`${email}:${logId}`).digest("base64url");
 
     // Timing-safe comparison to prevent oracle attacks
-    const sigBuf      = Buffer.from(sig,      "base64url");
+    const sigBuf = Buffer.from(sig, "base64url");
     const expectedBuf = Buffer.from(expected, "base64url");
     if (sigBuf.length !== expectedBuf.length) return null;
     if (!timingSafeEqual(sigBuf, expectedBuf)) return null;

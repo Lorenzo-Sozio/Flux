@@ -1,36 +1,25 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useFieldArray } from "react-hook-form";
-import { z } from "zod";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import React, { useEffect, useMemo, useState } from "react";
 
-import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, Plus, Trash2, Loader2, FileText } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { ChevronLeft, FileText, Loader2, Plus, Trash2 } from "lucide-react";
+import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import type { z } from "zod";
+
 import { createQuoteAction, getQuoteFormData } from "@/actions/quotes";
 import { CreateQuoteSchema } from "@/actions/quotes-validation";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
 
 type FormValues = z.infer<typeof CreateQuoteSchema>;
 
@@ -53,9 +42,7 @@ export default function NewQuotePage() {
       dealId: "",
       companyId: "",
       contactId: "",
-      items: [
-        { productId: "", description: "", quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 0 },
-      ],
+      items: [{ productId: "", description: "", quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 0 }],
       notes: "",
       discountPercent: 0,
       taxPercent: 0,
@@ -147,10 +134,8 @@ export default function NewQuotePage() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <div className="flex flex-col lg:flex-row gap-6 items-start">
-
             {/* Left column: Deal, Adjustments, Notes */}
             <div className="w-full lg:w-1/3 flex flex-col gap-6">
-
               {/* Deal + Customer */}
               <Card>
                 <CardHeader className="pb-3">
@@ -164,7 +149,9 @@ export default function NewQuotePage() {
                     name="dealId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Deal <span className="text-destructive">*</span></FormLabel>
+                        <FormLabel>
+                          Deal <span className="text-destructive">*</span>
+                        </FormLabel>
                         <FormControl>
                           <SearchableSelect
                             disabled={isFormDataLoading}
@@ -192,7 +179,9 @@ export default function NewQuotePage() {
                     name="companyId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Company <span className="text-destructive">*</span></FormLabel>
+                        <FormLabel>
+                          Company <span className="text-destructive">*</span>
+                        </FormLabel>
                         <FormControl>
                           <SearchableSelect
                             disabled={isFormDataLoading}
@@ -309,7 +298,6 @@ export default function NewQuotePage() {
 
             {/* Right column: Line Items + Total Preview + Submit */}
             <div className="w-full lg:w-2/3 flex flex-col gap-6">
-
               {/* Line Items */}
               <Card>
                 <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
@@ -322,7 +310,14 @@ export default function NewQuotePage() {
                     size="sm"
                     disabled={!selectedDealId}
                     onClick={() =>
-                      append({ productId: "", description: "", quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 0 })
+                      append({
+                        productId: "",
+                        description: "",
+                        quantity: 1,
+                        unitPrice: 0,
+                        discountPercent: 0,
+                        taxPercent: 0,
+                      })
                     }
                   >
                     <Plus className="mr-2 h-3.5 w-3.5" />
@@ -506,7 +501,11 @@ export default function NewQuotePage() {
                     <div className="flex justify-between text-sm text-amber-600">
                       <span>Discount ({discountPct}%)</span>
                       <span className="tabular-nums">
-                        −${totals.discountAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        −$
+                        {totals.discountAmount.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </span>
                     </div>
                   )}
@@ -514,7 +513,11 @@ export default function NewQuotePage() {
                     <div className="flex justify-between text-sm text-slate-600">
                       <span>Tax ({taxPct}%)</span>
                       <span className="tabular-nums">
-                        +${totals.taxAmount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        +$
+                        {totals.taxAmount.toLocaleString("en-US", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
                       </span>
                     </div>
                   )}

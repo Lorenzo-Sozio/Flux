@@ -1,17 +1,16 @@
 import { eq } from "drizzle-orm";
-import { getDb } from "@/lib/tenant-context";
+
 import { exchangeRatesCache } from "@/db/schema";
 import { RATES_CACHE_DURATION_HOURS } from "@/lib/currency-config";
 import type { ExchangeRates } from "@/lib/currency-convert";
+import { getDb } from "@/lib/tenant-context";
 
 // Re-export pure helpers so callers can keep using @/lib/exchange-rates as the single import
 export type { ExchangeRates } from "@/lib/currency-convert";
 export { convertFromEur, convertToEur } from "@/lib/currency-convert";
 
-const PRIMARY_URL =
-  "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json";
-const FALLBACK_URL =
-  "https://currency-api.pages.dev/v1/currencies/eur.json";
+const PRIMARY_URL = "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json";
+const FALLBACK_URL = "https://currency-api.pages.dev/v1/currencies/eur.json";
 
 interface CachedRates {
   rates: ExchangeRates;
@@ -44,10 +43,7 @@ async function fetchRatesFromApi(): Promise<ExchangeRates> {
 export async function getExchangeRates(): Promise<CachedRates> {
   const db = await getDb();
 
-  const [cached] = await db
-    .select()
-    .from(exchangeRatesCache)
-    .where(eq(exchangeRatesCache.id, "eur"));
+  const [cached] = await db.select().from(exchangeRatesCache).where(eq(exchangeRatesCache.id, "eur"));
 
   const cacheMaxAgeMs = RATES_CACHE_DURATION_HOURS * 60 * 60 * 1000;
   const isStale = !cached || Date.now() - cached.fetchedAt.getTime() > cacheMaxAgeMs;

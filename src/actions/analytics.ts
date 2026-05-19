@@ -2,8 +2,8 @@
 
 import { and, count, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 
-import { getDb } from "@/lib/tenant-context";
 import { contacts, deals, leads, quotes } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 export async function getFunnelData(periodDays = 90) {
   const db = await getDb();

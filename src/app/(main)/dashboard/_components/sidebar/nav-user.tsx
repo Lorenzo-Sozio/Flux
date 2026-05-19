@@ -2,8 +2,8 @@
 
 import { EllipsisVertical, LogOut } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { logoutAction } from "@/actions/auth";
 
+import { logoutAction } from "@/actions/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,

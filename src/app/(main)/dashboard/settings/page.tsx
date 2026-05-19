@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { CreditCard, Settings2, Webhook, Mail } from "lucide-react";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+
+import { CreditCard, Mail, Settings2, Webhook } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+
+import { auth } from "@/auth";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -26,9 +28,7 @@ export default async function SettingsPage() {
             <CardHeader>
               <CreditCard className="mb-2 h-8 w-8 text-primary" />
               <CardTitle>{t("billing.title")}</CardTitle>
-              <CardDescription>
-                {t("billing.description")}
-              </CardDescription>
+              <CardDescription>{t("billing.description")}</CardDescription>
             </CardHeader>
           </Card>
         </Link>
@@ -37,9 +37,7 @@ export default async function SettingsPage() {
             <CardHeader>
               <Settings2 className="mb-2 h-8 w-8 text-primary" />
               <CardTitle>{t("customFields.title")}</CardTitle>
-              <CardDescription>
-                {t("customFields.description")}
-              </CardDescription>
+              <CardDescription>{t("customFields.description")}</CardDescription>
             </CardHeader>
           </Card>
         </Link>
@@ -48,9 +46,7 @@ export default async function SettingsPage() {
             <CardHeader>
               <Webhook className="mb-2 h-8 w-8 text-primary" />
               <CardTitle>{t("webhooks.title")}</CardTitle>
-              <CardDescription>
-                {t("webhooks.description")}
-              </CardDescription>
+              <CardDescription>{t("webhooks.description")}</CardDescription>
             </CardHeader>
           </Card>
         </Link>
@@ -59,9 +55,7 @@ export default async function SettingsPage() {
             <CardHeader>
               <Mail className="mb-2 h-8 w-8 text-primary" />
               <CardTitle>{t("email.title")}</CardTitle>
-              <CardDescription>
-                {t("email.description")}
-              </CardDescription>
+              <CardDescription>{t("email.description")}</CardDescription>
             </CardHeader>
           </Card>
         </Link>

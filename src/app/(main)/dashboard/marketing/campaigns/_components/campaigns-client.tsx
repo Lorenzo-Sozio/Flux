@@ -1,18 +1,30 @@
 "use client";
 
 import { useState, useTransition } from "react";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+
+import { format } from "date-fns";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  BarChart2,
+  CalendarClock,
+  Copy,
+  Eye,
+  Loader2,
+  Mail,
+  MoreHorizontal,
+  MousePointerClick,
+  Plus,
+  Send,
+  TargetIcon,
+  Trash2,
+  XCircle,
+} from "lucide-react";
+import { toast } from "sonner";
+
+import { cancelScheduledCampaignAction, deleteMarketingCampaign, duplicateCampaignAction } from "@/actions/marketing";
+import { CampaignModal } from "@/components/crm/campaign-modal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,25 +35,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  TargetIcon,
-  Send,
-  MoreHorizontal,
-  Trash2,
-  Copy,
-  BarChart2,
-  Mail,
-  MousePointerClick,
-  Eye,
-  Loader2,
-  Plus,
-  CalendarClock,
-  XCircle,
-} from "lucide-react";
-import { format } from "date-fns";
-import { toast } from "sonner";
-import { deleteMarketingCampaign, duplicateCampaignAction, cancelScheduledCampaignAction } from "@/actions/marketing";
-import { CampaignModal } from "@/components/crm/campaign-modal";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 import { LaunchDialog } from "./launch-dialog";
 
 interface Template {
@@ -75,10 +79,10 @@ interface Props {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  draft:     { label: "Draft",      className: "border-slate-300 text-slate-600" },
-  scheduled: { label: "Scheduled",  className: "border-orange-300 text-orange-700 bg-orange-50" },
-  active:    { label: "Active",     className: "border-green-300 text-green-700 bg-green-50" },
-  completed: { label: "Completed",  className: "border-blue-300 text-blue-700 bg-blue-50" },
+  draft: { label: "Draft", className: "border-slate-300 text-slate-600" },
+  scheduled: { label: "Scheduled", className: "border-orange-300 text-orange-700 bg-orange-50" },
+  active: { label: "Active", className: "border-green-300 text-green-700 bg-green-50" },
+  completed: { label: "Completed", className: "border-blue-300 text-blue-700 bg-blue-50" },
 };
 
 export function CampaignsClient({ campaigns: initial, templates }: Props) {
@@ -132,7 +136,9 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
       <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed rounded-xl bg-muted/5">
         <TargetIcon className="w-12 h-12 text-muted-foreground/20 mx-auto mb-4" />
         <p className="font-medium text-muted-foreground">No campaigns yet</p>
-        <p className="text-sm text-muted-foreground mt-1 mb-5">Create your first campaign to start reaching your audience.</p>
+        <p className="text-sm text-muted-foreground mt-1 mb-5">
+          Create your first campaign to start reaching your audience.
+        </p>
         <CampaignModal templates={templates} onSuccess={() => router.refresh()} />
       </div>
     );
@@ -146,7 +152,10 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
           const templateName = templates.find((t) => t.id === c.templateId)?.name;
 
           return (
-            <Card key={c.id} className="flex flex-col overflow-hidden hover:shadow-md transition-shadow border-0 shadow-sm">
+            <Card
+              key={c.id}
+              className="flex flex-col overflow-hidden hover:shadow-md transition-shadow border-0 shadow-sm"
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between gap-2">
                   <Badge variant="outline" className={`text-xs shrink-0 ${statusCfg.className}`}>
@@ -231,9 +240,7 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
               <CardContent className="pt-0 pb-4 mt-auto border-t bg-muted/5">
                 <div className="flex items-center justify-between text-xs text-muted-foreground mb-3 pt-3">
                   <span>{new Date(c.createdAt).toLocaleDateString()}</span>
-                  {c.stats.total > 0 && (
-                    <span>{c.stats.total} recipients</span>
-                  )}
+                  {c.stats.total > 0 && <span>{c.stats.total} recipients</span>}
                 </div>
                 <div className="flex gap-2">
                   {c.status === "scheduled" ? (
@@ -251,7 +258,13 @@ export function CampaignsClient({ campaigns: initial, templates }: Props) {
                     <>
                       <CampaignModal
                         templates={templates}
-                        campaign={{ id: c.id, name: c.name, description: c.description ?? undefined, status: c.status, templateId: c.templateId ?? undefined }}
+                        campaign={{
+                          id: c.id,
+                          name: c.name,
+                          description: c.description ?? undefined,
+                          status: c.status,
+                          templateId: c.templateId ?? undefined,
+                        }}
                         onSuccess={() => router.refresh()}
                       />
                       <Button

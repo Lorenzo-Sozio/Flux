@@ -20,6 +20,7 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import {
   Bar,
   BarChart,
@@ -35,7 +36,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import {
@@ -128,11 +128,7 @@ function StatCard({
 }
 
 function EmptyChart({ label }: { label: string }) {
-  return (
-    <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">
-      {label}
-    </div>
-  );
+  return <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">{label}</div>;
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────

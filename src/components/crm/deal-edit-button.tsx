@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+
 import { PencilIcon } from "lucide-react";
-import { Button } from "@/components/ui/button";
+
 import { DealModal } from "@/components/crm/deal-modal";
+import { Button } from "@/components/ui/button";
 
 export function DealEditButton({
   deal,
@@ -19,13 +21,7 @@ export function DealEditButton({
   const router = useRouter();
 
   return (
-    <DealModal
-      deal={deal}
-      stages={stages}
-      companies={companies}
-      contacts={contacts}
-      onSuccess={() => router.refresh()}
-    >
+    <DealModal deal={deal} stages={stages} companies={companies} contacts={contacts} onSuccess={() => router.refresh()}>
       <Button variant="outline" size="sm" className="gap-1.5">
         <PencilIcon className="h-3.5 w-3.5" />
         Edit

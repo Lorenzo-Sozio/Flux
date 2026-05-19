@@ -2,7 +2,6 @@
 
 import { and, count, desc, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
 
-import { getDb } from "@/lib/tenant-context";
 import {
   campaignLogs,
   contacts,
@@ -18,6 +17,7 @@ import {
   users,
 } from "@/db/schema";
 import { requireAdminAccess } from "@/lib/auth-guard";
+import { getDb } from "@/lib/tenant-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

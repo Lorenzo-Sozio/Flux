@@ -1,5 +1,6 @@
-import { timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
+
+import { timingSafeEqual } from "crypto";
 
 /**
  * Validates the Authorization: Bearer <CRON_SECRET> header.
@@ -9,10 +10,7 @@ import { NextResponse } from "next/server";
 export function verifyCronRequest(req: Request): NextResponse | null {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
-    return NextResponse.json(
-      { error: "CRON_SECRET is not configured on this server." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "CRON_SECRET is not configured on this server." }, { status: 500 });
   }
 
   const authHeader = req.headers.get("authorization") ?? "";

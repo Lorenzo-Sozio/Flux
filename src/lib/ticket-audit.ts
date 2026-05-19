@@ -1,14 +1,14 @@
+import { ticketAuditLogs } from "@/db/schema";
 import { getDb } from "@/lib/tenant-context";
-import { ticketAuditLogs } from "@/db/schema"
 
 interface LogTicketChangeParams {
-  ticketId: string
-  actorId?: string
-  actorName?: string
-  action: string
-  field?: string
-  oldValue?: string
-  newValue?: string
+  ticketId: string;
+  actorId?: string;
+  actorName?: string;
+  action: string;
+  field?: string;
+  oldValue?: string;
+  newValue?: string;
 }
 
 export async function logTicketChange(params: LogTicketChangeParams) {
@@ -21,5 +21,5 @@ export async function logTicketChange(params: LogTicketChangeParams) {
     field: params.field,
     oldValue: params.oldValue,
     newValue: params.newValue,
-  })
+  });
 }

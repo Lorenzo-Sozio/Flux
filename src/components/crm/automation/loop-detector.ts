@@ -12,12 +12,13 @@
  *   Rule C (Deal) → Triggered by change to Y → Update Field X (LOOP!)
  */
 
-import { getDb } from "@/lib/tenant-context";
-import { automationLogs } from "@/db/schema"
-import { eq, and, desc } from "drizzle-orm"
+import { and, desc, eq } from "drizzle-orm";
 
-const MAX_RULE_DEPTH = 5
-const LOOP_DETECTION_WINDOW_MS = 5000 // 5 secondi per rilevare cicli rapidi
+import { automationLogs } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
+
+const MAX_RULE_DEPTH = 5;
+const LOOP_DETECTION_WINDOW_MS = 5000; // 5 secondi per rilevare cicli rapidi
 
 /**
  * Execution context che traccia la catena di automazioni
@@ -26,18 +27,18 @@ const LOOP_DETECTION_WINDOW_MS = 5000 // 5 secondi per rilevare cicli rapidi
 export interface ExecutionContext {
   // Catena di rule che si sono innescate
   ruleChain: {
-    ruleId: string
-    timestamp: number
-  }[]
-  
+    ruleId: string;
+    timestamp: number;
+  }[];
+
   // Entity (type + id) che sono stati processati
-  processedEntities: Set<string>
-  
+  processedEntities: Set<string>;
+
   // Profondità corrente
-  depth: number
-  
+  depth: number;
+
   // User ID che ha triggerato la prima automazione
-  originalUserId?: string
+  originalUserId?: string;
 }
 
 /**
@@ -49,7 +50,7 @@ export function createExecutionContext(userId?: string): ExecutionContext {
     processedEntities: new Set(),
     depth: 0,
     originalUserId: userId,
-  }
+  };
 }
 
 /**
@@ -66,29 +67,29 @@ export async function checkLoopDetection(
     return {
       allowed: false,
       reason: `Max rule chain depth (${MAX_RULE_DEPTH}) exceeded. Rule chain: ${context.ruleChain.map((r) => r.ruleId).join(" → ")}`,
-    }
+    };
   }
 
   // 2. Check entity già processato (stesso entity non dovrebbe essere toccato 2x nella stessa catena)
-  const entityKey = `${entityType}:${entityId}`
+  const entityKey = `${entityType}:${entityId}`;
   if (context.processedEntities.has(entityKey)) {
     return {
       allowed: false,
       reason: `Entity ${entityKey} already processed in this chain. Potential loop detected.`,
-    }
+    };
   }
 
   // 3. Check per cicli veloci (es. rule A → B → A in 5 secondi)
-  const now = Date.now()
+  const now = Date.now();
   const recentRuleIds = context.ruleChain
     .filter((r) => now - r.timestamp < LOOP_DETECTION_WINDOW_MS)
-    .map((r) => r.ruleId)
+    .map((r) => r.ruleId);
 
   if (recentRuleIds.includes(ruleId)) {
     return {
       allowed: false,
       reason: `Rule ${ruleId} executed recently in this chain. Rapid loop detected.`,
-    }
+    };
   }
 
   // 4. Check per cicli lenti (query gli ultimi log)
@@ -97,26 +98,21 @@ export async function checkLoopDetection(
   const recentLogs = await db
     .select({ ruleId: automationLogs.ruleId, entityId: automationLogs.entityId, createdAt: automationLogs.createdAt })
     .from(automationLogs)
-    .where(
-      and(
-        eq(automationLogs.ruleId, ruleId),
-        eq(automationLogs.entityId, entityId),
-      )
-    )
+    .where(and(eq(automationLogs.ruleId, ruleId), eq(automationLogs.entityId, entityId)))
     .orderBy(desc(automationLogs.createdAt))
-    .limit(3)
+    .limit(3);
 
   if (recentLogs.length >= 3) {
-    const timeSpan = recentLogs[0].createdAt.getTime() - recentLogs[2].createdAt.getTime()
+    const timeSpan = recentLogs[0].createdAt.getTime() - recentLogs[2].createdAt.getTime();
     if (timeSpan < 10000) {
       return {
         allowed: false,
         reason: `Rule ${ruleId} executed 3 times on entity ${entityId} in 10 seconds. Slow loop detected.`,
-      }
+      };
     }
   }
 
-  return { allowed: true }
+  return { allowed: true };
 }
 
 /**
@@ -133,12 +129,12 @@ export function recordRuleExecution(
     ruleChain: [...context.ruleChain, { ruleId, timestamp: Date.now() }],
     processedEntities: new Set([...context.processedEntities, `${entityType}:${entityId}`]),
     depth: context.depth + 1,
-  }
+  };
 }
 
 /**
  * Estrae la catena di rule come stringa leggibile
  */
 export function formatRuleChain(context: ExecutionContext): string {
-  return context.ruleChain.map((r) => r.ruleId).join(" → ") || "No chain"
+  return context.ruleChain.map((r) => r.ruleId).join(" → ") || "No chain";
 }

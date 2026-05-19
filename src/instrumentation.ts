@@ -10,9 +10,7 @@
 export async function register() {
   // Only run in the Node.js runtime, not in Edge or during the build.
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    const { initializeScheduler } = await import(
-      "@/components/crm/automation/scheduler"
-    )
-    await initializeScheduler()
+    const { initializeScheduler } = await import("@/components/crm/automation/scheduler");
+    await initializeScheduler();
   }
 }

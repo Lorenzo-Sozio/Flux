@@ -1,38 +1,19 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
-import { toast } from "sonner";
-import {
-  MailIcon,
-  Loader2Icon,
-  EyeIcon,
-  CodeIcon,
-  PencilIcon,
-  SendIcon,
-  XIcon,
-} from "lucide-react";
+import { useCallback, useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CodeIcon, EyeIcon, Loader2Icon, MailIcon, PencilIcon, SendIcon, XIcon } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
+
 import { sendEmailAction } from "@/actions/email";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 const emailSchema = z.object({
   subject: z.string().min(1, "Subject is required"),
@@ -117,10 +98,7 @@ export function SendEmailModal({
   // ─── Submit ────────────────────────────────────────────────────────────────
 
   const onSubmit = async (data: EmailFormValues) => {
-    const finalBody =
-      mode === "preview" && previewRef.current
-        ? previewRef.current.innerHTML
-        : body;
+    const finalBody = mode === "preview" && previewRef.current ? previewRef.current.innerHTML : body;
     if (!finalBody.trim()) {
       toast.error("Email body cannot be empty.");
       return;
@@ -162,7 +140,7 @@ export function SendEmailModal({
   const recipientName =
     entity.firstName || entity.lastName
       ? `${entity.firstName ?? ""} ${entity.lastName ?? ""}`.trim()
-      : entity.name ?? "";
+      : (entity.name ?? "");
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -181,25 +159,13 @@ export function SendEmailModal({
         No magic-number calc() — every section uses flex sizing.
       */}
       <DialogContent className="sm:max-w-[820px] h-[88vh] flex flex-col gap-0 p-0 overflow-hidden">
-
         {/* ── Header ───────────────────────────────────────────────────────── */}
         <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
-          <DialogTitle className="text-lg">
-            {recipientName
-              ? `New Email — ${recipientName}`
-              : "New Email"}
-          </DialogTitle>
-          {entity.email && (
-            <p className="text-sm text-muted-foreground font-normal mt-0.5">
-              {entity.email}
-            </p>
-          )}
+          <DialogTitle className="text-lg">{recipientName ? `New Email — ${recipientName}` : "New Email"}</DialogTitle>
+          {entity.email && <p className="text-sm text-muted-foreground font-normal mt-0.5">{entity.email}</p>}
         </DialogHeader>
 
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="flex flex-col flex-1 min-h-0"
-        >
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
           {/* ── Compose fields ─────────────────────────────────────────────── */}
           <div className="shrink-0 border-b">
             {/* Template row */}
@@ -235,9 +201,7 @@ export function SendEmailModal({
               />
             </div>
             {form.formState.errors.subject && (
-              <p className="px-6 pb-2 text-xs text-destructive">
-                {form.formState.errors.subject.message}
-              </p>
+              <p className="px-6 pb-2 text-xs text-destructive">{form.formState.errors.subject.message}</p>
             )}
           </div>
 
@@ -260,9 +224,13 @@ export function SendEmailModal({
                 )}
               >
                 {m === "preview" ? (
-                  <><EyeIcon className="h-3.5 w-3.5" /> Preview</>
+                  <>
+                    <EyeIcon className="h-3.5 w-3.5" /> Preview
+                  </>
                 ) : (
-                  <><CodeIcon className="h-3.5 w-3.5" /> Edit HTML</>
+                  <>
+                    <CodeIcon className="h-3.5 w-3.5" /> Edit HTML
+                  </>
                 )}
               </button>
             ))}
@@ -270,9 +238,15 @@ export function SendEmailModal({
             {/* Contextual hint — right-aligned, same bar */}
             <span className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground pr-2 select-none">
               {mode === "preview" ? (
-                <><PencilIcon className="h-2.5 w-2.5" />Click on text to edit</>
+                <>
+                  <PencilIcon className="h-2.5 w-2.5" />
+                  Click on text to edit
+                </>
               ) : (
-                <><EyeIcon className="h-2.5 w-2.5" />Changes reflected in Preview</>
+                <>
+                  <EyeIcon className="h-2.5 w-2.5" />
+                  Changes reflected in Preview
+                </>
               )}
             </span>
           </div>
@@ -283,7 +257,6 @@ export function SendEmailModal({
             Both panels are positioned absolute inside, so they always match this height.
           */}
           <div className="relative flex-1 min-h-0">
-
             {/* Preview panel */}
             <div
               className={cn(
@@ -346,23 +319,13 @@ export function SendEmailModal({
           <div className="flex items-center justify-between gap-3 px-6 py-3 border-t bg-background shrink-0">
             {/* Placeholder reference — unobtrusive, left side */}
             <p className="text-[10px] text-muted-foreground hidden sm:block">
-              Tip: use{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{firstName}}"}</code>
-              ,{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{lastName}}"}</code>
-              ,{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{companyName}}"}</code>
-              {" "}as placeholders
+              Tip: use <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{firstName}}"}</code>,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{lastName}}"}</code>,{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{companyName}}"}</code> as placeholders
             </p>
 
             <div className="flex items-center gap-2 ml-auto">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => handleOpen(false)}
-                className="gap-1.5"
-              >
+              <Button type="button" variant="ghost" size="sm" onClick={() => handleOpen(false)} className="gap-1.5">
                 <XIcon className="h-3.5 w-3.5" />
                 Discard
               </Button>

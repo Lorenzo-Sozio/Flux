@@ -1,6 +1,8 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+
 import { getPipelineStages } from "@/actions/pipeline";
+import { auth } from "@/auth";
+
 import { PipelineStagesClient } from "./_components/pipeline-stages-client";
 
 export default async function PipelineSettingsPage() {

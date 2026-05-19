@@ -30,8 +30,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { getDb } from "@/lib/tenant-context";
 import { activities, companies, contacts, deals, leads, salesTargets, tasks, tickets } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 import { type AgendaItem, AgendaWidget } from "./_components/agenda-widget";
 import { MonthTargetCard } from "./_components/month-target-card";
@@ -99,139 +99,151 @@ export default async function CRMPage() {
       ))`
     : undefined;
 
-  const [stats, rawLeads, topDeals, recentActivities, myTasks, todayActivities, todayAppointments, myTickets, myTarget, wonThisMonth] =
-    await Promise.all([
-      getDashboardStats(),
-      getLeads(),
-      getTopDeals(5),
-      getRecentActivities(10),
+  const [
+    stats,
+    rawLeads,
+    topDeals,
+    recentActivities,
+    myTasks,
+    todayActivities,
+    todayAppointments,
+    myTickets,
+    myTarget,
+    wonThisMonth,
+  ] = await Promise.all([
+    getDashboardStats(),
+    getLeads(),
+    getTopDeals(5),
+    getRecentActivities(10),
 
-      // Tasks due today or overdue, not done — with entity name joins
-      userId
-        ? db
-            .select({
-              id: tasks.id,
-              title: tasks.title,
-              dueDate: tasks.dueDate,
-              startDate: tasks.startDate,
-              allDay: tasks.allDay,
-              status: tasks.status,
-              priority: tasks.priority,
-              estimatedHours: tasks.estimatedHours,
-              ticketId: tasks.ticketId,
-              leadId: tasks.leadId,
-              contactId: tasks.contactId,
-              companyId: tasks.companyId,
-              dealId: tasks.dealId,
-              leadFirstName: leads.firstName,
-              leadLastName: leads.lastName,
-              contactFirstName: contacts.firstName,
-              contactLastName: contacts.lastName,
-              companyName: companies.name,
-              dealName: deals.name,
-            })
-            .from(tasks)
-            .leftJoin(leads, eq(tasks.leadId, leads.id))
-            .leftJoin(contacts, eq(tasks.contactId, contacts.id))
-            .leftJoin(companies, eq(tasks.companyId, companies.id))
-            .leftJoin(deals, eq(tasks.dealId, deals.id))
-            .where(
-              and(
-                agendaTaskFilter as any,
-                gte(tasks.dueDate, thirtyDaysAgo),
-                lte(tasks.dueDate, todayEnd),
-                notInArray(tasks.status, ["done"]),
-              ),
-            )
-            .orderBy(tasks.dueDate)
-        : Promise.resolve([]),
-
-      // Today's meetings and calls with entity name joins
-      userId
-        ? db
-            .select({
-              id: activities.id,
-              type: activities.type,
-              content: activities.content,
-              date: activities.date,
-              durationMinutes: activities.durationMinutes,
-              leadId: activities.leadId,
-              contactId: activities.contactId,
-              companyId: activities.companyId,
-              dealId: activities.dealId,
-              leadFirstName: leads.firstName,
-              leadLastName: leads.lastName,
-              contactFirstName: contacts.firstName,
-              contactLastName: contacts.lastName,
-              companyName: companies.name,
-              dealName: deals.name,
-            })
-            .from(activities)
-            .leftJoin(leads, eq(activities.leadId, leads.id))
-            .leftJoin(contacts, eq(activities.contactId, contacts.id))
-            .leftJoin(companies, eq(activities.companyId, companies.id))
-            .leftJoin(deals, eq(activities.dealId, deals.id))
-            .where(
-              and(
-                inArray(activities.type, ["meeting", "call"]),
-                gte(activities.date, todayStart),
-                lte(activities.date, todayEnd),
-                !isPrivileged && userId ? eq(activities.ownerId, userId) : undefined,
-              ) as any,
-            )
-            .orderBy(activities.date)
-        : Promise.resolve([]),
-
-      // Today's appointments (organizer or attendee)
-      userId
-        ? getAppointmentCalendarEvents([userId]).then((rows) =>
-            rows.filter((r) => {
-              const d = new Date(r.date);
-              return d >= todayStart && d <= todayEnd && r.status !== "cancelled";
-            }),
+    // Tasks due today or overdue, not done — with entity name joins
+    userId
+      ? db
+          .select({
+            id: tasks.id,
+            title: tasks.title,
+            dueDate: tasks.dueDate,
+            startDate: tasks.startDate,
+            allDay: tasks.allDay,
+            status: tasks.status,
+            priority: tasks.priority,
+            estimatedHours: tasks.estimatedHours,
+            ticketId: tasks.ticketId,
+            leadId: tasks.leadId,
+            contactId: tasks.contactId,
+            companyId: tasks.companyId,
+            dealId: tasks.dealId,
+            leadFirstName: leads.firstName,
+            leadLastName: leads.lastName,
+            contactFirstName: contacts.firstName,
+            contactLastName: contacts.lastName,
+            companyName: companies.name,
+            dealName: deals.name,
+          })
+          .from(tasks)
+          .leftJoin(leads, eq(tasks.leadId, leads.id))
+          .leftJoin(contacts, eq(tasks.contactId, contacts.id))
+          .leftJoin(companies, eq(tasks.companyId, companies.id))
+          .leftJoin(deals, eq(tasks.dealId, deals.id))
+          .where(
+            and(
+              agendaTaskFilter as any,
+              gte(tasks.dueDate, thirtyDaysAgo),
+              lte(tasks.dueDate, todayEnd),
+              notInArray(tasks.status, ["done"]),
+            ),
           )
-        : Promise.resolve([]),
+          .orderBy(tasks.dueDate)
+      : Promise.resolve([]),
 
-      // Open tickets assigned to me
-      userId
-        ? db
-            .select({
-              id: tickets.id,
-              ticketNumber: tickets.ticketNumber,
-              subject: tickets.subject,
-              status: tickets.status,
-              priority: tickets.priority,
-              updatedAt: tickets.updatedAt,
-              slaDeadlineAt: tickets.slaDeadlineAt,
-            })
-            .from(tickets)
-            .where(
-              and(
-                isPrivileged ? undefined : sql`${tickets.assigneeId} = ${userId}`,
-                notInArray(tickets.status, ["resolved", "closed"]),
-              ) as any,
-            )
-            .orderBy(desc(tickets.updatedAt))
-            .limit(8)
-        : Promise.resolve([]),
+    // Today's meetings and calls with entity name joins
+    userId
+      ? db
+          .select({
+            id: activities.id,
+            type: activities.type,
+            content: activities.content,
+            date: activities.date,
+            durationMinutes: activities.durationMinutes,
+            leadId: activities.leadId,
+            contactId: activities.contactId,
+            companyId: activities.companyId,
+            dealId: activities.dealId,
+            leadFirstName: leads.firstName,
+            leadLastName: leads.lastName,
+            contactFirstName: contacts.firstName,
+            contactLastName: contacts.lastName,
+            companyName: companies.name,
+            dealName: deals.name,
+          })
+          .from(activities)
+          .leftJoin(leads, eq(activities.leadId, leads.id))
+          .leftJoin(contacts, eq(activities.contactId, contacts.id))
+          .leftJoin(companies, eq(activities.companyId, companies.id))
+          .leftJoin(deals, eq(activities.dealId, deals.id))
+          .where(
+            and(
+              inArray(activities.type, ["meeting", "call"]),
+              gte(activities.date, todayStart),
+              lte(activities.date, todayEnd),
+              !isPrivileged && userId ? eq(activities.ownerId, userId) : undefined,
+            ) as any,
+          )
+          .orderBy(activities.date)
+      : Promise.resolve([]),
 
-      // Current month target for this user
-      userId
-        ? db.select({ targetAmount: salesTargets.targetAmount, currency: salesTargets.currency })
-            .from(salesTargets)
-            .where(and(eq(salesTargets.userId, userId), eq(salesTargets.period, currentPeriod)))
-            .limit(1)
-            .then((rows) => rows[0] ?? null)
-        : Promise.resolve(null),
+    // Today's appointments (organizer or attendee)
+    userId
+      ? getAppointmentCalendarEvents([userId]).then((rows) =>
+          rows.filter((r) => {
+            const d = new Date(r.date);
+            return d >= todayStart && d <= todayEnd && r.status !== "cancelled";
+          }),
+        )
+      : Promise.resolve([]),
 
-      // Won deals this month for this user
-      userId
-        ? db.select({ total: sum(deals.amount) })
-            .from(deals)
-            .where(and(eq(deals.status, "won"), eq(deals.ownerId, userId), gte(deals.updatedAt, monthStart)))
-            .then((rows) => parseFloat(rows[0]?.total ?? "0"))
-        : Promise.resolve(0 as number),
-    ]);
+    // Open tickets assigned to me
+    userId
+      ? db
+          .select({
+            id: tickets.id,
+            ticketNumber: tickets.ticketNumber,
+            subject: tickets.subject,
+            status: tickets.status,
+            priority: tickets.priority,
+            updatedAt: tickets.updatedAt,
+            slaDeadlineAt: tickets.slaDeadlineAt,
+          })
+          .from(tickets)
+          .where(
+            and(
+              isPrivileged ? undefined : sql`${tickets.assigneeId} = ${userId}`,
+              notInArray(tickets.status, ["resolved", "closed"]),
+            ) as any,
+          )
+          .orderBy(desc(tickets.updatedAt))
+          .limit(8)
+      : Promise.resolve([]),
+
+    // Current month target for this user
+    userId
+      ? db
+          .select({ targetAmount: salesTargets.targetAmount, currency: salesTargets.currency })
+          .from(salesTargets)
+          .where(and(eq(salesTargets.userId, userId), eq(salesTargets.period, currentPeriod)))
+          .limit(1)
+          .then((rows) => rows[0] ?? null)
+      : Promise.resolve(null),
+
+    // Won deals this month for this user
+    userId
+      ? db
+          .select({ total: sum(deals.amount) })
+          .from(deals)
+          .where(and(eq(deals.status, "won"), eq(deals.ownerId, userId), gte(deals.updatedAt, monthStart)))
+          .then((rows) => parseFloat(rows[0]?.total ?? "0"))
+      : Promise.resolve(0 as number),
+  ]);
 
   // ── Build agenda items ───────────────────────────────────────────────────────
 
@@ -515,7 +527,13 @@ export default async function CRMPage() {
       </div>
 
       {/* ── Target mensile ───────────────────────────────────────────── */}
-      {(myTarget || wonThisMonth > 0) && <MonthTargetCard myTarget={myTarget} wonThisMonth={wonThisMonth} monthLabel={now.toLocaleDateString("it-IT", { month: "long", year: "numeric" })} />}
+      {(myTarget || wonThisMonth > 0) && (
+        <MonthTargetCard
+          myTarget={myTarget}
+          wonThisMonth={wonThisMonth}
+          monthLabel={now.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}
+        />
+      )}
 
       {/* ── Charts ───────────────────────────────────────────────────── */}
       <CRMCharts dealDistribution={stats.dealDistribution} leadsBySource={stats.leadsBySource} />

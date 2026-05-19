@@ -2,12 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, desc, eq, getTableColumns, ilike, isNull, ne, or } from "drizzle-orm";
+import { and, count, desc, eq, getTableColumns, ilike, isNull, ne, or } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 
 import { createNotificationAction } from "@/actions/auth";
 import { dispatchWebhook } from "@/actions/webhooks";
-import { getDb } from "@/lib/tenant-context";
 import {
   activities,
   appointments,
@@ -25,7 +24,7 @@ import {
   tickets,
   users,
 } from "@/db/schema";
-import { requireWriteAccess } from "@/lib/auth-guard";
+import { requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
 import {
   buildWhereClause,
   COMPANY_FIELDS,
@@ -33,9 +32,9 @@ import {
   customFieldsToRegistry,
   LEAD_FIELDS,
 } from "@/lib/filter-engine";
-import type { FilterTree } from "@/lib/filter-types";
 import { decodeFilter } from "@/lib/filter-types";
 import { computeLeadScore } from "@/lib/lead-score";
+import { getDb } from "@/lib/tenant-context";
 
 // ── Company lookup tables ──────────────────────────────────────────────────────
 
@@ -49,10 +48,7 @@ export async function getCompanyCategories() {
 
 export async function getCompanyTypes() {
   const db = await getDb();
-  return db
-    .select({ id: companyTypes.id, name: companyTypes.name })
-    .from(companyTypes)
-    .orderBy(companyTypes.name);
+  return db.select({ id: companyTypes.id, name: companyTypes.name }).from(companyTypes).orderBy(companyTypes.name);
 }
 
 export async function createCompanyCategory(name: string) {
@@ -81,6 +77,18 @@ export async function createCompanyType(name: string) {
 export async function getAllUsers() {
   const db = await getDb();
   return db.select({ id: users.id, name: users.name, email: users.email }).from(users).orderBy(users.name);
+}
+
+// ─── Record-limit helper ──────────────────────────────────────────────────────
+
+async function getTotalRecordCount(db: Awaited<ReturnType<typeof getDb>>): Promise<number> {
+  const [[c], [l], [co], [d]] = await Promise.all([
+    db.select({ n: count() }).from(contacts),
+    db.select({ n: count() }).from(leads),
+    db.select({ n: count() }).from(companies),
+    db.select({ n: count() }).from(deals),
+  ]);
+  return Number(c?.n ?? 0) + Number(l?.n ?? 0) + Number(co?.n ?? 0) + Number(d?.n ?? 0);
 }
 
 // LEADS
@@ -119,9 +127,11 @@ export async function getContacts(encodedFilter?: string | null) {
   return base.where(where).orderBy(desc(contacts.createdAt));
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
 export async function createLead(data: any) {
   await requireWriteAccess();
   const db = await getDb();
+  await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
   const payload = {
     ...data,
     marketingConsent: data.marketingConsent ?? false,
@@ -143,10 +153,12 @@ export async function createLead(data: any) {
     email: newLead.email,
     firstName: newLead.firstName,
     lastName: newLead.lastName,
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
   }).catch(() => {});
   return newLead;
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
 export async function updateLead(id: string, data: any) {
   await requireWriteAccess();
   const db = await getDb();
@@ -163,6 +175,7 @@ export async function updateLead(id: string, data: any) {
         title: "Lead assigned to you",
         message: `${cur.firstName} ${cur.lastName} has been assigned to you.`,
         link: `/dashboard/leads/${id}`,
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
       }).catch(() => {});
     }
   }
@@ -195,6 +208,7 @@ export async function deleteLead(id: string) {
 export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   await requireWriteAccess();
   const db = await getDb();
+  await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
 
   const [lead] = await db.select().from(leads).where(eq(leads.id, leadId));
   if (!lead) throw new Error("Lead not found");
@@ -335,6 +349,7 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
     contactId: result.contactId,
     companyId: result.companyId,
     dealId: result.dealId,
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
   }).catch(() => {});
 
   revalidatePath("/dashboard/leads");
@@ -345,9 +360,11 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   return result;
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
 export async function createContact(data: any) {
   await requireWriteAccess();
   const db = await getDb();
+  await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
   const payload = {
     ...data,
     marketingConsent: data.marketingConsent ?? false,
@@ -369,10 +386,12 @@ export async function createContact(data: any) {
     email: newContact.email,
     firstName: newContact.firstName,
     lastName: newContact.lastName,
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
   }).catch(() => {});
   return newContact;
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
 export async function updateContact(id: string, data: any) {
   await requireWriteAccess();
   const db = await getDb();
@@ -389,6 +408,7 @@ export async function updateContact(id: string, data: any) {
         title: "Contact assigned to you",
         message: `${cur.firstName} ${cur.lastName} has been assigned to you.`,
         link: `/dashboard/contacts/${id}`,
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
       }).catch(() => {});
     }
   }
@@ -413,6 +433,7 @@ export async function updateContact(id: string, data: any) {
     email: updatedContact.email,
     firstName: updatedContact.firstName,
     lastName: updatedContact.lastName,
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
   }).catch(() => {});
   return updatedContact;
 }
@@ -422,6 +443,7 @@ export async function deleteContact(id: string) {
   const db = await getDb();
   await db.delete(contacts).where(eq(contacts.id, id));
   revalidatePath("/dashboard/contacts");
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
   dispatchWebhook("contact.deleted", { id }).catch(() => {});
 }
 
@@ -443,9 +465,11 @@ export async function getCompanies(encodedFilter?: string | null) {
   return base.where(where).orderBy(desc(companies.createdAt));
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
 export async function createCompany(data: any) {
   await requireWriteAccess();
   const db = await getDb();
+  await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
   const payload = {
     ...data,
     vatNumber: data.vatNumber,
@@ -464,6 +488,7 @@ export async function createCompany(data: any) {
   return newCompany;
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
 export async function updateCompany(id: string, data: any) {
   await requireWriteAccess();
   const db = await getDb();
@@ -480,6 +505,7 @@ export async function updateCompany(id: string, data: any) {
         title: "Company assigned to you",
         message: `${cur.name} has been assigned to you.`,
         link: `/dashboard/companies/${id}`,
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
       }).catch(() => {});
     }
   }
@@ -534,7 +560,6 @@ export async function getLeadsForSelect() {
 // ── Duplicate detection ───────────────────────────────────────────────────────
 
 export async function checkLeadDuplicates(params: {
-
   email?: string | null;
   phone?: string | null;
   firstName?: string | null;
@@ -551,6 +576,7 @@ export async function checkLeadDuplicates(params: {
   }
   if (!conditions.length) return [];
 
+  // biome-ignore lint/style/noNonNullAssertion: or() returns SQL when conditions array is non-empty (guard above)
   const base = or(...conditions)!;
   const where = excludeId ? and(base, ne(leads.id, excludeId)) : base;
 
@@ -568,7 +594,6 @@ export async function checkLeadDuplicates(params: {
 }
 
 export async function checkContactDuplicates(params: {
-
   email?: string | null;
   phone?: string | null;
   firstName?: string | null;
@@ -585,6 +610,7 @@ export async function checkContactDuplicates(params: {
   }
   if (!conditions.length) return [];
 
+  // biome-ignore lint/style/noNonNullAssertion: or() returns SQL when conditions array is non-empty (guard above)
   const base = or(...conditions)!;
   const where = excludeId ? and(base, ne(contacts.id, excludeId)) : base;
 
@@ -602,7 +628,6 @@ export async function checkContactDuplicates(params: {
 }
 
 export async function checkCompanyDuplicates(params: {
-
   name?: string | null;
   website?: string | null;
   mainEmail?: string | null;
@@ -616,6 +641,7 @@ export async function checkCompanyDuplicates(params: {
   if (mainEmail?.trim()) conditions.push(ilike(companies.mainEmail, mainEmail.trim()));
   if (!conditions.length) return [];
 
+  // biome-ignore lint/style/noNonNullAssertion: or() returns SQL when conditions array is non-empty (guard above)
   const base = or(...conditions)!;
   const where = excludeId ? and(base, ne(companies.id, excludeId)) : base;
 

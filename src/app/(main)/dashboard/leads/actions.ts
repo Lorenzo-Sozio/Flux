@@ -6,8 +6,8 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
 import { leads } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 const emptyStringToNull = z.union([z.string(), z.null(), z.undefined()]).transform((v) => (!v ? null : v));
 

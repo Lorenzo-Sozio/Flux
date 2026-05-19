@@ -1,9 +1,11 @@
-import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
-import { leads } from "@/db/schema";
+import { NextResponse } from "next/server";
+
 import { eq } from "drizzle-orm";
 import { unparse } from "papaparse";
-import { NextResponse } from "next/server";
+
+import { auth } from "@/auth";
+import { leads } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 export async function GET() {
   const db = await getDb();

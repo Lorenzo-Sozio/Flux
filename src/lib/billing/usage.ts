@@ -6,10 +6,12 @@
  * No per-usage billing: data is used only for limit enforcement and reporting.
  */
 
-import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
+
 import { platformDb } from "@/db";
-import { billingUsageStats, billingAlerts, billingSubscriptions } from "@/db/schema";
-import { getEntitlements } from "./licensing";
+import { billingAlerts, billingUsageStats } from "@/db/schema";
+
+import { assertLimit, EntitlementError, getEntitlements } from "./licensing";
 import type { PlanLimits } from "./plans-config";
 import { USAGE_ALERT_THRESHOLDS } from "./plans-config";
 
@@ -26,11 +28,7 @@ function currentPeriodBounds(): { start: Date; end: Date } {
 
 // ─── Increment ────────────────────────────────────────────────────────────────
 
-export async function incrementUsage(
-  tenantId: string,
-  metric: MetricType,
-  amount = 1,
-): Promise<number> {
+export async function incrementUsage(tenantId: string, metric: MetricType, amount = 1): Promise<number> {
   const { start, end } = currentPeriodBounds();
   const rowId = crypto.randomUUID();
 
@@ -53,6 +51,7 @@ export async function incrementUsage(
   const newValue = (result.rows[0] as { current_value: number }).current_value;
 
   // Fire threshold alerts (non-blocking)
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
   checkAndSendAlerts(tenantId, metric as string, newValue).catch(() => {});
 
   return newValue;
@@ -86,27 +85,18 @@ export async function getUsage(
   return { current, limit, percent };
 }
 
-export async function getAllUsage(tenantId: string): Promise<
-  Record<
-    string,
-    { current: number; limit: number | null; percent: number | null }
-  >
-> {
+export async function getAllUsage(
+  tenantId: string,
+): Promise<Record<string, { current: number; limit: number | null; percent: number | null }>> {
   const { start } = currentPeriodBounds();
 
   const rows = await platformDb
     .select()
     .from(billingUsageStats)
-    .where(
-      and(
-        eq(billingUsageStats.tenantId, tenantId),
-        gte(billingUsageStats.periodStart, start),
-      ),
-    );
+    .where(and(eq(billingUsageStats.tenantId, tenantId), gte(billingUsageStats.periodStart, start)));
 
   const ent = await getEntitlements(tenantId);
-  const result: Record<string, { current: number; limit: number | null; percent: number | null }> =
-    {};
+  const result: Record<string, { current: number; limit: number | null; percent: number | null }> = {};
 
   for (const row of rows) {
     const limit = ent.limits[row.metricType as keyof PlanLimits] ?? null;
@@ -122,11 +112,7 @@ export async function getAllUsage(tenantId: string): Promise<
 
 // ─── Threshold alerts ─────────────────────────────────────────────────────────
 
-async function checkAndSendAlerts(
-  tenantId: string,
-  metric: string,
-  currentValue: number,
-): Promise<void> {
+async function checkAndSendAlerts(tenantId: string, metric: string, currentValue: number): Promise<void> {
   const ent = await getEntitlements(tenantId);
   const limit = ent.limits[metric as keyof PlanLimits];
   if (!limit) return;
@@ -163,11 +149,27 @@ async function checkAndSendAlerts(
   }
 }
 
+// ─── API call enforcement ─────────────────────────────────────────────────────
+
+/**
+ * Checks the apiCallsPerMonth limit for a tenant-authenticated API request.
+ * Throws EntitlementError (→ 429) if the limit is reached.
+ * Increments the counter fire-and-forget on success.
+ */
+export async function checkAndTrackApiCall(tenantId: string): Promise<void> {
+  const { current } = await getUsage(tenantId, "apiCallsPerMonth");
+  await assertLimit(tenantId, "apiCallsPerMonth", current);
+  // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+  incrementUsage(tenantId, "apiCallsPerMonth", 1).catch(() => {});
+}
+
+export { EntitlementError };
+
 // ─── Admin: aggregate usage per tenant ───────────────────────────────────────
 
-export async function getAggregateUsage(tenantId: string): Promise<
-  Array<{ metric: string; current: number; limit: number | null; percent: number | null }>
-> {
+export async function getAggregateUsage(
+  tenantId: string,
+): Promise<Array<{ metric: string; current: number; limit: number | null; percent: number | null }>> {
   const usage = await getAllUsage(tenantId);
   return Object.entries(usage).map(([metric, data]) => ({ metric, ...data }));
 }

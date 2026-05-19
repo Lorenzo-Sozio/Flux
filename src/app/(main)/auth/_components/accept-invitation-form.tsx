@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
+
+import { useRouter } from "next/navigation";
+
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -79,7 +81,13 @@ export function AcceptInvitationForm({ token, email }: Props) {
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor="inv-password">Password</FieldLabel>
-              <Input {...field} id="inv-password" type="password" placeholder="••••••••" aria-invalid={fieldState.invalid} />
+              <Input
+                {...field}
+                id="inv-password"
+                type="password"
+                placeholder="••••••••"
+                aria-invalid={fieldState.invalid}
+              />
               {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
             </Field>
           )}
@@ -90,7 +98,13 @@ export function AcceptInvitationForm({ token, email }: Props) {
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor="inv-confirm">Confirm Password</FieldLabel>
-              <Input {...field} id="inv-confirm" type="password" placeholder="••••••••" aria-invalid={fieldState.invalid} />
+              <Input
+                {...field}
+                id="inv-confirm"
+                type="password"
+                placeholder="••••••••"
+                aria-invalid={fieldState.invalid}
+              />
               {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
             </Field>
           )}

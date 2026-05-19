@@ -1,10 +1,13 @@
+import Link from "next/link";
+
+import { ArrowLeft, Clock, DollarSign, Target, TrendingUp } from "lucide-react";
+import { getTranslations } from "next-intl/server";
+
 import { getPipelineReport } from "@/actions/pipeline";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, TrendingUp, DollarSign, Target, Clock } from "lucide-react";
-import Link from "next/link";
-import { getTranslations } from "next-intl/server";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { PipelineReportCharts } from "./_components/pipeline-report-charts";
 
 export default async function PipelineReportPage() {
@@ -72,9 +75,7 @@ export default async function PipelineReportPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {fmt(report.stageReport.reduce((s, r) => s + r.weightedValue, 0))}
-            </div>
+            <div className="text-2xl font-bold">{fmt(report.stageReport.reduce((s, r) => s + r.weightedValue, 0))}</div>
             <p className="text-xs text-muted-foreground mt-1">{t("probabilityAdjusted")}</p>
           </CardContent>
         </Card>
@@ -105,10 +106,7 @@ export default async function PipelineReportPage() {
                   <tr key={stage.id} className="py-2">
                     <td className="py-3">
                       <div className="flex items-center gap-2">
-                        <span
-                          className="h-3 w-3 rounded-full"
-                          style={{ background: stage.color ?? "#94a3b8" }}
-                        />
+                        <span className="h-3 w-3 rounded-full" style={{ background: stage.color ?? "#94a3b8" }} />
                         {stage.name}
                       </div>
                     </td>

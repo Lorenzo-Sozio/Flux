@@ -76,9 +76,7 @@ export function PublicQuoteView({ quote, token }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   const statusCfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.sent;
-  const contactName = quote.contact
-    ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim()
-    : null;
+  const contactName = quote.contact ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim() : null;
   const canAct = ["sent", "viewed"].includes(status);
 
   async function handleAction(action: "accepted" | "declined") {
@@ -110,9 +108,7 @@ export function PublicQuoteView({ quote, token }: Props) {
         {/* Branding header */}
         <div className="text-center space-y-1">
           <p className="text-sm text-muted-foreground">You have received a quote from</p>
-          {quote.owner && (
-            <p className="font-semibold text-lg">{quote.owner.name ?? quote.owner.email}</p>
-          )}
+          {quote.owner && <p className="font-semibold text-lg">{quote.owner.name ?? quote.owner.email}</p>}
         </div>
 
         {/* Main quote card */}
@@ -269,20 +265,10 @@ export function PublicQuoteView({ quote, token }: Props) {
                     rows={3}
                   />
                   <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowDeclineForm(false)}
-                      disabled={loading}
-                    >
+                    <Button variant="outline" size="sm" onClick={() => setShowDeclineForm(false)} disabled={loading}>
                       Back
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={loading}
-                      onClick={() => handleAction("declined")}
-                    >
+                    <Button size="sm" variant="destructive" disabled={loading} onClick={() => handleAction("declined")}>
                       Confirm Decline
                     </Button>
                   </div>
@@ -317,14 +303,17 @@ export function PublicQuoteView({ quote, token }: Props) {
                 </span>
               </div>
               <p className="font-semibold text-red-600 dark:text-red-400">Quote Declined</p>
-              <p className="text-sm text-muted-foreground">We've recorded your response. Feel free to reach out if you'd like to discuss.</p>
+              <p className="text-sm text-muted-foreground">
+                We've recorded your response. Feel free to reach out if you'd like to discuss.
+              </p>
             </CardContent>
           </Card>
         )}
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground">
-          Powered by Flux CRM · This quote was sent to you directly by {quote.owner?.name ?? quote.owner?.email ?? "the sender"}
+          Powered by Flux CRM · This quote was sent to you directly by{" "}
+          {quote.owner?.name ?? quote.owner?.email ?? "the sender"}
         </p>
       </div>
     </div>

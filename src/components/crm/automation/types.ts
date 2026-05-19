@@ -1,12 +1,12 @@
-import { z } from "zod"
+import { z } from "zod";
 
 // ─── Entities & Events ────────────────────────────────────────────────────────
 
-export const TARGET_ENTITIES = ["deal", "lead", "contact", "company", "ticket"] as const
-export const TRIGGER_EVENTS  = ["onCreate", "onUpdate", "onSLABreach"] as const
+export const TARGET_ENTITIES = ["deal", "lead", "contact", "company", "ticket"] as const;
+export const TRIGGER_EVENTS = ["onCreate", "onUpdate", "onSLABreach"] as const;
 
-export type TargetEntity = typeof TARGET_ENTITIES[number]
-export type TriggerEvent  = typeof TRIGGER_EVENTS[number]
+export type TargetEntity = (typeof TARGET_ENTITIES)[number];
+export type TriggerEvent = (typeof TRIGGER_EVENTS)[number];
 
 // ─── Condition Operators ──────────────────────────────────────────────────────
 
@@ -21,21 +21,21 @@ export const CONDITION_OPERATORS = [
   "not_contains",
   "is_empty",
   "is_not_empty",
-  "changed",       // field changed at all (old !== new)
-  "changed_to",    // field changed to a specific value
-  "changed_from",  // field changed from a specific value
-] as const
+  "changed", // field changed at all (old !== new)
+  "changed_to", // field changed to a specific value
+  "changed_from", // field changed from a specific value
+] as const;
 
-export type ConditionOperator = typeof CONDITION_OPERATORS[number]
+export type ConditionOperator = (typeof CONDITION_OPERATORS)[number];
 
 export const ConditionSchema = z.object({
-  field:    z.string().min(1),
+  field: z.string().min(1),
   operator: z.enum(CONDITION_OPERATORS),
-  value:    z.union([z.string(), z.number(), z.boolean()]).optional(),
-  logic:    z.enum(["AND", "OR"]).default("AND"), // Logica PRIMA di questa condizione
-})
+  value: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  logic: z.enum(["AND", "OR"]).default("AND"), // Logica PRIMA di questa condizione
+});
 
-export type Condition = z.infer<typeof ConditionSchema>
+export type Condition = z.infer<typeof ConditionSchema>;
 
 // ─── Actions  (strict discriminated union = security boundary) ────────────────
 //
@@ -45,38 +45,46 @@ export type Condition = z.infer<typeof ConditionSchema>
 export const CreateTaskActionSchema = z.object({
   type: z.literal("create_task"),
   params: z.object({
-    title:       z.string().min(1).max(255),
+    title: z.string().min(1).max(255),
     description: z.string().max(2000).optional(),
-    priority:    z.enum(["low", "normal", "high"]).default("normal"),
+    priority: z.enum(["low", "normal", "high"]).default("normal"),
     // days from now when the task is due (0 = today)
     dueDateDays: z.number().int().min(0).max(365).optional(),
     // resolved to a real user id; "entity_owner" resolves at runtime
-    assigneeId:  z.string().optional(),
+    assigneeId: z.string().optional(),
   }),
-})
+});
 
 export const SendNotificationActionSchema = z.object({
   type: z.literal("send_notification"),
   params: z.object({
     // "entity_owner" is a special sentinel resolved at runtime
-    userId:  z.union([z.string(), z.literal("entity_owner")]),
-    title:   z.string().min(1).max(255),
+    userId: z.union([z.string(), z.literal("entity_owner")]),
+    title: z.string().min(1).max(255),
     message: z.string().max(1000),
   }),
-})
+});
 
 export const UpdateFieldActionSchema = z.object({
   type: z.literal("update_field"),
   params: z.object({
     // Only non-destructive, non-relational scalar fields are allowed
     field: z.enum([
-      "status", "probability", "notes", "rating", "type",
+      "status",
+      "probability",
+      "notes",
+      "rating",
+      "type",
       // extended
-      "source", "leadScore", "currency", "industry", "jobTitle",
+      "source",
+      "leadScore",
+      "currency",
+      "industry",
+      "jobTitle",
     ]),
     value: z.string().max(500),
   }),
-})
+});
 
 export const SendEmailActionSchema = z.object({
   type: z.literal("send_email"),
@@ -95,7 +103,7 @@ export const SendEmailActionSchema = z.object({
     trackOpens: z.boolean().default(false),
     trackClicks: z.boolean().default(false),
   }),
-})
+});
 
 export const SendWebhookActionSchema = z.object({
   type: z.literal("send_webhook"),
@@ -113,7 +121,7 @@ export const SendWebhookActionSchema = z.object({
     // Timeout in milliseconds
     timeoutMs: z.number().int().min(1000).max(30000).default(10000),
   }),
-})
+});
 
 export const ActionSchema = z.discriminatedUnion("type", [
   CreateTaskActionSchema,
@@ -121,9 +129,9 @@ export const ActionSchema = z.discriminatedUnion("type", [
   UpdateFieldActionSchema,
   SendEmailActionSchema,
   SendWebhookActionSchema,
-])
+]);
 
-export type AutomationAction = z.infer<typeof ActionSchema>
+export type AutomationAction = z.infer<typeof ActionSchema>;
 
 // ─── Full Rule (form + server validation) ─────────────────────────────────────
 
@@ -132,34 +140,34 @@ export type AutomationAction = z.infer<typeof ActionSchema>
 const TriggerItemSchema = z.union([
   z.enum(TRIGGER_EVENTS),
   z.string().regex(/^scheduled:.+/, "Scheduled trigger must be in the form 'scheduled:<cron>'"),
-])
+]);
 
 export const AutomationRuleFormSchema = z.object({
-  name:                 z.string().min(1, "Name is required").max(255),
-  description:          z.string().max(1000).optional(),
-  isActive:             z.boolean().default(true),
-  targetEntity:         z.enum(TARGET_ENTITIES),
-  triggerOn:            z.array(TriggerItemSchema).min(1, "Select at least one trigger event"),
+  name: z.string().min(1, "Name is required").max(255),
+  description: z.string().max(1000).optional(),
+  isActive: z.boolean().default(true),
+  targetEntity: z.enum(TARGET_ENTITIES),
+  triggerOn: z.array(TriggerItemSchema).min(1, "Select at least one trigger event"),
   // Legacy: supporto backward compatibility
-  conditionLogic:       z.enum(["AND", "OR"]).default("AND").optional(),
-  conditions:           z.array(ConditionSchema).min(1, "At least one condition is required"),
+  conditionLogic: z.enum(["AND", "OR"]).default("AND").optional(),
+  conditions: z.array(ConditionSchema).min(1, "At least one condition is required"),
   // Espressione logica avanzata per condizioni complesse
   // Esempi: "(C0 AND C1) OR C2", "NOT C0 AND (C1 OR C2)"
-  conditionExpression:  z.string().max(1000).optional(),
-  actions:              z.array(ActionSchema).min(1, "At least one action is required"),
-})
+  conditionExpression: z.string().max(1000).optional(),
+  actions: z.array(ActionSchema).min(1, "At least one action is required"),
+});
 
-export type AutomationRuleFormData = z.infer<typeof AutomationRuleFormSchema>
+export type AutomationRuleFormData = z.infer<typeof AutomationRuleFormSchema>;
 
 // ─── Runtime context passed to the engine ────────────────────────────────────
 
 export interface RuleContext {
-  entityType:    TargetEntity
-  entityId:      string
-  event:         TriggerEvent | "onSLABreach"
-  oldData:       Record<string, unknown>
-  newData:       Record<string, unknown>
-  currentUserId?: string
+  entityType: TargetEntity;
+  entityId: string;
+  event: TriggerEvent | "onSLABreach";
+  oldData: Record<string, unknown>;
+  newData: Record<string, unknown>;
+  currentUserId?: string;
 }
 
 // ─── Field registry — what fields are exposed per entity ─────────────────────
@@ -167,116 +175,143 @@ export interface RuleContext {
 //  Used by the RuleBuilder UI to render field selectors and correct
 //  operator lists. Keep in sync with the actual DB columns.
 
-export type FieldType = "text" | "number" | "enum" | "boolean"
+export type FieldType = "text" | "number" | "enum" | "boolean";
 
 export interface FieldDef {
-  key:     string           // matches the Drizzle column camelCase name
-  label:   string           // human-readable
-  type:    FieldType
-  options?: { value: string; label: string }[]  // for "enum" fields
+  key: string; // matches the Drizzle column camelCase name
+  label: string; // human-readable
+  type: FieldType;
+  options?: { value: string; label: string }[]; // for "enum" fields
 }
 
 export const ENTITY_FIELDS: Record<TargetEntity, FieldDef[]> = {
   deal: [
-    { key: "name",     label: "Name",        type: "text" },
-    { key: "amount",   label: "Amount",      type: "number" },
-    { key: "currency", label: "Currency",    type: "text" },
+    { key: "name", label: "Name", type: "text" },
+    { key: "amount", label: "Amount", type: "number" },
+    { key: "currency", label: "Currency", type: "text" },
     { key: "probability", label: "Probability (%)", type: "number" },
-    { key: "status",   label: "Status",      type: "enum",
+    {
+      key: "status",
+      label: "Status",
+      type: "enum",
       options: [
         { value: "open", label: "Open" },
-        { value: "won",  label: "Won" },
+        { value: "won", label: "Won" },
         { value: "lost", label: "Lost" },
       ],
     },
-    { key: "stageId",  label: "Stage (ID)",  type: "text" },
-    { key: "notes",    label: "Notes",       type: "text" },
+    { key: "stageId", label: "Stage (ID)", type: "text" },
+    { key: "notes", label: "Notes", type: "text" },
   ],
   lead: [
-    { key: "firstName",  label: "First Name",   type: "text" },
-    { key: "lastName",   label: "Last Name",    type: "text" },
-    { key: "status",     label: "Status",       type: "enum",
+    { key: "firstName", label: "First Name", type: "text" },
+    { key: "lastName", label: "Last Name", type: "text" },
+    {
+      key: "status",
+      label: "Status",
+      type: "enum",
       options: [
-        { value: "new",          label: "New" },
-        { value: "contacting",   label: "Contacting" },
-        { value: "engaged",      label: "Engaged" },
-        { value: "qualified",    label: "Qualified" },
-        { value: "unqualified",  label: "Unqualified" },
+        { value: "new", label: "New" },
+        { value: "contacting", label: "Contacting" },
+        { value: "engaged", label: "Engaged" },
+        { value: "qualified", label: "Qualified" },
+        { value: "unqualified", label: "Unqualified" },
       ],
     },
-    { key: "rating",     label: "Rating",       type: "enum",
+    {
+      key: "rating",
+      label: "Rating",
+      type: "enum",
       options: [
-        { value: "hot",  label: "Hot" },
+        { value: "hot", label: "Hot" },
         { value: "warm", label: "Warm" },
         { value: "cold", label: "Cold" },
       ],
     },
-    { key: "leadScore",  label: "Lead Score",   type: "number" },
-    { key: "source",     label: "Source",       type: "text" },
-    { key: "isConverted", label: "Converted",   type: "boolean" },
+    { key: "leadScore", label: "Lead Score", type: "number" },
+    { key: "source", label: "Source", type: "text" },
+    { key: "isConverted", label: "Converted", type: "boolean" },
   ],
   contact: [
-    { key: "firstName",  label: "First Name",   type: "text" },
-    { key: "lastName",   label: "Last Name",    type: "text" },
-    { key: "status",     label: "Status",       type: "text" },
-    { key: "leadScore",  label: "Lead Score",   type: "number" },
-    { key: "source",     label: "Source",       type: "text" },
+    { key: "firstName", label: "First Name", type: "text" },
+    { key: "lastName", label: "Last Name", type: "text" },
+    { key: "status", label: "Status", type: "text" },
+    { key: "leadScore", label: "Lead Score", type: "number" },
+    { key: "source", label: "Source", type: "text" },
   ],
   company: [
-    { key: "name",          label: "Name",          type: "text" },
-    { key: "type",          label: "Type",          type: "enum",
+    { key: "name", label: "Name", type: "text" },
+    {
+      key: "type",
+      label: "Type",
+      type: "enum",
       options: [
         { value: "prospect", label: "Prospect" },
         { value: "customer", label: "Customer" },
-        { value: "partner",  label: "Partner" },
-        { value: "vendor",   label: "Vendor" },
+        { value: "partner", label: "Partner" },
+        { value: "vendor", label: "Vendor" },
       ],
     },
-    { key: "status",        label: "Status",        type: "text" },
+    { key: "status", label: "Status", type: "text" },
     { key: "employeeCount", label: "Employee Count", type: "number" },
     { key: "annualRevenue", label: "Annual Revenue", type: "number" },
-    { key: "industry",      label: "Industry",      type: "text" },
+    { key: "industry", label: "Industry", type: "text" },
   ],
   ticket: [
-    { key: "status",   label: "Status",   type: "enum",
+    {
+      key: "status",
+      label: "Status",
+      type: "enum",
       options: [
-        { value: "new",         label: "New" },
-        { value: "open",        label: "Open" },
+        { value: "new", label: "New" },
+        { value: "open", label: "Open" },
         { value: "in_progress", label: "In Progress" },
-        { value: "waiting",     label: "Waiting" },
-        { value: "on_hold",     label: "On Hold" },
-        { value: "resolved",    label: "Resolved" },
-        { value: "closed",      label: "Closed" },
+        { value: "waiting", label: "Waiting" },
+        { value: "on_hold", label: "On Hold" },
+        { value: "resolved", label: "Resolved" },
+        { value: "closed", label: "Closed" },
       ],
     },
-    { key: "priority", label: "Priority", type: "enum",
+    {
+      key: "priority",
+      label: "Priority",
+      type: "enum",
       options: [
-        { value: "low",    label: "Low" },
+        { value: "low", label: "Low" },
         { value: "normal", label: "Normal" },
-        { value: "high",   label: "High" },
+        { value: "high", label: "High" },
         { value: "urgent", label: "Urgent" },
       ],
     },
     { key: "severity", label: "Severity", type: "text" },
-    { key: "channel",  label: "Channel",  type: "text" },
-    { key: "subject",  label: "Subject",  type: "text" },
+    { key: "channel", label: "Channel", type: "text" },
+    { key: "subject", label: "Subject", type: "text" },
   ],
-}
+};
 
 // Operators valid per field type
 export const OPERATORS_BY_TYPE: Record<FieldType, ConditionOperator[]> = {
   text: [
-    "equals", "not_equals", "contains", "not_contains",
-    "is_empty", "is_not_empty", "changed", "changed_to", "changed_from",
+    "equals",
+    "not_equals",
+    "contains",
+    "not_contains",
+    "is_empty",
+    "is_not_empty",
+    "changed",
+    "changed_to",
+    "changed_from",
   ],
   number: [
-    "equals", "not_equals", "greater_than", "less_than",
-    "greater_than_or_equal", "less_than_or_equal", "changed", "changed_to",
+    "equals",
+    "not_equals",
+    "greater_than",
+    "less_than",
+    "greater_than_or_equal",
+    "less_than_or_equal",
+    "changed",
+    "changed_to",
   ],
-  enum: [
-    "equals", "not_equals", "changed", "changed_to", "changed_from",
-  ],
-  boolean: [
-    "equals", "not_equals", "changed",
-  ],
-}
+  enum: ["equals", "not_equals", "changed", "changed_to", "changed_from"],
+  boolean: ["equals", "not_equals", "changed"],
+};

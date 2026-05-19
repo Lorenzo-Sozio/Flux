@@ -1,15 +1,36 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { toast } from "sonner";
+
 import {
+  Check,
+  ChevronDown,
+  Copy,
+  Crown,
+  Eye,
+  Info,
+  KeyRound,
+  Mail,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Shield,
+  Trash2,
+  UserCog,
+  Users,
+} from "lucide-react";
+import { useTranslations } from "next-intl";
+import { toast } from "sonner";
+
+import {
+  adminSendPasswordResetAction,
+  changePasswordAction,
   deleteUserAction,
   getPendingInvitationsAction,
   inviteUserAction,
   updateUserRoleAction,
-  changePasswordAction,
-  adminSendPasswordResetAction,
 } from "@/actions/auth";
+import { getUserGroups } from "@/actions/user-groups";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,34 +43,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getInitials } from "@/lib/utils";
-import { Check, ChevronDown, Copy, Crown, Eye, Info, KeyRound, Mail, Pencil, Plus, RotateCcw, Shield, Trash2, UserCog, Users } from "lucide-react";
-import { useTranslations } from "next-intl";
+
 import { GroupModal } from "./group-modal";
-import { getUserGroups } from "@/actions/user-groups";
 
 type User = {
   id: string;
@@ -102,7 +108,9 @@ function RoleSelector({
   const Icon = cfg.icon;
 
   const pill = (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium select-none ${cfg.color}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium select-none ${cfg.color}`}
+    >
       <Icon className="h-3 w-3" />
       {tr(`roleLabel.${cfg.id}`)}
     </span>
@@ -133,7 +141,9 @@ function RoleSelector({
               onSelect={() => onRoleChange(userId, r)}
               className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 cursor-pointer"
             >
-              <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${rc.color}`}>
+              <span
+                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${rc.color}`}
+              >
                 <RIcon className="h-3 w-3" />
                 {tr(`roleLabel.${rc.id}`)}
               </span>
@@ -155,7 +165,12 @@ interface Props {
 
 type Group = Awaited<ReturnType<typeof getUserGroups>>[number];
 
-export function UsersClient({ users: initialUsers, pendingInvitations: initialInvitations, currentUserId, currentUserRole }: Props) {
+export function UsersClient({
+  users: initialUsers,
+  pendingInvitations: initialInvitations,
+  currentUserId,
+  currentUserRole,
+}: Props) {
   const t = useTranslations("users");
   const tc = useTranslations("common");
   const tr = useTranslations("roles");
@@ -164,7 +179,9 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
   const [groups, setGroups] = useState<Group[]>([]);
 
   useEffect(() => {
-    getUserGroups().then(setGroups).catch(() => {});
+    getUserGroups()
+      .then(setGroups)
+      .catch(() => {});
   }, []);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -241,17 +258,31 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
   };
 
   const handleChangePassword = async () => {
-    if (newPw !== confirmPw) { toast.error("Passwords do not match."); return; }
-    if (newPw.length < 8) { toast.error("Password must be at least 8 characters."); return; }
+    if (newPw !== confirmPw) {
+      toast.error("Passwords do not match.");
+      return;
+    }
+    if (newPw.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
     setIsChangingPw(true);
     try {
       const result = await changePasswordAction({ currentPassword: currentPw, newPassword: newPw });
-      if ("error" in result) { toast.error(result.error); return; }
+      if ("error" in result) {
+        toast.error(result.error);
+        return;
+      }
       toast.success("Password changed successfully.");
       setChangePwOpen(false);
-      setCurrentPw(""); setNewPw(""); setConfirmPw("");
-    } catch { toast.error(tc("errorOccurred")); }
-    finally { setIsChangingPw(false); }
+      setCurrentPw("");
+      setNewPw("");
+      setConfirmPw("");
+    } catch {
+      toast.error(tc("errorOccurred"));
+    } finally {
+      setIsChangingPw(false);
+    }
   };
 
   const handleAdminSendReset = async (user: User) => {
@@ -270,13 +301,15 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
         toast.error(result.error as string);
         setResetTarget(null);
       }
-    } catch { toast.error(tc("errorOccurred")); setResetTarget(null); }
-    finally { setIsSendingReset(false); }
+    } catch {
+      toast.error(tc("errorOccurred"));
+      setResetTarget(null);
+    } finally {
+      setIsSendingReset(false);
+    }
   };
 
-  const availableRoles = currentUserRole === "owner"
-    ? ["owner", "admin", "user", "viewer"]
-    : ["user", "viewer"];
+  const availableRoles = currentUserRole === "owner" ? ["owner", "admin", "user", "viewer"] : ["user", "viewer"];
 
   return (
     <div className="p-6 space-y-6">
@@ -426,7 +459,9 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                   <TableRow key={inv.id}>
                     <TableCell className="font-medium">{inv.email}</TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="capitalize">{inv.role}</Badge>
+                      <Badge variant="outline" className="capitalize">
+                        {inv.role}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
                       {new Date(inv.expiresAt).toLocaleDateString()}
@@ -451,7 +486,9 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
               const perms = tr.raw(`rolePerms.${r.id}`) as string[];
               return (
                 <div key={r.id} className="rounded-lg border p-3">
-                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full mb-2 ${r.color}`}>
+                  <span
+                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full mb-2 ${r.color}`}
+                  >
                     <Icon className="h-3 w-3" />
                     {tr(`roleLabel.${r.id}`)}
                   </span>
@@ -482,29 +519,23 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
             {["admin", "owner"].includes(currentUserRole) && (
               <GroupModal onSaved={() => getUserGroups().then(setGroups)}>
                 <Button size="sm" variant="outline">
-                  <Plus className="mr-2 h-3.5 w-3.5" />{t("newGroup")}
+                  <Plus className="mr-2 h-3.5 w-3.5" />
+                  {t("newGroup")}
                 </Button>
               </GroupModal>
             )}
           </div>
-          <CardDescription className="text-xs">
-            {t("userGroupsDesc")}
-          </CardDescription>
+          <CardDescription className="text-xs">{t("userGroupsDesc")}</CardDescription>
         </CardHeader>
         <CardContent>
           {groups.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">
-              {t("noGroups")}
-            </p>
+            <p className="text-sm text-muted-foreground text-center py-6">{t("noGroups")}</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {groups.map((g) => (
                 <div key={g.id} className="rounded-lg border p-3 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <span
-                      className="inline-block h-3 w-3 rounded-full shrink-0"
-                      style={{ backgroundColor: g.color }}
-                    />
+                    <span className="inline-block h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
                     <span className="font-medium text-sm truncate flex-1">{g.name}</span>
                     {["admin", "owner"].includes(currentUserRole) && (
                       <GroupModal
@@ -517,9 +548,7 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                       </GroupModal>
                     )}
                   </div>
-                  {g.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-2">{g.description}</p>
-                  )}
+                  {g.description && <p className="text-xs text-muted-foreground line-clamp-2">{g.description}</p>}
                   <div className="flex flex-wrap gap-1">
                     {g.members.slice(0, 4).map((m) => (
                       <Badge key={m.id} variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
@@ -543,7 +572,13 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
       </Card>
 
       {/* Invite Dialog */}
-      <Dialog open={inviteOpen} onOpenChange={(open) => { setInviteOpen(open); if (!open) setFallbackInviteUrl(null); }}>
+      <Dialog
+        open={inviteOpen}
+        onOpenChange={(open) => {
+          setInviteOpen(open);
+          if (!open) setFallbackInviteUrl(null);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("inviteDialog.title")}</DialogTitle>
@@ -568,11 +603,13 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableRoles.filter((r) => r !== "owner").map((r) => (
-                    <SelectItem key={r} value={r} className="capitalize">
-                      {r}
-                    </SelectItem>
-                  ))}
+                  {availableRoles
+                    .filter((r) => r !== "owner")
+                    .map((r) => (
+                      <SelectItem key={r} value={r} className="capitalize">
+                        {r}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -590,20 +627,27 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                     size="icon"
                     variant="outline"
                     className="h-8 w-8 shrink-0"
-                    onClick={() => { navigator.clipboard.writeText(fallbackInviteUrl); toast.success(tc("copy")); }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(fallbackInviteUrl);
+                      toast.success(tc("copy"));
+                    }}
                     title={tc("copy")}
                   >
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  {t("inviteDialog.emailConfig")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("inviteDialog.emailConfig")}</p>
               </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setInviteOpen(false); setFallbackInviteUrl(null); }}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setInviteOpen(false);
+                setFallbackInviteUrl(null);
+              }}
+            >
               {fallbackInviteUrl ? t("inviteDialog.close") : tc("cancel")}
             </Button>
             {!fallbackInviteUrl && (
@@ -616,7 +660,17 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
       </Dialog>
 
       {/* ── Change Own Password Dialog ────────────────────────────────────── */}
-      <Dialog open={changePwOpen} onOpenChange={(o) => { setChangePwOpen(o); if (!o) { setCurrentPw(""); setNewPw(""); setConfirmPw(""); } }}>
+      <Dialog
+        open={changePwOpen}
+        onOpenChange={(o) => {
+          setChangePwOpen(o);
+          if (!o) {
+            setCurrentPw("");
+            setNewPw("");
+            setConfirmPw("");
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("changePw.title")}</DialogTitle>
@@ -625,19 +679,36 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
               <Label>{t("changePw.current")}</Label>
-              <Input type="password" value={currentPw} onChange={(e) => setCurrentPw(e.target.value)} autoComplete="current-password" />
+              <Input
+                type="password"
+                value={currentPw}
+                onChange={(e) => setCurrentPw(e.target.value)}
+                autoComplete="current-password"
+              />
             </div>
             <div className="space-y-1.5">
               <Label>{t("changePw.new")}</Label>
-              <Input type="password" value={newPw} onChange={(e) => setNewPw(e.target.value)} autoComplete="new-password" />
+              <Input
+                type="password"
+                value={newPw}
+                onChange={(e) => setNewPw(e.target.value)}
+                autoComplete="new-password"
+              />
             </div>
             <div className="space-y-1.5">
               <Label>{t("changePw.confirm")}</Label>
-              <Input type="password" value={confirmPw} onChange={(e) => setConfirmPw(e.target.value)} autoComplete="new-password" />
+              <Input
+                type="password"
+                value={confirmPw}
+                onChange={(e) => setConfirmPw(e.target.value)}
+                autoComplete="new-password"
+              />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setChangePwOpen(false)}>{tc("cancel")}</Button>
+            <Button variant="outline" onClick={() => setChangePwOpen(false)}>
+              {tc("cancel")}
+            </Button>
             <Button onClick={handleChangePassword} disabled={isChangingPw || !currentPw || !newPw || !confirmPw}>
               {isChangingPw ? t("changePw.saving") : t("changePw.save")}
             </Button>
@@ -646,12 +717,21 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
       </Dialog>
 
       {/* ── Admin: Reset Password Fallback Dialog ─────────────────────────── */}
-      <Dialog open={!!resetFallbackUrl} onOpenChange={(o) => { if (!o) { setResetFallbackUrl(null); setResetTarget(null); } }}>
+      <Dialog
+        open={!!resetFallbackUrl}
+        onOpenChange={(o) => {
+          if (!o) {
+            setResetFallbackUrl(null);
+            setResetTarget(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{t("resetFallback.title")}</DialogTitle>
             <DialogDescription>
-              The reset link was generated but could not be emailed to <strong>{resetTarget?.email}</strong>. Share it manually:
+              The reset link was generated but could not be emailed to <strong>{resetTarget?.email}</strong>. Share it
+              manually:
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
@@ -663,7 +743,10 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
                 size="icon"
                 variant="outline"
                 className="h-8 w-8 shrink-0"
-                onClick={() => { navigator.clipboard.writeText(resetFallbackUrl!); toast.success(tc("copy")); }}
+                onClick={() => {
+                  navigator.clipboard.writeText(resetFallbackUrl!);
+                  toast.success(tc("copy"));
+                }}
               >
                 <Copy className="h-3.5 w-3.5" />
               </Button>
@@ -671,7 +754,14 @@ export function UsersClient({ users: initialUsers, pendingInvitations: initialIn
             <p className="text-xs text-muted-foreground">{t("resetFallback.expires")}</p>
           </div>
           <DialogFooter>
-            <Button onClick={() => { setResetFallbackUrl(null); setResetTarget(null); }}>{tc("close")}</Button>
+            <Button
+              onClick={() => {
+                setResetFallbackUrl(null);
+                setResetTarget(null);
+              }}
+            >
+              {tc("close")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

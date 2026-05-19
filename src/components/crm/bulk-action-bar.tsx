@@ -49,9 +49,7 @@ export function BulkActionBar({ count, statusOptions, users, onClear, onDelete, 
 
   return (
     <div className="flex items-center gap-3 rounded-lg border bg-primary/5 px-4 py-2.5 shadow-sm">
-      <span className="text-sm font-medium">
-        {count} selected
-      </span>
+      <span className="text-sm font-medium">{count} selected</span>
 
       <div className="flex items-center gap-2 ml-2">
         {/* Change status */}

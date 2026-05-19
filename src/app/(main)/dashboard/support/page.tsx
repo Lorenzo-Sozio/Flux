@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 
 import Link from "next/link";
-import { useTranslations } from "next-intl";
 
 import { AlertCircle, CheckCircle2, Clock, Mail, MessageCircle, MessageSquare, Phone, Users } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { getSLAs, getTickets } from "@/actions/support";
 import { CreateTicketButton } from "@/components/crm/create-ticket-button";
@@ -270,7 +270,10 @@ export default function SupportDashboard() {
                       </div>
                       <span className="text-xs text-muted-foreground shrink-0 ml-3">
                         {ticket.resolvedAt
-                          ? new Date(ticket.resolvedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+                          ? new Date(ticket.resolvedAt).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            })
                           : ""}
                       </span>
                     </Link>

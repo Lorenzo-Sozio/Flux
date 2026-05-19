@@ -81,43 +81,70 @@ const CHANNEL_ICONS: Record<string, React.ReactNode> = {
 };
 
 const STATUS_OPTIONS = [
-  { value: "new",         label: "Nuovo",       color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  { value: "open",        label: "Aperto",      color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
-  { value: "in_progress", label: "In corso",    color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300" },
-  { value: "waiting",     label: "In attesa",   color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
-  { value: "on_hold",     label: "Sospeso",     color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300" },
-  { value: "resolved",    label: "Risolto",     color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
-  { value: "closed",      label: "Chiuso",      color: "bg-muted text-muted-foreground" },
+  { value: "new", label: "Nuovo", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
+  { value: "open", label: "Aperto", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+  {
+    value: "in_progress",
+    label: "In corso",
+    color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+  },
+  {
+    value: "waiting",
+    label: "In attesa",
+    color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  },
+  {
+    value: "on_hold",
+    label: "Sospeso",
+    color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+  },
+  {
+    value: "resolved",
+    label: "Risolto",
+    color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  },
+  { value: "closed", label: "Chiuso", color: "bg-muted text-muted-foreground" },
 ];
 
 const PRIORITY_OPTIONS = [
   { value: "urgent", label: "Urgente", color: "text-red-600 dark:text-red-400" },
-  { value: "high",   label: "Alta",    color: "text-orange-600 dark:text-orange-400" },
+  { value: "high", label: "Alta", color: "text-orange-600 dark:text-orange-400" },
   { value: "normal", label: "Normale", color: "text-blue-600 dark:text-blue-400" },
-  { value: "low",    label: "Bassa",   color: "text-slate-500" },
+  { value: "low", label: "Bassa", color: "text-slate-500" },
 ];
 
 const PRIORITY_DOT: Record<string, string> = {
-  blocker: "bg-red-600", critical: "bg-orange-500",
-  high: "bg-red-400",    normal: "bg-blue-500",    low: "bg-slate-400",
+  blocker: "bg-red-600",
+  critical: "bg-orange-500",
+  high: "bg-red-400",
+  normal: "bg-blue-500",
+  low: "bg-slate-400",
 };
 
 const TASK_PRIORITY_OPTIONS = [
-  { value: "normal", label: "Normale" }, { value: "high", label: "Alta" },
-  { value: "critical", label: "Critica" }, { value: "blocker", label: "Bloccante" },
+  { value: "normal", label: "Normale" },
+  { value: "high", label: "Alta" },
+  { value: "critical", label: "Critica" },
+  { value: "blocker", label: "Bloccante" },
   { value: "low", label: "Bassa" },
 ];
 
 const AUDIT_LABELS: Record<string, string> = {
-  created: "Ticket creato", status_changed: "Stato modificato",
-  priority_changed: "Priorità modificata", assigned: "Assegnatario cambiato",
-  message_added: "Messaggio aggiunto", field_changed: "Campo aggiornato",
+  created: "Ticket creato",
+  status_changed: "Stato modificato",
+  priority_changed: "Priorità modificata",
+  assigned: "Assegnatario cambiato",
+  message_added: "Messaggio aggiunto",
+  field_changed: "Campo aggiornato",
 };
 
 const AVATAR_PALETTE = [
-  "from-violet-500 to-violet-700", "from-blue-500 to-blue-700",
-  "from-emerald-500 to-emerald-700", "from-rose-500 to-rose-700",
-  "from-indigo-500 to-indigo-700", "from-cyan-500 to-cyan-700",
+  "from-violet-500 to-violet-700",
+  "from-blue-500 to-blue-700",
+  "from-emerald-500 to-emerald-700",
+  "from-rose-500 to-rose-700",
+  "from-indigo-500 to-indigo-700",
+  "from-cyan-500 to-cyan-700",
   "from-amber-500 to-amber-700",
 ];
 
@@ -131,7 +158,12 @@ function avatarColor(name: string) {
 }
 
 function initials(name: string) {
-  return name.split(/\s+/).map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+  return name
+    .split(/\s+/)
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 function formatBytes(b: number) {
@@ -145,11 +177,12 @@ function formatStamp(date: Date) {
   const diff = now - date.getTime();
   if (diff < 60_000) return "Adesso";
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m fa`;
-  if (diff < 86_400_000)
-    return date.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  if (diff < 86_400_000) return date.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
   return date.toLocaleDateString("it-IT", {
-    day: "numeric", month: "short",
-    hour: "2-digit", minute: "2-digit",
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 
@@ -175,10 +208,20 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
     if (!data.title.trim()) return;
     setSaving(true);
     try {
-      await createTask({ title: data.title.trim(), priority: data.priority, dueDate: data.dueDate ? new Date(data.dueDate) : undefined, ticketId });
-      reset(); setAdding(false); load();
-    } catch { toast.error("Errore nella creazione dell'attività"); }
-    finally { setSaving(false); }
+      await createTask({
+        title: data.title.trim(),
+        priority: data.priority,
+        dueDate: data.dueDate ? new Date(data.dueDate) : undefined,
+        ticketId,
+      });
+      reset();
+      setAdding(false);
+      load();
+    } catch {
+      toast.error("Errore nella creazione dell'attività");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -194,8 +237,11 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
               </span>
             )}
           </span>
-          <button type="button" onClick={() => setAdding((v) => !v)}
-            className="flex items-center gap-0.5 font-medium normal-case tracking-normal text-xs hover:text-foreground transition-colors">
+          <button
+            type="button"
+            onClick={() => setAdding((v) => !v)}
+            className="flex items-center gap-0.5 font-medium normal-case tracking-normal text-xs hover:text-foreground transition-colors"
+          >
             <Plus className="h-3.5 w-3.5" /> Nuova
           </button>
         </CardTitle>
@@ -205,50 +251,85 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
           <form onSubmit={handleSubmit(onSubmit)} className="mb-2 space-y-2 rounded-lg border bg-muted/30 p-2.5">
             <Input {...register("title")} placeholder="Titolo attività…" className="h-8 text-sm" autoFocus />
             <div className="flex gap-2">
-              <select {...register("priority")}
-                className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring">
-                {TASK_PRIORITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              <select
+                {...register("priority")}
+                className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              >
+                {TASK_PRIORITY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
               </select>
-              <input type="date" {...register("dueDate")}
-                className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+              <input
+                type="date"
+                {...register("dueDate")}
+                className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              />
             </div>
             <div className="flex justify-end gap-1.5">
-              <button type="button" onClick={() => { setAdding(false); reset(); }}
-                className="rounded px-2 py-1 text-xs text-muted-foreground hover:text-foreground">Annulla</button>
-              <button type="submit" disabled={saving}
-                className="rounded bg-primary px-3 py-1 font-semibold text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
+              <button
+                type="button"
+                onClick={() => {
+                  setAdding(false);
+                  reset();
+                }}
+                className="rounded px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+              >
+                Annulla
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="rounded bg-primary px-3 py-1 font-semibold text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
                 {saving ? "…" : "Crea"}
               </button>
             </div>
           </form>
         )}
-        {tasks.length === 0 && !adding && (
-          <p className="py-1 text-muted-foreground text-sm italic">Nessuna attività</p>
-        )}
+        {tasks.length === 0 && !adding && <p className="py-1 text-muted-foreground text-sm italic">Nessuna attività</p>}
         {tasks.map((task) => {
           const done = task.status === "done";
           return (
-            <div key={task.id} className="group flex items-start gap-2 rounded-md p-1.5 transition-colors hover:bg-muted/50">
-              {done
-                ? <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                : <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+            <div
+              key={task.id}
+              className="group flex items-start gap-2 rounded-md p-1.5 transition-colors hover:bg-muted/50"
+            >
+              {done ? (
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+              ) : (
+                <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              )}
               <div className="min-w-0 flex-1">
-                <p className={`truncate font-medium text-sm leading-snug ${done ? "text-muted-foreground line-through" : ""}`}>
+                <p
+                  className={`truncate font-medium text-sm leading-snug ${done ? "text-muted-foreground line-through" : ""}`}
+                >
                   {task.title}
                 </p>
                 <div className="mt-0.5 flex items-center gap-1.5">
-                  <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOT[task.priority] ?? PRIORITY_DOT.normal}`} />
+                  <span
+                    className={`h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOT[task.priority] ?? PRIORITY_DOT.normal}`}
+                  />
                   {task.dueDate && (
                     <span className="text-xs text-muted-foreground tabular-nums">
                       {new Date(task.dueDate).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}
                     </span>
                   )}
-                  {task.assigneeName && <span className="truncate text-xs text-muted-foreground">{task.assigneeName}</span>}
+                  {task.assigneeName && (
+                    <span className="truncate text-xs text-muted-foreground">{task.assigneeName}</span>
+                  )}
                 </div>
               </div>
-              <TaskModal task={task} users={users} currentUserId={currentUserId}
+              <TaskModal
+                task={task}
+                users={users}
+                currentUserId={currentUserId}
                 revalidatePathStr={`/dashboard/support/tickets/${ticketId}`}
-                onUpdated={(updated) => setTasks((prev) => prev.map((t) => t.id === updated.id ? { ...t, ...updated } : t))} />
+                onUpdated={(updated) =>
+                  setTasks((prev) => prev.map((t) => (t.id === updated.id ? { ...t, ...updated } : t)))
+                }
+              />
             </div>
           );
         })}
@@ -283,8 +364,11 @@ function SLATimer({ targetDate }: { targetDate: Date | null }) {
 
   if (!targetDate || !remaining) return <span className="text-muted-foreground text-sm">—</span>;
   return (
-    <span className={`font-mono font-semibold text-sm tabular-nums ${isOverdue ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
-      {isOverdue && <AlertTriangle className="mr-1 inline h-3 w-3" />}{remaining}
+    <span
+      className={`font-mono font-semibold text-sm tabular-nums ${isOverdue ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}
+    >
+      {isOverdue && <AlertTriangle className="mr-1 inline h-3 w-3" />}
+      {remaining}
     </span>
   );
 }
@@ -324,10 +408,14 @@ function AttachmentChips({ docs }: { docs: any[] }) {
       {docs.map((doc) => {
         const isPdf = doc.mimeType === "application/pdf";
         return (
-          <a key={doc.id} href={`/api/documents/${doc.id}${isPdf ? "?view=1" : ""}`}
-            target={isPdf ? "_blank" : undefined} download={!isPdf ? doc.name : undefined}
+          <a
+            key={doc.id}
+            href={`/api/documents/${doc.id}${isPdf ? "?view=1" : ""}`}
+            target={isPdf ? "_blank" : undefined}
+            download={!isPdf ? doc.name : undefined}
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-md border bg-background/80 px-2 py-1 text-xs transition-colors hover:bg-muted">
+            className="flex items-center gap-1.5 rounded-md border bg-background/80 px-2 py-1 text-xs transition-colors hover:bg-muted"
+          >
             <FileText className="h-3 w-3 shrink-0 text-muted-foreground" />
             <span className="max-w-[140px] truncate font-medium">{doc.name}</span>
             {doc.size != null && <span className="text-muted-foreground">({formatBytes(doc.size)})</span>}
@@ -347,18 +435,30 @@ function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent
     return (
       <div className="rounded-xl border border-amber-200/60 bg-amber-50/70 px-4 py-3 dark:border-amber-800/30 dark:bg-amber-950/20">
         <div className="mb-1.5 flex items-center gap-2">
-          <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-[10px] font-bold ${avatarColor(senderName)}`}>
+          <div
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-[10px] font-bold ${avatarColor(senderName)}`}
+          >
             {initials(senderName)}
           </div>
           <span className="font-semibold text-sm text-amber-800 dark:text-amber-300">{senderName}</span>
-          <Badge variant="secondary" className="h-4 gap-0.5 bg-amber-100 px-1.5 text-[10px] text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+          <Badge
+            variant="secondary"
+            className="h-4 gap-0.5 bg-amber-100 px-1.5 text-[10px] text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
+          >
             <Lock className="h-2.5 w-2.5" /> Nota interna
           </Badge>
           <span className="ml-auto text-xs text-amber-600/70 dark:text-amber-500/60">{stamp}</span>
         </div>
-        {msg.content?.startsWith("<")
-          ? <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed prose-p:text-amber-900 dark:prose-p:text-amber-100" dangerouslySetInnerHTML={{ __html: msg.content }} />
-          : <p className="whitespace-pre-wrap text-sm leading-relaxed text-amber-900 dark:text-amber-100">{msg.content}</p>}
+        {msg.content?.startsWith("<") ? (
+          <div
+            className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed prose-p:text-amber-900 dark:prose-p:text-amber-100"
+            dangerouslySetInnerHTML={{ __html: msg.content }}
+          />
+        ) : (
+          <p className="whitespace-pre-wrap text-sm leading-relaxed text-amber-900 dark:text-amber-100">
+            {msg.content}
+          </p>
+        )}
         <AttachmentChips docs={docs ?? []} />
       </div>
     );
@@ -374,13 +474,20 @@ function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent
             <span className="font-semibold text-sm">{senderName}</span>
           </div>
           <div className="rounded-2xl rounded-tr-sm bg-primary/8 dark:bg-primary/12 border border-primary/12 px-4 py-3">
-            {msg.content?.startsWith("<")
-              ? <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: msg.content }} />
-              : <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>}
+            {msg.content?.startsWith("<") ? (
+              <div
+                className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: msg.content }}
+              />
+            ) : (
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+            )}
             <AttachmentChips docs={docs ?? []} />
           </div>
         </div>
-        <div className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-[10px] font-bold self-start ${avatarColor(senderName)}`}>
+        <div
+          className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-[10px] font-bold self-start ${avatarColor(senderName)}`}
+        >
           {initials(senderName)}
         </div>
       </div>
@@ -390,7 +497,9 @@ function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent
   // Customer message
   return (
     <div className="flex gap-3">
-      <div className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-[10px] font-bold self-start ${avatarColor(senderName)}`}>
+      <div
+        className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-[10px] font-bold self-start ${avatarColor(senderName)}`}
+      >
         {initials(senderName)}
       </div>
       <div className="max-w-[85%] min-w-0">
@@ -401,9 +510,14 @@ function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent
           <span className="text-xs text-muted-foreground/70">{stamp}</span>
         </div>
         <div className="rounded-2xl rounded-tl-sm bg-muted/60 border border-border/60 px-4 py-3">
-          {msg.content?.startsWith("<")
-            ? <div className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: msg.content }} />
-            : <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>}
+          {msg.content?.startsWith("<") ? (
+            <div
+              className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: msg.content }}
+            />
+          ) : (
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
+          )}
           <AttachmentChips docs={docs ?? []} />
         </div>
       </div>
@@ -434,7 +548,9 @@ function ContactCard({ ticket }: { ticket: any }) {
       </CardHeader>
       <CardContent className="px-3 pb-3 space-y-2.5">
         <div className="flex items-center gap-2.5">
-          <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-xs font-bold ${avatarColor(name)}`}>
+          <div
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-xs font-bold ${avatarColor(name)}`}
+          >
             {initials(name)}
           </div>
           <div className="min-w-0">
@@ -444,7 +560,8 @@ function ContactCard({ ticket }: { ticket: any }) {
         </div>
         {contact.phone && (
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <Phone className="h-3.5 w-3.5 shrink-0" />{contact.phone}
+            <Phone className="h-3.5 w-3.5 shrink-0" />
+            {contact.phone}
           </div>
         )}
         {ticket.company && (
@@ -459,7 +576,10 @@ function ContactCard({ ticket }: { ticket: any }) {
 }
 
 function PropertiesCard({
-  ticket, onStatusChange, onPriorityChange, onReassign,
+  ticket,
+  onStatusChange,
+  onPriorityChange,
+  onReassign,
 }: {
   ticket: any;
   onStatusChange: (s: string) => void;
@@ -469,9 +589,7 @@ function PropertiesCard({
   return (
     <Card>
       <CardHeader className="pb-2 pt-3 px-3">
-        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-          Proprietà
-        </CardTitle>
+        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Proprietà</CardTitle>
       </CardHeader>
       <CardContent className="px-3 pb-3 space-y-3">
         {/* Status pills */}
@@ -479,12 +597,16 @@ function PropertiesCard({
           <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Stato</p>
           <div className="flex flex-wrap gap-1">
             {STATUS_OPTIONS.map((opt) => (
-              <button key={opt.value} type="button" onClick={() => onStatusChange(opt.value)}
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => onStatusChange(opt.value)}
                 className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition-all ${
                   ticket.status === opt.value
                     ? `${opt.color} ring-1 ring-inset ring-current/30`
                     : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                }`}>
+                }`}
+              >
                 {opt.label}
               </button>
             ))}
@@ -496,12 +618,16 @@ function PropertiesCard({
           <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Priorità</p>
           <div className="flex gap-1">
             {PRIORITY_OPTIONS.map((opt) => (
-              <button key={opt.value} type="button" onClick={() => onPriorityChange(opt.value)}
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => onPriorityChange(opt.value)}
                 className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition-all ${
                   (ticket.priority ?? "normal") === opt.value
                     ? `bg-muted ${opt.color} ring-1 ring-inset ring-current/20`
                     : "bg-muted/50 text-muted-foreground hover:bg-muted"
-                }`}>
+                }`}
+              >
                 {opt.label}
               </button>
             ))}
@@ -511,8 +637,11 @@ function PropertiesCard({
         {/* Assignee */}
         <div>
           <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Assegnato a</p>
-          <button type="button" onClick={onReassign}
-            className="group flex w-full items-center gap-2 rounded-lg border border-dashed border-border/60 px-2.5 py-1.5 transition-colors hover:border-primary/40 hover:bg-primary/5">
+          <button
+            type="button"
+            onClick={onReassign}
+            className="group flex w-full items-center gap-2 rounded-lg border border-dashed border-border/60 px-2.5 py-1.5 transition-colors hover:border-primary/40 hover:bg-primary/5"
+          >
             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted">
               <User className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
@@ -524,9 +653,15 @@ function PropertiesCard({
         {/* SLA tier + severity */}
         {(ticket.sla || ticket.severity) && (
           <div className="flex flex-wrap gap-1.5 border-t pt-2.5">
-            {ticket.sla && <Badge variant="outline" className="text-xs">{ticket.sla.name}</Badge>}
+            {ticket.sla && (
+              <Badge variant="outline" className="text-xs">
+                {ticket.sla.name}
+              </Badge>
+            )}
             {ticket.severity && ticket.severity !== "normal" && (
-              <Badge variant="outline" className="text-xs capitalize">Severity: {ticket.severity}</Badge>
+              <Badge variant="outline" className="text-xs capitalize">
+                Severity: {ticket.severity}
+              </Badge>
             )}
           </div>
         )}
@@ -535,7 +670,15 @@ function PropertiesCard({
   );
 }
 
-function SLACard({ ticket, slaFirstTarget, slaResTarget }: { ticket: any; slaFirstTarget: Date | null; slaResTarget: Date | null }) {
+function SLACard({
+  ticket,
+  slaFirstTarget,
+  slaResTarget,
+}: {
+  ticket: any;
+  slaFirstTarget: Date | null;
+  slaResTarget: Date | null;
+}) {
   if (!ticket.sla && !ticket.firstResponseAt && !ticket.resolvedAt) return null;
   return (
     <Card>
@@ -547,20 +690,35 @@ function SLACard({ ticket, slaFirstTarget, slaResTarget }: { ticket: any; slaFir
       <CardContent className="px-3 pb-3 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Prima risposta</span>
-          {ticket.firstResponseAt
-            ? <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">✓ {new Date(ticket.firstResponseAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}</span>
-            : <SLATimer targetDate={slaFirstTarget} />}
+          {ticket.firstResponseAt ? (
+            <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+              ✓ {new Date(ticket.firstResponseAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          ) : (
+            <SLATimer targetDate={slaFirstTarget} />
+          )}
         </div>
         <div className="flex items-center justify-between">
           <span className="text-sm text-muted-foreground">Risoluzione</span>
-          {ticket.resolvedAt
-            ? <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">✓ {new Date(ticket.resolvedAt).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}</span>
-            : <SLATimer targetDate={slaResTarget} />}
+          {ticket.resolvedAt ? (
+            <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+              ✓ {new Date(ticket.resolvedAt).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}
+            </span>
+          ) : (
+            <SLATimer targetDate={slaResTarget} />
+          )}
         </div>
         {ticket.closedAt && (
           <div className="flex items-center justify-between border-t pt-2">
             <span className="text-sm text-muted-foreground">Chiuso</span>
-            <span className="font-mono text-sm">{new Date(ticket.closedAt).toLocaleDateString("it-IT", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</span>
+            <span className="font-mono text-sm">
+              {new Date(ticket.closedAt).toLocaleDateString("it-IT", {
+                day: "numeric",
+                month: "short",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
           </div>
         )}
       </CardContent>
@@ -583,15 +741,20 @@ function AttachmentsCard({ docs }: { docs: any[] }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="px-3 pb-3 space-y-1">
-        {docs.length === 0
-          ? <p className="py-0.5 text-sm text-muted-foreground italic">Nessun allegato</p>
-          : docs.map((doc) => {
+        {docs.length === 0 ? (
+          <p className="py-0.5 text-sm text-muted-foreground italic">Nessun allegato</p>
+        ) : (
+          docs.map((doc) => {
             const isPdf = doc.mimeType === "application/pdf";
             return (
-              <a key={doc.id} href={`/api/documents/${doc.id}${isPdf ? "?view=1" : ""}`}
-                target={isPdf ? "_blank" : undefined} download={!isPdf ? doc.name : undefined}
+              <a
+                key={doc.id}
+                href={`/api/documents/${doc.id}${isPdf ? "?view=1" : ""}`}
+                target={isPdf ? "_blank" : undefined}
+                download={!isPdf ? doc.name : undefined}
                 rel="noopener noreferrer"
-                className="group flex items-center gap-2 rounded-md p-1.5 transition-colors hover:bg-muted/50">
+                className="group flex items-center gap-2 rounded-md p-1.5 transition-colors hover:bg-muted/50"
+              >
                 <FileText className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium leading-snug group-hover:text-primary">{doc.name}</p>
@@ -600,7 +763,8 @@ function AttachmentsCard({ docs }: { docs: any[] }) {
                 <ExternalLink className="h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity" />
               </a>
             );
-          })}
+          })
+        )}
       </CardContent>
     </Card>
   );
@@ -641,29 +805,55 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     try {
       const [data, docsRes] = await Promise.all([
         getTicketById(id),
-        fetch(`/api/documents?entityType=ticket&entityId=${id}`).then((r) => r.json()).catch(() => ({ documents: [] })),
+        fetch(`/api/documents?entityType=ticket&entityId=${id}`)
+          .then((r) => r.json())
+          .catch(() => ({ documents: [] })),
       ]);
       if (data) {
         setTicket(data);
-        setMessages([...(data.messages ?? [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
-        setAuditLogs([...(data.auditLogs ?? [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()));
+        setMessages(
+          [...(data.messages ?? [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+        );
+        setAuditLogs(
+          [...(data.auditLogs ?? [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
+        );
         setSelectedAssignee(encodeAssignee(data.assigneeId, null));
       }
       const docsById: Record<string, any> = {};
       for (const doc of docsRes.documents ?? []) docsById[doc.id] = doc;
       setTicketDocs(docsById);
-    } catch (e) { console.error("Failed to load ticket:", e); }
-    finally { setLoading(false); }
+    } catch (e) {
+      console.error("Failed to load ticket:", e);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
 
-  useEffect(() => { loadTicket(); getMacros().then(setMacros).catch(console.error); }, [id, loadTicket]);
-  useEffect(() => { if (!loading) scrollToBottom(); }, [loading, scrollToBottom]);
+  useEffect(() => {
+    loadTicket();
+    getMacros().then(setMacros).catch(console.error);
+  }, [id, loadTicket]);
+  useEffect(() => {
+    if (!loading) scrollToBottom();
+  }, [loading, scrollToBottom]);
   useEffect(() => {
     const announce = (action: "viewing" | "typing") =>
-      fetch(`/api/tickets/${id}/presence`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action }) }).catch(console.error);
-    const poll = () => fetch(`/api/tickets/${id}/presence`).then((r) => r.json()).then((d: unknown[]) => setPresence(d)).catch(console.error);
-    announce("viewing"); poll();
-    const t = setInterval(() => { announce("viewing"); poll(); }, 15_000);
+      fetch(`/api/tickets/${id}/presence`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      }).catch(console.error);
+    const poll = () =>
+      fetch(`/api/tickets/${id}/presence`)
+        .then((r) => r.json())
+        .then((d: unknown[]) => setPresence(d))
+        .catch(console.error);
+    announce("viewing");
+    poll();
+    const t = setInterval(() => {
+      announce("viewing");
+      poll();
+    }, 15_000);
     return () => clearInterval(t);
   }, [id]);
 
@@ -673,7 +863,11 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     if (isReplyEmpty) return;
     setSending(true);
     try {
-      const result = await addTicketMessageAction(id, { content: replyContent, channel: ticket?.channel ?? "email", isPublic: !isInternal });
+      const result = await addTicketMessageAction(id, {
+        content: replyContent,
+        channel: ticket?.channel ?? "email",
+        isPublic: !isInternal,
+      });
       if (result?.linkedFromClosed) {
         toast.info(`Ticket chiuso — nuovo ticket ${result.newTicketNumber} creato`);
         router.push(`/dashboard/support/tickets/${result.newTicketId}`);
@@ -682,33 +876,51 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       setReplyContent("<p></p>");
       await loadTicket();
       scrollToBottom();
-    } catch (err: any) { toast.error(err.message ?? "Invio fallito"); }
-    finally { setSending(false); }
+    } catch (err: any) {
+      toast.error(err.message ?? "Invio fallito");
+    } finally {
+      setSending(false);
+    }
   }, [id, isInternal, isReplyEmpty, loadTicket, replyContent, router, scrollToBottom, ticket?.channel]);
 
-  const handleStatusChange = useCallback(async (status: string) => {
-    try {
-      await updateTicketAction(id, { status: status as any });
-      setTicket((p: any) => ({ ...p, status }));
-      toast.success("Stato aggiornato");
-    } catch (err: any) { toast.error(err.message ?? "Errore"); }
-  }, [id]);
+  const handleStatusChange = useCallback(
+    async (status: string) => {
+      try {
+        await updateTicketAction(id, { status: status as any });
+        setTicket((p: any) => ({ ...p, status }));
+        toast.success("Stato aggiornato");
+      } catch (err: any) {
+        toast.error(err.message ?? "Errore");
+      }
+    },
+    [id],
+  );
 
-  const handlePriorityChange = useCallback(async (priority: string) => {
-    try {
-      await updateTicketAction(id, { priority: priority as any });
-      setTicket((p: any) => ({ ...p, priority }));
-      toast.success("Priorità aggiornata");
-    } catch (err: any) { toast.error(err.message ?? "Errore"); }
-  }, [id]);
+  const handlePriorityChange = useCallback(
+    async (priority: string) => {
+      try {
+        await updateTicketAction(id, { priority: priority as any });
+        setTicket((p: any) => ({ ...p, priority }));
+        toast.success("Priorità aggiornata");
+      } catch (err: any) {
+        toast.error(err.message ?? "Errore");
+      }
+    },
+    [id],
+  );
 
   const handleEscalate = useCallback(async () => {
     try {
       const result = await escalateTicketAction(id);
-      if (result.alreadyMaxPriority) { toast.info("Priorità già al massimo (Urgente)"); return; }
+      if (result.alreadyMaxPriority) {
+        toast.info("Priorità già al massimo (Urgente)");
+        return;
+      }
       setTicket((p: any) => ({ ...p, priority: result.newPriority }));
       toast.success(`Priorità escalata a ${result.newPriority}`);
-    } catch (err: any) { toast.error(err.message ?? "Errore"); }
+    } catch (err: any) {
+      toast.error(err.message ?? "Errore");
+    }
   }, [id]);
 
   const handleReassign = useCallback(async () => {
@@ -719,8 +931,11 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       await loadTicket();
       setReassignOpen(false);
       toast.success(ownerId ? "Ticket riassegnato" : "Assegnatario rimosso");
-    } catch (err: any) { toast.error(err.message ?? "Errore"); }
-    finally { setReassigning(false); }
+    } catch (err: any) {
+      toast.error(err.message ?? "Errore");
+    } finally {
+      setReassigning(false);
+    }
   }, [id, loadTicket, selectedAssignee]);
 
   const handleDelete = useCallback(async () => {
@@ -731,14 +946,19 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       router.push("/dashboard/support/tickets");
     } catch (err: any) {
       toast.error(err.message ?? "Errore");
-      setDeleting(false); setDeleteOpen(false);
+      setDeleting(false);
+      setDeleteOpen(false);
     }
   }, [id, router]);
 
-  const slaFirstTarget = ticket?.sla && !ticket.firstResponseAt
-    ? new Date(new Date(ticket.createdAt).getTime() + ticket.sla.firstResponseTimeMinutes * 60_000) : null;
-  const slaResTarget = ticket?.sla && !ticket.resolvedAt
-    ? new Date(new Date(ticket.createdAt).getTime() + ticket.sla.resolutionTimeMinutes * 60_000) : null;
+  const slaFirstTarget =
+    ticket?.sla && !ticket.firstResponseAt
+      ? new Date(new Date(ticket.createdAt).getTime() + ticket.sla.firstResponseTimeMinutes * 60_000)
+      : null;
+  const slaResTarget =
+    ticket?.sla && !ticket.resolvedAt
+      ? new Date(new Date(ticket.createdAt).getTime() + ticket.sla.resolutionTimeMinutes * 60_000)
+      : null;
 
   // Build chronological timeline merging messages + audit events
   const timeline = [
@@ -773,7 +993,9 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       <div className="py-24 text-center">
         <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
         <p className="mb-4 text-muted-foreground">Ticket non trovato</p>
-        <Button asChild variant="outline"><Link href="/dashboard/support/tickets">← Torna ai ticket</Link></Button>
+        <Button asChild variant="outline">
+          <Link href="/dashboard/support/tickets">← Torna ai ticket</Link>
+        </Button>
       </div>
     );
   }
@@ -784,13 +1006,14 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     <>
       {/* Cancel parent vertical padding only, fill viewport below the 3rem app header */}
       <div className="-my-4 md:-my-6 flex flex-col overflow-hidden" style={{ height: "calc(100vh - 3rem)" }}>
-
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="shrink-0 border-b bg-background px-6 pb-4 pt-5">
           {/* Breadcrumb + actions */}
           <div className="mb-3 flex items-center justify-between gap-4">
-            <Link href="/dashboard/support/tickets"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            <Link
+              href="/dashboard/support/tickets"
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+            >
               <ArrowLeft className="h-3.5 w-3.5" /> Tutti i ticket
             </Link>
             <div className="flex items-center gap-2">
@@ -809,7 +1032,10 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                     <UserCheck className="h-4 w-4 text-blue-500" /> Riassegna
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setDeleteOpen(true)} className="gap-2 text-destructive focus:text-destructive">
+                  <DropdownMenuItem
+                    onClick={() => setDeleteOpen(true)}
+                    className="gap-2 text-destructive focus:text-destructive"
+                  >
                     <Trash2 className="h-4 w-4" /> Elimina ticket
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -829,30 +1055,42 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               <span className="capitalize">{ticket.channel}</span>
             </Badge>
             {ticket.severity && ticket.severity !== "normal" && (
-              <Badge variant="outline" className="h-5 text-xs capitalize">Severity: {ticket.severity}</Badge>
+              <Badge variant="outline" className="h-5 text-xs capitalize">
+                Severity: {ticket.severity}
+              </Badge>
             )}
             {ticket.tags?.map((tag: string) => (
-              <Badge key={tag} variant="secondary" className="h-5 text-xs">{tag}</Badge>
+              <Badge key={tag} variant="secondary" className="h-5 text-xs">
+                {tag}
+              </Badge>
             ))}
             <span className="flex items-center gap-1 text-xs text-muted-foreground ml-1">
               <Clock className="h-3.5 w-3.5" />
-              {new Date(ticket.createdAt).toLocaleString("it-IT", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              {new Date(ticket.createdAt).toLocaleString("it-IT", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
             </span>
           </div>
         </div>
 
         {/* ── Body grid ───────────────────────────────────────────────────── */}
         <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_300px]">
-
           {/* ── Left: Conversation ──────────────────────────────────────── */}
           <div className="flex flex-col min-h-0 border-r">
-
             {/* Typing presence banner */}
             {typingUsers.length > 0 && (
               <div className="flex items-center gap-2 border-b bg-amber-50/80 px-6 py-2 text-xs text-amber-700 dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-400">
                 <span className="flex gap-0.5">
                   {[0, 150, 300].map((d) => (
-                    <span key={d} className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500" style={{ animationDelay: `${d}ms` }} />
+                    <span
+                      key={d}
+                      className="h-1.5 w-1.5 animate-bounce rounded-full bg-amber-500"
+                      style={{ animationDelay: `${d}ms` }}
+                    />
                   ))}
                 </span>
                 {typingUsers.map((p: any) => p.userName).join(", ")} sta scrivendo…
@@ -860,8 +1098,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             )}
 
             {/* Timeline */}
-            <div ref={scrollRef}
-              className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
+            <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
               {timeline.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <MessageSquare className="mb-3 h-10 w-10 text-muted-foreground/20" />
@@ -882,44 +1119,70 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             </div>
 
             {/* ── Reply area ──────────────────────────────────────────── */}
-            <div className={`shrink-0 border-t p-4 space-y-3 ${isInternal ? "bg-amber-50/40 dark:bg-amber-950/10" : "bg-background"}`}>
-
+            <div
+              className={`shrink-0 border-t p-4 space-y-3 ${isInternal ? "bg-amber-50/40 dark:bg-amber-950/10" : "bg-background"}`}
+            >
               {/* Public / Internal toggle */}
               <div className="flex items-center gap-1 w-fit rounded-lg border bg-muted/40 p-0.5">
                 {[
                   { val: false, icon: Send, label: "Risposta pubblica" },
                   { val: true, icon: Lock, label: "Nota interna" },
                 ].map(({ val, icon: Icon, label }) => (
-                  <button key={String(val)} type="button" onClick={() => setIsInternal(val)}
+                  <button
+                    key={String(val)}
+                    type="button"
+                    onClick={() => setIsInternal(val)}
                     className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-all ${
                       isInternal === val
-                        ? val ? "bg-amber-100 text-amber-700 shadow-sm dark:bg-amber-900/40 dark:text-amber-300"
-                               : "bg-background text-foreground shadow-sm"
+                        ? val
+                          ? "bg-amber-100 text-amber-700 shadow-sm dark:bg-amber-900/40 dark:text-amber-300"
+                          : "bg-background text-foreground shadow-sm"
                         : "text-muted-foreground hover:text-foreground"
-                    }`}>
-                    <Icon className="h-3 w-3" />{label}
+                    }`}
+                  >
+                    <Icon className="h-3 w-3" />
+                    {label}
                   </button>
                 ))}
               </div>
 
               {/* Editor */}
-              <div onKeyDown={(e) => { if (e.ctrlKey && e.key === "Enter") { e.preventDefault(); handleSendReply(); } }}>
-                <RichTextEditor value={replyContent}
+              <div
+                onKeyDown={(e) => {
+                  if (e.ctrlKey && e.key === "Enter") {
+                    e.preventDefault();
+                    handleSendReply();
+                  }
+                }}
+              >
+                <RichTextEditor
+                  value={replyContent}
                   onChange={(html) => {
                     setReplyContent(html);
-                    fetch(`/api/tickets/${id}/presence`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "typing" }) }).catch(() => {});
+                    fetch(`/api/tickets/${id}/presence`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ action: "typing" }),
+                    }).catch(() => {});
                   }}
-                  placeholder={isInternal ? "Scrivi una nota interna (visibile solo al team)…" : "Scrivi una risposta al cliente…"}
+                  placeholder={
+                    isInternal ? "Scrivi una nota interna (visibile solo al team)…" : "Scrivi una risposta al cliente…"
+                  }
                   className={isInternal ? "border-amber-300 dark:border-amber-700" : ""}
-                  macroVariables />
+                  macroVariables
+                />
               </div>
 
               {/* Footer */}
               <div className="flex items-center justify-between">
                 <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                  {isInternal
-                    ? <><Shield className="h-3 w-3" /> Visibile solo agli agenti</>
-                    : <>Ctrl+Enter per inviare</>}
+                  {isInternal ? (
+                    <>
+                      <Shield className="h-3 w-3" /> Visibile solo agli agenti
+                    </>
+                  ) : (
+                    <>Ctrl+Enter per inviare</>
+                  )}
                 </p>
                 <div className="flex items-center gap-2">
                   {macros.length > 0 && (
@@ -931,25 +1194,46 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="max-h-60 w-52 overflow-y-auto">
                         {macros.map((macro: any) => (
-                          <DropdownMenuItem key={macro.id} className="flex flex-col items-start gap-0.5 py-2"
+                          <DropdownMenuItem
+                            key={macro.id}
+                            className="flex flex-col items-start gap-0.5 py-2"
                             onClick={() => {
-                              setReplyContent(macro.body
-                                .replace(/\{ticket\.number\}/g, ticket?.ticketNumber ?? "")
-                                .replace(/\{contact\.firstName\}/g, ticket?.contact?.firstName ?? ticket?.contact?.name?.split(" ")[0] ?? "")
-                                .replace(/\{agent\.name\}/g, ""));
+                              setReplyContent(
+                                macro.body
+                                  .replace(/\{ticket\.number\}/g, ticket?.ticketNumber ?? "")
+                                  .replace(
+                                    /\{contact\.firstName\}/g,
+                                    ticket?.contact?.firstName ?? ticket?.contact?.name?.split(" ")[0] ?? "",
+                                  )
+                                  .replace(/\{agent\.name\}/g, ""),
+                              );
                               setIsInternal(!macro.isPublic);
-                            }}>
+                            }}
+                          >
                             <span className="font-medium text-sm">{macro.name}</span>
-                            {macro.description && <span className="w-full truncate text-xs text-muted-foreground">{macro.description}</span>}
+                            {macro.description && (
+                              <span className="w-full truncate text-xs text-muted-foreground">{macro.description}</span>
+                            )}
                           </DropdownMenuItem>
                         ))}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
-                  <Button variant="ghost" size="sm" className="h-8" onClick={() => setReplyContent("<p></p>")} disabled={isReplyEmpty}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8"
+                    onClick={() => setReplyContent("<p></p>")}
+                    disabled={isReplyEmpty}
+                  >
                     Pulisci
                   </Button>
-                  <Button size="sm" className="h-8 gap-1.5" onClick={handleSendReply} disabled={isReplyEmpty || sending}>
+                  <Button
+                    size="sm"
+                    className="h-8 gap-1.5"
+                    onClick={handleSendReply}
+                    disabled={isReplyEmpty || sending}
+                  >
                     <Send className="h-3.5 w-3.5" />
                     {sending ? "Invio…" : isInternal ? "Aggiungi nota" : "Invia risposta"}
                   </Button>
@@ -961,7 +1245,12 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
           {/* ── Right: Sidebar ──────────────────────────────────────────── */}
           <div className="space-y-3 overflow-y-auto p-4">
             <ContactCard ticket={ticket} />
-            <PropertiesCard ticket={ticket} onStatusChange={handleStatusChange} onPriorityChange={handlePriorityChange} onReassign={() => setReassignOpen(true)} />
+            <PropertiesCard
+              ticket={ticket}
+              onStatusChange={handleStatusChange}
+              onPriorityChange={handlePriorityChange}
+              onReassign={() => setReassignOpen(true)}
+            />
             <SLACard ticket={ticket} slaFirstTarget={slaFirstTarget} slaResTarget={slaResTarget} />
             <LinkedTasksCard ticketId={id} currentUserId={ticket?.ownerId ?? undefined} />
             <AttachmentsCard docs={Object.values(ticketDocs)} />
@@ -980,7 +1269,9 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
           </DialogHeader>
           <AssigneeSelect value={selectedAssignee} onChange={setSelectedAssignee} />
           <DialogFooter>
-            <Button variant="outline" onClick={() => setReassignOpen(false)}>Annulla</Button>
+            <Button variant="outline" onClick={() => setReassignOpen(false)}>
+              Annulla
+            </Button>
             <Button onClick={handleReassign} disabled={reassigning}>
               {reassigning ? "Riassegno…" : "Riassegna"}
             </Button>
@@ -996,12 +1287,14 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               <Trash2 className="h-5 w-5" /> Elimina ticket
             </DialogTitle>
             <DialogDescription>
-              Sei sicuro di voler eliminare <span className="font-semibold text-foreground">{ticket.ticketNumber}</span>?
-              Questa azione rimuoverà permanentemente il ticket e tutti i suoi messaggi.
+              Sei sicuro di voler eliminare <span className="font-semibold text-foreground">{ticket.ticketNumber}</span>
+              ? Questa azione rimuoverà permanentemente il ticket e tutti i suoi messaggi.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>Annulla</Button>
+            <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
+              Annulla
+            </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? "Eliminazione…" : "Elimina"}
             </Button>

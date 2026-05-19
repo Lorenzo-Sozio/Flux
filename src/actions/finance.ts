@@ -2,9 +2,9 @@
 
 import { and, eq, gte, lte, sql } from "drizzle-orm";
 
-import { getDb } from "@/lib/tenant-context";
 import { deals, orders, pipelineStages, quotes } from "@/db/schema";
 import { requireAdminAccess } from "@/lib/auth-guard";
+import { getDb } from "@/lib/tenant-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -117,18 +117,12 @@ export async function getFinanceDashboard(): Promise<FinanceDashboardData> {
     db
       .select({ revenue: sql<number>`coalesce(sum(cast(${deals.amount} as numeric)), 0)` })
       .from(deals)
-      .where(
-        and(eq(deals.status, "won"), gte(deals.updatedAt, thisMonthStart), lte(deals.updatedAt, thisMonthEnd)),
-      ),
+      .where(and(eq(deals.status, "won"), gte(deals.updatedAt, thisMonthStart), lte(deals.updatedAt, thisMonthEnd))),
     db
       .select({ revenue: sql<number>`coalesce(sum(cast(${orders.totalAmount} as numeric)), 0)` })
       .from(orders)
       .where(
-        and(
-          eq(orders.status, "completed"),
-          gte(orders.orderDate, thisMonthStart),
-          lte(orders.orderDate, thisMonthEnd),
-        ),
+        and(eq(orders.status, "completed"), gte(orders.orderDate, thisMonthStart), lte(orders.orderDate, thisMonthEnd)),
       ),
   ]);
   const monthlyRevenue = Number(dealsThisMonth.revenue) + Number(ordersThisMonth.revenue);

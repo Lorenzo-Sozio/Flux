@@ -1,32 +1,22 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Button } from "@/components/ui/button";
+
+import { Loader2, MoreHorizontal, Plus } from "lucide-react";
+import { toast } from "sonner";
+
+import { deletePlan, seedDefaultPlans } from "@/actions/admin-billing";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Plus, MoreHorizontal, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import { deletePlan, seedDefaultPlans } from "@/actions/admin-billing";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+
 import { PlanForm } from "./plan-form";
 
 interface Plan {
@@ -65,9 +55,9 @@ interface PlansClientProps {
 
 /** Converts all null values in an object to undefined (for form props). */
 function nullsToUndefined<T extends object>(obj: T): { [K in keyof T]: NonNullable<T[K]> | undefined } {
-  return Object.fromEntries(
-    Object.entries(obj).map(([k, v]) => [k, v === null ? undefined : v]),
-  ) as { [K in keyof T]: NonNullable<T[K]> | undefined };
+  return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, v === null ? undefined : v])) as {
+    [K in keyof T]: NonNullable<T[K]> | undefined;
+  };
 }
 
 export function PlansClient({ plans: initialPlans }: PlansClientProps) {
@@ -118,12 +108,7 @@ export function PlansClient({ plans: initialPlans }: PlansClientProps) {
           </DialogContent>
         </Dialog>
 
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleSeed}
-          disabled={seeding}
-        >
+        <Button size="sm" variant="outline" onClick={handleSeed} disabled={seeding}>
           {seeding && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Seed Default Plans
         </Button>
@@ -158,23 +143,25 @@ export function PlansClient({ plans: initialPlans }: PlansClientProps) {
                   </div>
                 </TableCell>
                 <TableCell>
-                  {plan.pricePerUserMonthly === 0
-                    ? "Free"
-                    : `€${(plan.pricePerUserMonthly / 100).toFixed(0)}`}
+                  {plan.pricePerUserMonthly === 0 ? "Free" : `€${(plan.pricePerUserMonthly / 100).toFixed(0)}`}
                 </TableCell>
                 <TableCell>{plan.includedUsers}</TableCell>
-                <TableCell>
-                  {plan.trialDays > 0 ? `${plan.trialDays} days` : "—"}
-                </TableCell>
+                <TableCell>{plan.trialDays > 0 ? `${plan.trialDays} days` : "—"}</TableCell>
                 <TableCell>
                   <div className="flex gap-1">
                     {plan.isActive ? (
-                      <Badge variant="default" className="text-xs">Active</Badge>
+                      <Badge variant="default" className="text-xs">
+                        Active
+                      </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-xs">Inactive</Badge>
+                      <Badge variant="outline" className="text-xs">
+                        Inactive
+                      </Badge>
                     )}
                     {!plan.isPublic && (
-                      <Badge variant="secondary" className="text-xs">Hidden</Badge>
+                      <Badge variant="secondary" className="text-xs">
+                        Hidden
+                      </Badge>
                     )}
                   </div>
                 </TableCell>
@@ -186,13 +173,8 @@ export function PlansClient({ plans: initialPlans }: PlansClientProps) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setEditPlan(plan)}>
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => handleDelete(plan.id)}
-                      >
+                      <DropdownMenuItem onClick={() => setEditPlan(plan)}>Edit</DropdownMenuItem>
+                      <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(plan.id)}>
                         Deactivate
                       </DropdownMenuItem>
                     </DropdownMenuContent>

@@ -1,16 +1,19 @@
 "use client";
 
 import { useState } from "react";
+
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+
 import { formatDistanceToNow } from "date-fns";
+import { CornerDownRight, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+
+import type { DealComment } from "@/actions/deal-comments";
+import { addDealComment, deleteDealComment, editDealComment } from "@/actions/deal-comments";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MessageSquare, Pencil, Trash2, CornerDownRight } from "lucide-react";
 import { getInitials } from "@/lib/utils";
-import { addDealComment, editDealComment, deleteDealComment } from "@/actions/deal-comments";
-import type { DealComment } from "@/actions/deal-comments";
 
 interface Props {
   dealId: string;
@@ -38,16 +41,9 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
   const [replyLoading, setReplyLoading] = useState(false);
 
   const canEdit = comment.userId === currentUserId;
-  const canDelete =
-    comment.userId === currentUserId ||
-    currentUserRole === "admin" ||
-    currentUserRole === "owner";
+  const canDelete = comment.userId === currentUserId || currentUserRole === "admin" || currentUserRole === "owner";
 
-  async function run(
-    action: () => Promise<void>,
-    setLoading: (v: boolean) => void,
-    errorMsg: string,
-  ) {
+  async function run(action: () => Promise<void>, setLoading: (v: boolean) => void, errorMsg: string) {
     setLoading(true);
     try {
       await action();
@@ -107,8 +103,17 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
               autoFocus
             />
             <div className="flex gap-2">
-              <Button size="sm" onClick={handleEdit} disabled={editLoading}>Save</Button>
-              <Button size="sm" variant="ghost" onClick={() => { setEditing(false); setEditContent(comment.content); }}>
+              <Button size="sm" onClick={handleEdit} disabled={editLoading}>
+                Save
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setEditing(false);
+                  setEditContent(comment.content);
+                }}
+              >
                 Cancel
               </Button>
             </div>
@@ -165,7 +170,14 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
               <Button size="sm" onClick={handleReply} disabled={replyLoading || !replyContent.trim()}>
                 Reply
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => { setReplying(false); setReplyContent(""); }}>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setReplying(false);
+                  setReplyContent("");
+                }}
+              >
                 Cancel
               </Button>
             </div>

@@ -5,12 +5,12 @@ import { revalidatePath } from "next/cache";
 import { and, eq, gte, inArray, isNotNull, lte, ne, or } from "drizzle-orm";
 
 import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
 import { appointmentAttendees, appointments, companies, contacts, deals, leads, users } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
 import { type AppointmentEmailData, sendAppointmentInviteEmail } from "@/lib/email";
 import { getEmailConfig } from "@/lib/email-provider";
 import { generateICS, type ICSAttendee } from "@/lib/ical";
+import { getDb } from "@/lib/tenant-context";
 
 export type InviteResult = {
   sent: number;
@@ -481,7 +481,10 @@ export async function getOverlappingAppointments(startAt: Date, endAt: Date, exc
 }
 
 // For calendar action — returns formatted events
-export async function getAppointmentCalendarEvents(filterUserIds?: string[] | null, range?: { start: Date; end: Date }) {
+export async function getAppointmentCalendarEvents(
+  filterUserIds?: string[] | null,
+  range?: { start: Date; end: Date },
+) {
   const rows = await getAppointments(filterUserIds, range);
 
   return rows
@@ -532,10 +535,7 @@ export async function getContactsForPicker() {
 
 export type BusySlot = { startAt: Date; endAt: Date; title: string };
 
-export async function getColleagueAvailability(
-  userIds: string[],
-  date: Date,
-): Promise<Record<string, BusySlot[]>> {
+export async function getColleagueAvailability(userIds: string[], date: Date): Promise<Record<string, BusySlot[]>> {
   if (userIds.length === 0) return {};
   const db = await getDb();
 

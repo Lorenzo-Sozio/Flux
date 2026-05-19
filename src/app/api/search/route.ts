@@ -1,9 +1,10 @@
+import { type NextRequest, NextResponse } from "next/server";
+
 import { ilike, or } from "drizzle-orm";
-import { NextRequest, NextResponse } from "next/server";
 
 import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
 import { companies, contacts, deals, leads, orders, quotes, tickets } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 export async function GET(req: NextRequest) {
   const db = await getDb();
@@ -24,9 +25,22 @@ export async function GET(req: NextRequest) {
         .limit(5),
 
       db
-        .select({ id: leads.id, firstName: leads.firstName, lastName: leads.lastName, email: leads.email, companyName: leads.companyName })
+        .select({
+          id: leads.id,
+          firstName: leads.firstName,
+          lastName: leads.lastName,
+          email: leads.email,
+          companyName: leads.companyName,
+        })
         .from(leads)
-        .where(or(ilike(leads.firstName, like), ilike(leads.lastName, like), ilike(leads.email, like), ilike(leads.companyName, like)))
+        .where(
+          or(
+            ilike(leads.firstName, like),
+            ilike(leads.lastName, like),
+            ilike(leads.email, like),
+            ilike(leads.companyName, like),
+          ),
+        )
         .limit(5),
 
       db
@@ -42,7 +56,12 @@ export async function GET(req: NextRequest) {
         .limit(5),
 
       db
-        .select({ id: tickets.id, ticketNumber: tickets.ticketNumber, subject: tickets.subject, status: tickets.status })
+        .select({
+          id: tickets.id,
+          ticketNumber: tickets.ticketNumber,
+          subject: tickets.subject,
+          status: tickets.status,
+        })
         .from(tickets)
         .where(or(ilike(tickets.subject, like), ilike(tickets.ticketNumber, like)))
         .limit(5),

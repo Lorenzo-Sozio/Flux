@@ -1,35 +1,17 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { toast } from "sonner";
-import {
-  Package,
-  Plus,
-  Pencil,
-  Trash2,
-  Search,
-  ToggleLeft,
-  ToggleRight,
-  Loader2,
-  Tag,
-  DollarSign,
-} from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useRouter } from "next/navigation";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { DollarSign, Loader2, Package, Pencil, Plus, Search, Tag, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
+
+import { createProduct, deleteProduct, toggleProductActive, updateProduct } from "@/actions/products";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,17 +22,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
-import { useTranslations } from "next-intl";
-import { cn } from "@/lib/utils";
 import { useCurrency } from "@/hooks/use-currency";
-import {
-  createProduct,
-  updateProduct,
-  deleteProduct,
-  toggleProductActive,
-} from "@/actions/products";
+import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -71,14 +51,14 @@ type Product = {
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const formSchema = z.object({
-  name:        z.string().min(1, "Name is required"),
+  name: z.string().min(1, "Name is required"),
   description: z.string().optional(),
-  sku:         z.string().optional(),
-  price:       z.coerce.number().min(0, "Must be ≥ 0"),
-  taxPercent:  z.coerce.number().min(0).max(100).default(0),
-  unit:        z.string().optional().nullable(),
-  category:    z.string().optional().nullable(),
-  isActive:    z.boolean().default(true),
+  sku: z.string().optional(),
+  price: z.coerce.number().min(0, "Must be ≥ 0"),
+  taxPercent: z.coerce.number().min(0).max(100).default(0),
+  unit: z.string().optional().nullable(),
+  category: z.string().optional().nullable(),
+  isActive: z.boolean().default(true),
 });
 type FormValues = z.infer<typeof formSchema>;
 
@@ -102,27 +82,27 @@ function ProductDialog({
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name:        product?.name ?? "",
+      name: product?.name ?? "",
       description: product?.description ?? "",
-      sku:         product?.sku ?? "",
-      price:       product ? Number(product.price) : 0,
-      taxPercent:  product ? Number(product.taxPercent ?? 0) : 0,
-      unit:        product?.unit ?? "",
-      category:    product?.category ?? "",
-      isActive:    product?.isActive ?? true,
+      sku: product?.sku ?? "",
+      price: product ? Number(product.price) : 0,
+      taxPercent: product ? Number(product.taxPercent ?? 0) : 0,
+      unit: product?.unit ?? "",
+      category: product?.category ?? "",
+      isActive: product?.isActive ?? true,
     },
   });
 
   useEffect(() => {
     form.reset({
-      name:        product?.name ?? "",
+      name: product?.name ?? "",
       description: product?.description ?? "",
-      sku:         product?.sku ?? "",
-      price:       product ? Number(product.price) : 0,
-      taxPercent:  product ? Number(product.taxPercent ?? 0) : 0,
-      unit:        product?.unit ?? "",
-      category:    product?.category ?? "",
-      isActive:    product?.isActive ?? true,
+      sku: product?.sku ?? "",
+      price: product ? Number(product.price) : 0,
+      taxPercent: product ? Number(product.taxPercent ?? 0) : 0,
+      unit: product?.unit ?? "",
+      category: product?.category ?? "",
+      isActive: product?.isActive ?? true,
     });
   }, [product]);
 
@@ -148,7 +128,15 @@ function ProductDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!submitting) { onOpenChange(v); if (!v) form.reset(); } }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!submitting) {
+          onOpenChange(v);
+          if (!v) form.reset();
+        }
+      }}
+    >
       <DialogContent className="sm:max-w-[480px] p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2">
@@ -161,7 +149,9 @@ function ProductDialog({
           <div className="px-6 py-5 space-y-4">
             {/* Name */}
             <div className="space-y-1.5">
-              <Label>{t("dialog.nameLabel")} <span className="text-destructive">*</span></Label>
+              <Label>
+                {t("dialog.nameLabel")} <span className="text-destructive">*</span>
+              </Label>
               <Input {...form.register("name")} placeholder={t("form.namePlaceholder")} />
               {form.formState.errors.name && (
                 <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
@@ -178,15 +168,10 @@ function ProductDialog({
               </div>
               <div className="space-y-1.5">
                 <Label className="flex items-center gap-1.5">
-                  <DollarSign className="h-3.5 w-3.5 text-muted-foreground" /> Price <span className="text-destructive">*</span>
+                  <DollarSign className="h-3.5 w-3.5 text-muted-foreground" /> Price{" "}
+                  <span className="text-destructive">*</span>
                 </Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  {...form.register("price")}
-                  placeholder="0.00"
-                />
+                <Input type="number" step="0.01" min="0" {...form.register("price")} placeholder="0.00" />
                 {form.formState.errors.price && (
                   <p className="text-xs text-destructive">{form.formState.errors.price.message}</p>
                 )}
@@ -196,31 +181,34 @@ function ProductDialog({
             {/* Category + Tax % */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>{t("category")} <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span></Label>
+                <Label>
+                  {t("category")} <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span>
+                </Label>
                 <Input {...form.register("category")} placeholder={t("form.categoryPlaceholder")} />
               </div>
               <div className="space-y-1.5">
-                <Label>{t("taxRate")} % <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span></Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  max="100"
-                  {...form.register("taxPercent")}
-                  placeholder="0"
-                />
+                <Label>
+                  {t("taxRate")} % <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span>
+                </Label>
+                <Input type="number" step="0.01" min="0" max="100" {...form.register("taxPercent")} placeholder="0" />
               </div>
             </div>
 
             {/* Unit */}
             <div className="space-y-1.5">
-              <Label>{t("dialog.unitLabel")} <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span></Label>
+              <Label>
+                {t("dialog.unitLabel")}{" "}
+                <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span>
+              </Label>
               <Input {...form.register("unit")} placeholder={t("form.unitPlaceholder")} />
             </div>
 
             {/* Description */}
             <div className="space-y-1.5">
-              <Label>{t("dialog.descriptionLabel")} <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span></Label>
+              <Label>
+                {t("dialog.descriptionLabel")}{" "}
+                <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span>
+              </Label>
               <Textarea
                 {...form.register("description")}
                 placeholder={t("form.descriptionPlaceholder")}
@@ -234,10 +222,7 @@ function ProductDialog({
                 <p className="text-sm font-medium">{t("dialog.activeLabel")}</p>
                 <p className="text-xs text-muted-foreground">{t("dialog.activeDesc")}</p>
               </div>
-              <Switch
-                checked={form.watch("isActive")}
-                onCheckedChange={(v) => form.setValue("isActive", v)}
-              />
+              <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} />
             </div>
           </div>
 
@@ -282,19 +267,26 @@ export function ProductsClient({ products: initial }: Props) {
   // Filtered list
   const filtered = products.filter((p) => {
     const q = search.toLowerCase();
-    const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.sku ?? "").toLowerCase().includes(q) || (p.category ?? "").toLowerCase().includes(q);
-    const matchFilter =
-      filter === "all" ? true :
-      filter === "active" ? p.isActive :
-      !p.isActive;
+    const matchSearch =
+      !q ||
+      p.name.toLowerCase().includes(q) ||
+      (p.sku ?? "").toLowerCase().includes(q) ||
+      (p.category ?? "").toLowerCase().includes(q);
+    const matchFilter = filter === "all" ? true : filter === "active" ? p.isActive : !p.isActive;
     return matchSearch && matchFilter;
   });
 
-  const activeCount   = products.filter((p) => p.isActive).length;
+  const activeCount = products.filter((p) => p.isActive).length;
   const inactiveCount = products.filter((p) => !p.isActive).length;
 
-  const handleOpenCreate = () => { setEditing(undefined); setDialogOpen(true); };
-  const handleOpenEdit   = (p: Product) => { setEditing(p); setDialogOpen(true); };
+  const handleOpenCreate = () => {
+    setEditing(undefined);
+    setDialogOpen(true);
+  };
+  const handleOpenEdit = (p: Product) => {
+    setEditing(p);
+    setDialogOpen(true);
+  };
 
   const handleSaved = (saved: Product) => {
     setProducts((prev) => {
@@ -312,9 +304,7 @@ export function ProductsClient({ products: initial }: Props) {
     const newVal = !product.isActive;
     startTransition(async () => {
       await toggleProductActive(product.id, newVal);
-      setProducts((prev) =>
-        prev.map((p) => p.id === product.id ? { ...p, isActive: newVal } : p),
-      );
+      setProducts((prev) => prev.map((p) => (p.id === product.id ? { ...p, isActive: newVal } : p)));
     });
   };
 
@@ -352,9 +342,14 @@ export function ProductsClient({ products: initial }: Props) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: t("total"),    value: products.length, active: filter === "all",      onClick: () => setFilter("all") },
-          { label: t("active"),   value: activeCount,     active: filter === "active",   onClick: () => setFilter("active") },
-          { label: t("inactive"), value: inactiveCount,   active: filter === "inactive", onClick: () => setFilter("inactive") },
+          { label: t("total"), value: products.length, active: filter === "all", onClick: () => setFilter("all") },
+          { label: t("active"), value: activeCount, active: filter === "active", onClick: () => setFilter("active") },
+          {
+            label: t("inactive"),
+            value: inactiveCount,
+            active: filter === "inactive",
+            onClick: () => setFilter("inactive"),
+          },
         ].map(({ label, value, active, onClick }) => (
           <button
             key={label}
@@ -412,9 +407,7 @@ export function ProductsClient({ products: initial }: Props) {
               filtered.map((product) => (
                 <tr key={product.id} className="hover:bg-muted/30 transition-colors group">
                   <td className="px-4 py-3">
-                    <p className={cn("font-medium", !product.isActive && "text-muted-foreground")}>
-                      {product.name}
-                    </p>
+                    <p className={cn("font-medium", !product.isActive && "text-muted-foreground")}>{product.name}</p>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell">
                     {product.sku ? (
@@ -425,7 +418,9 @@ export function ProductsClient({ products: initial }: Props) {
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell">
                     {product.category ? (
-                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">{product.category}</span>
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                        {product.category}
+                      </span>
                     ) : (
                       <span className="text-muted-foreground/40">—</span>
                     )}
@@ -438,7 +433,11 @@ export function ProductsClient({ products: initial }: Props) {
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     <span className="text-sm tabular-nums">
-                      {parseFloat(product.taxPercent ?? "0") > 0 ? `${parseFloat(product.taxPercent ?? "0")}%` : <span className="text-muted-foreground/40">—</span>}
+                      {parseFloat(product.taxPercent ?? "0") > 0 ? (
+                        `${parseFloat(product.taxPercent ?? "0")}%`
+                      ) : (
+                        <span className="text-muted-foreground/40">—</span>
+                      )}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
@@ -457,12 +456,7 @@ export function ProductsClient({ products: initial }: Props) {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => handleOpenEdit(product)}
-                      >
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenEdit(product)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
                       <Button
@@ -489,15 +483,15 @@ export function ProductsClient({ products: initial }: Props) {
       )}
 
       {/* Create / Edit dialog */}
-      <ProductDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        product={editing}
-        onSaved={handleSaved}
-      />
+      <ProductDialog open={dialogOpen} onOpenChange={setDialogOpen} product={editing} onSaved={handleSaved} />
 
       {/* Delete confirmation */}
-      <AlertDialog open={!!deleteTarget} onOpenChange={(v) => { if (!v) setDeleteTarget(null); }}>
+      <AlertDialog
+        open={!!deleteTarget}
+        onOpenChange={(v) => {
+          if (!v) setDeleteTarget(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("deleteTitle")}</AlertDialogTitle>

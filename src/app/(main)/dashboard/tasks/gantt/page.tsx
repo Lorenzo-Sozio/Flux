@@ -2,8 +2,8 @@ import { redirect } from "next/navigation";
 
 import { getAllTasksForGantt, getAllUsers } from "@/actions/tasks";
 import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
 import { taskDependencies } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 import { TaskGantt } from "./_components/task-gantt";
 

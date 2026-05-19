@@ -1,8 +1,9 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { MergeEntityModal, type MergeField } from "@/components/crm/merge-entity-modal";
+
 import { getLeadForMerge, mergeLeads } from "@/actions/crm";
+import { MergeEntityModal, type MergeField } from "@/components/crm/merge-entity-modal";
 
 type LeadData = NonNullable<Awaited<ReturnType<typeof getLeadForMerge>>>;
 
@@ -47,9 +48,13 @@ export function MergeLeadsModal({ keepId, mergeId, open, onOpenChange }: Props) 
       reassignedDescription={(keep, merge) => (
         <>
           {t("reassignedStart")}{" "}
-          <strong>{merge.firstName} {merge.lastName}</strong>{" "}
+          <strong>
+            {merge.firstName} {merge.lastName}
+          </strong>{" "}
           {t("reassignedMiddle")}{" "}
-          <strong>{keep.firstName} {keep.lastName}</strong>
+          <strong>
+            {keep.firstName} {keep.lastName}
+          </strong>
           {t("reassignedEnd")}
         </>
       )}

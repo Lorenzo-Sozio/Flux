@@ -1,9 +1,11 @@
-import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
-import { companies } from "@/db/schema";
+import { NextResponse } from "next/server";
+
 import { eq } from "drizzle-orm";
 import { unparse } from "papaparse";
-import { NextResponse } from "next/server";
+
+import { auth } from "@/auth";
+import { companies } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 export async function GET() {
   const db = await getDb();
@@ -40,9 +42,7 @@ export async function GET() {
     })
     .from(companies);
 
-  const rows = isPrivileged
-    ? await baseQuery
-    : await baseQuery.where(eq(companies.ownerId, session.user.id));
+  const rows = isPrivileged ? await baseQuery : await baseQuery.where(eq(companies.ownerId, session.user.id));
 
   const csvData = rows.map((r) => ({
     ...r,

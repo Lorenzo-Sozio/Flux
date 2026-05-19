@@ -3,15 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, count, eq, gte, inArray } from "drizzle-orm";
 
 import { createNotificationAction } from "@/actions/auth";
 import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
+import { activities, companies, contacts, deals, leads, pipelineStages, salesTargets, users } from "@/db/schema";
+import { requireAdminAccess, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
+import { convertToEur, getExchangeRates } from "@/lib/exchange-rates";
 import { getDb } from "@/lib/tenant-context";
-import { activities, companies, contacts, deals, pipelineStages, salesTargets, users } from "@/db/schema";
-import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
-import { getExchangeRates, convertToEur } from "@/lib/exchange-rates";
 
 export async function getPipelineData() {
   const db = await getDb();
@@ -39,6 +39,16 @@ export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
   const db = await getDb();
   if (!data.name || !data.stageId) throw new Error("Name and Stage are required.");
 
+  // Enforce the combined maxRecords quota before inserting
+  const [[c], [l], [co], [d]] = await Promise.all([
+    db.select({ n: count() }).from(contacts),
+    db.select({ n: count() }).from(leads),
+    db.select({ n: count() }).from(companies),
+    db.select({ n: count() }).from(deals),
+  ]);
+  const totalRecords = Number(c?.n ?? 0) + Number(l?.n ?? 0) + Number(co?.n ?? 0) + Number(d?.n ?? 0);
+  await requirePlanLimit("maxRecords", totalRecords);
+
   // Convert input amount to EUR for storage; record the original input currency
   let amountEur = data.amount ? Number(data.amount) : 0;
   const inputCurrency = (data.currency || "EUR").toUpperCase();
@@ -56,7 +66,7 @@ export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
 
   const [newDeal] = await db
     .insert(deals)
-    .values(payload as any)
+    .values(payload as typeof deals.$inferInsert)
     .returning();
   revalidatePath("/dashboard/pipeline");
   dispatchWebhook("deal.created", {
@@ -64,6 +74,7 @@ export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
     name: newDeal.name,
     amount: newDeal.amount,
     stageId: newDeal.stageId,
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
   }).catch(() => {});
 
   // Run automation rules after response is sent (zero-latency)
@@ -108,6 +119,7 @@ export async function updateDealStage(dealId: string, newStageId: string) {
     name: updatedDeal.name,
     stageId: newStageId,
     probability: updatedDeal.probability,
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
   }).catch(() => {});
 
   revalidatePath("/dashboard/pipeline");
@@ -152,7 +164,7 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
 
   const [updatedDeal] = await db
     .update(deals)
-    .set(payload as any)
+    .set(payload as Partial<typeof deals.$inferInsert>)
     .where(eq(deals.id, dealId))
     .returning();
   revalidatePath("/dashboard/pipeline");
@@ -160,6 +172,7 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
   // Fire webhook + notification on deal won/lost
   if (data.status === "won") {
     dispatchWebhook("deal.won", { id: updatedDeal.id, name: updatedDeal.name, amount: updatedDeal.amount }).catch(
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
       () => {},
     );
     if (updatedDeal.ownerId) {
@@ -169,9 +182,11 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
         title: "Deal won! 🏆",
         message: `"${updatedDeal.name}" has been marked as won.`,
         link: `/dashboard/pipeline`,
+        // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
       }).catch(() => {});
     }
   } else if (data.status === "lost") {
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
     dispatchWebhook("deal.lost", { id: updatedDeal.id, name: updatedDeal.name }).catch(() => {});
   }
 
@@ -358,7 +373,12 @@ function computeHealthScore(
 async function refreshDealHealthScore(dealId: string) {
   const db = await getDb();
   const [deal] = await db
-    .select({ status: deals.status, probability: deals.probability, expectedCloseDate: deals.expectedCloseDate, updatedAt: deals.updatedAt })
+    .select({
+      status: deals.status,
+      probability: deals.probability,
+      expectedCloseDate: deals.expectedCloseDate,
+      updatedAt: deals.updatedAt,
+    })
     .from(deals)
     .where(eq(deals.id, dealId));
   if (!deal || deal.status !== "open") return;

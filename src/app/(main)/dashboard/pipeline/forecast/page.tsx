@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
 
 import { ArrowLeft, CheckCircle2, DollarSign, Target, TrendingUp } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 import { getForecastData } from "@/actions/pipeline";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,6 @@ export default async function ForecastPage() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-4">
-        
         <div>
           <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
           <p className="text-muted-foreground text-sm">{t("subtitle")}</p>

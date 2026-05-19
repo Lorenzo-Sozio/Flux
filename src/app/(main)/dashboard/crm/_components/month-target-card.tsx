@@ -4,8 +4,8 @@ import Link from "next/link";
 
 import { TrendingUp } from "lucide-react";
 
-import { useCurrency } from "@/hooks/use-currency";
 import { Card, CardContent } from "@/components/ui/card";
+import { useCurrency } from "@/hooks/use-currency";
 
 type TargetRow = { targetAmount: string; currency: string } | null;
 

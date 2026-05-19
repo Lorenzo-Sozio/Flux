@@ -1,8 +1,11 @@
 import Link from "next/link";
-import { Command } from "lucide-react";
-import { getDb } from "@/lib/tenant-context";
-import { userInvitations } from "@/db/schema";
+
 import { and, eq, gt } from "drizzle-orm";
+import { Command } from "lucide-react";
+
+import { userInvitations } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
+
 import { AcceptInvitationForm } from "../../_components/accept-invitation-form";
 
 interface Props {

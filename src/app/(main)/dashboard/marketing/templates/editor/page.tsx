@@ -1,10 +1,12 @@
-import { getDb } from "@/lib/tenant-context";
-import { emailTemplates } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
+
+import { eq } from "drizzle-orm";
+
 import { EmailBuilder } from "@/components/email-builder";
+import { emailTemplates } from "@/db/schema";
 import type { EmailDesign } from "@/lib/email-builder";
 import { emptyDesign } from "@/lib/email-builder";
+import { getDb } from "@/lib/tenant-context";
 
 interface Props {
   searchParams: Promise<{ id?: string }>;
@@ -16,17 +18,10 @@ export default async function EmailEditorPage({ searchParams }: Props) {
 
   if (!id) {
     // New template
-    return (
-      <EmailBuilder
-        initialDesign={emptyDesign()}
-      />
-    );
+    return <EmailBuilder initialDesign={emptyDesign()} />;
   }
 
-  const [template] = await db
-    .select()
-    .from(emailTemplates)
-    .where(eq(emailTemplates.id, id));
+  const [template] = await db.select().from(emailTemplates).where(eq(emailTemplates.id, id));
 
   if (!template) return notFound();
 

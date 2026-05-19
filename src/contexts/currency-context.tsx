@@ -1,15 +1,9 @@
 "use client";
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+
 import { useLocale } from "next-intl";
+
 import {
   CURRENCY_LOCALE,
   CURRENCY_MANUAL_OVERRIDE_KEY,
@@ -104,7 +98,9 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
       }
     }
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const setCurrency = useCallback((code: string) => {

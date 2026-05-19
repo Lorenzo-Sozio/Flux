@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+
 import { CampaignModal } from "@/components/crm/campaign-modal";
 
 interface Template {

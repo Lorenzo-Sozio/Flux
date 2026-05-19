@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+
 import { CheckCircle2, DollarSign, Target, TrendingUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -15,12 +16,7 @@ interface ForecastData {
   byOwner: { name: string; dealCount: number; weighted: number }[];
 }
 
-export function ForecastKPI({
-  totalWeighted,
-  bestCase,
-  committed,
-  currentMonthTarget,
-}: Omit<ForecastData, "byOwner">) {
+export function ForecastKPI({ totalWeighted, bestCase, committed, currentMonthTarget }: Omit<ForecastData, "byOwner">) {
   const t = useTranslations("pipeline.forecast");
   const { formatAmount } = useCurrency();
 
@@ -57,9 +53,7 @@ export function ForecastKPI({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-600">
-            {formatAmount(committed, { noDecimals: true })}
-          </div>
+          <div className="text-2xl font-bold text-green-600">{formatAmount(committed, { noDecimals: true })}</div>
           <p className="text-xs text-muted-foreground mt-1">{t("committedDesc")}</p>
         </CardContent>
       </Card>

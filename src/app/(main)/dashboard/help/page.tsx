@@ -1,20 +1,26 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useRef, useState } from "react";
+
 import Link from "next/link";
+
 import {
   ArrowRight,
   Banknote,
+  BarChart3,
   Bell,
   BookOpen,
   Building2,
   Calendar,
   CheckSquare,
   ChevronRight,
+  Clock,
   Contact,
   FileText,
   GanttChartSquare,
+  GitMerge,
   HelpCircle,
+  Info,
   Kanban,
   Mail,
   MessageCircle,
@@ -24,28 +30,19 @@ import {
   Settings,
   Shield,
   ShoppingCart,
+  Star,
   Target,
   TrendingUp,
+  UserCheck,
   Users,
   Webhook,
   Zap,
-  BarChart3,
-  Star,
-  UserCheck,
-  GitMerge,
-  Clock,
-  Info,
 } from "lucide-react";
 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 import { cn } from "@/lib/utils";
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
@@ -655,9 +652,7 @@ export default function HelpPage() {
       s.title.toLowerCase().includes(q) ||
       s.subtitle.toLowerCase().includes(q) ||
       s.description.toLowerCase().includes(q) ||
-      s.topics.some(
-        (t) => t.q.toLowerCase().includes(q) || t.a.toLowerCase().includes(q),
-      )
+      s.topics.some((t) => t.q.toLowerCase().includes(q) || t.a.toLowerCase().includes(q))
     );
   });
 
@@ -741,9 +736,7 @@ export default function HelpPage() {
         {/* Quick links */}
         {!search && (
           <div>
-            <p className="mb-3 font-medium text-sm text-muted-foreground uppercase tracking-wide">
-              Sezioni principali
-            </p>
+            <p className="mb-3 font-medium text-sm text-muted-foreground uppercase tracking-wide">Sezioni principali</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
               {sections.slice(0, 8).map((s) => {
                 const Icon = s.icon;
@@ -772,12 +765,8 @@ export default function HelpPage() {
         {filtered.length === 0 ? (
           <div className="flex flex-col items-center py-20 text-center">
             <Search className="mb-4 h-10 w-10 text-muted-foreground/30" />
-            <p className="font-medium text-muted-foreground">
-              Nessun risultato per &ldquo;{search}&rdquo;
-            </p>
-            <p className="mt-1 text-muted-foreground text-sm">
-              Prova con un termine diverso.
-            </p>
+            <p className="font-medium text-muted-foreground">Nessun risultato per &ldquo;{search}&rdquo;</p>
+            <p className="mt-1 text-muted-foreground text-sm">Prova con un termine diverso.</p>
           </div>
         ) : (
           filtered.map((section) => {
@@ -793,12 +782,7 @@ export default function HelpPage() {
               >
                 <Card className={cn("overflow-hidden border", section.border)}>
                   {/* Section header */}
-                  <CardHeader
-                    className={cn(
-                      "flex flex-row items-center gap-4 border-b pb-4",
-                      section.bg,
-                    )}
-                  >
+                  <CardHeader className={cn("flex flex-row items-center gap-4 border-b pb-4", section.bg)}>
                     <div
                       className={cn(
                         "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
@@ -838,19 +822,13 @@ export default function HelpPage() {
                     {/* Description */}
                     <div className="flex items-start gap-3 border-b bg-muted/20 px-6 py-4">
                       <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                      <p className="text-muted-foreground text-sm leading-relaxed">
-                        {section.description}
-                      </p>
+                      <p className="text-muted-foreground text-sm leading-relaxed">{section.description}</p>
                     </div>
 
                     {/* FAQ */}
                     <Accordion type="multiple" className="divide-y">
                       {section.topics.map((topic, i) => (
-                        <AccordionItem
-                          key={i}
-                          value={`${section.id}-${i}`}
-                          className="border-0 px-6"
-                        >
+                        <AccordionItem key={i} value={`${section.id}-${i}`} className="border-0 px-6">
                           <AccordionTrigger className="py-4 text-left text-sm font-medium hover:no-underline">
                             {topic.q}
                           </AccordionTrigger>

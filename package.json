@@ -19,9 +19,7 @@
     "generate:postman": "npx tsx scripts/generate-postman-collection.ts"
   },
   "lint-staged": {
-    "*.{js,ts,jsx,tsx}": [
-      "biome check --write --no-errors-on-unmatched"
-    ]
+    "*.{js,ts,jsx,tsx}": ["biome check --write --no-errors-on-unmatched"]
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",

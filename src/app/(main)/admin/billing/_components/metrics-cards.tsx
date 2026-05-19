@@ -1,7 +1,8 @@
 "use client";
 
+import { AlertCircle, DollarSign, TrendingUp, Users } from "lucide-react";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, Users, DollarSign, AlertCircle } from "lucide-react";
 
 interface MetricsCardsProps {
   mrr: number;
@@ -12,6 +13,7 @@ interface MetricsCardsProps {
   trialCount: number;
   pastDueCount: number;
   suspendedCount: number;
+  freeCount: number;
   totalTenants: number;
 }
 
@@ -33,6 +35,7 @@ export function MetricsCards({
   trialCount,
   pastDueCount,
   suspendedCount,
+  freeCount,
   totalTenants,
 }: MetricsCardsProps) {
   return (
@@ -101,6 +104,14 @@ export function MetricsCards({
           <div>
             <span className="font-semibold text-destructive">{suspendedCount}</span>
             <span className="ml-1 text-muted-foreground">Suspended</span>
+          </div>
+          <div>
+            <span className="font-semibold text-muted-foreground">{freeCount}</span>
+            <span className="ml-1 text-muted-foreground">Free</span>
+          </div>
+          <div>
+            <span className="font-semibold">{totalTenants}</span>
+            <span className="ml-1 text-muted-foreground">Total</span>
           </div>
         </CardContent>
       </Card>

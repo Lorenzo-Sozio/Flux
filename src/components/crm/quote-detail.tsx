@@ -28,24 +28,24 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { type getQuoteById, approveQuoteAction, rejectQuoteAction, requestApprovalAction, updateQuoteAction } from "@/actions/quotes";
+import {
+  approveQuoteAction,
+  type getQuoteById,
+  rejectQuoteAction,
+  requestApprovalAction,
+  updateQuoteAction,
+} from "@/actions/quotes";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-
-import { QUOTE_STATUS_CONFIG } from "@/lib/quote-status";
 import { useCurrency } from "@/hooks/use-currency";
+import { QUOTE_STATUS_CONFIG } from "@/lib/quote-status";
+
 import { SendQuoteEmailDialog } from "./send-quote-email-dialog";
 
 type Quote = Awaited<ReturnType<typeof getQuoteById>>;
@@ -56,7 +56,6 @@ interface QuoteDetailProps {
   onStatusChange?: (newStatus: string) => void;
   userRole?: string;
 }
-
 
 const ACTIVITY_LABELS: Record<string, string> = {
   created: "Quote created",
@@ -450,18 +449,14 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
                         )}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{item.quantity}</TableCell>
-                      <TableCell className="text-right text-sm tabular-nums">
-                        {fmt(item.unitPrice)}
-                      </TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">{fmt(item.unitPrice)}</TableCell>
                       <TableCell className="text-right text-sm tabular-nums text-amber-600">
                         {parseFloat(item.discountPercent ?? "0") > 0
                           ? `${item.discountPercent}% (−${fmt(item.discountAmount)})`
                           : "—"}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums text-slate-600">
-                        {parseFloat(item.taxPercent ?? "0") > 0
-                          ? `${item.taxPercent}% (+${fmt(item.taxAmount)})`
-                          : "—"}
+                        {parseFloat(item.taxPercent ?? "0") > 0 ? `${item.taxPercent}% (+${fmt(item.taxAmount)})` : "—"}
                       </TableCell>
                       <TableCell className="text-right text-sm font-semibold tabular-nums">
                         {fmt(item.totalPrice)}

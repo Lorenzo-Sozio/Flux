@@ -1,22 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+
+import { Globe, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Plus, Pencil, Trash2, Lock, Globe } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { toast } from "sonner";
+
+import { createMacroAction, deleteMacroAction, updateMacroAction } from "@/actions/support";
+import { RichTextEditor } from "@/components/crm/rich-text-editor";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,8 +18,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { RichTextEditor } from "@/components/crm/rich-text-editor";
-import { createMacroAction, updateMacroAction, deleteMacroAction } from "@/actions/support";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 
 interface Macro {
   id: string;
@@ -106,7 +102,10 @@ export function MacrosClient({ macros: initial }: { macros: Macro[] }) {
 
   // Strip HTML for preview snippet
   const plainPreview = (html: string, max = 120) => {
-    const plain = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    const plain = html
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     return plain.length > max ? plain.slice(0, max) + "…" : plain;
   };
 
@@ -135,18 +134,18 @@ export function MacrosClient({ macros: initial }: { macros: Macro[] }) {
                     <span className="font-semibold text-sm">{macro.name}</span>
                     <Badge variant="outline" className="text-[10px] h-4 gap-1 px-1.5">
                       {macro.isPublic ? (
-                        <><Globe className="h-2.5 w-2.5" /> {t("publicBadge")}</>
+                        <>
+                          <Globe className="h-2.5 w-2.5" /> {t("publicBadge")}
+                        </>
                       ) : (
-                        <><Lock className="h-2.5 w-2.5" /> {t("internalBadge")}</>
+                        <>
+                          <Lock className="h-2.5 w-2.5" /> {t("internalBadge")}
+                        </>
                       )}
                     </Badge>
                   </div>
-                  {macro.description && (
-                    <p className="text-xs text-muted-foreground mb-2">{macro.description}</p>
-                  )}
-                  <p className="text-xs bg-muted/50 rounded p-2 text-muted-foreground">
-                    {plainPreview(macro.body)}
-                  </p>
+                  {macro.description && <p className="text-xs text-muted-foreground mb-2">{macro.description}</p>}
+                  <p className="text-xs bg-muted/50 rounded p-2 text-muted-foreground">{plainPreview(macro.body)}</p>
                 </div>
                 <div className="flex gap-1 flex-shrink-0">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(macro)}>
@@ -196,10 +195,7 @@ export function MacrosClient({ macros: initial }: { macros: Macro[] }) {
             </div>
             <div>
               <Label>
-                {t("bodyLabel")}{" "}
-                <span className="text-muted-foreground font-normal text-xs">
-                  — {t("bodyHint")}
-                </span>
+                {t("bodyLabel")} <span className="text-muted-foreground font-normal text-xs">— {t("bodyHint")}</span>
               </Label>
               <div className="mt-1.5">
                 <RichTextEditor

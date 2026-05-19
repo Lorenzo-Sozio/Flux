@@ -1,45 +1,47 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { toast } from "sonner";
 import { Loader2Icon, Users } from "lucide-react";
+import { Controller, useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
+
 import { getAllUsers } from "@/actions/crm";
-import {
-  createUserGroup,
-  updateUserGroup,
-  deleteUserGroup,
-  type UserGroupFormData,
-} from "@/actions/user-groups";
+import { createUserGroup, deleteUserGroup, type UserGroupFormData, updateUserGroup } from "@/actions/user-groups";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 
 const PRESET_COLORS = [
-  "#6366f1", "#8b5cf6", "#ec4899", "#f43f5e",
-  "#f97316", "#eab308", "#22c55e", "#14b8a6",
-  "#3b82f6", "#0ea5e9", "#64748b", "#1e293b",
+  "#6366f1",
+  "#8b5cf6",
+  "#ec4899",
+  "#f43f5e",
+  "#f97316",
+  "#eab308",
+  "#22c55e",
+  "#14b8a6",
+  "#3b82f6",
+  "#0ea5e9",
+  "#64748b",
+  "#1e293b",
 ];
 
 const groupSchema = z.object({
-  name:        z.string().min(1, "Group name is required").max(100),
+  name: z.string().min(1, "Group name is required").max(100),
   description: z.string().max(255).optional(),
-  color:       z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#6366f1"),
-  memberIds:   z.array(z.string()).default([]),
+  color: z
+    .string()
+    .regex(/^#[0-9a-fA-F]{6}$/)
+    .default("#6366f1"),
+  memberIds: z.array(z.string()).default([]),
 });
 
 type GroupFormValues = z.infer<typeof groupSchema>;
@@ -59,9 +61,9 @@ interface Props {
 }
 
 export function GroupModal({ group, children, onSaved }: Props) {
-  const [open, setOpen]       = useState(false);
-  const [users, setUsers]     = useState<UserOption[]>([]);
-  const [search, setSearch]   = useState("");
+  const [open, setOpen] = useState(false);
+  const [users, setUsers] = useState<UserOption[]>([]);
+  const [search, setSearch] = useState("");
   const isEditing = !!group;
 
   useEffect(() => {
@@ -71,20 +73,27 @@ export function GroupModal({ group, children, onSaved }: Props) {
   const form = useForm<GroupFormValues>({
     resolver: zodResolver(groupSchema),
     defaultValues: {
-      name:        group?.name        ?? "",
+      name: group?.name ?? "",
       description: group?.description ?? "",
-      color:       group?.color       ?? "#6366f1",
-      memberIds:   group?.members.map((m) => m.id) ?? [],
+      color: group?.color ?? "#6366f1",
+      memberIds: group?.members.map((m) => m.id) ?? [],
     },
   });
 
-  const { register, control, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = form;
-  const watchedColor     = watch("color");
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    formState: { errors, isSubmitting },
+  } = form;
+  const watchedColor = watch("color");
   const watchedMemberIds = watch("memberIds");
 
   const filteredUsers = users.filter((u) => {
     const q = search.toLowerCase();
-    return (u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q));
+    return u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q);
   });
 
   const toggleMember = (userId: string) => {
@@ -129,7 +138,16 @@ export function GroupModal({ group, children, onSaved }: Props) {
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { form.reset(); setSearch(""); } }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) {
+          form.reset();
+          setSearch("");
+        }
+      }}
+    >
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="sm:max-w-[520px] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
@@ -157,9 +175,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
 
             {/* Description */}
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Description
-              </Label>
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</Label>
               <Textarea
                 {...register("description")}
                 placeholder="Briefly describe this group's purpose…"
@@ -170,9 +186,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
 
             {/* Color */}
             <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                Color
-              </Label>
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Color</Label>
               <div className="flex items-center gap-2 flex-wrap">
                 {PRESET_COLORS.map((c) => (
                   <button
@@ -180,7 +194,9 @@ export function GroupModal({ group, children, onSaved }: Props) {
                     type="button"
                     onClick={() => setValue("color", c, { shouldDirty: true })}
                     className={`h-6 w-6 rounded-full transition-all ${
-                      watchedColor === c ? "ring-2 ring-offset-2 ring-primary scale-110" : "opacity-80 hover:opacity-100"
+                      watchedColor === c
+                        ? "ring-2 ring-offset-2 ring-primary scale-110"
+                        : "opacity-80 hover:opacity-100"
                     }`}
                     style={{ backgroundColor: c }}
                   />
@@ -196,9 +212,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
             {/* Members */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                  Members
-                </Label>
+                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Members</Label>
                 <Badge variant="secondary" className="text-xs">
                   {watchedMemberIds.length} selected
                 </Badge>
@@ -232,9 +246,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
                         )}
                       />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium leading-none truncate">
-                          {u.name || u.email || u.id}
-                        </p>
+                        <p className="text-sm font-medium leading-none truncate">{u.name || u.email || u.id}</p>
                         {u.name && u.email && (
                           <p className="text-xs text-muted-foreground mt-0.5 truncate">{u.email}</p>
                         )}

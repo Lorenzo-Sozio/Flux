@@ -10,20 +10,23 @@
  * - Supporta loop detection e retry logic
  */
 
-import cron, { type ScheduledTask } from 'node-cron'
-import { getDb } from '@/lib/tenant-context'
-import { automationRules, deals, leads, contacts, companies, tickets } from '@/db/schema'
-import { eq } from 'drizzle-orm'
-import { runAutomations } from './rule-engine'
-import { TargetEntity } from '../../crm/automation/types'
-import { parseScheduledTrigger } from './scheduler-utils'
-export { SCHEDULED_TRIGGER_PREFIX, parseScheduledTrigger, encodeScheduledTrigger } from './scheduler-utils'
+import { eq } from "drizzle-orm";
+import cron, { type ScheduledTask } from "node-cron";
+
+import { automationRules, companies, contacts, deals, leads, tickets } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
+
+import type { TargetEntity } from "../../crm/automation/types";
+import { runAutomations } from "./rule-engine";
+import { parseScheduledTrigger } from "./scheduler-utils";
+
+export { encodeScheduledTrigger, parseScheduledTrigger, SCHEDULED_TRIGGER_PREFIX } from "./scheduler-utils";
 
 interface RegisteredCronJob {
-  ruleId: string
-  targetEntity: TargetEntity
-  cronExpression: string
-  task: ScheduledTask
+  ruleId: string;
+  targetEntity: TargetEntity;
+  cronExpression: string;
+  task: ScheduledTask;
 }
 
 // ============================================================================
@@ -31,44 +34,44 @@ interface RegisteredCronJob {
 // ============================================================================
 
 class SchedulerService {
-  private jobs: Map<string, RegisteredCronJob> = new Map()
+  private jobs: Map<string, RegisteredCronJob> = new Map();
 
   /**
    * Inizializza tutti gli scheduled triggers dal database
    */
   async initialize() {
-    console.log('🔄 Initializing scheduled triggers...')
+    console.log("🔄 Initializing scheduled triggers...");
 
     try {
       const db = await getDb();
-      const rules = await db.select().from(automationRules).where(eq(automationRules.isActive, true))
+      const rules = await db.select().from(automationRules).where(eq(automationRules.isActive, true));
 
       for (const rule of rules) {
         // Cerca trigger di tipo scheduled
-        const triggerOnArray = rule.triggerOn || []
+        const triggerOnArray = rule.triggerOn || [];
         for (const trigger of triggerOnArray) {
-          const cronExpr = parseScheduledTrigger(trigger)
+          const cronExpr = parseScheduledTrigger(trigger);
           if (cronExpr) {
             try {
               this.registerCronJob({
                 ruleId: rule.id,
                 targetEntity: rule.targetEntity as TargetEntity,
                 cronExpression: cronExpr,
-              })
+              });
             } catch (err) {
-              console.error(`❌ Failed to register scheduled trigger for rule ${rule.id}:`, err)
+              console.error(`❌ Failed to register scheduled trigger for rule ${rule.id}:`, err);
             }
           }
         }
       }
 
-      console.log(`✅ Scheduled triggers initialized: ${this.jobs.size} cron jobs active`)
+      console.log(`✅ Scheduled triggers initialized: ${this.jobs.size} cron jobs active`);
     } catch (err) {
       console.error(
-        '⚠️  Error initializing scheduled triggers (using platformDb):',
-        err instanceof Error ? err.message : String(err)
-      )
-      console.log('ℹ️  Scheduled triggers will initialize when the first request arrives.')
+        "⚠️  Error initializing scheduled triggers (using platformDb):",
+        err instanceof Error ? err.message : String(err),
+      );
+      console.log("ℹ️  Scheduled triggers will initialize when the first request arrives.");
     }
   }
 
@@ -80,29 +83,29 @@ class SchedulerService {
     targetEntity,
     cronExpression,
   }: {
-    ruleId: string
-    targetEntity: TargetEntity
-    cronExpression: string
+    ruleId: string;
+    targetEntity: TargetEntity;
+    cronExpression: string;
   }) {
     // Controlla se esiste già
     if (this.jobs.has(ruleId)) {
-      console.warn(`⚠️  Cron job ${ruleId} already registered, unregistering...`)
-      this.unregister(ruleId)
+      console.warn(`⚠️  Cron job ${ruleId} already registered, unregistering...`);
+      this.unregister(ruleId);
     }
 
     // Crea il task
     const task = cron.schedule(cronExpression, async () => {
-      await this.executeTrigger(ruleId, targetEntity)
-    })
+      await this.executeTrigger(ruleId, targetEntity);
+    });
 
     this.jobs.set(ruleId, {
       ruleId,
       targetEntity,
       cronExpression,
       task,
-    })
+    });
 
-    console.log(`✅ Cron job registered: ${ruleId} (${cronExpression})`)
+    console.log(`✅ Cron job registered: ${ruleId} (${cronExpression})`);
   }
 
   /**
@@ -110,10 +113,10 @@ class SchedulerService {
    */
   private async executeTrigger(ruleId: string, targetEntity: TargetEntity) {
     try {
-      console.log(`⏰ Executing scheduled trigger: ${ruleId}`)
+      console.log(`⏰ Executing scheduled trigger: ${ruleId}`);
 
       // Recupera tutti i record della entity type
-      const records = await this.getAllRecords(targetEntity)
+      const records = await this.getAllRecords(targetEntity);
 
       // Esegui automation per ogni record
       for (const record of records) {
@@ -121,50 +124,48 @@ class SchedulerService {
           await runAutomations({
             entityType: targetEntity,
             entityId: record.id,
-            event: 'onCreate', // ⚠️ Workaround: usiamo onCreate perché event è limitato a onCreate|onUpdate
+            event: "onCreate", // ⚠️ Workaround: usiamo onCreate perché event è limitato a onCreate|onUpdate
             oldData: record,
             newData: record,
-          })
+          });
         } catch (err) {
-          console.error(`❌ Error executing trigger for record ${record.id}:`, err)
+          console.error(`❌ Error executing trigger for record ${record.id}:`, err);
         }
       }
     } catch (err) {
-      console.error(`❌ Error executing scheduled trigger ${ruleId}:`, err)
+      console.error(`❌ Error executing scheduled trigger ${ruleId}:`, err);
     }
   }
 
   /**
    * Recupera tutti i record di un tipo di entity
    */
-  private async getAllRecords(
-    entityType: TargetEntity
-  ): Promise<Array<{ id: string; [key: string]: unknown }>> {
+  private async getAllRecords(entityType: TargetEntity): Promise<Array<{ id: string; [key: string]: unknown }>> {
     const schemaMap = {
-      deal:    deals,
-      lead:    leads,
+      deal: deals,
+      lead: leads,
       contact: contacts,
       company: companies,
-      ticket:  tickets,
-    }
+      ticket: tickets,
+    };
 
-    const schema = schemaMap[entityType]
+    const schema = schemaMap[entityType];
 
     const db = await getDb();
-    const records = await db.select().from(schema).limit(1000)
+    const records = await db.select().from(schema).limit(1000);
 
-    return records as Array<{ id: string; [key: string]: unknown }>
+    return records as Array<{ id: string; [key: string]: unknown }>;
   }
 
   /**
    * Deregistra un cron job
    */
   unregister(ruleId: string) {
-    const job = this.jobs.get(ruleId)
+    const job = this.jobs.get(ruleId);
     if (job) {
-      job.task.stop()
-      this.jobs.delete(ruleId)
-      console.log(`🛑 Cron job unregistered: ${ruleId}`)
+      job.task.stop();
+      this.jobs.delete(ruleId);
+      console.log(`🛑 Cron job unregistered: ${ruleId}`);
     }
   }
 
@@ -172,9 +173,9 @@ class SchedulerService {
    * Ferma tutti i cron jobs
    */
   shutdown() {
-    console.log('🛑 Shutting down scheduler...')
+    console.log("🛑 Shutting down scheduler...");
     for (const [ruleId] of this.jobs) {
-      this.unregister(ruleId)
+      this.unregister(ruleId);
     }
   }
 
@@ -189,7 +190,7 @@ class SchedulerService {
         cronExpression: j.cronExpression,
         targetEntity: j.targetEntity,
       })),
-    }
+    };
   }
 }
 
@@ -197,29 +198,29 @@ class SchedulerService {
 // SINGLETON INSTANCE
 // ============================================================================
 
-let scheduler: SchedulerService | null = null
+let scheduler: SchedulerService | null = null;
 
 export function getScheduler(): SchedulerService {
   if (!scheduler) {
-    scheduler = new SchedulerService()
+    scheduler = new SchedulerService();
   }
-  return scheduler
+  return scheduler;
 }
 
 export async function initializeScheduler() {
-  const svc = getScheduler()
-  await svc.initialize()
+  const svc = getScheduler();
+  await svc.initialize();
 }
 
 export function shutdownScheduler() {
-  const svc = getScheduler()
-  svc.shutdown()
-  scheduler = null
+  const svc = getScheduler();
+  svc.shutdown();
+  scheduler = null;
 }
 
 export function getSchedulerStatus() {
-  const svc = getScheduler()
-  return svc.getStatus()
+  const svc = getScheduler();
+  return svc.getStatus();
 }
 
 // ============================================================================
@@ -240,7 +241,7 @@ export function cronBuilder() {
      * @param minute 0-59
      */
     everyDayAt(hour: number, minute: number): string {
-      return `${minute} ${hour} * * *`
+      return `${minute} ${hour} * * *`;
     },
 
     /**
@@ -250,28 +251,28 @@ export function cronBuilder() {
      * @param minute 0-59
      */
     everyDayOfWeekAt(dayOfWeek: number, hour: number, minute: number): string {
-      return `${minute} ${hour} * * ${dayOfWeek}`
+      return `${minute} ${hour} * * ${dayOfWeek}`;
     },
 
     /**
      * Ogni N ore
      */
     everyNHours(n: number): string {
-      return `0 */${n} * * *`
+      return `0 */${n} * * *`;
     },
 
     /**
      * Ogni N minuti (non usare in prod, testing only)
      */
     everyNMinutes(n: number): string {
-      return `*/${n} * * * *`
+      return `*/${n} * * * *`;
     },
 
     /**
      * Raw cron expression
      */
     custom(expr: string): string {
-      return expr
+      return expr;
     },
-  }
+  };
 }

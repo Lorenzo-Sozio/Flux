@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 
 import Link from "next/link";
-import { useTranslations } from "next-intl";
 
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { bulkAssignCompanies, bulkDeleteCompanies, bulkUpdateCompanyStatus } from "@/actions/bulk";
@@ -181,7 +181,9 @@ export function CompaniesTable({ companies, users, canEdit, activeCount, categor
               <TableCell>{company.city}</TableCell>
               <TableCell>
                 {company.type && (
-                  <span className={`text-xs font-medium px-1.5 py-0.5 rounded capitalize ${TYPE_COLORS[company.type] ?? ""}`}>
+                  <span
+                    className={`text-xs font-medium px-1.5 py-0.5 rounded capitalize ${TYPE_COLORS[company.type] ?? ""}`}
+                  >
                     {t(`types.${company.type as "customer" | "prospect" | "partner" | "vendor"}`)}
                   </span>
                 )}

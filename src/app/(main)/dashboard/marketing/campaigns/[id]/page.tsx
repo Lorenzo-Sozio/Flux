@@ -1,28 +1,31 @@
-import { getCampaignReport, getEmailTemplates } from "@/actions/marketing";
-import { notFound } from "next/navigation";
 import Link from "next/link";
+import { notFound } from "next/navigation";
+
 import { format } from "date-fns";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  AlertCircle,
+  ChevronLeft,
+  Clock,
+  Eye,
+  Mail,
+  MousePointerClick,
+  Send,
+  ShieldCheck,
+  UserMinus,
+} from "lucide-react";
+
+import { getCampaignReport, getEmailTemplates } from "@/actions/marketing";
+import { CampaignModal } from "@/components/crm/campaign-modal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import {
-  ChevronLeft,
-  Send,
-  Eye,
-  MousePointerClick,
-  AlertCircle,
-  UserMinus,
-  Clock,
-  Mail,
-  ShieldCheck,
-} from "lucide-react";
-import { CampaignModal } from "@/components/crm/campaign-modal";
+
 import { CampaignLogTable } from "../_components/campaign-log-table";
 
 const CAMPAIGN_STATUS: Record<string, { label: string; className: string }> = {
-  draft:     { label: "Draft",     className: "border-slate-300 text-slate-600" },
-  active:    { label: "Active",    className: "border-green-300 text-green-700 bg-green-50" },
+  draft: { label: "Draft", className: "border-slate-300 text-slate-600" },
+  active: { label: "Active", className: "border-green-300 text-green-700 bg-green-50" },
   completed: { label: "Completed", className: "border-blue-300 text-blue-700 bg-blue-50" },
 };
 
@@ -32,24 +35,21 @@ interface Props {
 
 export default async function CampaignDetailPage({ params }: Props) {
   const { id } = await params;
-  const [report, templates] = await Promise.all([
-    getCampaignReport(id),
-    getEmailTemplates(),
-  ]);
+  const [report, templates] = await Promise.all([getCampaignReport(id), getEmailTemplates()]);
   if (!report) notFound();
 
   const { campaign, stats, logs } = report;
-  const statusCfg  = CAMPAIGN_STATUS[campaign.status] ?? CAMPAIGN_STATUS.draft;
+  const statusCfg = CAMPAIGN_STATUS[campaign.status] ?? CAMPAIGN_STATUS.draft;
   const templateName = templates.find((t) => t.id === campaign.templateId)?.name;
 
   const statCards = [
-    { label: "Queued",       value: stats.queued,      icon: Clock,              color: "text-slate-400" },
-    { label: "Sent",         value: stats.sent,         icon: Send,               color: "text-blue-500" },
-    { label: "Opened",       value: stats.opened,       icon: Eye,                color: "text-violet-500" },
-    { label: "Clicked",      value: stats.clicked,      icon: MousePointerClick,  color: "text-green-500" },
-    { label: "Bounced",      value: stats.bounced,      icon: AlertCircle,        color: "text-amber-500" },
-    { label: "Unsubscribed", value: stats.unsubscribed, icon: UserMinus,          color: "text-orange-500" },
-    { label: "Failed",       value: stats.failed,       icon: AlertCircle,        color: "text-red-500" },
+    { label: "Queued", value: stats.queued, icon: Clock, color: "text-slate-400" },
+    { label: "Sent", value: stats.sent, icon: Send, color: "text-blue-500" },
+    { label: "Opened", value: stats.opened, icon: Eye, color: "text-violet-500" },
+    { label: "Clicked", value: stats.clicked, icon: MousePointerClick, color: "text-green-500" },
+    { label: "Bounced", value: stats.bounced, icon: AlertCircle, color: "text-amber-500" },
+    { label: "Unsubscribed", value: stats.unsubscribed, icon: UserMinus, color: "text-orange-500" },
+    { label: "Failed", value: stats.failed, icon: AlertCircle, color: "text-red-500" },
   ];
 
   return (
@@ -102,9 +102,7 @@ export default async function CampaignDetailPage({ params }: Props) {
           />
         </div>
 
-        {campaign.description && (
-          <p className="text-sm text-muted-foreground mt-2">{campaign.description}</p>
-        )}
+        {campaign.description && <p className="text-sm text-muted-foreground mt-2">{campaign.description}</p>}
       </div>
 
       {/* ── Stats grid ── */}
@@ -136,7 +134,9 @@ export default async function CampaignDetailPage({ params }: Props) {
                 <span className="flex items-center gap-1.5 text-muted-foreground">
                   <Eye className="h-3.5 w-3.5 text-violet-500" />
                   Open Rate
-                  <span className="text-[10px] text-muted-foreground">({stats.opened}/{stats.sent})</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    ({stats.opened}/{stats.sent})
+                  </span>
                 </span>
                 <span className="font-semibold tabular-nums">{stats.openRate}%</span>
               </div>
@@ -154,7 +154,9 @@ export default async function CampaignDetailPage({ params }: Props) {
                 <span className="flex items-center gap-1.5 text-muted-foreground">
                   <MousePointerClick className="h-3.5 w-3.5 text-green-500" />
                   Click Rate
-                  <span className="text-[10px] text-muted-foreground">({stats.clicked}/{stats.sent})</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    ({stats.clicked}/{stats.sent})
+                  </span>
                 </span>
                 <span className="font-semibold tabular-nums">{stats.clickRate}%</span>
               </div>
@@ -173,7 +175,9 @@ export default async function CampaignDetailPage({ params }: Props) {
                   <span className="flex items-center gap-1.5 text-muted-foreground">
                     <MousePointerClick className="h-3.5 w-3.5 text-emerald-500" />
                     Click-to-Open Rate
-                    <span className="text-[10px] text-muted-foreground">({stats.clicked}/{stats.opened})</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      ({stats.clicked}/{stats.opened})
+                    </span>
                   </span>
                   <span className="font-semibold tabular-nums">
                     {((stats.clicked / stats.opened) * 100).toFixed(1)}%

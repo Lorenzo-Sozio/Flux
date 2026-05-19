@@ -9,6 +9,7 @@ import { platformDb } from "@/db";
 import { passwordResetTokens, users } from "@/db/schema";
 import { clearAdminSession, setAdminSession } from "@/lib/admin-session";
 import { sendAdminOtpEmail } from "@/lib/email";
+import { checkRateLimit } from "@/lib/rate-limiter";
 
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 
@@ -90,6 +91,13 @@ export async function adminLogin(_prev: ActionResult, formData: FormData): Promi
 
 export async function requestAdminOtp(email: string): Promise<{ success: boolean; error?: string }> {
   const normalizedEmail = email.trim().toLowerCase();
+
+  // Rate-limit OTP requests per email address: max 3 per 15 minutes.
+  // Using the email as key prevents flooding a specific admin's inbox.
+  const allowed = await checkRateLimit(`admin_otp:${normalizedEmail}`, 3, 15 * 60_000);
+  if (!allowed) {
+    return { success: false, error: "Troppi tentativi. Attendi qualche minuto prima di richiedere un nuovo codice." };
+  }
 
   const [user] = await platformDb.select().from(users).where(eq(users.email, normalizedEmail));
 

@@ -4,8 +4,8 @@ import { eq } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { APP_CONFIG } from "@/config/app-config";
-import { getDb } from "@/lib/tenant-context";
 import { quotes } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();

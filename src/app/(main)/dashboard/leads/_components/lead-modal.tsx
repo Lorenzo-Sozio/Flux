@@ -22,7 +22,14 @@ import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { checkLeadDuplicates, createCompanyCategory, createCompanyType, createLead, deleteLead, updateLead } from "@/actions/crm";
+import {
+  checkLeadDuplicates,
+  createCompanyCategory,
+  createCompanyType,
+  createLead,
+  deleteLead,
+  updateLead,
+} from "@/actions/crm";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
 import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combobox";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
@@ -114,8 +121,12 @@ export function LeadModal({
   const isEditing = !!lead;
   const searchParams = useSearchParams();
 
-  useEffect(() => { setLocalCategories(categories); }, [categories]);
-  useEffect(() => { setLocalTypes(companyTypes); }, [companyTypes]);
+  useEffect(() => {
+    setLocalCategories(categories);
+  }, [categories]);
+  useEffect(() => {
+    setLocalTypes(companyTypes);
+  }, [companyTypes]);
 
   useEffect(() => {
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);

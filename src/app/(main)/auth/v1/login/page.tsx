@@ -1,9 +1,11 @@
 import Link from "next/link";
+
 import { Command } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+
+import { DemoCredentialsBanner } from "../../_components/demo-credentials-banner";
 import { LoginForm } from "../../_components/login-form";
 import { GoogleButton } from "../../_components/social-auth/google-button";
-import { DemoCredentialsBanner } from "../../_components/demo-credentials-banner";
 
 export default async function LoginV1() {
   const t = await getTranslations("auth.login");
@@ -25,9 +27,7 @@ export default async function LoginV1() {
         <div className="w-full max-w-md space-y-6 py-16 lg:py-24">
           <div className="space-y-2 text-center">
             <div className="font-medium tracking-tight">{t("signIn")}</div>
-            <div className="mx-auto max-w-xl text-muted-foreground text-sm">
-              {t("subtitle")}
-            </div>
+            <div className="mx-auto max-w-xl text-muted-foreground text-sm">{t("subtitle")}</div>
           </div>
 
           <DemoCredentialsBanner />

@@ -1,7 +1,7 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 import { useTranslations } from "next-intl";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -46,16 +46,12 @@ export function CashFlowOverview({ revenueTrend }: Props) {
           <div className="flex items-center gap-1.5">
             <span className="inline-block size-2.5 rounded-sm" style={{ background: "var(--chart-1)" }} />
             <span className="text-muted-foreground text-xs">{t("dealsLabel")}</span>
-            <span className="font-medium text-xs tabular-nums">
-              {formatAmount(totalDeals, { noDecimals: true })}
-            </span>
+            <span className="font-medium text-xs tabular-nums">{formatAmount(totalDeals, { noDecimals: true })}</span>
           </div>
           <div className="flex items-center gap-1.5">
             <span className="inline-block size-2.5 rounded-sm" style={{ background: "var(--chart-2)" }} />
             <span className="text-muted-foreground text-xs">{t("ordersLabel")}</span>
-            <span className="font-medium text-xs tabular-nums">
-              {formatAmount(totalOrders, { noDecimals: true })}
-            </span>
+            <span className="font-medium text-xs tabular-nums">{formatAmount(totalOrders, { noDecimals: true })}</span>
           </div>
         </div>
       </CardHeader>

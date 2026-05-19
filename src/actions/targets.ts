@@ -1,13 +1,14 @@
 "use server";
 
-import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getAllUsersAction } from "@/actions/auth";
+import { salesTargets } from "@/db/schema";
 import { requireAdminAccess } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
-import { salesTargets } from "@/db/schema";
 
 export { getAllUsersAction as getAllUsers };
 

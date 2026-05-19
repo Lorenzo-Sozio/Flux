@@ -10,10 +10,9 @@ import { type NextRequest, NextResponse } from "next/server";
 import { and, eq, isNotNull, lt } from "drizzle-orm";
 
 import { createNotificationAction } from "@/actions/auth";
-import { getDb } from "@/lib/tenant-context";
 import { taskDependencies, tasks } from "@/db/schema";
-
 import { verifyCronRequest } from "@/lib/cron-auth";
+import { getDb } from "@/lib/tenant-context";
 
 export async function GET(req: NextRequest) {
   const authError = verifyCronRequest(req);

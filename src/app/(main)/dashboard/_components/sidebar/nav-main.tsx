@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTranslations } from "next-intl";
 
 import {
   Building2,
@@ -17,6 +16,7 @@ import {
   ShoppingCart,
   Users,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -87,12 +87,7 @@ const NavItemExpanded = ({
           </>
         ) : (
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton
-              asChild
-              aria-disabled={item.comingSoon}
-              isActive={isActive(item.url)}
-              tooltip={title}
-            >
+            <SidebarMenuButton asChild aria-disabled={item.comingSoon} isActive={isActive(item.url)} tooltip={title}>
               <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
                 {item.icon && <item.icon />}
                 <span>{title}</span>
@@ -137,11 +132,7 @@ const NavItemCollapsed = ({
     <SidebarMenuItem key={item.titleKey}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuButton
-            disabled={item.comingSoon}
-            tooltip={title}
-            isActive={isActive(item.url, item.subItems)}
-          >
+          <SidebarMenuButton disabled={item.comingSoon} tooltip={title} isActive={isActive(item.url, item.subItems)}>
             {item.icon && <item.icon />}
             <span>{title}</span>
             <ChevronRight />
@@ -204,7 +195,9 @@ export function NavMain({ items }: NavMainProps) {
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-52" side="right" align="start">
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">{t("quickCreate.crm")}</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    {t("quickCreate.crm")}
+                  </DropdownMenuLabel>
                   <DropdownMenuItem asChild>
                     <Link prefetch={false} href="/dashboard/leads?new=true" className="flex items-center gap-2">
                       <Users className="h-3.5 w-3.5" /> {t("quickCreate.newLead")}
@@ -226,7 +219,9 @@ export function NavMain({ items }: NavMainProps) {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">{t("quickCreate.sales")}</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    {t("quickCreate.sales")}
+                  </DropdownMenuLabel>
                   <DropdownMenuItem asChild>
                     <Link prefetch={false} href="/dashboard/sales/quotes/new" className="flex items-center gap-2">
                       <FileText className="h-3.5 w-3.5" /> {t("quickCreate.newQuote")}
@@ -238,19 +233,29 @@ export function NavMain({ items }: NavMainProps) {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">{t("quickCreate.work")}</DropdownMenuLabel>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                    {t("quickCreate.work")}
+                  </DropdownMenuLabel>
                   <DropdownMenuItem asChild>
                     <Link prefetch={false} href="/dashboard/tasks?new=true" className="flex items-center gap-2">
                       <CheckSquare className="h-3.5 w-3.5" /> {t("quickCreate.newTask")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/support/tickets?new=true" className="flex items-center gap-2">
+                    <Link
+                      prefetch={false}
+                      href="/dashboard/support/tickets?new=true"
+                      className="flex items-center gap-2"
+                    >
                       <Headphones className="h-3.5 w-3.5" /> {t("quickCreate.newTicket")}
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/marketing/campaigns?new=true" className="flex items-center gap-2">
+                    <Link
+                      prefetch={false}
+                      href="/dashboard/marketing/campaigns?new=true"
+                      className="flex items-center gap-2"
+                    >
                       <MessageSquare className="h-3.5 w-3.5" /> {t("quickCreate.newCampaign")}
                     </Link>
                   </DropdownMenuItem>
@@ -262,9 +267,7 @@ export function NavMain({ items }: NavMainProps) {
       </SidebarGroup>
       {items.map((group) => (
         <SidebarGroup key={group.id}>
-          {group.labelKey && (
-            <SidebarGroupLabel>{t(`groups.${group.labelKey}` as any)}</SidebarGroupLabel>
-          )}
+          {group.labelKey && <SidebarGroupLabel>{t(`groups.${group.labelKey}` as any)}</SidebarGroupLabel>}
           <SidebarGroupContent className="flex flex-col gap-2">
             <SidebarMenu>
               {group.items.map((item) => {
@@ -289,7 +292,13 @@ export function NavMain({ items }: NavMainProps) {
                   return <NavItemCollapsed key={item.titleKey} item={item} isActive={isItemActive} t={t} />;
                 }
                 return (
-                  <NavItemExpanded key={item.titleKey} item={item} isActive={isItemActive} isSubmenuOpen={isSubmenuOpen} t={t} />
+                  <NavItemExpanded
+                    key={item.titleKey}
+                    item={item}
+                    isActive={isItemActive}
+                    isSubmenuOpen={isSubmenuOpen}
+                    t={t}
+                  />
                 );
               })}
             </SidebarMenu>

@@ -15,8 +15,8 @@
  *   • Otherwise → creates a new user with role "owner".
  */
 
-import { eq, or } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { eq, or } from "drizzle-orm";
 
 async function main() {
   // Lazy-load so env vars are resolved before module initialisation
@@ -29,7 +29,9 @@ async function main() {
 
   if (!email) {
     console.error("❌  ADMIN_EMAIL is required.");
-    console.error("   Usage: ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=secret npx tsx --env-file=.env src/scripts/seed-admin.ts");
+    console.error(
+      "   Usage: ADMIN_EMAIL=you@example.com ADMIN_PASSWORD=secret npx tsx --env-file=.env src/scripts/seed-admin.ts",
+    );
     process.exit(1);
   }
 

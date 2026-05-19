@@ -9,15 +9,17 @@
  * Retry: up to 3 attempts with exponential backoff (5 min, 30 min).
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+
 import { and, eq, lte, sql } from "drizzle-orm";
-import { verifyCronRequest } from "@/lib/cron-auth";
-import { getDb } from "@/lib/tenant-context";
-import { campaignLogs, emailJobs, marketingCampaigns, users } from "@/db/schema";
-import { sendEmail, getEmailConfig } from "@/lib/email-provider";
-import { sendActivityReminderEmail } from "@/lib/email";
+
 import { getActivitiesWithPendingReminder } from "@/actions/activities";
 import { createNotificationAction } from "@/actions/auth";
+import { campaignLogs, emailJobs, marketingCampaigns, users } from "@/db/schema";
+import { verifyCronRequest } from "@/lib/cron-auth";
+import { sendActivityReminderEmail } from "@/lib/email";
+import { getEmailConfig, sendEmail } from "@/lib/email-provider";
+import { getDb } from "@/lib/tenant-context";
 
 const BATCH_SIZE = parseInt(process.env.EMAILS_PER_WORKER_RUN ?? "30");
 
@@ -39,7 +41,7 @@ export async function GET(req: NextRequest) {
     .from(emailJobs)
     .where(and(eq(emailJobs.status, "pending"), lte(emailJobs.scheduledAt, now)))
     .limit(BATCH_SIZE)
-    .for("update", { skipLocked: true });  // prevent duplicate processing
+    .for("update", { skipLocked: true }); // prevent duplicate processing
 
   if (jobs.length === 0) {
     return NextResponse.json({ processed: 0, message: "No pending jobs." });
@@ -50,7 +52,12 @@ export async function GET(req: NextRequest) {
   await db
     .update(emailJobs)
     .set({ status: "processing" })
-    .where(sql`${emailJobs.id} = ANY(ARRAY[${sql.join(jobIds.map((id) => sql`${id}`), sql`, `)}]::text[])`);
+    .where(
+      sql`${emailJobs.id} = ANY(ARRAY[${sql.join(
+        jobIds.map((id) => sql`${id}`),
+        sql`, `,
+      )}]::text[])`,
+    );
 
   let sent = 0;
   let failed = 0;
@@ -58,10 +65,7 @@ export async function GET(req: NextRequest) {
 
   for (const job of jobs) {
     try {
-      const result = await sendEmail(
-        { to: job.toEmail, subject: job.subject, html: job.htmlBody },
-        config
-      );
+      const result = await sendEmail({ to: job.toEmail, subject: job.subject, html: job.htmlBody }, config);
 
       if (result.success) {
         // Mark job sent
@@ -96,12 +100,7 @@ export async function GET(req: NextRequest) {
     const remaining = await db
       .select({ id: emailJobs.id })
       .from(emailJobs)
-      .where(
-        and(
-          eq(emailJobs.campaignId, campaignId),
-          sql`${emailJobs.status} IN ('pending', 'processing')`
-        )
-      )
+      .where(and(eq(emailJobs.campaignId, campaignId), sql`${emailJobs.status} IN ('pending', 'processing')`))
       .limit(1);
 
     if (remaining.length === 0) {

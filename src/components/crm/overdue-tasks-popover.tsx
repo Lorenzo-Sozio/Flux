@@ -1,19 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, CheckCircle2, ExternalLink } from "lucide-react";
+
 import Link from "next/link";
+
 import { differenceInDays } from "date-fns";
+import { AlertCircle, CheckCircle2, ExternalLink } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
+
 import { updateTaskStatus } from "@/actions/tasks";
 import { Badge } from "@/components/ui/badge";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 export interface OverdueTask {
@@ -25,11 +24,7 @@ export interface OverdueTask {
   priority: string;
 }
 
-export function OverdueTasksPopover({
-  tasks: initialTasks,
-}: {
-  tasks: OverdueTask[];
-}) {
+export function OverdueTasksPopover({ tasks: initialTasks }: { tasks: OverdueTask[] }) {
   const t = useTranslations("calendar");
   const [tasks, setTasks] = useState(initialTasks);
   const [completing, setCompleting] = useState<Set<string>>(new Set());
@@ -79,9 +74,7 @@ export function OverdueTasksPopover({
         <div className="flex items-center justify-between px-4 py-3 border-b bg-red-50 dark:bg-red-950/20 rounded-t-md">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
-            <span className="text-sm font-semibold text-red-800 dark:text-red-200">
-              {t("overdueSection")}
-            </span>
+            <span className="text-sm font-semibold text-red-800 dark:text-red-200">{t("overdueSection")}</span>
           </div>
           <Badge variant="destructive" className="text-xs tabular-nums">
             {tasks.length}
@@ -97,10 +90,7 @@ export function OverdueTasksPopover({
           ) : (
             <div className="divide-y">
               {tasks.map((task) => {
-                const daysLate = Math.max(
-                  1,
-                  differenceInDays(new Date(), new Date(task.date)),
-                );
+                const daysLate = Math.max(1, differenceInDays(new Date(), new Date(task.date)));
                 const isCompleting = completing.has(task.id);
                 return (
                   <div
@@ -124,21 +114,15 @@ export function OverdueTasksPopover({
                     {/* Content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-medium truncate">
-                          {task.displayTitle}
-                        </span>
+                        <span className="text-sm font-medium truncate">{task.displayTitle}</span>
                         {task.priority === "high" && (
-                          <span className="shrink-0 text-[10px] font-bold text-red-600 dark:text-red-400">
-                            ↑
-                          </span>
+                          <span className="shrink-0 text-[10px] font-bold text-red-600 dark:text-red-400">↑</span>
                         )}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5">
                         {task.entityName !== "No Entity" && (
                           <>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {task.entityName}
-                            </span>
+                            <span className="text-xs text-muted-foreground truncate">{task.entityName}</span>
                             <span className="text-muted-foreground/30 shrink-0">·</span>
                           </>
                         )}

@@ -1,18 +1,55 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireWriteAccess } from "@/lib/auth-guard";
-import { getDb } from "@/lib/tenant-context";
-import {
-  campaignLogs,
-  contacts,
-  emailSuppressions,
-  emailTemplates,
-  leads,
-  marketingCampaigns,
-} from "@/db/schema";
+
 import { and, eq } from "drizzle-orm";
+import { z } from "zod";
+
+import { campaignLogs, contacts, emailSuppressions, emailTemplates, leads, marketingCampaigns } from "@/db/schema";
+import { requireWriteAccess } from "@/lib/auth-guard";
 import { executeCampaignSend } from "@/lib/campaign-send";
+import { getDb } from "@/lib/tenant-context";
+
+// ─── Schemas ──────────────────────────────────────────────────────────────────
+
+/**
+ * Whitelist-based schemas: only the listed columns reach the DB.
+ * Unknown keys from callers are stripped (Zod default: strip mode).
+ * Actions accept `unknown` input so TypeScript callers are not constrained
+ * by the strict output type — validation happens entirely server-side.
+ */
+const EmailTemplateCreateSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().max(1000).optional(),
+  subject: z.string().min(1).max(998),
+  body: z.string().min(1),
+  isHtml: z.boolean().default(true),
+  // Accept any string; the DB column has no constraint, so we keep validation loose.
+  category: z.string().max(64).default("general"),
+  previewText: z.string().max(255).optional(),
+  ownerId: z.string().optional(),
+  isPublic: z.boolean().default(false),
+  tags: z.array(z.string().max(64)).max(20).default([]),
+});
+
+const EmailTemplateUpdateSchema = EmailTemplateCreateSchema.partial().omit({ ownerId: true });
+
+const MarketingCampaignCreateSchema = z.object({
+  name: z.string().min(1).max(255),
+  description: z.string().max(1000).optional(),
+  status: z.string().max(32).optional(),
+  templateId: z.string().optional().nullable(),
+  ownerId: z.string().optional().nullable(),
+  scheduledAt: z
+    .union([z.string().datetime(), z.date()])
+    .optional()
+    .nullable()
+    .transform((v) => (v ? new Date(v) : null))
+    .pipe(z.date().optional().nullable()),
+  recipientType: z.enum(["contacts", "leads"]).optional().nullable(),
+});
+
+const MarketingCampaignUpdateSchema = MarketingCampaignCreateSchema.partial();
 
 // ─── Email Templates ──────────────────────────────────────────────────────────
 
@@ -21,20 +58,22 @@ export async function getEmailTemplates() {
   return db.select().from(emailTemplates).orderBy(emailTemplates.createdAt);
 }
 
-export async function createEmailTemplate(data: any) {
+export async function createEmailTemplate(data: unknown) {
   await requireWriteAccess();
+  const validated = EmailTemplateCreateSchema.parse(data);
   const db = await getDb();
-  const [t] = await db.insert(emailTemplates).values(data).returning();
+  const [t] = await db.insert(emailTemplates).values(validated).returning();
   revalidatePath("/dashboard/marketing/templates");
   return t;
 }
 
-export async function updateEmailTemplate(id: string, data: any) {
+export async function updateEmailTemplate(id: string, data: unknown) {
   await requireWriteAccess();
+  const validated = EmailTemplateUpdateSchema.parse(data);
   const db = await getDb();
   const [t] = await db
     .update(emailTemplates)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...validated, updatedAt: new Date() })
     .where(eq(emailTemplates.id, id))
     .returning();
   revalidatePath("/dashboard/marketing/templates");
@@ -55,20 +94,22 @@ export async function getMarketingCampaigns() {
   return db.select().from(marketingCampaigns).orderBy(marketingCampaigns.createdAt);
 }
 
-export async function createMarketingCampaign(data: any) {
+export async function createMarketingCampaign(data: unknown) {
   await requireWriteAccess();
+  const validated = MarketingCampaignCreateSchema.parse(data);
   const db = await getDb();
-  const [c] = await db.insert(marketingCampaigns).values(data).returning();
+  const [c] = await db.insert(marketingCampaigns).values(validated).returning();
   revalidatePath("/dashboard/marketing/campaigns");
   return c;
 }
 
-export async function updateMarketingCampaign(id: string, data: any) {
+export async function updateMarketingCampaign(id: string, data: unknown) {
   await requireWriteAccess();
+  const validated = MarketingCampaignUpdateSchema.parse(data);
   const db = await getDb();
   const [c] = await db
     .update(marketingCampaigns)
-    .set({ ...data, updatedAt: new Date() })
+    .set({ ...validated, updatedAt: new Date() })
     .where(eq(marketingCampaigns.id, id))
     .returning();
   revalidatePath("/dashboard/marketing/campaigns");
@@ -104,57 +145,65 @@ export async function getCampaignReport(campaignId: string) {
   // Join with contacts and leads to get recipient names/emails
   const rawLogs = await db
     .select({
-      id:               campaignLogs.id,
-      status:           campaignLogs.status,
-      sentAt:           campaignLogs.sentAt,
-      openedAt:         campaignLogs.openedAt,
-      clickedAt:        campaignLogs.clickedAt,
-      errorMessage:     campaignLogs.errorMessage,
-      contactId:        campaignLogs.contactId,
-      leadId:           campaignLogs.leadId,
+      id: campaignLogs.id,
+      status: campaignLogs.status,
+      sentAt: campaignLogs.sentAt,
+      openedAt: campaignLogs.openedAt,
+      clickedAt: campaignLogs.clickedAt,
+      errorMessage: campaignLogs.errorMessage,
+      contactId: campaignLogs.contactId,
+      leadId: campaignLogs.leadId,
       contactFirstName: contacts.firstName,
-      contactLastName:  contacts.lastName,
-      contactEmail:     contacts.email,
-      leadFirstName:    leads.firstName,
-      leadLastName:     leads.lastName,
-      leadEmail:        leads.email,
+      contactLastName: contacts.lastName,
+      contactEmail: contacts.email,
+      leadFirstName: leads.firstName,
+      leadLastName: leads.lastName,
+      leadEmail: leads.email,
     })
     .from(campaignLogs)
     .leftJoin(contacts, eq(campaignLogs.contactId, contacts.id))
-    .leftJoin(leads,    eq(campaignLogs.leadId,    leads.id))
+    .leftJoin(leads, eq(campaignLogs.leadId, leads.id))
     .where(eq(campaignLogs.campaignId, campaignId));
 
   const logs = rawLogs.map((r) => ({
-    id:            r.id,
-    status:        r.status,
-    sentAt:        r.sentAt,
-    openedAt:      r.openedAt,
-    clickedAt:     r.clickedAt,
-    errorMessage:  r.errorMessage,
-    contactId:     r.contactId,
-    leadId:        r.leadId,
-    recipientName: [r.contactFirstName ?? r.leadFirstName, r.contactLastName ?? r.leadLastName]
-      .filter(Boolean).join(" ") || "—",
+    id: r.id,
+    status: r.status,
+    sentAt: r.sentAt,
+    openedAt: r.openedAt,
+    clickedAt: r.clickedAt,
+    errorMessage: r.errorMessage,
+    contactId: r.contactId,
+    leadId: r.leadId,
+    recipientName:
+      [r.contactFirstName ?? r.leadFirstName, r.contactLastName ?? r.leadLastName].filter(Boolean).join(" ") || "—",
     recipientEmail: r.contactEmail ?? r.leadEmail ?? "—",
-    recipientType:  r.contactId ? ("contact" as const) : r.leadId ? ("lead" as const) : null,
+    recipientType: r.contactId ? ("contact" as const) : r.leadId ? ("lead" as const) : null,
   }));
 
-  const total       = logs.length;
-  const queued      = logs.filter((l) => l.status === "queued").length;
-  const sent        = logs.filter((l) => !["failed", "queued"].includes(l.status)).length;
-  const opened      = logs.filter((l) => ["opened", "clicked"].includes(l.status)).length;
-  const clicked     = logs.filter((l) => l.status === "clicked").length;
-  const bounced     = logs.filter((l) => l.status === "bounced").length;
-  const complained  = logs.filter((l) => l.status === "complained").length;
+  const total = logs.length;
+  const queued = logs.filter((l) => l.status === "queued").length;
+  const sent = logs.filter((l) => !["failed", "queued"].includes(l.status)).length;
+  const opened = logs.filter((l) => ["opened", "clicked"].includes(l.status)).length;
+  const clicked = logs.filter((l) => l.status === "clicked").length;
+  const bounced = logs.filter((l) => l.status === "bounced").length;
+  const complained = logs.filter((l) => l.status === "complained").length;
   const unsubscribed = logs.filter((l) => l.status === "unsubscribed").length;
-  const failed      = logs.filter((l) => l.status === "failed").length;
+  const failed = logs.filter((l) => l.status === "failed").length;
 
   return {
     campaign,
     logs,
     stats: {
-      total, queued, sent, opened, clicked, bounced, complained, unsubscribed, failed,
-      openRate:  sent > 0 ? ((opened  / sent) * 100).toFixed(1) : "0",
+      total,
+      queued,
+      sent,
+      opened,
+      clicked,
+      bounced,
+      complained,
+      unsubscribed,
+      failed,
+      openRate: sent > 0 ? ((opened / sent) * 100).toFixed(1) : "0",
       clickRate: sent > 0 ? ((clicked / sent) * 100).toFixed(1) : "0",
     },
   };
@@ -164,10 +213,7 @@ export async function getCampaignReport(campaignId: string) {
 
 export async function getCampaignsWithStats() {
   const db = await getDb();
-  const campaigns = await db
-    .select()
-    .from(marketingCampaigns)
-    .orderBy(marketingCampaigns.createdAt);
+  const campaigns = await db.select().from(marketingCampaigns).orderBy(marketingCampaigns.createdAt);
 
   const allLogs = await db.select().from(campaignLogs);
 
@@ -209,13 +255,9 @@ export async function getEligibleRecipientCounts() {
     .from(leads)
     .where(and(eq(leads.marketingConsent, true), eq(leads.isConverted, false)));
 
-  const eligibleContacts = allContacts.filter(
-    (c) => c.email && !suppressedEmails.has(c.email.toLowerCase()),
-  ).length;
+  const eligibleContacts = allContacts.filter((c) => c.email && !suppressedEmails.has(c.email.toLowerCase())).length;
 
-  const eligibleLeads = allLeads.filter(
-    (l) => l.email && !suppressedEmails.has(l.email.toLowerCase()),
-  ).length;
+  const eligibleLeads = allLeads.filter((l) => l.email && !suppressedEmails.has(l.email.toLowerCase())).length;
 
   return { contacts: eligibleContacts, leads: eligibleLeads };
 }
@@ -258,7 +300,12 @@ export async function duplicateCampaignAction(id: string) {
 
   const [copy] = await db
     .insert(marketingCampaigns)
-    .values({ name: `${original.name} (Copy)`, description: original.description, templateId: original.templateId, status: "draft" })
+    .values({
+      name: `${original.name} (Copy)`,
+      description: original.description,
+      templateId: original.templateId,
+      status: "draft",
+    })
     .returning();
 
   revalidatePath("/dashboard/marketing/campaigns");

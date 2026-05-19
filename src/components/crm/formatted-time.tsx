@@ -13,7 +13,7 @@ export function FormattedTime({ date }: { date: Date | string | null }) {
         hour: "2-digit",
         minute: "2-digit",
         hour12: false,
-      })
+      }),
     );
   }, [date]);
 

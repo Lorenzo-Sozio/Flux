@@ -1,145 +1,127 @@
 // Tenant-only schema: everything except platform registry tables (tenants, tenantMembers).
 // Used by migrateTenantDb() so that platform tables are never pushed to tenant databases.
 export {
-  // Auth / users
-  users,
-  userGroups,
-  userGroupMembers,
   accounts,
-  sessions,
-  verificationTokens,
-  passwordResetTokens,
-  userInvitations,
-  userActivityLogs,
-  userGroupsRelations,
-  userGroupMembersRelations,
-  userInvitationsRelations,
-  userActivityLogsRelations,
-
-  // Geo reference
-  geoCountries,
-  geoCities,
-
-  // CRM core
-  companies,
-  leads,
-  contacts,
-  opportunities,
   activities,
   activitiesRelations,
-  leadsRelations,
+  appointmentAttendees,
+  appointmentAttendeesRelations,
+  // Appointments
+  appointments,
+  appointmentsRelations,
+  automationLogs,
+  automationLogsRelations,
+  // Automation
+  automationRules,
+  automationRulesRelations,
+  campaignLogs,
+  campaignLogsRelations,
+  // Chat / DM
+  chatChannels,
+  chatChannelsRelations,
+  chatSessions,
+  chatSessionsRelations,
+  // CRM core
+  companies,
+  contacts,
   contactsRelations,
-
-  // Tasks
-  tasks,
-  taskTimeLogs,
-  taskAssignees,
-  taskDependencies,
-  tasksRelations,
-  taskDependenciesRelations,
-  taskAssigneesRelations,
-  taskTimeLogsRelations,
-
-  // Pipeline / deals
-  pipelineStages,
-  deals,
-  pipelineStagesRelations,
-  dealsRelations,
+  // Custom fields
+  customFieldDefinitions,
+  customFieldDefinitionsRelations,
+  customFieldValues,
+  customFieldValuesRelations,
+  // Filters
+  customFilters,
+  customFiltersRelations,
+  customFilterTags,
+  customFilterTagsRelations,
   dealComments,
   dealCommentsRelations,
-
-  // Products / orders / quotes
-  products,
-  orders,
-  orderItems,
-  quotes,
-  quoteItems,
-  quoteActivities,
-  quotesRelations,
-  quoteItemsRelations,
-  quoteActivitiesRelations,
-
-  // Finance
-  salesTargets,
-  salesTargetsRelations,
-
+  deals,
+  dealsRelations,
+  dmConversationMembers,
+  dmConversationMembersRelations,
+  dmConversations,
+  dmConversationsRelations,
+  dmMessages,
+  dmMessagesRelations,
+  // Documents
+  documents,
+  emailJobs,
+  emailSettings,
+  emailSuppressions,
   // Marketing / email
   emailTemplates,
-  marketingCampaigns,
-  campaignLogs,
-  emailSettings,
-  emailJobs,
-  emailSuppressions,
   emailTemplatesRelations,
+  // Exchange rates cache
+  exchangeRatesCache,
+  filterPresets,
+  geoCities,
+  // Geo reference
+  geoCountries,
+  leads,
+  leadsRelations,
+  marketingCampaigns,
   marketingCampaignsRelations,
-  campaignLogsRelations,
-
-  // Support / tickets
-  tickets,
-  ticketMessages,
-  ticketAuditLogs,
-  ticketMacros,
-  slas,
-  ticketsRelations,
-  ticketMessagesRelations,
-  ticketAuditLogsRelations,
-  ticketMacrosRelations,
-  slasRelations,
-
   // Notifications
   notifications,
   notificationsRelations,
-
-  // Custom fields
-  customFieldDefinitions,
-  customFieldValues,
-  customFieldDefinitionsRelations,
-  customFieldValuesRelations,
-
-  // Filters
-  customFilters,
-  customFilterTags,
-  filterPresets,
-  customFiltersRelations,
-  customFilterTagsRelations,
-
-  // Documents
-  documents,
-
-  // Webhooks
-  webhooks,
-  webhookLogs,
-  webhooksRelations,
-  webhookLogsRelations,
-
-  // Automation
-  automationRules,
-  automationLogs,
-  automationRulesRelations,
-  automationLogsRelations,
-
-  // Appointments
-  appointments,
-  appointmentAttendees,
-  appointmentsRelations,
-  appointmentAttendeesRelations,
-
-  // Chat / DM
-  chatChannels,
-  chatSessions,
-  dmConversations,
-  dmConversationMembers,
-  dmMessages,
-  chatChannelsRelations,
-  chatSessionsRelations,
-  dmConversationsRelations,
-  dmConversationMembersRelations,
-  dmMessagesRelations,
-
+  opportunities,
+  orderItems,
+  orders,
+  passwordResetTokens,
+  // Pipeline / deals
+  pipelineStages,
+  pipelineStagesRelations,
+  // Products / orders / quotes
+  products,
+  quoteActivities,
+  quoteActivitiesRelations,
+  quoteItems,
+  quoteItemsRelations,
+  quotes,
+  quotesRelations,
+  // Finance
+  salesTargets,
+  salesTargetsRelations,
   // Reports
   savedReports,
   savedReportsRelations,
-
-  // Exchange rates cache
-  exchangeRatesCache,
+  sessions,
+  slas,
+  slasRelations,
+  taskAssignees,
+  taskAssigneesRelations,
+  taskDependencies,
+  taskDependenciesRelations,
+  // Tasks
+  tasks,
+  tasksRelations,
+  taskTimeLogs,
+  taskTimeLogsRelations,
+  ticketAuditLogs,
+  ticketAuditLogsRelations,
+  ticketMacros,
+  ticketMacrosRelations,
+  ticketMessages,
+  ticketMessagesRelations,
+  // Support / tickets
+  tickets,
+  ticketsRelations,
+  userActivityLogs,
+  userActivityLogsRelations,
+  userGroupMembers,
+  userGroupMembersRelations,
+  userGroups,
+  userGroupsRelations,
+  userInvitations,
+  userInvitationsRelations,
+  // Auth / users
+  users,
+  verificationTokens,
+  webhookLogs,
+  webhookLogsRelations,
+  // Webhooks
+  webhooks,
+  webhooksRelations,
 } from "./schema";

@@ -199,7 +199,16 @@
       "Bash(node -e \"const p = require\\('./node_modules/next-auth/package.json'\\); console.log\\(JSON.stringify\\(p.exports['./jwt'], null, 2\\)\\)\")",
       "Bash(node -e \"process.stdin.pipe\\(require\\('stream'\\).Transform\\({transform\\(c,_,cb\\){process.stdout.write\\(c\\);cb\\(\\)}}\\)\\)\")",
       "Bash(node -e \"const p = require\\('./node_modules/next-auth/package.json'\\); console.log\\(p.typesVersions\\)\")",
-      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")"
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")",
+      "PowerShell(cd \"c:\\\\React\\\\Flux\"; npx biome check src/actions/admin-billing.ts src/app/\\(main\\)/admin/billing/page.tsx \"src/app/\\(main\\)/admin/billing/_components/metrics-cards.tsx\")",
+      "Bash(npx @biomejs/biome check src/lib/billing/usage.ts src/components/crm/automation/rule-engine.ts src/actions/crm.ts src/actions/pipeline.ts src/app/api/crm/contacts/route.ts src/app/api/crm/leads/route.ts src/app/api/crm/companies/route.ts src/app/api/crm/activities/route.ts src/app/api/crm/contacts/bulk/route.ts src/app/api/crm/leads/bulk/route.ts src/app/api/crm/companies/bulk/route.ts src/app/api/crm/activities/bulk/route.ts)",
+      "Bash(git stash *)",
+      "Bash(npx @biomejs/biome check src/lib/billing/usage.ts src/components/crm/automation/rule-engine.ts src/actions/crm.ts src/actions/pipeline.ts)",
+      "Bash(npx @biomejs/biome check src/lib/billing/usage.ts src/components/crm/automation/rule-engine.ts src/actions/crm.ts src/actions/pipeline.ts src/actions/billing.ts src/app/api/crm/contacts/route.ts src/app/api/crm/leads/route.ts src/app/api/crm/companies/route.ts src/app/api/crm/activities/route.ts src/app/api/crm/contacts/bulk/route.ts src/app/api/crm/leads/bulk/route.ts src/app/api/crm/companies/bulk/route.ts src/app/api/crm/activities/bulk/route.ts)",
+      "Bash(npx @biomejs/biome check --write src/lib/billing/usage.ts src/components/crm/automation/rule-engine.ts src/actions/crm.ts src/actions/pipeline.ts src/actions/billing.ts src/app/api/crm/contacts/route.ts src/app/api/crm/leads/route.ts src/app/api/crm/companies/route.ts src/app/api/crm/activities/route.ts src/app/api/crm/contacts/bulk/route.ts src/app/api/crm/leads/bulk/route.ts src/app/api/crm/companies/bulk/route.ts src/app/api/crm/activities/bulk/route.ts)",
+      "Bash(npx @biomejs/biome check src/actions/pipeline.ts)",
+      "Bash(npx @biomejs/biome check src/actions/crm.ts src/actions/pipeline.ts src/lib/billing/usage.ts src/components/crm/automation/rule-engine.ts)",
+      "Bash(npx @biomejs/biome check --write src/actions/crm.ts src/actions/pipeline.ts)"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",

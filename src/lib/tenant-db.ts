@@ -25,10 +25,7 @@ export function encryptDbUrl(plaintext: string): string {
   const key = getKey();
   const iv = randomBytes(16);
   const cipher = createCipheriv(ALGORITHM, key, iv);
-  const encrypted = Buffer.concat([
-    cipher.update(plaintext, "utf8"),
-    cipher.final(),
-  ]);
+  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
   const authTag = cipher.getAuthTag();
   return [iv.toString("hex"), authTag.toString("hex"), encrypted.toString("hex")].join(":");
 }
@@ -41,11 +38,10 @@ export function decryptDbUrl(stored: string): string {
   try {
     const decipher = createDecipheriv(ALGORITHM, key, Buffer.from(ivHex, "hex"));
     decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
-    return (
-      decipher.update(Buffer.from(dataHex, "hex")).toString("utf8") +
-      decipher.final("utf8")
-    );
+    return decipher.update(Buffer.from(dataHex, "hex")).toString("utf8") + decipher.final("utf8");
   } catch {
-    throw new Error("Failed to decrypt tenant database URL. The value may be corrupted or the encryption key may have changed.");
+    throw new Error(
+      "Failed to decrypt tenant database URL. The value may be corrupted or the encryption key may have changed.",
+    );
   }
 }

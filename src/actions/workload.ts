@@ -4,15 +4,15 @@ import { revalidatePath } from "next/cache";
 
 import { and, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 
-import { getDb } from "@/lib/tenant-context";
 import { taskAssignees, taskDependencies, tasks, users } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type WorkloadTaskEntry = {
   id: string;
   title: string;
-  hours: number;        // per-day allocation within the view window
+  hours: number; // per-day allocation within the view window
   estimatedHours: number;
   startDate: string | null;
   dueDate: string;
@@ -187,7 +187,7 @@ export async function rescheduleTaskDueDate(
   try {
     const { requireWriteAccess } = await import("@/lib/auth-guard");
     await requireWriteAccess();
-  const db = await getDb();
+    const db = await getDb();
     await db.update(tasks).set({ dueDate: newDueDate }).where(eq(tasks.id, taskId));
     revalidatePath("/dashboard/tasks/workload");
     revalidatePath("/dashboard/tasks");

@@ -20,7 +20,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-4">          
+        <div className="flex items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
             <p className="text-sm text-muted-foreground">{t("subtitle", { days: data.periodDays })}</p>

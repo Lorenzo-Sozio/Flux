@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useTransition, useEffect, useCallback } from "react";
-import { Bell, CheckCheck, ExternalLink } from "lucide-react";
+import { useCallback, useEffect, useState, useTransition } from "react";
+
 import Link from "next/link";
-import {
-  markAllNotificationsReadAction,
-  markNotificationReadAction,
-} from "@/actions/auth";
+
+import { Bell, CheckCheck, ExternalLink } from "lucide-react";
+
+import { markAllNotificationsReadAction, markNotificationReadAction } from "@/actions/auth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -88,9 +88,7 @@ export function NotificationCenter({ notifications: initial, userId }: Props) {
         <Button variant="ghost" size="icon" className="relative h-8 w-8">
           <Bell className="h-4 w-4" />
           {unreadCount > 0 && (
-            <Badge
-              className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full p-0 text-[10px]"
-            >
+            <Badge className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full p-0 text-[10px]">
               {unreadCount > 9 ? "9+" : unreadCount}
             </Badge>
           )}
@@ -126,24 +124,16 @@ export function NotificationCenter({ notifications: initial, userId }: Props) {
                   key={n.id}
                   className={cn(
                     "flex gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50",
-                    !n.isRead && "bg-primary/5"
+                    !n.isRead && "bg-primary/5",
                   )}
                 >
                   <span className="mt-0.5 text-base" aria-hidden>
                     {TYPE_ICONS[n.type] ?? "📌"}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className={cn("text-sm leading-tight", !n.isRead && "font-medium")}>
-                      {n.title}
-                    </p>
-                    {n.message && (
-                      <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">
-                        {n.message}
-                      </p>
-                    )}
-                    <p className="mt-1 text-[10px] text-muted-foreground">
-                      {new Date(n.createdAt).toLocaleString()}
-                    </p>
+                    <p className={cn("text-sm leading-tight", !n.isRead && "font-medium")}>{n.title}</p>
+                    {n.message && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{n.message}</p>}
+                    <p className="mt-1 text-[10px] text-muted-foreground">{new Date(n.createdAt).toLocaleString()}</p>
                   </div>
                   <div className="flex flex-col items-center gap-1">
                     {!n.isRead && (

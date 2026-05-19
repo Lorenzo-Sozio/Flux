@@ -11,8 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { ADDON_CONFIGS } from "@/lib/billing/plans-config";
 import type { AddonType } from "@/lib/billing/plans-config";
+import { ADDON_CONFIGS } from "@/lib/billing/plans-config";
 
 interface Addon {
   id: string;
@@ -61,10 +61,7 @@ export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
           activeAddons.map((addon) => {
             const cfg = ADDON_CONFIGS[addon.addonType as AddonType];
             return (
-              <div
-                key={addon.id}
-                className="flex items-center justify-between rounded-md border px-4 py-3"
-              >
+              <div key={addon.id} className="flex items-center justify-between rounded-md border px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">
                     {cfg?.displayName ?? addon.addonType}
@@ -96,37 +93,30 @@ export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             {t("addons.availableTitle")}
           </p>
-          {(Object.entries(ADDON_CONFIGS) as [AddonType, (typeof ADDON_CONFIGS)[AddonType]][]).map(
-            ([type, cfg]) => {
-              const alreadyActive = activeAddons.some((a) => a.addonType === type);
-              return (
-                <div
-                  key={type}
-                  className="flex items-center justify-between rounded-md border px-4 py-3"
-                >
-                  <div>
-                    <p className="text-sm font-medium">{cfg.displayName}</p>
-                    <p className="text-xs text-muted-foreground">{cfg.description}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {t("addons.pricePerMonth", { price: (cfg.priceMonthly / 100).toFixed(0) })}
-                    </p>
-                  </div>
-                  {alreadyActive ? (
-                    <Badge variant="outline" className="text-xs">{t("addons.activeBadge")}</Badge>
-                  ) : (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => toast.info(t("addons.addViaPortal"))}
-                    >
-                      <Plus className="mr-1 h-3 w-3" />
-                      {t("addons.addButton")}
-                    </Button>
-                  )}
+          {(Object.entries(ADDON_CONFIGS) as [AddonType, (typeof ADDON_CONFIGS)[AddonType]][]).map(([type, cfg]) => {
+            const alreadyActive = activeAddons.some((a) => a.addonType === type);
+            return (
+              <div key={type} className="flex items-center justify-between rounded-md border px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">{cfg.displayName}</p>
+                  <p className="text-xs text-muted-foreground">{cfg.description}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {t("addons.pricePerMonth", { price: (cfg.priceMonthly / 100).toFixed(0) })}
+                  </p>
                 </div>
-              );
-            },
-          )}
+                {alreadyActive ? (
+                  <Badge variant="outline" className="text-xs">
+                    {t("addons.activeBadge")}
+                  </Badge>
+                ) : (
+                  <Button size="sm" variant="outline" onClick={() => toast.info(t("addons.addViaPortal"))}>
+                    <Plus className="mr-1 h-3 w-3" />
+                    {t("addons.addButton")}
+                  </Button>
+                )}
+              </div>
+            );
+          })}
         </div>
       </CardContent>
     </Card>

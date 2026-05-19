@@ -8,11 +8,7 @@ import { auth } from "@/auth";
 
 import { TasksClient } from "./_components/tasks-client";
 
-export default async function TasksPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ task?: string }>;
-}) {
+export default async function TasksPage({ searchParams }: { searchParams: Promise<{ task?: string }> }) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 

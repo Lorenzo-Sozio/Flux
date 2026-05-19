@@ -1,10 +1,12 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { TrashIcon } from "lucide-react";
-import { deleteEmailTemplate } from "@/actions/marketing";
-import { toast } from "sonner";
 import { useState } from "react";
+
+import { TrashIcon } from "lucide-react";
+import { toast } from "sonner";
+
+import { deleteEmailTemplate } from "@/actions/marketing";
+import { Button } from "@/components/ui/button";
 
 interface TemplateDeleteButtonProps {
   templateId: string;
@@ -15,7 +17,7 @@ export function TemplateDeleteButton({ templateId }: TemplateDeleteButtonProps) 
 
   async function handleDelete() {
     if (!confirm("Are you sure you want to delete this template?")) return;
-    
+
     setLoading(true);
     try {
       await deleteEmailTemplate(templateId);

@@ -3,8 +3,8 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { desc, eq } from "drizzle-orm";
 
-import { getDb } from "@/lib/tenant-context";
 import { quoteActivities, quoteItems, quotes } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 // GET /api/quotes/public?token=xxx  — fetch quote by public token (no auth)
 export async function GET(req: NextRequest) {

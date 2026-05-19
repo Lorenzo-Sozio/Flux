@@ -12,14 +12,15 @@
  *   4. Normalized payload is passed to processInboundEmail() → creates/updates ticket
  */
 
-import { NextRequest, NextResponse } from "next/server";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { type NextRequest, NextResponse } from "next/server";
 
 import { simpleParser } from "mailparser";
 import { Resend } from "resend";
 
 import type { InboundAttachment } from "@/lib/ticket-from-email";
 import { processInboundEmail } from "@/lib/ticket-from-email";
+
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 // ─── Svix signature verification ─────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
       textBody = parsed.text ?? "";
 
       // Threading headers
-      inboundMessageId = inboundMessageId ?? (parsed.messageId ?? null);
+      inboundMessageId = inboundMessageId ?? parsed.messageId ?? null;
       inReplyTo = parsed.inReplyTo ?? null;
 
       // Collect real attachments, skip inline images (contentId set = embedded in HTML)

@@ -18,6 +18,7 @@ import {
   companies,
   contacts,
   deals,
+  leads,
   tenantMembers,
 } from "@/db/schema";
 import { getEntitlements, invalidateEntitlementCache, logEntitlementChange } from "@/lib/billing/licensing";
@@ -106,14 +107,18 @@ export async function getSubscriptionDetails() {
 
   const memberCount = Number(memberRows[0]?.value ?? 0);
 
-  const [contactRows, companyRows, dealRows] = await Promise.all([
+  const [contactRows, leadRows, companyRows, dealRows] = await Promise.all([
     db.select({ value: count() }).from(contacts),
+    db.select({ value: count() }).from(leads),
     db.select({ value: count() }).from(companies),
     db.select({ value: count() }).from(deals),
   ]);
 
   const totalRecords =
-    Number(contactRows[0]?.value ?? 0) + Number(companyRows[0]?.value ?? 0) + Number(dealRows[0]?.value ?? 0);
+    Number(contactRows[0]?.value ?? 0) +
+    Number(leadRows[0]?.value ?? 0) +
+    Number(companyRows[0]?.value ?? 0) +
+    Number(dealRows[0]?.value ?? 0);
 
   const maxUserLimit = entitlements.limits.maxUsers;
   const maxRecordLimit = entitlements.limits.maxRecords;

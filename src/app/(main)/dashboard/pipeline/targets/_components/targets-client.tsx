@@ -2,18 +2,18 @@
 
 import { useState, useTransition } from "react";
 
-import { format, addMonths, startOfMonth } from "date-fns";
+import { addMonths, format, startOfMonth } from "date-fns";
 import { Loader2, Plus, Save, Target, Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteSalesTarget, upsertSalesTarget } from "@/actions/targets";
-import { formatCurrency } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { formatCurrency } from "@/lib/utils";
 
 type User = { id: string; name: string | null; email: string | null; role: string };
 type SalesTarget = {
@@ -145,7 +145,10 @@ export function TargetsClient({ users, initialTargets }: Props) {
                     {t("colUser")}
                   </th>
                   {months.map((m) => (
-                    <th key={m} className="px-3 py-2.5 text-center font-medium text-xs text-muted-foreground min-w-[140px]">
+                    <th
+                      key={m}
+                      className="px-3 py-2.5 text-center font-medium text-xs text-muted-foreground min-w-[140px]"
+                    >
                       {format(new Date(m + "-01"), "MMM yyyy")}
                     </th>
                   ))}
@@ -178,7 +181,9 @@ export function TargetsClient({ users, initialTargets }: Props) {
                                   </SelectTrigger>
                                   <SelectContent>
                                     {["EUR", "USD", "GBP"].map((c) => (
-                                      <SelectItem key={c} value={c} className="text-xs">{c}</SelectItem>
+                                      <SelectItem key={c} value={c} className="text-xs">
+                                        {c}
+                                      </SelectItem>
                                     ))}
                                   </SelectContent>
                                 </Select>
@@ -232,7 +237,10 @@ export function TargetsClient({ users, initialTargets }: Props) {
                                 onClick={() => startEdit(target)}
                                 className="text-sm font-semibold tabular-nums hover:text-primary transition-colors"
                               >
-                                {formatCurrency(parseFloat(target.targetAmount), { currency: target.currency, maximumFractionDigits: 0 })}
+                                {formatCurrency(parseFloat(target.targetAmount), {
+                                  currency: target.currency,
+                                  maximumFractionDigits: 0,
+                                })}
                               </button>
                               {target.targetDeals != null && (
                                 <span className="text-xs text-muted-foreground">

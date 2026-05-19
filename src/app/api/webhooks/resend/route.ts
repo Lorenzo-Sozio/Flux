@@ -7,11 +7,13 @@
  * Signature verification uses the Svix algorithm (SHA-256 HMAC).
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+
 import { createHmac, timingSafeEqual } from "crypto";
 import { eq } from "drizzle-orm";
-import { getDb } from "@/lib/tenant-context";
+
 import { campaignLogs, emailSuppressions } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 export async function POST(req: NextRequest) {
   const db = await getDb();
@@ -56,10 +58,7 @@ export async function POST(req: NextRequest) {
 
           // Update campaign log if we can correlate by messageId
           if (messageId) {
-            await db
-              .update(campaignLogs)
-              .set({ status: "bounced" })
-              .where(eq(campaignLogs.messageId, messageId));
+            await db.update(campaignLogs).set({ status: "bounced" }).where(eq(campaignLogs.messageId, messageId));
           }
         }
         break;
@@ -75,10 +74,7 @@ export async function POST(req: NextRequest) {
             .onConflictDoNothing();
 
           if (messageId) {
-            await db
-              .update(campaignLogs)
-              .set({ status: "complained" })
-              .where(eq(campaignLogs.messageId, messageId));
+            await db.update(campaignLogs).set({ status: "complained" }).where(eq(campaignLogs.messageId, messageId));
           }
         }
         break;

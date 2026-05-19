@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+
 import {
   ArrowLeft,
   BellOff,
@@ -19,13 +20,23 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+
+import {
+  createGroupConversation,
+  deleteConversation,
+  getChatUsers,
+  getConversations,
+  getMessages,
+  getOrCreateDirectConversation,
+  getTotalUnreadCount,
+  leaveConversation,
+  markConversationRead,
+  muteConversation,
+  sendMessage,
+} from "@/actions/chat-internal";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,19 +45,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  getConversations,
-  getTotalUnreadCount,
-  getMessages,
-  sendMessage,
-  markConversationRead,
-  getOrCreateDirectConversation,
-  createGroupConversation,
-  getChatUsers,
-  muteConversation,
-  leaveConversation,
-  deleteConversation,
-} from "@/actions/chat-internal";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -84,8 +86,12 @@ type View = { kind: "list" } | { kind: "thread"; conv: Conversation } | { kind: 
 
 function initials(name: string | null, email: string | null) {
   return (name ?? email ?? "?")
-    .split(/[\s@.]/).filter(Boolean)
-    .map((p) => p[0]).join("").toUpperCase().slice(0, 2);
+    .split(/[\s@.]/)
+    .filter(Boolean)
+    .map((p) => p[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 function convName(conv: Conversation, myId: string) {
@@ -100,7 +106,7 @@ function formatTime(date: Date | string) {
   const diffDays = Math.floor(diffMs / 86_400_000);
   if (diffDays === 0) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7)  return d.toLocaleDateString([], { weekday: "short" });
+  if (diffDays < 7) return d.toLocaleDateString([], { weekday: "short" });
   return d.toLocaleDateString([], { month: "short", day: "numeric" });
 }
 
@@ -130,11 +136,11 @@ function ConvItem({
   onLeave: (convId: string) => void;
   onDelete: (convId: string) => void;
 }) {
-  const isGroup   = conv.type === "group";
-  const last      = conv.messages[0];
-  const name      = convName(conv, myId);
-  const muteText  = muteLabel(conv.mutedUntil);
-  const other     = !isGroup ? conv.members.find((m) => m.userId !== myId) : null;
+  const isGroup = conv.type === "group";
+  const last = conv.messages[0];
+  const name = convName(conv, myId);
+  const muteText = muteLabel(conv.mutedUntil);
+  const other = !isGroup ? conv.members.find((m) => m.userId !== myId) : null;
 
   return (
     <div className="group relative flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors rounded-md mx-1">
@@ -146,8 +152,9 @@ function ConvItem({
         <AvatarFallback
           className={cn(
             "text-xs font-medium",
-            isGroup ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
-                    : "bg-primary/10 text-primary",
+            isGroup
+              ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
+              : "bg-primary/10 text-primary",
           )}
         >
           {isGroup ? <Users className="h-4 w-4" /> : initials(other?.user?.name ?? null, other?.user?.email ?? null)}
@@ -157,18 +164,23 @@ function ConvItem({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1">
-          <span className={cn("truncate text-sm", conv.unread > 0 ? "font-semibold" : "font-medium")}>
-            {name}
-          </span>
+          <span className={cn("truncate text-sm", conv.unread > 0 ? "font-semibold" : "font-medium")}>{name}</span>
           <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
             {last ? formatTime(last.createdAt) : ""}
           </span>
         </div>
         <div className="flex items-center justify-between gap-1 mt-0.5">
-          <span className={cn("truncate text-xs leading-4", conv.unread > 0 ? "text-foreground" : "text-muted-foreground")}>
-            {muteText
-              ? <span className="flex items-center gap-1"><BellOff className="h-2.5 w-2.5 shrink-0" />{muteText}</span>
-              : (last?.content ?? "No messages yet")}
+          <span
+            className={cn("truncate text-xs leading-4", conv.unread > 0 ? "text-foreground" : "text-muted-foreground")}
+          >
+            {muteText ? (
+              <span className="flex items-center gap-1">
+                <BellOff className="h-2.5 w-2.5 shrink-0" />
+                {muteText}
+              </span>
+            ) : (
+              (last?.content ?? "No messages yet")
+            )}
           </span>
           {conv.unread > 0 && (
             <Badge className="h-4 min-w-4 shrink-0 rounded-full px-1 text-[10px] bg-primary leading-none">
@@ -180,7 +192,11 @@ function ConvItem({
         {/* Group members preview */}
         {isGroup && (
           <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">
-            {conv.members.map((m) => m.user?.name ?? m.user?.email).filter(Boolean).slice(0, 4).join(", ")}
+            {conv.members
+              .map((m) => m.user?.name ?? m.user?.email)
+              .filter(Boolean)
+              .slice(0, 4)
+              .join(", ")}
             {conv.members.length > 4 ? ` +${conv.members.length - 4}` : ""}
           </p>
         )}
@@ -216,7 +232,9 @@ function ConvItem({
               </DropdownMenuItem>
             ) : (
               <>
-                <DropdownMenuLabel className="text-[11px] text-muted-foreground px-2 pt-1 pb-0">Mute for…</DropdownMenuLabel>
+                <DropdownMenuLabel className="text-[11px] text-muted-foreground px-2 pt-1 pb-0">
+                  Mute for…
+                </DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => onMute(conv.id, 60)}>1 hour</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onMute(conv.id, 8 * 60)}>8 hours</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => onMute(conv.id, 24 * 60)}>24 hours</DropdownMenuItem>
@@ -226,20 +244,14 @@ function ConvItem({
             {isGroup && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => onLeave(conv.id)}
-                  className="text-destructive focus:text-destructive"
-                >
+                <DropdownMenuItem onClick={() => onLeave(conv.id)} className="text-destructive focus:text-destructive">
                   <LogOut className="h-3.5 w-3.5 mr-2" />
                   Leave group
                 </DropdownMenuItem>
               </>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => onDelete(conv.id)}
-              className="text-destructive focus:text-destructive"
-            >
+            <DropdownMenuItem onClick={() => onDelete(conv.id)} className="text-destructive focus:text-destructive">
               <Trash2 className="h-3.5 w-3.5 mr-2" />
               Delete
             </DropdownMenuItem>
@@ -263,7 +275,9 @@ function GroupHeader({ conv, myId }: { conv: Conversation; myId: string }) {
       </Avatar>
       <div className="min-w-0">
         <p className="truncate font-semibold text-sm leading-4">{convName(conv, myId)}</p>
-        <p className="text-[10px] text-muted-foreground">{memberCount} member{memberCount !== 1 ? "s" : ""}</p>
+        <p className="text-[10px] text-muted-foreground">
+          {memberCount} member{memberCount !== 1 ? "s" : ""}
+        </p>
       </div>
     </div>
   );
@@ -272,33 +286,39 @@ function GroupHeader({ conv, myId }: { conv: Conversation; myId: string }) {
 // ── Main widget ───────────────────────────────────────────────────────────────
 
 export function ChatWidget({ userId }: { userId: string }) {
-  const [open,          setOpen]          = useState(false);
-  const [view,          setView]          = useState<View>({ kind: "list" });
-  const [tab,           setTab]           = useState<TabValue>("all");
+  const [open, setOpen] = useState(false);
+  const [view, setView] = useState<View>({ kind: "list" });
+  const [tab, setTab] = useState<TabValue>("all");
   const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [messages,      setMessages]      = useState<Message[]>([]);
-  const [unreadTotal,   setUnreadTotal]   = useState(0);
-  const [input,         setInput]         = useState("");
-  const [sending,       setSending]       = useState(false);
-  const [chatUsers,     setChatUsers]     = useState<ChatUser[]>([]);
-  const [userSearch,    setUserSearch]    = useState("");
-  const [groupName,     setGroupName]     = useState("");
-  const [selectedIds,   setSelectedIds]   = useState<string[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [unreadTotal, setUnreadTotal] = useState(0);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [chatUsers, setChatUsers] = useState<ChatUser[]>([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [groupName, setGroupName] = useState("");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef       = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // ── Loaders ───────────────────────────────────────────────────────────────
 
   const loadConvs = useCallback(async () => {
-    try { setConversations((await getConversations()) as Conversation[]); } catch {}
+    try {
+      setConversations((await getConversations()) as Conversation[]);
+    } catch {}
   }, []);
 
   const loadUnread = useCallback(async () => {
-    try { setUnreadTotal(await getTotalUnreadCount()); } catch {}
+    try {
+      setUnreadTotal(await getTotalUnreadCount());
+    } catch {}
   }, []);
 
   const loadMessages = useCallback(async (convId: string) => {
-    try { setMessages((await getMessages(convId)) as Message[]); } catch {}
+    try {
+      setMessages((await getMessages(convId)) as Message[]);
+    } catch {}
   }, []);
 
   // ── Polling ───────────────────────────────────────────────────────────────
@@ -326,7 +346,9 @@ export function ChatWidget({ userId }: { userId: string }) {
 
   // ── Auto-scroll + mark read ───────────────────────────────────────────────
 
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   useEffect(() => {
     if (view.kind !== "thread") return;
@@ -338,8 +360,12 @@ export function ChatWidget({ userId }: { userId: string }) {
 
   useEffect(() => {
     if (view.kind === "new-dm" || view.kind === "new-group") {
-      getChatUsers().then((d) => setChatUsers(d as ChatUser[])).catch(() => {});
-      setUserSearch(""); setSelectedIds([]); setGroupName("");
+      getChatUsers()
+        .then((d) => setChatUsers(d as ChatUser[]))
+        .catch(() => {});
+      setUserSearch("");
+      setSelectedIds([]);
+      setGroupName("");
     }
   }, [view]);
 
@@ -354,13 +380,16 @@ export function ChatWidget({ userId }: { userId: string }) {
     return (u.name ?? "").toLowerCase().includes(q) || (u.email ?? "").toLowerCase().includes(q);
   });
 
-  const groupCount  = conversations.filter((c) => c.type === "group").length;
+  const groupCount = conversations.filter((c) => c.type === "group").length;
   const directCount = conversations.filter((c) => c.type === "direct").length;
   const groupUnread = conversations.filter((c) => c.type === "group").reduce((s, c) => s + c.unread, 0);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
-  const openThread = (conv: Conversation) => { setView({ kind: "thread", conv }); setInput(""); };
+  const openThread = (conv: Conversation) => {
+    setView({ kind: "thread", conv });
+    setInput("");
+  };
 
   const handleSend = async () => {
     if (!input.trim() || sending || view.kind !== "thread") return;
@@ -370,7 +399,11 @@ export function ChatWidget({ userId }: { userId: string }) {
       setInput("");
       await loadMessages(view.conv.id);
       loadConvs();
-    } catch {} finally { setSending(false); inputRef.current?.focus(); }
+    } catch {
+    } finally {
+      setSending(false);
+      inputRef.current?.focus();
+    }
   };
 
   const handleStartDM = async (otherUserId: string) => {
@@ -379,7 +412,8 @@ export function ChatWidget({ userId }: { userId: string }) {
       const fresh = (await getConversations()) as Conversation[];
       setConversations(fresh);
       const found = fresh.find((c) => c.id === conv.id);
-      if (found) openThread(found); else setView({ kind: "list" });
+      if (found) openThread(found);
+      else setView({ kind: "list" });
     } catch {}
   };
 
@@ -391,14 +425,16 @@ export function ChatWidget({ userId }: { userId: string }) {
       setConversations(fresh);
       const found = fresh.find((c) => c.id === conv.id);
       setTab("groups");
-      if (found) openThread(found); else setView({ kind: "list" });
+      if (found) openThread(found);
+      else setView({ kind: "list" });
     } catch {}
   };
 
   const handleMute = async (convId: string, minutes: number | null) => {
     try {
       await muteConversation(convId, minutes);
-      loadConvs(); loadUnread();
+      loadConvs();
+      loadUnread();
     } catch {}
   };
 
@@ -450,7 +486,6 @@ export function ChatWidget({ userId }: { userId: string }) {
       {/* ── Chat panel ── */}
       {open && (
         <div className={panelClass}>
-
           {/* ─ Header ─ */}
           <div className="shrink-0 border-b bg-muted/20">
             {/* Title row */}
@@ -460,14 +495,18 @@ export function ChatWidget({ userId }: { userId: string }) {
                   <span className="font-semibold text-sm">Messages</span>
                   <div className="flex items-center gap-1">
                     <Button
-                      size="icon" variant="ghost" className="h-7 w-7"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
                       onClick={() => setView({ kind: "new-dm" })}
                       title="New direct message"
                     >
                       <Edit className="h-3.5 w-3.5" />
                     </Button>
                     <Button
-                      size="icon" variant="ghost" className="h-7 w-7"
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7"
                       onClick={() => setView({ kind: "new-group" })}
                       title="New group"
                     >
@@ -481,24 +520,29 @@ export function ChatWidget({ userId }: { userId: string }) {
               ) : view.kind === "thread" ? (
                 <>
                   <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0" onClick={() => setView({ kind: "list" })}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => setView({ kind: "list" })}
+                    >
                       <ArrowLeft className="h-4 w-4" />
                     </Button>
-                    {view.conv.type === "group"
-                      ? <GroupHeader conv={view.conv} myId={userId} />
-                      : (
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Avatar className="h-7 w-7 shrink-0">
-                            <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                              {initials(
-                                view.conv.members.find((m) => m.userId !== userId)?.user?.name ?? null,
-                                view.conv.members.find((m) => m.userId !== userId)?.user?.email ?? null,
-                              )}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="truncate font-semibold text-sm">{convName(view.conv, userId)}</span>
-                        </div>
-                      )}
+                    {view.conv.type === "group" ? (
+                      <GroupHeader conv={view.conv} myId={userId} />
+                    ) : (
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Avatar className="h-7 w-7 shrink-0">
+                          <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                            {initials(
+                              view.conv.members.find((m) => m.userId !== userId)?.user?.name ?? null,
+                              view.conv.members.find((m) => m.userId !== userId)?.user?.email ?? null,
+                            )}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate font-semibold text-sm">{convName(view.conv, userId)}</span>
+                      </div>
+                    )}
                   </div>
                   {/* Thread quick actions */}
                   <DropdownMenu>
@@ -517,8 +561,12 @@ export function ChatWidget({ userId }: { userId: string }) {
                           <DropdownMenuLabel className="text-[11px] text-muted-foreground">Mute for…</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => handleMute(view.conv.id, 60)}>1 hour</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleMute(view.conv.id, 8 * 60)}>8 hours</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleMute(view.conv.id, 24 * 60)}>24 hours</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleMute(view.conv.id, 999_999_999)}>Forever</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleMute(view.conv.id, 24 * 60)}>
+                            24 hours
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleMute(view.conv.id, 999_999_999)}>
+                            Forever
+                          </DropdownMenuItem>
                         </>
                       )}
                       {view.conv.type === "group" && (
@@ -572,10 +620,12 @@ export function ChatWidget({ userId }: { userId: string }) {
                     <TabsTrigger value="groups" className="flex-1 text-xs h-6 gap-1">
                       <Users className="h-3 w-3" /> Groups
                       {groupCount > 0 && (
-                        <span className={cn(
-                          "rounded-full px-1 text-[10px] leading-4 font-semibold",
-                          groupUnread > 0 ? "bg-primary/20 text-primary" : "text-muted-foreground"
-                        )}>
+                        <span
+                          className={cn(
+                            "rounded-full px-1 text-[10px] leading-4 font-semibold",
+                            groupUnread > 0 ? "bg-primary/20 text-primary" : "text-muted-foreground",
+                          )}
+                        >
                           {groupCount}
                         </span>
                       )}
@@ -602,7 +652,12 @@ export function ChatWidget({ userId }: { userId: string }) {
                         <p className="text-sm font-medium">No groups yet</p>
                         <p className="text-xs text-muted-foreground mt-1">Create a group to start collaborating</p>
                       </div>
-                      <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => setView({ kind: "new-group" })}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 h-8 text-xs"
+                        onClick={() => setView({ kind: "new-group" })}
+                      >
                         <Plus className="h-3.5 w-3.5" /> New Group
                       </Button>
                     </>
@@ -615,7 +670,12 @@ export function ChatWidget({ userId }: { userId: string }) {
                         <p className="text-sm font-medium">No direct messages</p>
                         <p className="text-xs text-muted-foreground mt-1">Start a conversation with a colleague</p>
                       </div>
-                      <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs" onClick={() => setView({ kind: "new-dm" })}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-1.5 h-8 text-xs"
+                        onClick={() => setView({ kind: "new-dm" })}
+                      >
                         <Edit className="h-3.5 w-3.5" /> New Message
                       </Button>
                     </>
@@ -634,37 +694,41 @@ export function ChatWidget({ userId }: { userId: string }) {
               ) : (
                 <div className="py-1">
                   {/* Groups section heading when viewing "all" */}
-                  {tab === "all" && filtered.some((c) => c.type === "group") && filtered.some((c) => c.type === "direct") && (
-                    <>
-                      {filtered[0]?.type !== "group" && (
-                        <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                          Direct
-                        </p>
-                      )}
-                      {filtered.map((conv, i) => {
-                        const prevType = i > 0 ? filtered[i - 1]?.type : null;
-                        const showGroupDivider = conv.type === "group" && prevType === "direct";
-                        return (
-                          <React.Fragment key={conv.id}>
-                            {showGroupDivider && (
-                              <p className="px-4 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                Groups
-                              </p>
-                            )}
-                            <ConvItem
-                              conv={conv}
-                              myId={userId}
-                              onClick={() => openThread(conv)}
-                              onMute={handleMute}
-                              onLeave={handleLeave}
-                              onDelete={handleDelete}
-                            />
-                          </React.Fragment>
-                        );
-                      })}
-                    </>
-                  )}
-                  {(tab !== "all" || !filtered.some((c) => c.type === "group") || !filtered.some((c) => c.type === "direct")) && (
+                  {tab === "all" &&
+                    filtered.some((c) => c.type === "group") &&
+                    filtered.some((c) => c.type === "direct") && (
+                      <>
+                        {filtered[0]?.type !== "group" && (
+                          <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                            Direct
+                          </p>
+                        )}
+                        {filtered.map((conv, i) => {
+                          const prevType = i > 0 ? filtered[i - 1]?.type : null;
+                          const showGroupDivider = conv.type === "group" && prevType === "direct";
+                          return (
+                            <React.Fragment key={conv.id}>
+                              {showGroupDivider && (
+                                <p className="px-4 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                  Groups
+                                </p>
+                              )}
+                              <ConvItem
+                                conv={conv}
+                                myId={userId}
+                                onClick={() => openThread(conv)}
+                                onMute={handleMute}
+                                onLeave={handleLeave}
+                                onDelete={handleDelete}
+                              />
+                            </React.Fragment>
+                          );
+                        })}
+                      </>
+                    )}
+                  {(tab !== "all" ||
+                    !filtered.some((c) => c.type === "group") ||
+                    !filtered.some((c) => c.type === "direct")) &&
                     filtered.map((conv) => (
                       <ConvItem
                         key={conv.id}
@@ -675,8 +739,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                         onLeave={handleLeave}
                         onDelete={handleDelete}
                       />
-                    ))
-                  )}
+                    ))}
                 </div>
               )}
             </ScrollArea>
@@ -712,18 +775,18 @@ export function ChatWidget({ userId }: { userId: string }) {
                               {msg.sender?.name ?? msg.sender?.email}
                             </span>
                           )}
-                          <div className={cn(
-                            "rounded-2xl px-3 py-2 text-sm leading-relaxed break-words whitespace-pre-wrap",
-                            isMe
-                              ? "bg-primary text-primary-foreground rounded-tr-sm"
-                              : "bg-muted text-foreground rounded-tl-sm",
-                          )}>
+                          <div
+                            className={cn(
+                              "rounded-2xl px-3 py-2 text-sm leading-relaxed break-words whitespace-pre-wrap",
+                              isMe
+                                ? "bg-primary text-primary-foreground rounded-tr-sm"
+                                : "bg-muted text-foreground rounded-tl-sm",
+                            )}
+                          >
                             {msg.content}
                           </div>
                           {(!sameAuthor || i === messages.length - 1) && (
-                            <span className="text-[9px] text-muted-foreground px-1">
-                              {formatTime(msg.createdAt)}
-                            </span>
+                            <span className="text-[9px] text-muted-foreground px-1">{formatTime(msg.createdAt)}</span>
                           )}
                         </div>
                       </div>
@@ -738,13 +801,23 @@ export function ChatWidget({ userId }: { userId: string }) {
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
                   placeholder="Write a message…"
                   className="h-9 text-sm"
                   disabled={sending}
                   autoFocus
                 />
-                <Button size="icon" className="h-9 w-9 shrink-0" onClick={handleSend} disabled={!input.trim() || sending}>
+                <Button
+                  size="icon"
+                  className="h-9 w-9 shrink-0"
+                  onClick={handleSend}
+                  disabled={!input.trim() || sending}
+                >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
@@ -757,27 +830,38 @@ export function ChatWidget({ userId }: { userId: string }) {
               <div className="shrink-0 px-3 pt-2 pb-2 border-b">
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                  <Input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Search people…" className="h-8 pl-8 text-sm" autoFocus />
+                  <Input
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    placeholder="Search people…"
+                    className="h-8 pl-8 text-sm"
+                    autoFocus
+                  />
                 </div>
               </div>
               <ScrollArea className="flex-1">
-                {filteredUsers.length === 0
-                  ? <p className="text-center text-xs text-muted-foreground py-10">No users found</p>
-                  : filteredUsers.map((u) => (
+                {filteredUsers.length === 0 ? (
+                  <p className="text-center text-xs text-muted-foreground py-10">No users found</p>
+                ) : (
+                  filteredUsers.map((u) => (
                     <button
-                      key={u.id} type="button"
+                      key={u.id}
+                      type="button"
                       onClick={() => handleStartDM(u.id)}
                       className="flex w-full items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
                     >
                       <Avatar className="h-8 w-8 shrink-0">
-                        <AvatarFallback className="text-xs bg-primary/10 text-primary">{initials(u.name, u.email)}</AvatarFallback>
+                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                          {initials(u.name, u.email)}
+                        </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{u.name ?? u.email}</p>
                         {u.name && <p className="text-xs text-muted-foreground truncate">{u.email}</p>}
                       </div>
                     </button>
-                  ))}
+                  ))
+                )}
               </ScrollArea>
             </div>
           )}
@@ -786,10 +870,21 @@ export function ChatWidget({ userId }: { userId: string }) {
           {view.kind === "new-group" && (
             <div className="flex flex-col flex-1 overflow-hidden">
               <div className="shrink-0 px-3 pt-2 pb-2 border-b space-y-2">
-                <Input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Group name…" className="h-8 text-sm" autoFocus />
+                <Input
+                  value={groupName}
+                  onChange={(e) => setGroupName(e.target.value)}
+                  placeholder="Group name…"
+                  className="h-8 text-sm"
+                  autoFocus
+                />
                 <div className="relative">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-                  <Input value={userSearch} onChange={(e) => setUserSearch(e.target.value)} placeholder="Add members…" className="h-8 pl-8 text-sm" />
+                  <Input
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    placeholder="Add members…"
+                    className="h-8 pl-8 text-sm"
+                  />
                 </div>
                 {selectedIds.length > 0 && (
                   <div className="flex flex-wrap gap-1">
@@ -812,12 +907,18 @@ export function ChatWidget({ userId }: { userId: string }) {
                   const sel = selectedIds.includes(u.id);
                   return (
                     <button
-                      key={u.id} type="button"
-                      onClick={() => setSelectedIds((s) => sel ? s.filter((x) => x !== u.id) : [...s, u.id])}
+                      key={u.id}
+                      type="button"
+                      onClick={() => setSelectedIds((s) => (sel ? s.filter((x) => x !== u.id) : [...s, u.id]))}
                       className="flex w-full items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
                     >
                       <Avatar className="h-7 w-7 shrink-0">
-                        <AvatarFallback className={cn("text-[10px]", sel ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary")}>
+                        <AvatarFallback
+                          className={cn(
+                            "text-[10px]",
+                            sel ? "bg-primary text-primary-foreground" : "bg-primary/10 text-primary",
+                          )}
+                        >
                           {sel ? <Check className="h-3.5 w-3.5" /> : initials(u.name, u.email)}
                         </AvatarFallback>
                       </Avatar>

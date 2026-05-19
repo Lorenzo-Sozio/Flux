@@ -61,14 +61,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/contacts/export",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "contacts",
-                "export"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "contacts", "export"]
             },
             "description": "Returns all contacts visible to the authenticated user as a CSV attachment. Admins and Owners see all contacts; Editors and Viewers see only their own."
           }
@@ -90,14 +84,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/contacts/import",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "contacts",
-                "import"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "contacts", "import"]
             },
             "body": {
               "mode": "formdata",
@@ -136,14 +124,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/companies/export",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "companies",
-                "export"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "companies", "export"]
             },
             "description": "Returns all companies in the organisation as a CSV attachment."
           }
@@ -165,14 +147,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/companies/import",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "companies",
-                "import"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "companies", "import"]
             },
             "body": {
               "mode": "formdata",
@@ -211,14 +187,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/leads/export",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "leads",
-                "export"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "leads", "export"]
             },
             "description": "Returns all leads visible to the authenticated user as a CSV attachment."
           }
@@ -246,13 +216,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/documents?entityType=contact&entityId=cnt_01JX4K",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "documents"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "documents"],
               "query": [
                 {
                   "key": "entityType",
@@ -286,13 +251,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/documents?id=doc_02",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "documents"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "documents"],
               "query": [
                 {
                   "key": "id",
@@ -321,14 +281,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/documents/upload",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "documents",
-                "upload"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "documents", "upload"]
             },
             "body": {
               "mode": "formdata",
@@ -379,13 +333,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/search?q=Mario Rossi",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "search"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "search"],
               "query": [
                 {
                   "key": "q",
@@ -420,13 +369,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/notifications",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "notifications"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notifications"]
             },
             "description": "Returns the last 50 notifications for the authenticated user, ordered newest first. Used by the NotificationCenter with 60-second polling."
           }
@@ -447,14 +391,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/quotes/public?token=qt_pTkXz3mNR9aQv8",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "quotes",
-                "public"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "quotes", "public"],
               "query": [
                 {
                   "key": "token",
@@ -481,14 +419,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/quotes/public",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "quotes",
-                "public"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "quotes", "public"]
             },
             "body": {
               "mode": "raw",
@@ -524,14 +456,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/currency/rates",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "currency",
-                "rates"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "currency", "rates"]
             },
             "description": "Returns current exchange rates with EUR as base (sourced from Fawaz API, DB-cached 6h). Response is CDN-cached for 1 hour."
           }
@@ -551,14 +477,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/currency/rates",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "currency",
-                "rates"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "currency", "rates"]
             },
             "body": {
               "mode": "raw",
@@ -589,14 +509,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/geo/countries",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "geo",
-                "countries"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "geo", "countries"]
             },
             "description": "Returns the list of countries available in the system, used for address forms."
           }
@@ -618,14 +532,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/geo/cities?country=IT",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "geo",
-                "cities"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "geo", "cities"],
               "query": [
                 {
                   "key": "country",
@@ -653,14 +561,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/appointments/rsvp?token=rsvp_abc123def456&r=accept",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "appointments",
-                "rsvp"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "appointments", "rsvp"],
               "query": [
                 {
                   "key": "token",
@@ -693,14 +595,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/track/click?log=clog_01JX4K&url=https%3A%2F%2Facme.com%2Flanding",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "track",
-                "click"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "track", "click"],
               "query": [
                 {
                   "key": "log",
@@ -727,14 +623,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/track/open?log=clog_01JX4K",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "track",
-                "open"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "track", "open"],
               "query": [
                 {
                   "key": "log",
@@ -756,13 +646,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/unsubscribe?token=unsub_xyz789abc",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "unsubscribe"
-              ],
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "unsubscribe"],
               "query": [
                 {
                   "key": "token",
@@ -800,14 +685,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/webhooks/stripe",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "webhooks",
-                "stripe"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "stripe"]
             },
             "body": {
               "mode": "raw",
@@ -836,14 +715,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/webhooks/resend",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "webhooks",
-                "resend"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "resend"]
             },
             "body": {
               "mode": "raw",
@@ -872,14 +745,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/webhooks/email-inbound",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "webhooks",
-                "email-inbound"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "webhooks", "email-inbound"]
             },
             "body": {
               "mode": "raw",
@@ -916,14 +783,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/cron/campaign-scheduler",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "cron",
-                "campaign-scheduler"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cron", "campaign-scheduler"]
             },
             "description": "Checks for campaigns whose `scheduledAt` has passed and dispatches them. Runs every 5 minutes."
           }
@@ -945,14 +806,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/cron/email-worker",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "cron",
-                "email-worker"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cron", "email-worker"]
             },
             "description": "Processes the email send queue (batch from campaigns). Sends pending messages via Resend and updates logs. Runs every minute."
           }
@@ -974,14 +829,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/cron/task-reminders",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "cron",
-                "task-reminders"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cron", "task-reminders"]
             },
             "description": "Sends notifications for tasks due within 24 hours. Runs every hour."
           }
@@ -1003,14 +852,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/cron/ticket-autoclose",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "cron",
-                "ticket-autoclose"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cron", "ticket-autoclose"]
             },
             "description": "Closes tickets in `resolved` status that have had no client reply for more than 7 days. Runs once daily."
           }
@@ -1032,14 +875,8 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/cron/ticket-sla-check",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "cron",
-                "ticket-sla-check"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "cron", "ticket-sla-check"]
             },
             "description": "Checks tickets about to breach (or already breaching) configured SLAs and alerts agents. Runs every 15 minutes."
           }
@@ -1072,14 +909,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/crm/leads",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "crm",
-                "leads"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "crm", "leads"]
             },
             "body": {
               "mode": "raw",
@@ -1115,15 +946,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/crm/leads/bulk",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "crm",
-                "leads",
-                "bulk"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "crm", "leads", "bulk"]
             },
             "body": {
               "mode": "raw",
@@ -1159,14 +983,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/crm/contacts",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "crm",
-                "contacts"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "crm", "contacts"]
             },
             "body": {
               "mode": "raw",
@@ -1202,15 +1020,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/crm/contacts/bulk",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "crm",
-                "contacts",
-                "bulk"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "crm", "contacts", "bulk"]
             },
             "body": {
               "mode": "raw",
@@ -1246,14 +1057,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/crm/companies",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "crm",
-                "companies"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "crm", "companies"]
             },
             "body": {
               "mode": "raw",
@@ -1289,15 +1094,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/crm/companies/bulk",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "crm",
-                "companies",
-                "bulk"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "crm", "companies", "bulk"]
             },
             "body": {
               "mode": "raw",
@@ -1333,14 +1131,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/crm/activities",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "crm",
-                "activities"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "crm", "activities"]
             },
             "body": {
               "mode": "raw",
@@ -1376,15 +1168,8 @@
             ],
             "url": {
               "raw": "{{baseUrl}}/api/crm/activities/bulk",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "crm",
-                "activities",
-                "bulk"
-              ]
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "crm", "activities", "bulk"]
             },
             "body": {
               "mode": "raw",

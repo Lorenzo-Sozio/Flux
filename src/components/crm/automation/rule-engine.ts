@@ -1,14 +1,24 @@
-import { getDb } from "@/lib/tenant-context";
-import { automationRules, automationLogs } from "@/db/schema"
-import { and, eq } from "drizzle-orm"
-import { z } from "zod"
-import { ActionDispatcher } from "./action-dispatcher"
-import { ActionSchema, ConditionSchema } from "../../crm/automation/types"
-import { checkLoopDetection, recordRuleExecution, formatRuleChain, createExecutionContext, type ExecutionContext } from "./loop-detector"
-import { validateExpression, compileExpression } from "./condition-parser"
-import type { RuleContext } from "../../crm/automation/types"
+import { and, eq } from "drizzle-orm";
+import { z } from "zod";
 
-const dispatcher = new ActionDispatcher()
+import { automationLogs, automationRules } from "@/db/schema";
+import { assertLimit, EntitlementError } from "@/lib/billing/licensing";
+import { getUsage, incrementUsage } from "@/lib/billing/usage";
+import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
+
+import type { Condition, RuleContext } from "../../crm/automation/types";
+import { ActionSchema, ConditionSchema } from "../../crm/automation/types";
+import { ActionDispatcher } from "./action-dispatcher";
+import { compileExpression, validateExpression } from "./condition-parser";
+import {
+  checkLoopDetection,
+  createExecutionContext,
+  type ExecutionContext,
+  formatRuleChain,
+  recordRuleExecution,
+} from "./loop-detector";
+
+const dispatcher = new ActionDispatcher();
 
 // ─── Condition Evaluation Helper ───────────────────────────────────────────────
 
@@ -16,121 +26,113 @@ const dispatcher = new ActionDispatcher()
  * Valuta le condizioni supportando sia logica semplice che espressioni avanzate
  */
 function evaluateConditions(
-  conditions: any[],
+  conditions: Condition[],
   simpleLogic: "AND" | "OR",
   advancedExpression: string,
   oldData: Record<string, unknown> | undefined,
-  newData: Record<string, unknown>
+  newData: Record<string, unknown>,
 ): boolean {
   // Se c'è un'espressione avanzata e non è vuota, usala
-  if (advancedExpression && advancedExpression.trim()) {
+  if (advancedExpression?.trim()) {
     try {
       // Valida l'espressione
-      const validation = validateExpression(advancedExpression, conditions.length)
+      const validation = validateExpression(advancedExpression, conditions.length);
 
       if (!validation.valid || !validation.tree) {
-        console.warn(
-          `[RuleEngine] Invalid condition expression: ${advancedExpression}`,
-          validation.errors
-        )
+        console.warn(`[RuleEngine] Invalid condition expression: ${advancedExpression}`, validation.errors);
         // Fallback a logica semplice
-        return evaluateSimpleConditions(conditions, simpleLogic, oldData, newData)
+        return evaluateSimpleConditions(conditions, simpleLogic, oldData, newData);
       }
 
       // Valuta ogni condizione
-      const evaluatedConditions = conditions.map((cond) =>
-        evaluateCondition(cond, newData, oldData)
-      )
+      const evaluatedConditions = conditions.map((cond) => evaluateCondition(cond, newData, oldData));
 
       // Compila e esegui l'espressione
-      const evaluator_compiled = compileExpression(validation.tree)
-      return evaluator_compiled(evaluatedConditions)
+      const evaluator_compiled = compileExpression(validation.tree);
+      return evaluator_compiled(evaluatedConditions);
     } catch (error) {
-      console.warn(`[RuleEngine] Error evaluating expression: ${error}`)
+      console.warn(`[RuleEngine] Error evaluating expression: ${error}`);
       // Fallback
-      return evaluateSimpleConditions(conditions, simpleLogic, oldData, newData)
+      return evaluateSimpleConditions(conditions, simpleLogic, oldData, newData);
     }
   }
 
   // Usa logica semplice
-  return evaluateSimpleConditions(conditions, simpleLogic, oldData, newData)
+  return evaluateSimpleConditions(conditions, simpleLogic, oldData, newData);
 }
 
 /**
  * Valuta le condizioni usando logica semplice (AND/OR globale)
  */
 function evaluateSimpleConditions(
-  conditions: any[],
+  conditions: Condition[],
   logic: "AND" | "OR",
   oldData: Record<string, unknown> | undefined,
-  newData: Record<string, unknown>
+  newData: Record<string, unknown>,
 ): boolean {
-  const evaluated = conditions.map((cond) =>
-    evaluateCondition(cond, newData, oldData)
-  )
+  const evaluated = conditions.map((cond) => evaluateCondition(cond, newData, oldData));
 
   if (logic === "OR") {
-    return evaluated.some((c) => c)
-  } else {
-    return evaluated.every((c) => c)
+    return evaluated.some((c) => c);
   }
+  return evaluated.every((c) => c);
 }
 
 /**
  * Valuta una singola condizione
  */
 function evaluateCondition(
-  condition: any,
+  condition: Condition,
   entityData: Record<string, unknown>,
-  oldData?: Record<string, unknown>
+  oldData?: Record<string, unknown>,
 ): boolean {
-  const fieldValue = getNestedFieldValue(entityData, condition.field)
-  const oldValue = oldData ? getNestedFieldValue(oldData, condition.field) : undefined
-  const conditionValue = condition.value
+  const fieldValue = getNestedFieldValue(entityData, condition.field);
+  const oldValue = oldData ? getNestedFieldValue(oldData, condition.field) : undefined;
+  const conditionValue = condition.value;
 
   switch (condition.operator) {
     case "equals":
-      return fieldValue === conditionValue
+      return fieldValue === conditionValue;
 
     case "not_equals":
-      return fieldValue !== conditionValue
+      return fieldValue !== conditionValue;
 
     case "greater_than":
-      return Number(fieldValue) > Number(conditionValue)
+      return Number(fieldValue) > Number(conditionValue);
 
     case "less_than":
-      return Number(fieldValue) < Number(conditionValue)
+      return Number(fieldValue) < Number(conditionValue);
 
     case "greater_than_or_equal":
-      return Number(fieldValue) >= Number(conditionValue)
+      return Number(fieldValue) >= Number(conditionValue);
 
     case "less_than_or_equal":
-      return Number(fieldValue) <= Number(conditionValue)
+      return Number(fieldValue) <= Number(conditionValue);
 
     case "contains":
-      return String(fieldValue).includes(String(conditionValue))
+      return String(fieldValue).includes(String(conditionValue));
 
     case "not_contains":
-      return !String(fieldValue).includes(String(conditionValue))
+      return !String(fieldValue).includes(String(conditionValue));
 
     case "is_empty":
-      return !fieldValue || fieldValue === "" || (Array.isArray(fieldValue) && fieldValue.length === 0)
+      return !fieldValue || fieldValue === "" || (Array.isArray(fieldValue) && fieldValue.length === 0);
 
     case "is_not_empty":
-      return !!fieldValue && fieldValue !== "" && (!Array.isArray(fieldValue) || fieldValue.length > 0)
+      return !!fieldValue && fieldValue !== "" && (!Array.isArray(fieldValue) || fieldValue.length > 0);
 
     case "changed":
-      return oldValue !== fieldValue
+      return oldValue !== fieldValue;
 
     case "changed_to":
-      return fieldValue === conditionValue && oldValue !== fieldValue
+      return fieldValue === conditionValue && oldValue !== fieldValue;
 
     case "changed_from":
-      return oldValue === conditionValue && fieldValue !== oldValue
+      return oldValue === conditionValue && fieldValue !== oldValue;
 
     default:
-      console.warn(`[RuleEngine] Unknown operator: ${condition.operator}`)
-      return false
+      console.warn(`[RuleEngine] Unknown operator: ${condition.operator}`);
+      return false;
   }
 }
 
@@ -138,15 +140,15 @@ function evaluateCondition(
  * Helper per leggere valori nested (es: "company.name")
  */
 function getNestedFieldValue(data: Record<string, unknown>, fieldPath: string): unknown {
-  const parts = fieldPath.split(".")
-  let value: any = data
+  const parts = fieldPath.split(".");
+  let value: unknown = data;
 
   for (const part of parts) {
-    if (value == null) return undefined
-    value = value[part]
+    if (value == null || typeof value !== "object") return undefined;
+    value = (value as Record<string, unknown>)[part];
   }
 
-  return value
+  return value;
 }
 
 /**
@@ -157,31 +159,49 @@ function getNestedFieldValue(data: Record<string, unknown>, fieldPath: string): 
  * Designed to run inside `after()` so it never delays the HTTP response.
  */
 export async function runAutomations(context: RuleContext, executionCtx?: ExecutionContext): Promise<void> {
-  const db = await getDb();
-  // Se non c'è un execution context, ne creiamo uno nuovo
-  const execCtx = executionCtx || createExecutionContext(context.currentUserId)
+  const execCtx = executionCtx || createExecutionContext(context.currentUserId);
 
+  // Resolve the tenant to track and enforce automation quota.
+  // getCurrentTenantId() may return null when called from cron jobs or the
+  // scheduler — in those cases we skip quota tracking rather than blocking.
+  let tenantId: string | null = null;
+  try {
+    tenantId = await getCurrentTenantId();
+  } catch {
+    // Outside request context (e.g. scheduled jobs) — skip quota enforcement
+  }
+
+  if (tenantId) {
+    try {
+      const { current } = await getUsage(tenantId, "automationRunsPerMonth");
+      await assertLimit(tenantId, "automationRunsPerMonth", current);
+    } catch (err) {
+      if (err instanceof EntitlementError) {
+        console.warn(`[RuleEngine] automationRunsPerMonth limit reached for tenant ${tenantId} — skipping rules`);
+        return;
+      }
+      // DB/network errors: log and continue rather than silently blocking automations
+      console.error("[RuleEngine] Failed to check automation quota:", err);
+    }
+  }
+
+  const db = await getDb();
   try {
     const rules = await db
       .select()
       .from(automationRules)
-      .where(
-        and(
-          eq(automationRules.targetEntity, context.entityType),
-          eq(automationRules.isActive, true),
-        )
-      )
+      .where(and(eq(automationRules.targetEntity, context.entityType), eq(automationRules.isActive, true)));
 
     // Filter by triggerOn client-side (array contains check is cleaner in TS)
     const matching = rules.filter((r) => {
-      const triggers = r.triggerOn as string[] | null
-      return Array.isArray(triggers) && triggers.includes(context.event)
-    })
+      const triggers = r.triggerOn as string[] | null;
+      return Array.isArray(triggers) && triggers.includes(context.event);
+    });
 
     // Process rules in parallel — each rule is independent
-    await Promise.allSettled(matching.map((rule) => executeRule(rule, context, execCtx)))
+    await Promise.allSettled(matching.map((rule) => executeRule(rule, context, execCtx, tenantId)));
   } catch (err) {
-    console.error("[RuleEngine] Failed to fetch rules:", err)
+    console.error("[RuleEngine] Failed to fetch rules:", err);
   }
 }
 
@@ -191,42 +211,46 @@ async function executeRule(
   rule: typeof automationRules.$inferSelect,
   context: RuleContext,
   executionCtx: ExecutionContext,
+  tenantId: string | null,
 ): Promise<void> {
-  let success         = false
-  let actionsExecuted = 0
-  let totalRetries    = 0
-  let errorMessage: string | undefined
+  let success = false;
+  let actionsExecuted = 0;
+  let totalRetries = 0;
+  let errorMessage: string | undefined;
   const db = await getDb();
 
   try {
     // 1. Loop detection - Check se è sicuro eseguire questa rule
-    const loopCheck = await checkLoopDetection(rule.id, context.entityType, context.entityId, executionCtx)
+    const loopCheck = await checkLoopDetection(rule.id, context.entityType, context.entityId, executionCtx);
     if (!loopCheck.allowed) {
-      errorMessage = loopCheck.reason
-      console.warn(`[RuleEngine] Rule "${rule.name}" blocked - ${loopCheck.reason}`)
+      errorMessage = loopCheck.reason;
+      console.warn(`[RuleEngine] Rule "${rule.name}" blocked - ${loopCheck.reason}`);
       // Non eseguire ma registrare il tentativo bloccato
-      await db.insert(automationLogs).values({
-        ruleId:          rule.id,
-        entityType:      context.entityType,
-        entityId:        context.entityId,
-        event:           context.event,
-        success:         false,
-        actionsExecuted: 0,
-        errorMessage:    errorMessage,
-        loopDetected:    true,
-        retryCount:      0,
-      }).catch((logErr) => {
-        console.error("[RuleEngine] Failed to write automation log:", logErr)
-      })
-      return
+      await db
+        .insert(automationLogs)
+        .values({
+          ruleId: rule.id,
+          entityType: context.entityType,
+          entityId: context.entityId,
+          event: context.event,
+          success: false,
+          actionsExecuted: 0,
+          errorMessage: errorMessage,
+          loopDetected: true,
+          retryCount: 0,
+        })
+        .catch((logErr) => {
+          console.error("[RuleEngine] Failed to write automation log:", logErr);
+        });
+      return;
     }
 
     // 2. Update execution context con questa rule
-    const nextExecCtx = recordRuleExecution(rule.id, context.entityType, context.entityId, executionCtx)
+    const nextExecCtx = recordRuleExecution(rule.id, context.entityType, context.entityId, executionCtx);
 
     // 3. Parse + validate conditions from stored JSON (defense-in-depth)
-    const conditions = z.array(ConditionSchema).parse(JSON.parse(rule.conditions))
-    const logic      = (rule.conditionLogic ?? "AND") as "AND" | "OR"
+    const conditions = z.array(ConditionSchema).parse(JSON.parse(rule.conditions));
+    const logic = (rule.conditionLogic ?? "AND") as "AND" | "OR";
 
     // Valuta le condizioni (supporta sia logica semplice che avanzata)
     const conditionsMet = evaluateConditions(
@@ -234,47 +258,59 @@ async function executeRule(
       logic,
       rule.conditionExpression ?? "",
       context.oldData,
-      context.newData
-    )
-    if (!conditionsMet) return  // silent skip — this is the happy-path fast exit
+      context.newData,
+    );
+    if (!conditionsMet) return; // silent skip — this is the happy-path fast exit
 
     // 4. Parse + validate actions from stored JSON
     //    Zod discriminated union rejects any unknown action type here.
-    const actions = z.array(ActionSchema).parse(JSON.parse(rule.actions))
+    const actions = z.array(ActionSchema).parse(JSON.parse(rule.actions));
 
     // 5. Dispatch con execution context per propagare la catena
-    const dispatched = await dispatcher.dispatchAll(actions, context, nextExecCtx)
-    actionsExecuted  = dispatched.actionsExecuted
-    totalRetries     = dispatched.totalRetries
-    if (dispatched.lastError) errorMessage = dispatched.lastError
-    success = actionsExecuted > 0 || actions.length === 0
+    const dispatched = await dispatcher.dispatchAll(actions, context, nextExecCtx);
+    actionsExecuted = dispatched.actionsExecuted;
+    totalRetries = dispatched.totalRetries;
+    if (dispatched.lastError) errorMessage = dispatched.lastError;
+    success = actionsExecuted > 0 || actions.length === 0;
 
-    console.log(`[RuleEngine] Rule "${rule.name}" executed ${actionsExecuted} action(s) on ${context.entityType}:${context.entityId}. Chain: ${formatRuleChain(nextExecCtx)}`)
+    // Count each rule that actually dispatched actions against the monthly quota
+    if (actionsExecuted > 0 && tenantId) {
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+      incrementUsage(tenantId, "automationRunsPerMonth", 1).catch(() => {});
+    }
+
+    console.log(
+      `[RuleEngine] Rule "${rule.name}" executed ${actionsExecuted} action(s) on ${context.entityType}:${context.entityId}. Chain: ${formatRuleChain(nextExecCtx)}`,
+    );
   } catch (err) {
-    errorMessage = err instanceof Error ? err.message : String(err)
-    console.error(`[RuleEngine] Rule "${rule.name}" failed:`, err)
+    errorMessage = err instanceof Error ? err.message : String(err);
+    console.error(`[RuleEngine] Rule "${rule.name}" failed:`, err);
   } finally {
     // Always write a log entry — invaluable for debugging + audit trail
-    await db.insert(automationLogs).values({
-      ruleId:          rule.id,
-      entityType:      context.entityType,
-      entityId:        context.entityId,
-      event:           context.event,
-      success,
-      actionsExecuted,
-      errorMessage:    errorMessage ?? null,
-      retryCount:      totalRetries,
-      retryInfo:       totalRetries > 0
-        ? JSON.stringify({
-            attempts:           totalRetries,
-            maxAttempts:        actionsExecuted * 3,
-            exponentialBackoff: true,
-            lastError:          errorMessage ?? null,
-          })
-        : null,
-    }).catch((logErr) => {
-      // Never let a logging failure propagate — the action already ran
-      console.error("[RuleEngine] Failed to write automation log:", logErr)
-    })
+    await db
+      .insert(automationLogs)
+      .values({
+        ruleId: rule.id,
+        entityType: context.entityType,
+        entityId: context.entityId,
+        event: context.event,
+        success,
+        actionsExecuted,
+        errorMessage: errorMessage ?? null,
+        retryCount: totalRetries,
+        retryInfo:
+          totalRetries > 0
+            ? JSON.stringify({
+                attempts: totalRetries,
+                maxAttempts: actionsExecuted * 3,
+                exponentialBackoff: true,
+                lastError: errorMessage ?? null,
+              })
+            : null,
+      })
+      .catch((logErr) => {
+        // Never let a logging failure propagate — the action already ran
+        console.error("[RuleEngine] Failed to write automation log:", logErr);
+      });
   }
 }

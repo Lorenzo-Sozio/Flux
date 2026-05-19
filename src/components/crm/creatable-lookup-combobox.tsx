@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { Check, ChevronsUpDown, PlusCircleIcon } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -16,6 +15,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 export interface LookupItem {
   id: string;
@@ -56,9 +56,7 @@ export function CreatableLookupCombobox({
   const selected = items.find((i) => i.id === value);
 
   const trimmed = search.trim();
-  const filtered = trimmed
-    ? items.filter((i) => i.name.toLowerCase().includes(trimmed.toLowerCase()))
-    : items;
+  const filtered = trimmed ? items.filter((i) => i.name.toLowerCase().includes(trimmed.toLowerCase())) : items;
 
   const hasExactMatch = items.some((i) => i.name.toLowerCase() === trimmed.toLowerCase());
   const showCreate = trimmed.length > 0 && !hasExactMatch;
@@ -111,9 +109,7 @@ export function CreatableLookupCombobox({
         <Command shouldFilter={false}>
           <CommandInput placeholder={searchPlaceholder} value={search} onValueChange={setSearch} />
           <CommandList>
-            {filtered.length === 0 && !showCreate && (
-              <CommandEmpty>No results found.</CommandEmpty>
-            )}
+            {filtered.length === 0 && !showCreate && <CommandEmpty>No results found.</CommandEmpty>}
             <CommandGroup>
               {value && (
                 <CommandItem
@@ -126,9 +122,7 @@ export function CreatableLookupCombobox({
               )}
               {filtered.map((item) => (
                 <CommandItem key={item.id} value={item.id} onSelect={() => handleSelect(item.id)}>
-                  <Check
-                    className={cn("mr-2 h-4 w-4 shrink-0", value === item.id ? "opacity-100" : "opacity-0")}
-                  />
+                  <Check className={cn("mr-2 h-4 w-4 shrink-0", value === item.id ? "opacity-100" : "opacity-0")} />
                   {item.name}
                 </CommandItem>
               ))}

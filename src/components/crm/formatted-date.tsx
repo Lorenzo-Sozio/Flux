@@ -12,7 +12,7 @@ export function FormattedDate({ date, includeTime = true }: { date: Date | strin
       d.toLocaleString(undefined, {
         dateStyle: "medium",
         timeStyle: includeTime ? "short" : undefined,
-      })
+      }),
     );
   }, [date, includeTime]);
 

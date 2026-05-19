@@ -1,10 +1,11 @@
-import { neon } from '@neondatabase/serverless';
-import * as dotenv from 'dotenv';
+import { neon } from "@neondatabase/serverless";
+import * as dotenv from "dotenv";
+
 dotenv.config();
 
 async function run() {
   const sql = neon(process.env.DATABASE_URL!);
-  
+
   await sql`DROP TABLE IF EXISTS "order_item" CASCADE;`;
   await sql`DROP TABLE IF EXISTS "order" CASCADE;`;
   await sql`DROP TABLE IF EXISTS "product" CASCADE;`;
@@ -17,8 +18,8 @@ async function run() {
   await sql`DROP TABLE IF EXISTS "session" CASCADE;`;
   await sql`DROP TABLE IF EXISTS "verificationToken" CASCADE;`;
   await sql`DROP TABLE IF EXISTS "user" CASCADE;`;
-  
-  console.log('Tables dropped');
+
+  console.log("Tables dropped");
 }
 
 run().catch(console.error);

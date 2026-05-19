@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+
 import { Plus } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
+
 import { CreateTicketModal } from "./create-ticket-modal";
 
 interface CreateTicketButtonProps {
@@ -16,21 +19,12 @@ export function CreateTicketButton({ contactId, companyId, variant = "default" }
 
   return (
     <>
-      <Button 
-        variant={variant}
-        onClick={() => setOpen(true)}
-        className="gap-2"
-      >
+      <Button variant={variant} onClick={() => setOpen(true)} className="gap-2">
         <Plus className="h-4 w-4" />
         New Ticket
       </Button>
-      
-      <CreateTicketModal
-        open={open}
-        onOpenChange={setOpen}
-        defaultContactId={contactId}
-        defaultCompanyId={companyId}
-      />
+
+      <CreateTicketModal open={open} onOpenChange={setOpen} defaultContactId={contactId} defaultCompanyId={companyId} />
     </>
   );
 }

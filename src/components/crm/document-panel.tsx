@@ -1,19 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import {
+  Download,
   Eye,
   File,
-  FileText,
   FileSpreadsheet,
+  FileText,
   Image,
   Loader2,
+  Paperclip,
   Trash2,
   Upload,
-  Download,
-  Paperclip,
 } from "lucide-react";
 import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -83,9 +85,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
   // ── Fetch docs ──────────────────────────────────────────────────────────────
   const fetchDocs = useCallback(async () => {
     try {
-      const res = await fetch(
-        `/api/documents?entityType=${entityType}&entityId=${encodeURIComponent(entityId)}`
-      );
+      const res = await fetch(`/api/documents?entityType=${entityType}&entityId=${encodeURIComponent(entityId)}`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       setDocs(data.documents ?? []);
@@ -96,7 +96,9 @@ export function DocumentPanel({ entityType, entityId }: Props) {
     }
   }, [entityType, entityId]);
 
-  useEffect(() => { fetchDocs(); }, [fetchDocs]);
+  useEffect(() => {
+    fetchDocs();
+  }, [fetchDocs]);
 
   // ── Upload ──────────────────────────────────────────────────────────────────
   const uploadFile = useCallback(
@@ -157,7 +159,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
 
       xhr.send(formData);
     },
-    [entityType, entityId, fetchDocs]
+    [entityType, entityId, fetchDocs],
   );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -177,7 +179,9 @@ export function DocumentPanel({ entityType, entityId }: Props) {
     dragCounter.current--;
     if (dragCounter.current === 0) setDragging(false);
   };
-  const onDragOver = (e: React.DragEvent) => { e.preventDefault(); };
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+  };
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     dragCounter.current = 0;
@@ -223,20 +227,10 @@ export function DocumentPanel({ entityType, entityId }: Props) {
           disabled={uploading}
           onClick={() => inputRef.current?.click()}
         >
-          {uploading ? (
-            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Upload className="h-3.5 w-3.5" />
-          )}
+          {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
           Upload
         </Button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept={ACCEPT}
-          className="hidden"
-          onChange={handleFileChange}
-        />
+        <input ref={inputRef} type="file" accept={ACCEPT} className="hidden" onChange={handleFileChange} />
       </CardHeader>
 
       <CardContent className="space-y-3">
@@ -248,10 +242,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
               <span>{progress}%</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full bg-primary transition-all duration-100"
-                style={{ width: `${progress}%` }}
-              />
+              <div className="h-full bg-primary transition-all duration-100" style={{ width: `${progress}%` }} />
             </div>
           </div>
         )}
@@ -270,12 +261,8 @@ export function DocumentPanel({ entityType, entityId }: Props) {
           }`}
         >
           <Upload className={`h-5 w-5 ${dragging ? "text-primary" : "text-muted-foreground/60"}`} />
-          <p className="text-xs font-medium">
-            {dragging ? "Drop to upload" : "Drag & drop or click to browse"}
-          </p>
-          <p className="text-[11px] text-muted-foreground/60">
-            PDF, Word, Excel, images — max {MAX_SIZE_MB} MB
-          </p>
+          <p className="text-xs font-medium">{dragging ? "Drop to upload" : "Drag & drop or click to browse"}</p>
+          <p className="text-[11px] text-muted-foreground/60">PDF, Word, Excel, images — max {MAX_SIZE_MB} MB</p>
         </div>
 
         {/* Document list */}
@@ -284,9 +271,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : docs.length === 0 ? (
-          <p className="text-center text-xs text-muted-foreground py-2">
-            No documents attached yet.
-          </p>
+          <p className="text-center text-xs text-muted-foreground py-2">No documents attached yet.</p>
         ) : (
           <ul className="space-y-1.5">
             {docs.map((doc) => (
@@ -296,10 +281,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
               >
                 <FileIcon mime={doc.mimeType} />
                 <div className="min-w-0 flex-1">
-                  <p
-                    className="truncate text-sm font-medium leading-tight"
-                    title={doc.name}
-                  >
+                  <p className="truncate text-sm font-medium leading-tight" title={doc.name}>
                     {doc.name}
                   </p>
                   <p className="text-[11px] text-muted-foreground">

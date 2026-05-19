@@ -1,24 +1,22 @@
 import Link from "next/link";
 
-import { getContacts, getAllUsers } from "@/actions/crm";
-import { getCustomFilters } from "@/actions/filters";
-import { getCustomFieldDefinitions } from "@/actions/custom-fields";
-import { toFieldMetaMap, CONTACT_FIELDS, customFieldsToMetaMap } from "@/lib/filter-engine";
-import { decodeFilter, countActive } from "@/lib/filter-types";
-import { FilterBuilder } from "@/components/crm/filter-builder";
-import { ImportExportButtons } from "@/components/crm/import-export-buttons";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { ContactModal } from "./_components/contact-modal";
-import { ContactsTable } from "./_components/contacts-table";
-import { auth } from "@/auth";
 import { getTranslations } from "next-intl/server";
 
-export default async function ContactsPage({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string>>;
-}) {
+import { getAllUsers, getContacts } from "@/actions/crm";
+import { getCustomFieldDefinitions } from "@/actions/custom-fields";
+import { getCustomFilters } from "@/actions/filters";
+import { auth } from "@/auth";
+import { FilterBuilder } from "@/components/crm/filter-builder";
+import { ImportExportButtons } from "@/components/crm/import-export-buttons";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { CONTACT_FIELDS, customFieldsToMetaMap, toFieldMetaMap } from "@/lib/filter-engine";
+import { countActive, decodeFilter } from "@/lib/filter-types";
+
+import { ContactModal } from "./_components/contact-modal";
+import { ContactsTable } from "./_components/contacts-table";
+
+export default async function ContactsPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const params = await searchParams;
   const encoded = params.filter ?? null;
 
@@ -47,7 +45,9 @@ export default async function ContactsPage({
           {activeCount > 0 && (
             <Badge variant="outline" className="text-xs gap-1">
               {tc("filtersActive", { count: activeCount })}
-              <Link href="/dashboard/contacts" className="ml-1 hover:text-destructive">✕</Link>
+              <Link href="/dashboard/contacts" className="ml-1 hover:text-destructive">
+                ✕
+              </Link>
             </Badge>
           )}
         </div>
@@ -71,12 +71,7 @@ export default async function ContactsPage({
         </div>
       </div>
 
-      <ContactsTable
-        contacts={allContacts}
-        users={users}
-        canEdit={canEdit}
-        activeCount={activeCount}
-      />
+      <ContactsTable contacts={allContacts} users={users} canEdit={canEdit} activeCount={activeCount} />
     </div>
   );
 }

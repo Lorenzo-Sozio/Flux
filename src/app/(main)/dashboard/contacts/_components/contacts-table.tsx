@@ -3,8 +3,8 @@
 import { useState, useTransition } from "react";
 
 import Link from "next/link";
-import { useTranslations } from "next-intl";
 
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { bulkAssignContacts, bulkDeleteContacts, bulkUpdateContactStatus } from "@/actions/bulk";
@@ -129,11 +129,7 @@ export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) 
           <TableRow>
             {canEdit && (
               <TableHead className="w-10">
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={toggleAll}
-                  aria-label="Select all"
-                />
+                <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
               </TableHead>
             )}
             <TableHead>{t("columns.name")}</TableHead>

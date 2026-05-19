@@ -20,18 +20,18 @@ import {
   MailOpen,
   MessageCircle,
   MessageSquare,
-  Wand2,
   Package,
   Settings,
   Settings2,
+  Shield,
   ShoppingCart,
   Target,
   TrendingUp,
   Users,
   Users2,
+  Wand2,
   Webhook,
   Zap,
-  Shield,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -125,9 +125,7 @@ export const sidebarItems: NavGroup[] = [
         url: "/dashboard/reports",
         icon: BarChart3,
         isNew: true,
-        subItems: [
-          { titleKey: "reportBuilder", url: "/dashboard/reports/builder", icon: Wand2 },
-        ],
+        subItems: [{ titleKey: "reportBuilder", url: "/dashboard/reports/builder", icon: Wand2 }],
       },
       {
         titleKey: "settings",

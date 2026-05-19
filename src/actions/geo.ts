@@ -2,10 +2,10 @@
 
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 
-import { getDb } from "@/lib/tenant-context";
 import { geoCities, geoCountries } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
 import { slugifyCity } from "@/lib/geo-utils";
+import { getDb } from "@/lib/tenant-context";
 
 export type GeoCountry = typeof geoCountries.$inferSelect;
 export type GeoCity = typeof geoCities.$inferSelect;
@@ -106,4 +106,3 @@ export async function addPostalCodeToCity(cityId: string, postalCode: string): P
     sql`UPDATE geo_city SET postal_codes = array_append(postal_codes, ${trimmed}) WHERE id = ${cityId} AND NOT (${trimmed} = ANY(postal_codes))`,
   );
 }
-

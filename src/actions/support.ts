@@ -17,7 +17,6 @@ import {
 } from "@/actions/support-validation";
 import { auth } from "@/auth";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
-import { getDb } from "@/lib/tenant-context";
 import {
   chatChannels,
   chatSessions,
@@ -30,6 +29,7 @@ import {
   users,
 } from "@/db/schema";
 import { sendEmail } from "@/lib/email-provider";
+import { getDb } from "@/lib/tenant-context";
 import { logTicketChange } from "@/lib/ticket-audit";
 import { canTransition, isSLAPauseStatus } from "@/lib/ticket-state-machine";
 

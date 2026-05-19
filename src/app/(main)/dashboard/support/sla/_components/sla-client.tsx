@@ -1,14 +1,26 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { toast } from "sonner";
+import { Clock, Loader2, Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Plus, Pencil, Trash2, Clock, ShieldAlert, Loader2 } from "lucide-react";
-import { createSlaAction, updateSlaAction, deleteSlaAction, toggleSlaAction } from "@/actions/sla";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import type { z } from "zod";
+
+import { createSlaAction, deleteSlaAction, toggleSlaAction, updateSlaAction } from "@/actions/sla";
 import { SlaSchema } from "@/actions/sla-validation";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,28 +32,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
 
 type Sla = {
   id: string;
@@ -58,9 +54,9 @@ type FormValues = z.infer<typeof SlaSchema>;
 type PriorityKey = "low" | "normal" | "high" | "urgent";
 
 const PRIORITY_CLASSNAMES: Record<string, string> = {
-  low:    "border-slate-300 text-slate-600",
+  low: "border-slate-300 text-slate-600",
   normal: "border-blue-300 text-blue-600 bg-blue-50",
-  high:   "border-amber-300 text-amber-600 bg-amber-50",
+  high: "border-amber-300 text-amber-600 bg-amber-50",
   urgent: "border-red-300 text-red-600 bg-red-50",
 };
 
@@ -126,7 +122,7 @@ export function SlaClient({ slas: initial }: Props) {
     try {
       if (editTarget) {
         await updateSlaAction(editTarget.id, data);
-        setSlas((prev) => prev.map((s) => s.id === editTarget.id ? { ...s, ...data } : s));
+        setSlas((prev) => prev.map((s) => (s.id === editTarget.id ? { ...s, ...data } : s)));
         toast.success(t("updateSuccess"));
       } else {
         await createSlaAction(data);
@@ -143,7 +139,7 @@ export function SlaClient({ slas: initial }: Props) {
     startTransition(async () => {
       try {
         await toggleSlaAction(sla.id, isActive);
-        setSlas((prev) => prev.map((s) => s.id === sla.id ? { ...s, isActive } : s));
+        setSlas((prev) => prev.map((s) => (s.id === sla.id ? { ...s, isActive } : s)));
       } catch {
         toast.error(t("updateFailed"));
       }
@@ -174,9 +170,7 @@ export function SlaClient({ slas: initial }: Props) {
               <ShieldAlert className="h-4 w-4 text-primary" />
               {t("policies")}
             </CardTitle>
-            <CardDescription className="text-sm mt-1">
-              {t("policiesDescription")}
-            </CardDescription>
+            <CardDescription className="text-sm mt-1">{t("policiesDescription")}</CardDescription>
           </div>
           <Button size="sm" onClick={openCreate}>
             <Plus className="mr-2 h-4 w-4" />
@@ -214,9 +208,7 @@ export function SlaClient({ slas: initial }: Props) {
                       <TableCell>
                         <div className="font-medium text-sm">{sla.name}</div>
                         {sla.description && (
-                          <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                            {sla.description}
-                          </div>
+                          <div className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{sla.description}</div>
                         )}
                       </TableCell>
                       <TableCell>
@@ -239,12 +231,7 @@ export function SlaClient({ slas: initial }: Props) {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 w-7 p-0"
-                            onClick={() => openEdit(sla)}
-                          >
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(sla)}>
                             <Pencil className="h-3.5 w-3.5" />
                           </Button>
                           <Button
@@ -274,7 +261,9 @@ export function SlaClient({ slas: initial }: Props) {
           </DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-1">
             <div className="space-y-2">
-              <Label>{t("columns.name")} <span className="text-destructive">*</span></Label>
+              <Label>
+                {t("columns.name")} <span className="text-destructive">*</span>
+              </Label>
               <Input placeholder={t("dialog.namePlaceholder")} {...form.register("name")} />
               {form.formState.errors.name && (
                 <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
@@ -292,7 +281,9 @@ export function SlaClient({ slas: initial }: Props) {
             </div>
 
             <div className="space-y-2">
-              <Label>{t("dialog.priorityLabel")} <span className="text-destructive">*</span></Label>
+              <Label>
+                {t("dialog.priorityLabel")} <span className="text-destructive">*</span>
+              </Label>
               <Select
                 value={form.watch("priority")}
                 onValueChange={(v) => form.setValue("priority", v as FormValues["priority"])}
@@ -302,7 +293,9 @@ export function SlaClient({ slas: initial }: Props) {
                 </SelectTrigger>
                 <SelectContent>
                   {(["low", "normal", "high", "urgent"] as PriorityKey[]).map((p) => (
-                    <SelectItem key={p} value={p}>{t(`priorities.${p}`)}</SelectItem>
+                    <SelectItem key={p} value={p}>
+                      {t(`priorities.${p}`)}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -313,7 +306,9 @@ export function SlaClient({ slas: initial }: Props) {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>{t("dialog.firstResponse")} <span className="text-destructive">*</span></Label>
+                <Label>
+                  {t("dialog.firstResponse")} <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   type="number"
                   min="1"
@@ -326,7 +321,9 @@ export function SlaClient({ slas: initial }: Props) {
                 )}
               </div>
               <div className="space-y-2">
-                <Label>{t("dialog.resolution")} <span className="text-destructive">*</span></Label>
+                <Label>
+                  {t("dialog.resolution")} <span className="text-destructive">*</span>
+                </Label>
                 <Input
                   type="number"
                   min="1"
@@ -341,10 +338,7 @@ export function SlaClient({ slas: initial }: Props) {
             </div>
 
             <div className="flex items-center gap-3">
-              <Switch
-                checked={form.watch("isActive")}
-                onCheckedChange={(v) => form.setValue("isActive", v)}
-              />
+              <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} />
               <Label className="cursor-pointer">{t("dialog.activeLabel")}</Label>
             </div>
 

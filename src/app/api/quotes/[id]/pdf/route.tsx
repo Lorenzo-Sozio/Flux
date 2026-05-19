@@ -6,8 +6,8 @@ import { desc, eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { QuotePDF } from "@/components/pdf/quote-pdf";
 import { APP_CONFIG } from "@/config/app-config";
-import { getDb } from "@/lib/tenant-context";
 import { quoteActivities, quotes } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

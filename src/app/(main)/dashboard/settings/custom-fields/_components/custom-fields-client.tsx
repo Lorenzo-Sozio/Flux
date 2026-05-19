@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { toast } from "sonner";
+
+import { Plus, Settings2, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { Plus, Trash2, Settings2 } from "lucide-react";
+import { toast } from "sonner";
+
 import {
   createCustomFieldDefinition,
   deleteCustomFieldDefinition,
@@ -23,22 +25,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 type Field = {
   id: string;
@@ -83,10 +72,16 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
     if (!form.name.trim()) return;
     setIsPending(true);
     try {
-      const slug = form.name.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
+      const slug = form.name
+        .toLowerCase()
+        .replace(/\s+/g, "_")
+        .replace(/[^a-z0-9_]/g, "");
       const options =
         ["select", "multiselect"].includes(form.fieldType) && form.options
-          ? form.options.split(",").map((o) => o.trim()).filter(Boolean)
+          ? form.options
+              .split(",")
+              .map((o) => o.trim())
+              .filter(Boolean)
           : undefined;
 
       const field = await createCustomFieldDefinition({
@@ -121,10 +116,13 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
     }
   };
 
-  const groupedByEntity = ENTITY_TYPES.reduce<Record<string, Field[]>>((acc, et) => {
-    acc[et] = fields.filter((f) => f.entityType === et);
-    return acc;
-  }, {} as Record<string, Field[]>);
+  const groupedByEntity = ENTITY_TYPES.reduce<Record<string, Field[]>>(
+    (acc, et) => {
+      acc[et] = fields.filter((f) => f.entityType === et);
+      return acc;
+    },
+    {} as Record<string, Field[]>,
+  );
 
   return (
     <div className="p-6 space-y-6">
@@ -146,9 +144,7 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
               <Settings2 className="h-4 w-4" />
               {t("entityTitle", { entity: t(`entityTypes.${et as "contact" | "lead" | "company" | "deal"}`) })}
             </CardTitle>
-            <CardDescription>
-              {t("fieldCount", { count: groupedByEntity[et]?.length ?? 0 })}
-            </CardDescription>
+            <CardDescription>{t("fieldCount", { count: groupedByEntity[et]?.length ?? 0 })}</CardDescription>
           </CardHeader>
           <CardContent>
             {groupedByEntity[et]?.length === 0 ? (
@@ -180,7 +176,9 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
                       </TableCell>
                       <TableCell>
                         {field.isRequired ? (
-                          <Badge variant="destructive" className="text-[10px]">{t("requiredBadge")}</Badge>
+                          <Badge variant="destructive" className="text-[10px]">
+                            {t("requiredBadge")}
+                          </Badge>
                         ) : (
                           <span className="text-muted-foreground text-xs">{t("optionalLabel")}</span>
                         )}
@@ -250,7 +248,9 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
                   <SelectContent>
                     {FIELD_TYPE_VALUES.map((ft) => (
                       <SelectItem key={ft} value={ft}>
-                        {t(`fieldTypes.${ft as "text" | "number" | "date" | "select" | "multiselect" | "boolean" | "url"}`)}
+                        {t(
+                          `fieldTypes.${ft as "text" | "number" | "date" | "select" | "multiselect" | "boolean" | "url"}`,
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -279,7 +279,9 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAddOpen(false)}>{tc("cancel")}</Button>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>
+              {tc("cancel")}
+            </Button>
             <Button onClick={handleAdd} disabled={isPending || !form.name}>
               {isPending ? t("dialog.creating") : t("dialog.createField")}
             </Button>

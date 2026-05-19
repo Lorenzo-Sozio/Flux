@@ -4,15 +4,11 @@
  * and the Resend Inbound adapter (/api/webhooks/resend-inbound).
  */
 
-import crypto from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { after } from "next/server";
 
 import { eq } from "drizzle-orm";
 
 import { runAutomations } from "@/components/crm/automation/rule-engine";
-import { getDb } from "@/lib/tenant-context";
 import { contacts, documents, ticketMessages, tickets } from "@/db/schema";
 import {
   extractTicketReference,
@@ -21,6 +17,11 @@ import {
   stripHtmlQuotesAndSignature,
   stripPlainTextQuotes,
 } from "@/lib/email-parser";
+import { getDb } from "@/lib/tenant-context";
+
+import crypto from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
 // ─── Attachment handling ──────────────────────────────────────────────────────
 
@@ -117,7 +118,10 @@ const MIME_TO_EXT: Record<string, string> = {
 };
 
 function sanitizeFilename(name: string): string {
-  return name.replace(/[/\\?%*:|"<>]/g, "_").trim().slice(0, 255);
+  return name
+    .replace(/[/\\?%*:|"<>]/g, "_")
+    .trim()
+    .slice(0, 255);
 }
 
 // ─── Ticket processing ────────────────────────────────────────────────────────
@@ -244,10 +248,11 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
 
   // Create a new ticket
   const ticketNumber = generateTicketNumber();
-  const cleanSubject = subject
-    .replace(/^\[TKT-[A-Z0-9-]+\]\s*/i, "")
-    .replace(/^Re:\s*/i, "")
-    .trim() || subject;
+  const cleanSubject =
+    subject
+      .replace(/^\[TKT-[A-Z0-9-]+\]\s*/i, "")
+      .replace(/^Re:\s*/i, "")
+      .trim() || subject;
 
   const [newTicket] = await db
     .insert(tickets)

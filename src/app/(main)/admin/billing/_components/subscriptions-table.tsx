@@ -1,24 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
+
+import { MoreHorizontal, Search } from "lucide-react";
+import { toast } from "sonner";
+
+import { downgradeToFree, reactivateTenant, suspendTenant } from "@/actions/admin-billing";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,9 +15,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { MoreHorizontal, Search } from "lucide-react";
-import { toast } from "sonner";
-import { suspendTenant, reactivateTenant, downgradeToFree } from "@/actions/admin-billing";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface Subscription {
   subscription: {
@@ -71,10 +60,7 @@ export function SubscriptionsTable({ subscriptions, currentUserId }: Subscriptio
     return matchSearch && matchStatus;
   });
 
-  async function handleAction(
-    action: "suspend" | "reactivate" | "downgrade",
-    tenantId: string,
-  ) {
+  async function handleAction(action: "suspend" | "reactivate" | "downgrade", tenantId: string) {
     startTransition(async () => {
       try {
         if (action === "suspend") await suspendTenant(tenantId, currentUserId);
@@ -144,13 +130,9 @@ export function SubscriptionsTable({ subscriptions, currentUserId }: Subscriptio
                     <p className="text-xs text-muted-foreground">{s.tenant?.subdomain}</p>
                   </div>
                 </TableCell>
+                <TableCell>{s.plan?.displayName ?? <span className="text-muted-foreground">Free</span>}</TableCell>
                 <TableCell>
-                  {s.plan?.displayName ?? <span className="text-muted-foreground">Free</span>}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={STATUS_BADGE[s.subscription.status] ?? "outline"}>
-                    {s.subscription.status}
-                  </Badge>
+                  <Badge variant={STATUS_BADGE[s.subscription.status] ?? "outline"}>{s.subscription.status}</Badge>
                 </TableCell>
                 <TableCell>{s.subscription.quantity}</TableCell>
                 <TableCell className="capitalize">{s.subscription.billingCycle}</TableCell>
@@ -167,14 +149,10 @@ export function SubscriptionsTable({ subscriptions, currentUserId }: Subscriptio
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => handleAction("reactivate", s.subscription.tenantId)}
-                      >
+                      <DropdownMenuItem onClick={() => handleAction("reactivate", s.subscription.tenantId)}>
                         Reactivate
                       </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleAction("suspend", s.subscription.tenantId)}
-                      >
+                      <DropdownMenuItem onClick={() => handleAction("suspend", s.subscription.tenantId)}>
                         Suspend
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />

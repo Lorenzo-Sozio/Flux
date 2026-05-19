@@ -6,10 +6,12 @@
  * updates the campaign log, and returns an HTML confirmation page.
  */
 
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
+
 import { eq } from "drizzle-orm";
-import { getDb } from "@/lib/tenant-context";
+
 import { campaignLogs, contacts, emailSuppressions, leads } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe-token";
 
 export async function GET(req: NextRequest) {
@@ -44,15 +46,9 @@ export async function GET(req: NextRequest) {
 
     // Sync marketingConsent on the originating record so the CRM reflects reality
     if (log?.leadId) {
-      await db
-        .update(leads)
-        .set({ marketingConsent: false })
-        .where(eq(leads.id, log.leadId));
+      await db.update(leads).set({ marketingConsent: false }).where(eq(leads.id, log.leadId));
     } else if (log?.contactId) {
-      await db
-        .update(contacts)
-        .set({ marketingConsent: false })
-        .where(eq(contacts.id, log.contactId));
+      await db.update(contacts).set({ marketingConsent: false }).where(eq(contacts.id, log.contactId));
     }
   } catch {
     // Ignore DB errors — still show success to the user
@@ -61,7 +57,7 @@ export async function GET(req: NextRequest) {
   return htmlResponse(
     "Unsubscribed successfully",
     `The address <strong>${escapeHtml(email)}</strong> has been removed from our mailing list. You will no longer receive marketing emails from us.`,
-    true
+    true,
   );
 }
 

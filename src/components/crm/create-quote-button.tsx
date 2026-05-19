@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { CreateQuoteModal } from "@/components/crm/create-quote-modal";
+
 import { revalidateDealPage } from "@/actions/cache";
+import { CreateQuoteModal } from "@/components/crm/create-quote-modal";
+import { Button } from "@/components/ui/button";
 
 interface CreateQuoteButtonProps {
   dealId: string;
@@ -12,12 +13,7 @@ interface CreateQuoteButtonProps {
   products: Array<{ id: string; name: string; price: string }>;
 }
 
-export function CreateQuoteButton({
-  dealId,
-  companyId,
-  contactId,
-  products,
-}: CreateQuoteButtonProps) {
+export function CreateQuoteButton({ dealId, companyId, contactId, products }: CreateQuoteButtonProps) {
   const [open, setOpen] = useState(false);
 
   const handleSuccess = async (quoteId: string) => {
@@ -28,10 +24,7 @@ export function CreateQuoteButton({
 
   return (
     <>
-      <Button
-        size="sm"
-        onClick={() => setOpen(true)}
-      >
+      <Button size="sm" onClick={() => setOpen(true)}>
         Add Quote
       </Button>
       <CreateQuoteModal

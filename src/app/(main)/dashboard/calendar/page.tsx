@@ -359,7 +359,10 @@ export default async function CalendarPage({
     return (
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         {/* Single scroll container — headers, all-day strip, and time grid all share identical width */}
-        <div className="overflow-y-auto" style={{ maxHeight: "calc(100vh - 280px)", minHeight: "480px", scrollbarGutter: "stable" }}>
+        <div
+          className="overflow-y-auto"
+          style={{ maxHeight: "calc(100vh - 280px)", minHeight: "480px", scrollbarGutter: "stable" }}
+        >
           {/* Sticky wrapper: day headers + all-day strip pinned together at top */}
           <div className="sticky top-0 z-20">
             {/* Day headers */}
@@ -416,7 +419,8 @@ export default async function CalendarPage({
                 );
               })}
             </div>
-          </div>{/* end sticky wrapper */}
+          </div>
+          {/* end sticky wrapper */}
 
           <div style={{ display: "grid", gridTemplateColumns: gridCols, height: `${TOTAL_HEIGHT}px` }}>
             {/* Time labels column */}

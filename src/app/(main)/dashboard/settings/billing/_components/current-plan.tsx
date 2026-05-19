@@ -1,5 +1,6 @@
 "use client";
 
+import { CreditCard, ExternalLink, Zap } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import type { TenantEntitlements } from "@/lib/billing/licensing";
-import { CreditCard, ExternalLink, Zap } from "lucide-react";
 
 interface CurrentPlanProps {
   entitlements: TenantEntitlements;
@@ -34,13 +34,7 @@ function formatCents(cents: number) {
   }).format(cents / 100);
 }
 
-export function CurrentPlan({
-  entitlements,
-  periodEnd,
-  billingCycle,
-  onManageClick,
-  loading,
-}: CurrentPlanProps) {
+export function CurrentPlan({ entitlements, periodEnd, billingCycle, onManageClick, loading }: CurrentPlanProps) {
   const t = useTranslations("settings.billing");
 
   const statusKey = entitlements.status in STATUS_VARIANT ? entitlements.status : "free";
@@ -92,10 +86,7 @@ export function CurrentPlan({
             label={t("currentPlan.statModules")}
             value={t("currentPlan.modulesEnabled", { count: entitlements.enabledModules.length })}
           />
-          <Stat
-            label={t("currentPlan.statStorage")}
-            value={`${entitlements.limits.storageGb ?? 1} GB`}
-          />
+          <Stat label={t("currentPlan.statStorage")} value={`${entitlements.limits.storageGb ?? 1} GB`} />
           <Stat
             label={t("currentPlan.statApiCalls")}
             value={

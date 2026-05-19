@@ -1,6 +1,27 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+
+import { useRouter } from "next/navigation";
+
+import { addMinutes, format } from "date-fns";
+import {
+  AlertTriangle,
+  CalendarClock,
+  CheckCircle2,
+  Clock,
+  Eye,
+  Loader2,
+  MousePointerClick,
+  Send,
+  ShieldCheck,
+  Users,
+} from "lucide-react";
+import { toast } from "sonner";
+
+import { getEligibleRecipientCounts, scheduleCampaignAction, sendCampaignAction } from "@/actions/marketing";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,33 +30,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Eye,
-  Loader2,
-  MousePointerClick,
-  Send,
-  ShieldCheck,
-  Users,
-  AlertTriangle,
-  CheckCircle2,
-  CalendarClock,
-  Clock,
-} from "lucide-react";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-import { sendCampaignAction, getEligibleRecipientCounts, scheduleCampaignAction } from "@/actions/marketing";
-import { format, addMinutes } from "date-fns";
 
 interface Campaign {
   id: string;
@@ -66,9 +63,7 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
   const [isLoadingCounts, setIsLoadingCounts] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [result, setResult] = useState<
-    | { type: "sent"; queued: number; skipped: number }
-    | { type: "scheduled"; scheduledAt: Date }
-    | null
+    { type: "sent"; queued: number; skipped: number } | { type: "scheduled"; scheduledAt: Date } | null
   >(null);
 
   useEffect(() => {
@@ -93,11 +88,17 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
     try {
       if (mode === "now") {
         const res = await sendCampaignAction({ campaignId: campaign.id, recipientType });
-        if ("error" in res) { toast.error(res.error); return; }
+        if ("error" in res) {
+          toast.error(res.error);
+          return;
+        }
         setResult({ type: "sent", queued: res.queued, skipped: res.skipped });
       } else {
         const date = new Date(scheduledAt);
-        if (Number.isNaN(date.getTime())) { toast.error("Invalid date/time"); return; }
+        if (Number.isNaN(date.getTime())) {
+          toast.error("Invalid date/time");
+          return;
+        }
         await scheduleCampaignAction({ campaignId: campaign.id, recipientType, scheduledAt: date });
         setResult({ type: "scheduled", scheduledAt: date });
       }
@@ -110,8 +111,8 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
   }
 
   const minDatetime = toLocalDatetimeValue(addMinutes(new Date(), 5));
-  const canSubmit = hasTemplate && !isLoadingCounts && (eligibleCount ?? 0) > 0 &&
-    (mode === "now" || scheduledAt >= minDatetime);
+  const canSubmit =
+    hasTemplate && !isLoadingCounts && (eligibleCount ?? 0) > 0 && (mode === "now" || scheduledAt >= minDatetime);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -121,9 +122,7 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
             <Send className="h-4 w-4 text-primary" />
             Launch Campaign
           </DialogTitle>
-          <DialogDescription>
-            Emails are queued and sent asynchronously via the email worker.
-          </DialogDescription>
+          <DialogDescription>Emails are queued and sent asynchronously via the email worker.</DialogDescription>
         </DialogHeader>
 
         {result ? (
@@ -136,7 +135,9 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
                   <p className="text-sm text-muted-foreground mt-1">
                     <span className="font-medium text-foreground">{result.queued}</span> emails queued for delivery
                     {result.skipped > 0 && (
-                      <>, <span className="font-medium">{result.skipped}</span> skipped (no email / suppressed)</>
+                      <>
+                        , <span className="font-medium">{result.skipped}</span> skipped (no email / suppressed)
+                      </>
                     )}
                   </p>
                 </div>
@@ -210,9 +211,7 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
                 {isLoadingCounts ? (
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 ) : (
-                  <Badge variant={eligibleCount === 0 ? "destructive" : "secondary"}>
-                    {eligibleCount ?? "—"}
-                  </Badge>
+                  <Badge variant={eligibleCount === 0 ? "destructive" : "secondary"}>{eligibleCount ?? "—"}</Badge>
                 )}
               </div>
 
@@ -262,23 +261,41 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
             <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 dark:bg-emerald-950/20 dark:border-emerald-800 px-3 py-2.5 text-xs text-emerald-800 dark:text-emerald-300">
               <ShieldCheck className="h-4 w-4 mt-0.5 shrink-0" />
               <div>
-                <span className="font-semibold">Tracking enabled —</span> open and click tracking is automatically applied.
+                <span className="font-semibold">Tracking enabled —</span> open and click tracking is automatically
+                applied.
                 <div className="flex gap-3 mt-1.5 text-[11px] font-medium opacity-80">
-                  <span className="flex items-center gap-1"><Eye className="h-3 w-3" />Open tracking</span>
-                  <span className="flex items-center gap-1"><MousePointerClick className="h-3 w-3" />Click tracking</span>
+                  <span className="flex items-center gap-1">
+                    <Eye className="h-3 w-3" />
+                    Open tracking
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <MousePointerClick className="h-3 w-3" />
+                    Click tracking
+                  </span>
                 </div>
               </div>
             </div>
 
             <DialogFooter>
-              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
               <Button onClick={handleSubmit} disabled={isSubmitting || !canSubmit}>
                 {isSubmitting ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{mode === "now" ? "Launching…" : "Scheduling…"}</>
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {mode === "now" ? "Launching…" : "Scheduling…"}
+                  </>
                 ) : mode === "now" ? (
-                  <><Send className="mr-2 h-4 w-4" />Launch</>
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Launch
+                  </>
                 ) : (
-                  <><CalendarClock className="mr-2 h-4 w-4" />Schedule</>
+                  <>
+                    <CalendarClock className="mr-2 h-4 w-4" />
+                    Schedule
+                  </>
                 )}
               </Button>
             </DialogFooter>

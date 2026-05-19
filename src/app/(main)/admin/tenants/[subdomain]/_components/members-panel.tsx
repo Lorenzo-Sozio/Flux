@@ -1,24 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import {
-  addTenantMember,
-  removeTenantMember,
-  updateTenantMemberRole,
-} from "@/actions/tenants";
+
+import { format } from "date-fns";
+import { AlertCircle, Trash2, UserPlus } from "lucide-react";
+
+import { addTenantMember, removeTenantMember, updateTenantMemberRole } from "@/actions/tenants";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { AlertCircle, Trash2, UserPlus } from "lucide-react";
-import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Member = {
   memberId: string;
@@ -80,9 +72,7 @@ export function MembersPanel({ subdomain, initialMembers }: Props) {
     setError(null);
     try {
       await updateTenantMemberRole(subdomain, userId, newRole);
-      setMembers((prev) =>
-        prev.map((m) => (m.userId === userId ? { ...m, role: newRole } : m)),
-      );
+      setMembers((prev) => prev.map((m) => (m.userId === userId ? { ...m, role: newRole } : m)));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update role");
     }
@@ -136,28 +126,19 @@ export function MembersPanel({ subdomain, initialMembers }: Props) {
       {/* Members table */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-100 px-6 py-4">
-          <h2 className="font-semibold text-gray-900">
-            Members ({members.length})
-          </h2>
+          <h2 className="font-semibold text-gray-900">Members ({members.length})</h2>
         </div>
         {members.length === 0 ? (
-          <p className="px-6 py-8 text-center text-sm text-gray-400">
-            No members yet. Add the first one above.
-          </p>
+          <p className="px-6 py-8 text-center text-sm text-gray-400">No members yet. Add the first one above.</p>
         ) : (
           <ul className="divide-y divide-gray-100">
             {members.map((m) => (
               <li key={m.memberId} className="flex items-center gap-4 px-6 py-4">
                 <div className="flex-1 min-w-0">
-                  <p className="truncate font-medium text-sm text-gray-900">
-                    {m.name ?? "—"}
-                  </p>
+                  <p className="truncate font-medium text-sm text-gray-900">{m.name ?? "—"}</p>
                   <p className="truncate text-xs text-gray-500">{m.email}</p>
                 </div>
-                <Select
-                  value={m.role}
-                  onValueChange={(v) => handleRoleChange(m.userId, v)}
-                >
+                <Select value={m.role} onValueChange={(v) => handleRoleChange(m.userId, v)}>
                   <SelectTrigger className="w-28 h-8 text-xs">
                     <SelectValue />
                   </SelectTrigger>

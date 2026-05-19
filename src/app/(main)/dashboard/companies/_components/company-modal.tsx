@@ -30,8 +30,8 @@ import {
   deleteCompany,
   updateCompany,
 } from "@/actions/crm";
-import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combobox";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
+import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combobox";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -121,8 +121,12 @@ export function CompanyModal({
   const [localCategories, setLocalCategories] = useState<LookupItem[]>(categories);
   const [localTypes, setLocalTypes] = useState<LookupItem[]>(companyTypes);
 
-  useEffect(() => { setLocalCategories(categories); }, [categories]);
-  useEffect(() => { setLocalTypes(companyTypes); }, [companyTypes]);
+  useEffect(() => {
+    setLocalCategories(categories);
+  }, [categories]);
+  useEffect(() => {
+    setLocalTypes(companyTypes);
+  }, [companyTypes]);
 
   useEffect(() => {
     if (!isEditing && searchParams?.get("new") === "true") setOpen(true);
@@ -379,9 +383,7 @@ export function CompanyModal({
                           onChange={field.onChange}
                           items={localCategories}
                           onAddItem={(item) =>
-                            setLocalCategories((prev) =>
-                              [...prev, item].sort((a, b) => a.name.localeCompare(b.name)),
-                            )
+                            setLocalCategories((prev) => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)))
                           }
                           onCreate={createCompanyCategory}
                           placeholder={t("form.selectCategory")}
@@ -400,9 +402,7 @@ export function CompanyModal({
                           onChange={field.onChange}
                           items={localTypes}
                           onAddItem={(item) =>
-                            setLocalTypes((prev) =>
-                              [...prev, item].sort((a, b) => a.name.localeCompare(b.name)),
-                            )
+                            setLocalTypes((prev) => [...prev, item].sort((a, b) => a.name.localeCompare(b.name)))
                           }
                           onCreate={createCompanyType}
                           placeholder={t("form.selectCompanyType")}

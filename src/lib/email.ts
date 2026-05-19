@@ -37,10 +37,7 @@ function safeHref(url: string): string {
 
 // ─── Admin OTP ────────────────────────────────────────────────────────────────
 
-export async function sendAdminOtpEmail(
-  email: string,
-  otp: string,
-): Promise<{ success: boolean; error?: string }> {
+export async function sendAdminOtpEmail(email: string, otp: string): Promise<{ success: boolean; error?: string }> {
   const result = await sendEmail({
     to: sanitizeHeader(email),
     subject: "Codice di accesso al pannello admin — Flux CRM",

@@ -1,10 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { getDb } from "@/lib/tenant-context";
-import { customFieldDefinitions, customFieldValues } from "@/db/schema";
+
 import { and, eq } from "drizzle-orm";
+
+import { customFieldDefinitions, customFieldValues } from "@/db/schema";
 import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
+import { getDb } from "@/lib/tenant-context";
 
 export type FieldType = "text" | "number" | "date" | "select" | "multiselect" | "boolean" | "url";
 export type EntityType = "contact" | "lead" | "company" | "deal";
@@ -49,7 +51,7 @@ export async function updateCustomFieldDefinition(
     options: string[];
     isRequired: boolean;
     order: number;
-  }>
+  }>,
 ) {
   await requireAdminAccess();
   const db = await getDb();
@@ -81,12 +83,7 @@ export async function getCustomFieldValues(entityType: EntityType, entityId: str
   return await db
     .select()
     .from(customFieldValues)
-    .where(
-      and(
-        eq(customFieldValues.entityType, entityType),
-        eq(customFieldValues.entityId, entityId)
-      )
-    );
+    .where(and(eq(customFieldValues.entityType, entityType), eq(customFieldValues.entityId, entityId)));
 }
 
 export async function upsertCustomFieldValue(data: {
@@ -101,23 +98,13 @@ export async function upsertCustomFieldValue(data: {
   const existing = await db
     .select({ id: customFieldValues.id })
     .from(customFieldValues)
-    .where(
-      and(
-        eq(customFieldValues.fieldId, data.fieldId),
-        eq(customFieldValues.entityId, data.entityId)
-      )
-    );
+    .where(and(eq(customFieldValues.fieldId, data.fieldId), eq(customFieldValues.entityId, data.entityId)));
 
   if (existing.length > 0) {
     await db
       .update(customFieldValues)
       .set({ value: data.value, updatedAt: new Date() })
-      .where(
-        and(
-          eq(customFieldValues.fieldId, data.fieldId),
-          eq(customFieldValues.entityId, data.entityId)
-        )
-      );
+      .where(and(eq(customFieldValues.fieldId, data.fieldId), eq(customFieldValues.entityId, data.entityId)));
   } else {
     await db.insert(customFieldValues).values({
       ...data,
@@ -128,7 +115,7 @@ export async function upsertCustomFieldValue(data: {
 export async function bulkUpsertCustomFieldValues(
   entityType: EntityType,
   entityId: string,
-  values: Record<string, string>
+  values: Record<string, string>,
 ) {
   for (const [fieldId, value] of Object.entries(values)) {
     if (value !== undefined && value !== null) {

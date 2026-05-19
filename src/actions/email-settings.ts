@@ -1,11 +1,13 @@
 "use server";
 
-import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+
+import { eq } from "drizzle-orm";
+
 import { auth } from "@/auth";
-import { getDb } from "@/lib/tenant-context";
 import { emailSettings } from "@/db/schema";
-import { testEmailConfig, type EmailConfig } from "@/lib/email-provider";
+import { type EmailConfig, testEmailConfig } from "@/lib/email-provider";
+import { getDb } from "@/lib/tenant-context";
 
 // ─── Load current settings (secrets masked) ───────────────────────────────────
 
@@ -36,7 +38,6 @@ export async function getEmailSettings() {
 // ─── Save settings ────────────────────────────────────────────────────────────
 
 export async function saveEmailSettings(data: {
-
   provider: "resend" | "smtp";
   resendApiKey?: string;
   smtpHost?: string;
@@ -73,7 +74,10 @@ export async function saveEmailSettings(data: {
   const [existing] = await db.select({ id: emailSettings.id }).from(emailSettings).limit(1);
 
   if (existing) {
-    await db.update(emailSettings).set({ ...payload, updatedAt: new Date() }).where(eq(emailSettings.id, existing.id));
+    await db
+      .update(emailSettings)
+      .set({ ...payload, updatedAt: new Date() })
+      .where(eq(emailSettings.id, existing.id));
   } else {
     await db.insert(emailSettings).values(payload as any);
   }
@@ -85,7 +89,6 @@ export async function saveEmailSettings(data: {
 // ─── Test connection ──────────────────────────────────────────────────────────
 
 export async function testEmailConnection(data: {
-
   provider: "resend" | "smtp";
   resendApiKey?: string;
   smtpHost?: string;

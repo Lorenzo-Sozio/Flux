@@ -8,14 +8,11 @@
  *  - Every entitlement change is written to billing_audit_log.
  */
 
-import { eq, and } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
+
 import { platformDb } from "@/db";
-import {
-  billingSubscriptions,
-  billingPlans,
-  billingTenantAddons,
-  billingAuditLog,
-} from "@/db/schema";
+import { billingAuditLog, billingPlans, billingSubscriptions, billingTenantAddons } from "@/db/schema";
+
 import type { PlanLimits, PlanModule, SubscriptionStatus } from "./plans-config";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -43,7 +40,7 @@ export interface TenantEntitlements {
   addons: Array<{ type: string; quantity: number }>;
 
   // Derived booleans
-  isActive: boolean;       // status in [active, trialing, free]
+  isActive: boolean; // status in [active, trialing, free]
   isSuspended: boolean;
   canUpgrade: boolean;
 
@@ -109,25 +106,15 @@ async function computeEntitlements(tenantId: string): Promise<TenantEntitlements
   const addons = await platformDb
     .select()
     .from(billingTenantAddons)
-    .where(
-      and(
-        eq(billingTenantAddons.tenantId, tenantId),
-        eq(billingTenantAddons.status, "active"),
-      ),
-    );
+    .where(and(eq(billingTenantAddons.tenantId, tenantId), eq(billingTenantAddons.status, "active")));
 
   const baseLimits: PlanLimits = plan.limits ? JSON.parse(plan.limits) : {};
-  const baseModules: PlanModule[] = plan.enabledModules
-    ? JSON.parse(plan.enabledModules)
-    : ["crm"];
+  const baseModules: PlanModule[] = plan.enabledModules ? JSON.parse(plan.enabledModules) : ["crm"];
 
   // Merge add-on capabilities
-  const extraUsers = addons
-    .filter((a) => a.addonType === "extra_users")
-    .reduce((sum, a) => sum + a.quantity, 0);
+  const extraUsers = addons.filter((a) => a.addonType === "extra_users").reduce((sum, a) => sum + a.quantity, 0);
 
-  const effectiveMaxUsers =
-    baseLimits.maxUsers !== null ? (baseLimits.maxUsers ?? 0) + extraUsers : null;
+  const effectiveMaxUsers = baseLimits.maxUsers !== null ? (baseLimits.maxUsers ?? 0) + extraUsers : null;
 
   const addonModules: PlanModule[] = [];
   for (const addon of addons) {
@@ -137,10 +124,8 @@ async function computeEntitlements(tenantId: string): Promise<TenantEntitlements
 
   const allModules = Array.from(new Set([...baseModules, ...addonModules])) as PlanModule[];
 
-  const hasWhiteLabel =
-    plan.hasWhiteLabel || addons.some((a) => a.addonType === "white_label");
-  const hasSandbox =
-    plan.hasSandbox || addons.some((a) => a.addonType === "sandbox");
+  const hasWhiteLabel = plan.hasWhiteLabel || addons.some((a) => a.addonType === "white_label");
+  const hasSandbox = plan.hasSandbox || addons.some((a) => a.addonType === "sandbox");
 
   const status = sub.status as SubscriptionStatus;
   const isActive = ["active", "trialing", "free"].includes(status);
@@ -192,9 +177,7 @@ export async function requireModule(tenantId: string, module: PlanModule): Promi
     throw new EntitlementError(`Subscription inactive. Please update your billing.`);
   }
   if (!ent.enabledModules.includes(module)) {
-    throw new EntitlementError(
-      `The "${module}" module is not available on your current plan. Please upgrade.`,
-    );
+    throw new EntitlementError(`The "${module}" module is not available on your current plan. Please upgrade.`);
   }
 }
 
@@ -207,11 +190,7 @@ export async function canAddUser(tenantId: string, currentActiveUsers: number): 
 }
 
 /** Checks a quantitative limit; throws EntitlementError if exceeded. */
-export async function assertLimit(
-  tenantId: string,
-  metric: keyof PlanLimits,
-  currentValue: number,
-): Promise<void> {
+export async function assertLimit(tenantId: string, metric: keyof PlanLimits, currentValue: number): Promise<void> {
   const ent = await getEntitlements(tenantId);
   if (!ent.isActive || ent.isSuspended) {
     throw new EntitlementError("Subscription inactive. Please update your billing.");

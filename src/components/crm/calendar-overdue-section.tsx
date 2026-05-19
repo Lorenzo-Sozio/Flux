@@ -1,20 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import {
-  AlertCircle,
-  CheckCircle2,
-  ChevronDown,
-  Clock,
-  ExternalLink,
-} from "lucide-react";
+
 import Link from "next/link";
+
 import { differenceInDays } from "date-fns";
+import { AlertCircle, CheckCircle2, ChevronDown, Clock, ExternalLink } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
+
 import { updateTaskStatus } from "@/actions/tasks";
-import { Badge } from "@/components/ui/badge";
 import { FormattedTime } from "@/components/crm/formatted-time";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export interface OverdueTaskItem {
@@ -26,11 +23,7 @@ export interface OverdueTaskItem {
   priority: string;
 }
 
-export function CalendarOverdueSection({
-  tasks: initialTasks,
-}: {
-  tasks: OverdueTaskItem[];
-}) {
+export function CalendarOverdueSection({ tasks: initialTasks }: { tasks: OverdueTaskItem[] }) {
   const t = useTranslations("calendar");
   const [tasks, setTasks] = useState(initialTasks);
   const [open, setOpen] = useState(true);
@@ -72,29 +65,19 @@ export function CalendarOverdueSection({
       >
         <div className="flex items-center gap-2">
           <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
-          <span className="text-sm font-semibold text-red-800 dark:text-red-200">
-            {t("overdueSection")}
-          </span>
+          <span className="text-sm font-semibold text-red-800 dark:text-red-200">{t("overdueSection")}</span>
           <Badge variant="destructive" className="text-xs tabular-nums">
             {tasks.length}
           </Badge>
         </div>
-        <ChevronDown
-          className={cn(
-            "h-4 w-4 text-red-400 transition-transform duration-200",
-            !open && "-rotate-90",
-          )}
-        />
+        <ChevronDown className={cn("h-4 w-4 text-red-400 transition-transform duration-200", !open && "-rotate-90")} />
       </button>
 
       {/* Task list */}
       {open && (
         <div className="divide-y divide-red-100/60 dark:divide-red-900/20">
           {tasks.map((task) => {
-            const daysLate = Math.max(
-              1,
-              differenceInDays(new Date(), new Date(task.date)),
-            );
+            const daysLate = Math.max(1, differenceInDays(new Date(), new Date(task.date)));
             const isCompleting = completing.has(task.id);
 
             return (
@@ -122,19 +105,13 @@ export function CalendarOverdueSection({
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold truncate">
-                      {task.displayTitle}
-                    </span>
-                    {task.priority === "high" && (
-                      <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
-                    )}
+                    <span className="text-sm font-semibold truncate">{task.displayTitle}</span>
+                    {task.priority === "high" && <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />}
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     {task.entityName !== "No Entity" && (
                       <>
-                        <span className="text-xs text-muted-foreground truncate">
-                          {task.entityName}
-                        </span>
+                        <span className="text-xs text-muted-foreground truncate">{task.entityName}</span>
                         <span className="text-muted-foreground/30">·</span>
                       </>
                     )}

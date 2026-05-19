@@ -1,6 +1,8 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+
 import { getWebhooks } from "@/actions/webhooks";
+import { auth } from "@/auth";
+
 import { WebhooksClient } from "./_components/webhooks-client";
 
 export default async function WebhooksPage() {

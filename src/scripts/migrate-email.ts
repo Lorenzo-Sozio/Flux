@@ -5,6 +5,7 @@
  */
 import { neon } from "@neondatabase/serverless";
 import * as dotenv from "dotenv";
+
 dotenv.config({ path: ".env" });
 dotenv.config({ path: ".env.local" }); // overrides if exists
 
@@ -80,4 +81,7 @@ async function main() {
   console.log("\n✅ Migration complete.");
 }
 
-main().catch((err) => { console.error(err); process.exit(1); });
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+
+import { AlertCircle, CheckCircle2 } from "lucide-react";
+
 import { createTenant } from "@/actions/tenants";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
 
 export function CreateTenantForm() {
   const [loading, setLoading] = useState(false);
@@ -21,10 +23,7 @@ export function CreateTenantForm() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    const normalizedValue =
-      name === "subdomain"
-        ? value.toLowerCase().replace(/[^a-z0-9-]/g, "")
-        : value;
+    const normalizedValue = name === "subdomain" ? value.toLowerCase().replace(/[^a-z0-9-]/g, "") : value;
 
     setFormData((prev) => ({
       ...prev,
@@ -48,7 +47,7 @@ export function CreateTenantForm() {
         formData.name,
         formData.subdomain,
         formData.dbUrl,
-        formData.emoji ? { emoji: formData.emoji } : undefined
+        formData.emoji ? { emoji: formData.emoji } : undefined,
       );
 
       setSuccess(true);
@@ -76,8 +75,7 @@ export function CreateTenantForm() {
         <Alert className="border-green-200 bg-green-50">
           <CheckCircle2 className="h-4 w-4 text-green-600" />
           <AlertDescription className="text-green-800">
-            Tenant created successfully! You need to create the database and
-            apply migrations manually.
+            Tenant created successfully! You need to create the database and apply migrations manually.
           </AlertDescription>
         </Alert>
       )}
@@ -113,13 +111,9 @@ export function CreateTenantForm() {
               disabled={loading}
               required
             />
-            <span className="whitespace-nowrap text-sm text-gray-500">
-              .localhost:3000
-            </span>
+            <span className="whitespace-nowrap text-sm text-gray-500">.localhost:3000</span>
           </div>
-          <p className="text-xs text-gray-500">
-            3-63 chars, lowercase + hyphens
-          </p>
+          <p className="text-xs text-gray-500">3-63 chars, lowercase + hyphens</p>
         </div>
 
         <div className="sm:col-span-2 space-y-2">
@@ -136,9 +130,7 @@ export function CreateTenantForm() {
             disabled={loading}
             required
           />
-          <p className="text-xs text-gray-500">
-            PostgreSQL connection string (hidden for security)
-          </p>
+          <p className="text-xs text-gray-500">PostgreSQL connection string (hidden for security)</p>
         </div>
 
         <div className="space-y-2">

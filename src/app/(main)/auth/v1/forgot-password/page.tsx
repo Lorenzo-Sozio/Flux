@@ -1,6 +1,8 @@
 import Link from "next/link";
+
 import { Command } from "lucide-react";
 import { getTranslations } from "next-intl/server";
+
 import { ForgotPasswordForm } from "../../_components/forgot-password-form";
 
 export default async function ForgotPasswordPage() {

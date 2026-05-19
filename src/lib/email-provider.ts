@@ -4,8 +4,8 @@
  * Config is loaded from DB (email_settings table), falling back to env vars.
  */
 
-import { getDb } from "@/lib/tenant-context";
 import { emailSettings } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 export interface EmailConfig {
   provider: "resend" | "smtp";

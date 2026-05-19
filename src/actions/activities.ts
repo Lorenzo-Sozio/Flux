@@ -1,11 +1,13 @@
 "use server";
 
-import { getDb } from "@/lib/tenant-context";
-import { activities, contacts, leads, users } from "@/db/schema";
-import { eq, desc, and, gte, lte, or, isNotNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { sendCallInviteEmail } from "@/lib/email";
+
+import { and, desc, eq, gte, isNotNull, lte, or } from "drizzle-orm";
+
+import { activities, contacts, leads, users } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
+import { sendCallInviteEmail } from "@/lib/email";
+import { getDb } from "@/lib/tenant-context";
 
 export async function createActivity(data: {
   type: string;
@@ -119,7 +121,11 @@ export async function getActivitiesByCompany(companyId: string) {
     .orderBy(desc(activities.createdAt));
 }
 
-export async function updateActivity(id: string, data: Partial<typeof activities.$inferInsert>, revalidatePathStr?: string) {
+export async function updateActivity(
+  id: string,
+  data: Partial<typeof activities.$inferInsert>,
+  revalidatePathStr?: string,
+) {
   await requireWriteAccess();
   const db = await getDb();
   const result = await db.update(activities).set(data).where(eq(activities.id, id)).returning();
@@ -137,8 +143,10 @@ export async function deleteActivity(id: string, revalidatePathStr?: string) {
 // Returns call/meeting activities scheduled for today (for cron day-of reminders)
 export async function getActivitiesDueToday() {
   const db = await getDb();
-  const start = new Date(); start.setHours(0, 0, 0, 0);
-  const end   = new Date(); end.setHours(23, 59, 59, 999);
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setHours(23, 59, 59, 999);
 
   return await db
     .select({
@@ -157,10 +165,7 @@ export async function getActivitiesDueToday() {
         isNotNull(activities.date),
         gte(activities.date, start),
         lte(activities.date, end),
-        or(
-          eq(activities.type, "call"),
-          eq(activities.type, "meeting"),
-        ),
+        or(eq(activities.type, "call"), eq(activities.type, "meeting")),
       ),
     );
 }
@@ -172,7 +177,7 @@ export async function getActivitiesDueToday() {
  */
 export async function getActivitiesWithPendingReminder(windowMinutes = 2) {
   const db = await getDb();
-  const now   = new Date();
+  const now = new Date();
   const ahead = new Date(now.getTime() + windowMinutes * 60_000);
 
   return await db
@@ -188,12 +193,7 @@ export async function getActivitiesWithPendingReminder(windowMinutes = 2) {
       companyId: activities.companyId,
     })
     .from(activities)
-    .where(
-      and(
-        isNotNull(activities.date),
-        isNotNull(activities.reminderMinutes),
-      ),
-    )
+    .where(and(isNotNull(activities.date), isNotNull(activities.reminderMinutes)))
     // Filter in JS: date - reminderMinutes is in [now, ahead]
     .then((rows) =>
       rows.filter((r) => {

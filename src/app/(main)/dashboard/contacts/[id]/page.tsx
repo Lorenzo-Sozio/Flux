@@ -3,7 +3,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { eq } from "drizzle-orm";
-import type { LucideIcon } from "lucide-react";
 import {
   BriefcaseIcon,
   BuildingIcon,
@@ -15,11 +14,9 @@ import {
   MailIcon,
   MapPinIcon,
   PencilIcon,
-  PhoneCallIcon,
   PhoneIcon,
   SmartphoneIcon,
   StarIcon,
-  StickyNoteIcon,
   TagIcon,
   Trash2Icon,
   UserCheckIcon,
@@ -27,13 +24,13 @@ import {
 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
-import { createActivity, deleteActivity, getActivitiesByContact } from "@/actions/activities";
+import { createActivity, getActivitiesByContact } from "@/actions/activities";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { getEmailTemplates } from "@/actions/marketing";
 import { deleteTask, getAllUsers, getTasksByContact, updateTaskStatus } from "@/actions/tasks";
 import { ContactModal } from "@/app/(main)/dashboard/contacts/_components/contact-modal";
 import { auth } from "@/auth";
-import { ActivityModal } from "@/components/crm/activity-modal";
+import { ActivityTimeline } from "@/components/crm/activity-timeline";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { DocumentPanel } from "@/components/crm/document-panel";
 import { FormattedDate } from "@/components/crm/formatted-date";
@@ -46,26 +43,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { getDb } from "@/lib/tenant-context";
 import { companies, contacts } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 const STATUS_STYLES: Record<string, string> = {
   active: "border-green-400 text-green-600 dark:border-green-500 dark:text-green-400",
   inactive: "border-gray-400 text-gray-500 dark:border-gray-600 dark:text-gray-400",
-};
-
-const ACTIVITY_ICONS: Record<string, LucideIcon> = {
-  note: StickyNoteIcon,
-  call: PhoneCallIcon,
-  meeting: CalendarIcon,
-  email: MailIcon,
-};
-
-const ACTIVITY_COLORS: Record<string, string> = {
-  note: "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400",
-  call: "bg-green-100 text-green-600 dark:bg-green-900/40 dark:text-green-400",
-  meeting: "bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400",
-  email: "bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400",
 };
 
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -405,7 +388,6 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                       <option value="note">{tD("activityTypes.note")}</option>
                       <option value="call">{tD("activityTypes.call")}</option>
                       <option value="meeting">{tD("activityTypes.meeting")}</option>
-                      <option value="email">{tD("activityTypes.email")}</option>
                     </select>
                   </div>
                   <Button type="submit" size="sm">
@@ -414,61 +396,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                 </div>
               </form>
 
-              <div className="space-y-3 mt-2">
-                {activitiesList.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-6 text-center">{tD("noActivities")}</p>
-                ) : (
-                  activitiesList.map((activity) => {
-                    const ActivityIcon = ACTIVITY_ICONS[activity.type] ?? StickyNoteIcon;
-                    const iconClass = ACTIVITY_COLORS[activity.type] ?? ACTIVITY_COLORS.note;
-                    return (
-                      <div key={activity.id} className="flex gap-3">
-                        <div
-                          className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${iconClass}`}
-                        >
-                          <ActivityIcon className="w-4 h-4" />
-                        </div>
-                        <div className="flex-1 min-w-0 border rounded-lg p-3 bg-card">
-                          <div className="flex items-start justify-between gap-2">
-                            <p className="text-xs font-semibold text-primary flex items-center gap-1">
-                              <UserIcon className="w-3 h-3" />
-                              {activity.ownerName || tD("system")}
-                            </p>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <p className="text-[10px] text-muted-foreground">
-                                <FormattedDate date={activity.date || activity.createdAt} />
-                              </p>
-                              <ActivityModal
-                                mode="edit"
-                                activity={activity}
-                                revalidatePathStr={`/dashboard/contacts/${contactId}`}
-                              />
-                              <form
-                                action={async () => {
-                                  "use server";
-                                  await deleteActivity(activity.id, `/dashboard/contacts/${contactId}`);
-                                }}
-                              >
-                                <button
-                                  type="submit"
-                                  className="p-1 text-muted-foreground hover:text-destructive transition-colors"
-                                  title="Delete"
-                                >
-                                  <Trash2Icon className="w-3.5 h-3.5" />
-                                </button>
-                              </form>
-                            </div>
-                          </div>
-                          <p className="text-sm mt-1.5">{activity.content}</p>
-                          <Badge variant="secondary" className="text-[10px] mt-2 h-4 px-1 capitalize">
-                            {activity.type}
-                          </Badge>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
+              <ActivityTimeline activities={activitiesList} revalidatePathStr={`/dashboard/contacts/${contactId}`} />
             </CardContent>
           </Card>
 

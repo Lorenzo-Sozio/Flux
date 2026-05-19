@@ -1,7 +1,10 @@
+import { redirect } from "next/navigation";
+
+import { getTranslations } from "next-intl/server";
+
 import { getMacros } from "@/actions/support";
 import { auth } from "@/auth";
-import { redirect } from "next/navigation";
-import { getTranslations } from "next-intl/server";
+
 import { MacrosClient } from "./_components/macros-client";
 
 export default async function MacrosPage() {

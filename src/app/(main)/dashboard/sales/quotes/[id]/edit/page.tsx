@@ -1,7 +1,10 @@
-import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { notFound, redirect } from "next/navigation";
+
 import { ChevronLeft, FileEdit } from "lucide-react";
+
 import { getQuoteById, getQuoteFormData } from "@/actions/quotes";
+
 import { QuoteEditForm } from "./_components/quote-edit-form";
 
 interface Props {

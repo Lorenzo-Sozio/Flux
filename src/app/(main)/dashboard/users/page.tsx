@@ -1,6 +1,8 @@
-import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+
 import { getAllUsersAction, getPendingInvitationsAction } from "@/actions/auth";
+import { auth } from "@/auth";
+
 import { UsersClient } from "./_components/users-client";
 
 export default async function UsersPage() {
@@ -10,10 +12,7 @@ export default async function UsersPage() {
   const userRole = (session.user as any).role;
   if (!["admin", "owner"].includes(userRole)) redirect("/dashboard/crm");
 
-  const [users, pendingInvitations] = await Promise.all([
-    getAllUsersAction(),
-    getPendingInvitationsAction(),
-  ]);
+  const [users, pendingInvitations] = await Promise.all([getAllUsersAction(), getPendingInvitationsAction()]);
 
   return (
     <UsersClient

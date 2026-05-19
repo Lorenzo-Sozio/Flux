@@ -1,10 +1,12 @@
 "use server";
 
-import { getDb } from "@/lib/tenant-context";
-import { customFilters, customFilterTags, filterPresets } from "@/db/schema";
-import { eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+
+import { and, desc, eq } from "drizzle-orm";
+
 import { auth } from "@/auth";
+import { customFilters, customFilterTags, filterPresets } from "@/db/schema";
+import { getDb } from "@/lib/tenant-context";
 
 // --- CUSTOM FILTERS ---
 
@@ -16,12 +18,7 @@ export async function getCustomFilters(entityType: string) {
   return await db
     .select()
     .from(customFilters)
-    .where(
-      and(
-        eq(customFilters.entityType, entityType),
-        eq(customFilters.ownerId, userId!)
-      )
-    )
+    .where(and(eq(customFilters.entityType, entityType), eq(customFilters.ownerId, userId!)))
     .orderBy(desc(customFilters.isPinned), desc(customFilters.createdAt));
 }
 
@@ -30,12 +27,7 @@ export async function getPublicFilters(entityType: string) {
   return await db
     .select()
     .from(customFilters)
-    .where(
-      and(
-        eq(customFilters.entityType, entityType),
-        eq(customFilters.isPublic, true)
-      )
-    )
+    .where(and(eq(customFilters.entityType, entityType), eq(customFilters.isPublic, true)))
     .orderBy(desc(customFilters.createdAt));
 }
 
@@ -71,7 +63,7 @@ export async function createCustomFilter(data: {
       data.tags.map((tag) => ({
         filterId: newFilter.id,
         tag,
-      }))
+      })),
     );
   }
 
@@ -90,7 +82,7 @@ export async function updateCustomFilter(
     criteria?: Record<string, any>;
     isPublic?: boolean;
     isPinned?: boolean;
-  }
+  },
 ) {
   const db = await getDb();
   const updateData: Record<string, any> = {};
@@ -101,11 +93,7 @@ export async function updateCustomFilter(
   if (data.isPinned !== undefined) updateData.isPinned = data.isPinned;
   updateData.updatedAt = new Date();
 
-  const [updated] = await db
-    .update(customFilters)
-    .set(updateData)
-    .where(eq(customFilters.id, id))
-    .returning();
+  const [updated] = await db.update(customFilters).set(updateData).where(eq(customFilters.id, id)).returning();
 
   revalidatePath(`/dashboard/leads`);
   revalidatePath(`/dashboard/contacts`);
@@ -126,10 +114,7 @@ export async function deleteCustomFilter(id: string) {
 
 export async function togglePinFilter(id: string, isPinned: boolean) {
   const db = await getDb();
-  await db
-    .update(customFilters)
-    .set({ isPinned })
-    .where(eq(customFilters.id, id));
+  await db.update(customFilters).set({ isPinned }).where(eq(customFilters.id, id));
   revalidatePath(`/dashboard/leads`);
 }
 
@@ -137,10 +122,7 @@ export async function togglePinFilter(id: string, isPinned: boolean) {
 
 export async function getFilterPresets(entityType: string) {
   const db = await getDb();
-  return await db
-    .select()
-    .from(filterPresets)
-    .where(eq(filterPresets.entityType, entityType));
+  return await db.select().from(filterPresets).where(eq(filterPresets.entityType, entityType));
 }
 
 export async function createFilterPreset(data: {
