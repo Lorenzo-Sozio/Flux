@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export function CreateTenantForm() {
+export function CreateTenantForm({ appDomain }: { appDomain: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -94,7 +94,7 @@ export function CreateTenantForm() {
             disabled={loading}
             required
           />
-          <p className="text-xs text-gray-500">1-255 characters</p>
+          <p className="text-gray-500 text-xs">1-255 characters</p>
         </div>
 
         <div className="space-y-2">
@@ -111,12 +111,12 @@ export function CreateTenantForm() {
               disabled={loading}
               required
             />
-            <span className="whitespace-nowrap text-sm text-gray-500">.localhost:3000</span>
+            <span className="whitespace-nowrap text-gray-500 text-sm">.{appDomain}</span>
           </div>
-          <p className="text-xs text-gray-500">3-63 chars, lowercase + hyphens</p>
+          <p className="text-gray-500 text-xs">3-63 chars, lowercase + hyphens</p>
         </div>
 
-        <div className="sm:col-span-2 space-y-2">
+        <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="dbUrl">
             Database URL <span className="text-red-500">*</span>
           </Label>
@@ -130,7 +130,7 @@ export function CreateTenantForm() {
             disabled={loading}
             required
           />
-          <p className="text-xs text-gray-500">PostgreSQL connection string (hidden for security)</p>
+          <p className="text-gray-500 text-xs">PostgreSQL connection string (hidden for security)</p>
         </div>
 
         <div className="space-y-2">
@@ -144,7 +144,7 @@ export function CreateTenantForm() {
             disabled={loading}
             maxLength={2}
           />
-          <p className="text-xs text-gray-500">Single emoji character</p>
+          <p className="text-gray-500 text-xs">Single emoji character</p>
         </div>
       </div>
 
@@ -154,8 +154,8 @@ export function CreateTenantForm() {
         </Button>
       </div>
 
-      <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
-        <p className="font-semibold mb-1">⚠️ Next Steps:</p>
+      <div className="rounded-lg bg-blue-50 p-3 text-blue-800 text-sm">
+        <p className="mb-1 font-semibold">⚠️ Next Steps:</p>
         <ol className="list-inside list-decimal space-y-1 text-xs">
           <li>Create the PostgreSQL database (manually or via script)</li>
           <li>Run database migrations on the new tenant database</li>

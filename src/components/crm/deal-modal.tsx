@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { DollarSignIcon, FileTextIcon, KanbanIcon, Loader2Icon, UserIcon } from "lucide-react";
+import { ArrowUpRightIcon, DollarSignIcon, FileTextIcon, KanbanIcon, Loader2Icon, UserIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -189,9 +190,18 @@ export function DealModal({
 
       <DialogContent className="sm:max-w-[640px] max-h-[90vh] flex flex-col p-0 gap-0">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <DialogTitle className="text-lg">
-            {isEditing ? t("modal.editTitle", { name: deal.name }) : t("modal.newTitle")}
-          </DialogTitle>
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle className="text-lg">
+              {isEditing ? t("modal.editTitle", { name: deal.name }) : t("modal.newTitle")}
+            </DialogTitle>
+            {isEditing && deal && (
+              <Link href={`/dashboard/pipeline/${deal.id}`} onClick={() => setOpen(false)}>
+                <Button variant="ghost" size="icon" type="button" title="Apri scheda completa" className="h-8 w-8 shrink-0">
+                  <ArrowUpRightIcon className="h-4 w-4" />
+                </Button>
+              </Link>
+            )}
+          </div>
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">

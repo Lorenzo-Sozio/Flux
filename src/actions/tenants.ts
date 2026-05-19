@@ -2,9 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 
+import path from "node:path";
+
 import { neon } from "@neondatabase/serverless";
 import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
+import { migrate } from "drizzle-orm/neon-http/migrator";
 
 import { auth } from "@/auth";
 import { createTenantDb, invalidateTenantDbCache, platformDb } from "@/db";
@@ -72,6 +75,7 @@ export async function listTenants() {
       name: tenants.name,
       subdomain: tenants.subdomain,
       settings: tenants.settings,
+      lastMigratedAt: tenants.lastMigratedAt,
       createdAt: tenants.createdAt,
       updatedAt: tenants.updatedAt,
       subscriptionStatus: billingSubscriptions.status,
@@ -281,9 +285,11 @@ export async function deleteTenant(subdomain: string) {
   return { success: true };
 }
 
+const TENANT_MIGRATIONS_FOLDER = path.join(process.cwd(), "src/db/migrations-tenant");
+
 /**
- * Run all Drizzle migrations against a tenant's database.
- * Safe to run multiple times — Drizzle tracks applied migrations in __drizzle_migrations.
+ * Applies pending Drizzle migrations to a single tenant's database.
+ * Idempotent: Drizzle tracks applied migrations in the __drizzle_migrations journal table.
  */
 export async function migrateTenantDb(subdomain: string) {
   await requireAdminPanelAccess();
@@ -302,67 +308,11 @@ export async function migrateTenantDb(subdomain: string) {
   const sql = neon(dbUrl);
   const db = drizzle(sql);
 
-  // pushSchema compares the Drizzle schema against the live DB and applies only
-  // the missing tables/columns. Safe on fresh DBs and idempotent on existing ones.
-  const { pushSchema } = await import("drizzle-kit/api");
-  // Use tenant-only schema: excludes platform-only tables (tenants, tenantMembers)
-  const schema = await import("@/db/schema-tenant");
+  await migrate(db, { migrationsFolder: TENANT_MIGRATIONS_FOLDER });
 
-  const { hasDataLoss, warnings, apply } = await pushSchema(schema, db);
+  await platformDb.update(tenants).set({ lastMigratedAt: new Date() }).where(eq(tenants.id, tenant.id));
 
-  if (warnings.length > 0) {
-    console.warn(`[migrateTenantDb] ${subdomain}:`, warnings);
-  }
-
-  if (hasDataLoss) {
-    throw new Error("Schema push would cause data loss — aborting. Review tenant DB manually.");
-  }
-
-  await apply();
-  return { success: true, warnings };
-}
-
-/**
- * Run migrations against every tenant DB in sequence.
- * Returns a per-tenant result array so callers can surface partial failures.
- */
-export async function migrateAllTenants() {
-  await requireAdminPanelAccess();
-
-  const allTenants = await platformDb
-    .select({ id: tenants.id, subdomain: tenants.subdomain, dbUrl: tenants.dbUrl })
-    .from(tenants)
-    .orderBy(tenants.createdAt);
-
-  const results: { subdomain: string; success: boolean; error?: string; warnings?: string[] }[] = [];
-
-  for (const tenant of allTenants) {
-    try {
-      const dbUrl = decryptDbUrl(tenant.dbUrl);
-      const sql = neon(dbUrl);
-      const db = drizzle(sql);
-      const { pushSchema } = await import("drizzle-kit/api");
-      const schema = await import("@/db/schema-tenant");
-      const { hasDataLoss, warnings, apply } = await pushSchema(schema, db);
-
-      if (hasDataLoss) {
-        results.push({ subdomain: tenant.subdomain, success: false, error: "Would cause data loss — skipped" });
-        continue;
-      }
-
-      await apply();
-      results.push({ subdomain: tenant.subdomain, success: true, warnings });
-    } catch (err) {
-      results.push({
-        subdomain: tenant.subdomain,
-        success: false,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-
-  revalidatePath("/admin/tenants");
-  return results;
+  return { success: true };
 }
 
 // ─── Tenant member management ─────────────────────────────────────────────────

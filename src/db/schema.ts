@@ -1369,6 +1369,7 @@ export const tenants = pgTable("tenants", {
   subdomain: text("subdomain").notNull().unique(),
   dbUrl: text("db_url").notNull(), // AES-256-GCM encrypted Neon connection string
   settings: text("settings"), // JSON: { emoji?, logo?, primaryColor? }
+  lastMigratedAt: timestamp("last_migrated_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

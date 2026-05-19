@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  ArrowUpRightIcon,
   BuildingIcon,
   EyeIcon,
   GitMerge,
@@ -299,9 +300,18 @@ export function CompanyModal({
         <DialogTrigger asChild>{children}</DialogTrigger>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
           <DialogHeader className="px-6 pt-6 pb-4 border-b">
-            <DialogTitle className="text-lg">
-              {isEditing ? t("form.editTitle", { name: company.name }) : t("form.newTitle")}
-            </DialogTitle>
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle className="text-lg">
+                {isEditing ? t("form.editTitle", { name: company.name }) : t("form.newTitle")}
+              </DialogTitle>
+              {isEditing && company && (
+                <Link href={`/dashboard/companies/${company.id}`} onClick={() => setOpen(false)}>
+                  <Button variant="ghost" size="icon" type="button" title="Apri scheda completa" className="h-8 w-8 shrink-0">
+                    <ArrowUpRightIcon className="h-4 w-4" />
+                  </Button>
+                </Link>
+              )}
+            </div>
           </DialogHeader>
 
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">

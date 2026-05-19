@@ -18,6 +18,8 @@
               ":BLANK_LINE:",
               "next/**",
               ":BLANK_LINE:",
+              ":NODE:",
+              ":BLANK_LINE:",
               ":PACKAGE:",
               ":BLANK_LINE:",
               ":ALIAS:",

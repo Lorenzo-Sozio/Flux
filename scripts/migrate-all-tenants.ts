@@ -1,12 +1,12 @@
 #!/usr/bin/env npx tsx
 /**
- * Applies the Drizzle schema to every tenant database.
- * Safe to run multiple times — pushSchema only applies missing changes.
+ * Applies pending Drizzle migrations to every tenant database.
+ * Drizzle tracks applied migrations in __drizzle_migrations — safe to run multiple times.
  *
  * Usage:
  *   npx tsx scripts/migrate-all-tenants.ts              # all tenants
  *   npx tsx scripts/migrate-all-tenants.ts acme other   # specific tenants
- *   npx tsx scripts/migrate-all-tenants.ts --dry-run    # preview only
+ *   npx tsx scripts/migrate-all-tenants.ts --dry-run    # preview only (lists tenants, no DB changes)
  *
  * Required env vars (loaded from .env automatically):
  *   DATABASE_URL             — platform DB (tenant registry)
@@ -14,35 +14,24 @@
  */
 import "dotenv/config";
 
+import path from "node:path";
+
 import { neon } from "@neondatabase/serverless";
-import { pushSchema } from "drizzle-kit/api";
 import { drizzle } from "drizzle-orm/neon-http";
+import { migrate } from "drizzle-orm/neon-http/migrator";
 
 import { tenants } from "../src/db/schema";
-import * as tenantSchema from "../src/db/schema-tenant";
 import { decryptDbUrl } from "../src/lib/tenant-db";
 
 const isDryRun = process.argv.includes("--dry-run");
 const filterSubdomains = process.argv.slice(2).filter((a) => !a.startsWith("-"));
 
-async function migrateTenant(subdomain: string, dbUrl: string): Promise<{ warnings: string[] }> {
+const MIGRATIONS_FOLDER = path.join(process.cwd(), "src/db/migrations-tenant");
+
+async function migrateTenant(dbUrl: string): Promise<void> {
   const sql = neon(dbUrl);
   const db = drizzle(sql);
-  const { hasDataLoss, warnings, apply } = await pushSchema(tenantSchema, db);
-
-  if (warnings.length > 0) {
-    console.warn(`  ⚠  Warnings for ${subdomain}:`, warnings);
-  }
-
-  if (hasDataLoss) {
-    throw new Error("Schema push would cause data loss — skipped. Review manually.");
-  }
-
-  if (!isDryRun) {
-    await apply();
-  }
-
-  return { warnings };
+  await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
 }
 
 async function main() {
@@ -77,9 +66,7 @@ async function main() {
     filterSubdomains.length > 0 ? allTenants.filter((t) => filterSubdomains.includes(t.subdomain)) : allTenants;
 
   if (targets.length === 0) {
-    console.log(
-      "No tenants found" + (filterSubdomains.length > 0 ? ` matching: ${filterSubdomains.join(", ")}` : "") + ".",
-    );
+    console.log(`No tenants found${filterSubdomains.length > 0 ? ` matching: ${filterSubdomains.join(", ")}` : ""}.`);
     process.exit(0);
   }
 
@@ -91,9 +78,11 @@ async function main() {
   for (const tenant of targets) {
     process.stdout.write(`  ${tenant.subdomain} ... `);
     try {
-      const decrypted = decryptDbUrl(tenant.dbUrl);
-      const { warnings } = await migrateTenant(tenant.subdomain, decrypted);
-      console.log(isDryRun ? "ok (dry run)" : "✓ done" + (warnings.length ? ` (${warnings.length} warning(s))` : ""));
+      if (!isDryRun) {
+        const decrypted = decryptDbUrl(tenant.dbUrl);
+        await migrateTenant(decrypted);
+      }
+      console.log(isDryRun ? "ok (dry run)" : "✓ done");
       passed++;
     } catch (err) {
       console.log(`✗ FAILED: ${err instanceof Error ? err.message : String(err)}`);

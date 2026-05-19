@@ -5,11 +5,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { format } from "date-fns";
-import { AlertCircle, CheckCircle2, DatabaseZap, Loader2, Pencil, RefreshCw, Trash2, Users } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { AlertCircle, CheckCircle2, Clock, DatabaseZap, Loader2, Pencil, RefreshCw, Trash2, Users } from "lucide-react";
 
 import { adminSetTenantPlan, adminSyncTenantSubscription } from "@/actions/admin-billing";
-import { deleteTenant, migrateAllTenants, migrateTenantDb } from "@/actions/tenants";
+import { deleteTenant, migrateTenantDb } from "@/actions/tenants";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -30,6 +30,7 @@ interface Tenant {
   name: string;
   subdomain: string;
   settings: string | null;
+  lastMigratedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
   subscriptionStatus: string | null;
@@ -44,6 +45,8 @@ interface Plan {
   displayName: string;
   isActive: boolean;
 }
+
+type MigrateResult = { subdomain: string; success: boolean; error?: string };
 
 const STATUS_BADGE: Record<string, { label: string; className: string }> = {
   active: { label: "Active", className: "bg-green-100 text-green-700" },
@@ -62,9 +65,8 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
   const [loading, setLoading] = useState(false);
   const [migrating, setMigrating] = useState<string | null>(null);
   const [migratingAll, setMigratingAll] = useState(false);
-  const [migrateAllResults, setMigrateAllResults] = useState<
-    { subdomain: string; success: boolean; error?: string }[] | null
-  >(null);
+  const [migrateAllResults, setMigrateAllResults] = useState<MigrateResult[] | null>(null);
+  const [migrateAllDone, setMigrateAllDone] = useState<{ passed: number; failed: number } | null>(null);
   const [migrateSuccess, setMigrateSuccess] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -91,7 +93,6 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
   };
 
   const openPlanDialog = (tenant: Tenant) => {
-    // Pre-select the current plan; fall back to the "free" plan entry if planId is null
     const currentId = tenant.planId ?? activePlans.find((p) => p.name === "free")?.id ?? "";
     setPlanDialogTenant(tenant);
     setPendingPlanId(currentId);
@@ -120,14 +121,46 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
     }
   };
 
-  // ── Migrations ──────────────────────────────────────────────────────────────
+  // ── Migrate all (SSE stream) ─────────────────────────────────────────────────
   const handleMigrateAll = async () => {
     setMigratingAll(true);
     setError(null);
-    setMigrateAllResults(null);
+    setMigrateAllResults([]);
+    setMigrateAllDone(null);
+
     try {
-      const results = await migrateAllTenants();
-      setMigrateAllResults(results);
+      const res = await fetch("/api/admin/migrate-all");
+      if (!res.ok || !res.body) throw new Error(`Request failed: ${res.status}`);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          const dataLine = line.replace(/^data: /, "").trim();
+          if (!dataLine) continue;
+          try {
+            const parsed = JSON.parse(dataLine);
+            if (parsed.type === "done") {
+              setMigrateAllDone({ passed: parsed.passed, failed: parsed.failed });
+            } else {
+              setMigrateAllResults((prev) => [...(prev ?? []), parsed as MigrateResult]);
+            }
+          } catch {
+            // malformed SSE line — skip
+          }
+        }
+      }
+
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Migrate all failed");
     } finally {
@@ -135,6 +168,7 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
     }
   };
 
+  // ── Migrate single ───────────────────────────────────────────────────────────
   const handleMigrate = async (subdomain: string) => {
     setMigrating(subdomain);
     setError(null);
@@ -142,6 +176,7 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
     try {
       await migrateTenantDb(subdomain);
       setMigrateSuccess(subdomain);
+      router.refresh();
       setTimeout(() => setMigrateSuccess(null), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Migration failed");
@@ -262,14 +297,37 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
           </Alert>
         )}
 
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between">
+          <div className="text-muted-foreground text-xs">
+            {migratingAll && (
+              <span className="flex items-center gap-1.5">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Migrating… {migrateAllResults?.length ?? 0}/{tenants.length}
+              </span>
+            )}
+            {!migratingAll && migrateAllDone && (
+              <span className="text-gray-600">
+                Last run: {migrateAllDone.passed} ok, {migrateAllDone.failed} failed
+              </span>
+            )}
+          </div>
           <Button variant="outline" size="sm" onClick={handleMigrateAll} disabled={migratingAll}>
-            <DatabaseZap className="mr-1 h-4 w-4" />
-            {migratingAll ? "Migrating all…" : "Migrate All DBs"}
+            {migratingAll ? (
+              <>
+                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                Migrating…
+              </>
+            ) : (
+              <>
+                <DatabaseZap className="mr-1 h-4 w-4" />
+                Migrate All DBs
+              </>
+            )}
           </Button>
         </div>
 
-        {migrateAllResults && (
+        {/* SSE results panel */}
+        {migrateAllResults && migrateAllResults.length > 0 && (
           <div className="space-y-1 rounded-lg border p-3 text-sm">
             <p className="mb-2 font-semibold text-gray-700">Migration results:</p>
             {migrateAllResults.map((r) => (
@@ -293,6 +351,7 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Tenant</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Subdomain</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Plan</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Last migrated</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Created</th>
                 <th className="px-4 py-3 text-right font-semibold text-gray-700">Actions</th>
               </tr>
@@ -301,6 +360,8 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
               {tenants.map((tenant) => {
                 const settings = tenant.settings ? JSON.parse(tenant.settings) : {};
                 const statusMeta = STATUS_BADGE[tenant.subscriptionStatus ?? "free"] ?? STATUS_BADGE.free;
+                const isMigratingThis = migrating === tenant.subdomain;
+                const isMigratedSuccess = migrateSuccess === tenant.subdomain;
 
                 return (
                   <tr key={tenant.id} className="border-gray-100 border-b hover:bg-gray-50">
@@ -355,6 +416,23 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
                       </div>
                     </td>
 
+                    {/* Last migrated column */}
+                    <td className="px-4 py-3">
+                      {tenant.lastMigratedAt ? (
+                        <span
+                          className="flex items-center gap-1 text-gray-500 text-xs"
+                          title={format(new Date(tenant.lastMigratedAt), "PPpp")}
+                        >
+                          <Clock className="h-3 w-3 shrink-0" />
+                          {formatDistanceToNow(new Date(tenant.lastMigratedAt), { addSuffix: true })}
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-[10px] text-amber-700">
+                          Never
+                        </span>
+                      )}
+                    </td>
+
                     <td className="px-4 py-3 text-gray-500 text-xs">
                       {format(new Date(tenant.createdAt), "MMM d, yyyy")}
                     </td>
@@ -371,10 +449,10 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
                           variant="outline"
                           size="sm"
                           onClick={() => handleMigrate(tenant.subdomain)}
-                          disabled={migrating === tenant.subdomain}
+                          disabled={isMigratingThis || migratingAll}
                           title="Apply DB migrations"
                         >
-                          {migrateSuccess === tenant.subdomain ? (
+                          {isMigratedSuccess ? (
                             <>
                               <CheckCircle2 className="h-4 w-4 text-green-600" />
                               <span className="ml-1 text-xs">Migrated!</span>
@@ -382,9 +460,7 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
                           ) : (
                             <>
                               <DatabaseZap className="h-4 w-4" />
-                              <span className="ml-1 text-xs">
-                                {migrating === tenant.subdomain ? "Migrating…" : "Migrate DB"}
-                              </span>
+                              <span className="ml-1 text-xs">{isMigratingThis ? "Migrating…" : "Migrate DB"}</span>
                             </>
                           )}
                         </Button>

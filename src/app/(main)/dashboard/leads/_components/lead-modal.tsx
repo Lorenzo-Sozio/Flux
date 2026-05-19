@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  ArrowRightIcon,
+  ArrowUpRightIcon,
+  BuildingIcon,
   EyeIcon,
   FileTextIcon,
   GitMerge,
   Loader2Icon,
   MapPinIcon,
   PencilIcon,
+  SparklesIcon,
   TagIcon,
   TrashIcon,
   UserIcon,
@@ -24,6 +29,7 @@ import { z } from "zod";
 
 import {
   checkLeadDuplicates,
+  convertLead,
   createCompanyCategory,
   createCompanyType,
   createLead,
@@ -34,10 +40,20 @@ import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm
 import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combobox";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -292,9 +308,18 @@ export function LeadModal({
         <DialogTrigger asChild>{children}</DialogTrigger>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
           <DialogHeader className="px-6 pt-6 pb-4 border-b">
-            <DialogTitle className="text-lg">
-              {isEditing ? t("form.editTitle", { name: `${lead.firstName} ${lead.lastName}` }) : t("form.newTitle")}
-            </DialogTitle>
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle className="text-lg">
+                {isEditing ? t("form.editTitle", { name: `${lead.firstName} ${lead.lastName}` }) : t("form.newTitle")}
+              </DialogTitle>
+              {isEditing && lead && (
+                <Link href={`/dashboard/leads/${lead.id}`} onClick={() => setOpen(false)}>
+                  <Button variant="ghost" size="icon" type="button" title="Apri scheda completa" className="h-8 w-8 shrink-0">
+                    <ArrowUpRightIcon className="h-4 w-4" />
+                  </Button>
+                </Link>
+              )}
+            </div>
           </DialogHeader>
 
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
@@ -624,6 +649,108 @@ export function DeleteLeadButton({ id }: { id: string }) {
   );
 }
 
+function QuickConvertButton({ lead }: { lead: any }) {
+  const t = useTranslations("leads");
+  const [open, setOpen] = useState(false);
+  const [shouldCreateDeal, setShouldCreateDeal] = useState(true);
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
+  const handleConvert = () => {
+    startTransition(async () => {
+      try {
+        const result = await convertLead(lead.id, shouldCreateDeal);
+        toast.success(t("convertSuccessToast"));
+        setOpen(false);
+        if (result.dealId) {
+          router.push(`/dashboard/pipeline?dealId=${result.dealId}`);
+        } else {
+          router.push(`/dashboard/contacts?contactId=${result.contactId}`);
+        }
+      } catch {
+        toast.error(t("convertErrorToast"));
+      }
+    });
+  };
+
+  const leadName = `${lead.firstName} ${lead.lastName}`;
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          title={t("convertLead")}
+          disabled={isPending}
+        >
+          {isPending ? (
+            <Loader2Icon className="h-4 w-4 animate-spin" />
+          ) : (
+            <SparklesIcon className="h-4 w-4" />
+          )}
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{t("convertLead")}</DialogTitle>
+          <DialogDescription>{t("convertLeadDesc")}</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Verrà creato</p>
+          <div className="flex items-center gap-2">
+            <UserIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+            <span>
+              Contatto: <span className="font-medium">{leadName}</span>
+            </span>
+          </div>
+          {lead.companyName && (
+            <div className="flex items-center gap-2">
+              <BuildingIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <span>
+                Azienda: <span className="font-medium">{lead.companyName}</span>
+              </span>
+            </div>
+          )}
+        </div>
+
+        <Separator />
+
+        <div className="flex items-center justify-between gap-3">
+          <div className="space-y-0.5">
+            <Label htmlFor="quick-create-deal" className="text-sm font-medium">
+              {t("convertCreateDeal")}
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              Crea un'opportunità nella pipeline collegata a questo cliente
+            </p>
+          </div>
+          <Switch
+            id="quick-create-deal"
+            checked={shouldCreateDeal}
+            onCheckedChange={setShouldCreateDeal}
+            disabled={isPending}
+          />
+        </div>
+
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline" disabled={isPending}>
+              {t("convertCancel")}
+            </Button>
+          </DialogClose>
+          <Button type="button" onClick={handleConvert} disabled={isPending} className="gap-2">
+            {isPending ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <ArrowRightIcon className="h-4 w-4" />}
+            {t("convertConfirm")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function LeadActions({
   lead,
   categories,
@@ -645,6 +772,7 @@ export function LeadActions({
           <PencilIcon className="h-4 w-4" />
         </Button>
       </LeadModal>
+      {lead.status !== "converted" && <QuickConvertButton lead={lead} />}
       <DeleteLeadButton id={lead.id} />
     </div>
   );

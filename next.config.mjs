@@ -26,6 +26,10 @@ const securityHeaders = [
 
 const nextConfig = {
   serverExternalPackages: ["drizzle-kit"],
+  // Include tenant migration SQL files in the production bundle so migrate() can read them at runtime.
+  outputFileTracingIncludes: {
+    "/**": ["./src/db/migrations-tenant/**/*"],
+  },
   reactCompiler: true,
   compiler: {
     removeConsole: process.env.NODE_ENV === "production",

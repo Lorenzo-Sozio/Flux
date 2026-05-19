@@ -16,7 +16,8 @@
     "migrate:condition-expression": "node src/scripts/migrate-condition-expression.mjs",
     "migrate:tenants": "npx tsx scripts/migrate-all-tenants.ts",
     "migrate:tenants:dry": "npx tsx scripts/migrate-all-tenants.ts --dry-run",
-    "generate:postman": "npx tsx scripts/generate-postman-collection.ts"
+    "generate:postman": "npx tsx scripts/generate-postman-collection.ts",
+    "generate:tenant-migrations": "drizzle-kit generate --config=drizzle.tenant.config.ts"
   },
   "lint-staged": {
     "*.{js,ts,jsx,tsx}": ["biome check --write --no-errors-on-unmatched"]

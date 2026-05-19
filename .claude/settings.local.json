@@ -208,7 +208,9 @@
       "Bash(npx @biomejs/biome check --write src/lib/billing/usage.ts src/components/crm/automation/rule-engine.ts src/actions/crm.ts src/actions/pipeline.ts src/actions/billing.ts src/app/api/crm/contacts/route.ts src/app/api/crm/leads/route.ts src/app/api/crm/companies/route.ts src/app/api/crm/activities/route.ts src/app/api/crm/contacts/bulk/route.ts src/app/api/crm/leads/bulk/route.ts src/app/api/crm/companies/bulk/route.ts src/app/api/crm/activities/bulk/route.ts)",
       "Bash(npx @biomejs/biome check src/actions/pipeline.ts)",
       "Bash(npx @biomejs/biome check src/actions/crm.ts src/actions/pipeline.ts src/lib/billing/usage.ts src/components/crm/automation/rule-engine.ts)",
-      "Bash(npx @biomejs/biome check --write src/actions/crm.ts src/actions/pipeline.ts)"
+      "Bash(npx @biomejs/biome check --write src/actions/crm.ts src/actions/pipeline.ts)",
+      "Bash(node -e \"require\\('drizzle-orm/neon-http/migrator'\\); console.log\\('OK'\\)\")",
+      "PowerShell(Get-ChildItem -Path \"c:\\\\React\\\\Flux\" -Recurse -Directory | Select-Object -First 30 | ForEach-Object { $_.FullName })"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",
