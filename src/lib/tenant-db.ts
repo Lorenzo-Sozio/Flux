@@ -21,7 +21,8 @@ function getKey(): Buffer {
   return Buffer.from(raw, "hex");
 }
 
-export function encryptDbUrl(plaintext: string): string {
+/** Encrypts a secret value (API key, password, etc.) using AES-256-GCM. */
+export function encryptSecret(plaintext: string): string {
   const key = getKey();
   const iv = randomBytes(16);
   const cipher = createCipheriv(ALGORITHM, key, iv);
@@ -30,9 +31,10 @@ export function encryptDbUrl(plaintext: string): string {
   return [iv.toString("hex"), authTag.toString("hex"), encrypted.toString("hex")].join(":");
 }
 
-export function decryptDbUrl(stored: string): string {
+/** Decrypts a value encrypted by encryptSecret. Returns null if value is null/empty. */
+export function decryptSecret(stored: string): string {
   const parts = stored.split(":");
-  if (parts.length !== 3) throw new Error("Invalid encrypted DB URL format");
+  if (parts.length !== 3) throw new Error("Invalid encrypted secret format");
   const [ivHex, authTagHex, dataHex] = parts;
   const key = getKey();
   try {
@@ -40,8 +42,24 @@ export function decryptDbUrl(stored: string): string {
     decipher.setAuthTag(Buffer.from(authTagHex, "hex"));
     return decipher.update(Buffer.from(dataHex, "hex")).toString("utf8") + decipher.final("utf8");
   } catch {
-    throw new Error(
-      "Failed to decrypt tenant database URL. The value may be corrupted or the encryption key may have changed.",
-    );
+    throw new Error("Failed to decrypt secret. The value may be corrupted or the encryption key may have changed.");
   }
 }
+
+/**
+ * Decrypts a stored secret, falling back to returning the raw value if it's
+ * not in encrypted format (handles plaintext values written before encryption was added).
+ */
+export function tryDecryptSecret(stored: string | null | undefined): string | null {
+  if (!stored) return null;
+  const parts = stored.split(":");
+  if (parts.length !== 3) return stored; // plaintext fallback
+  try {
+    return decryptSecret(stored);
+  } catch {
+    return stored; // decryption failed — treat as plaintext
+  }
+}
+
+export const encryptDbUrl = encryptSecret;
+export const decryptDbUrl = decryptSecret;

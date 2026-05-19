@@ -2,10 +2,10 @@
 
 import { useState, useTransition } from "react";
 
-import { Save } from "lucide-react";
+import { Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { type PlatformUser, updatePlatformUserRole } from "@/actions/platform-users";
+import { deletePlatformUser, type PlatformUser, updatePlatformUserRole } from "@/actions/platform-users";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,12 +22,15 @@ interface Props {
   currentUserId: string;
 }
 
-export function PlatformUsersClient({ users, currentUserId }: Props) {
+export function PlatformUsersClient({ users: initialUsers, currentUserId }: Props) {
+  const [userList, setUserList] = useState<PlatformUser[]>(initialUsers);
   const [roles, setRoles] = useState<Record<string, string>>(() =>
-    Object.fromEntries(users.map((u) => [u.id, u.role])),
+    Object.fromEntries(initialUsers.map((u) => [u.id, u.role])),
   );
   const [isPending, startTransition] = useTransition();
   const [saving, setSaving] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   function handleRoleChange(userId: string, newRole: string) {
     setRoles((prev) => ({ ...prev, [userId]: newRole }));
@@ -41,11 +44,26 @@ export function PlatformUsersClient({ users, currentUserId }: Props) {
         toast.success("Ruolo aggiornato.");
       } catch (err: any) {
         toast.error(err?.message ?? "Errore durante l'aggiornamento.");
-        // Restore original role on error
-        const original = users.find((u) => u.id === userId)?.role;
+        const original = userList.find((u) => u.id === userId)?.role;
         if (original) setRoles((prev) => ({ ...prev, [userId]: original }));
       } finally {
         setSaving(null);
+      }
+    });
+  }
+
+  function handleDeleteConfirm(userId: string) {
+    setDeleting(userId);
+    setConfirmDelete(null);
+    startTransition(async () => {
+      try {
+        await deletePlatformUser(userId);
+        setUserList((prev) => prev.filter((u) => u.id !== userId));
+        toast.success("Utente eliminato.");
+      } catch (err: any) {
+        toast.error(err?.message ?? "Errore durante l'eliminazione.");
+      } finally {
+        setDeleting(null);
       }
     });
   }
@@ -59,18 +77,21 @@ export function PlatformUsersClient({ users, currentUserId }: Props) {
             <TableHead>Auth</TableHead>
             <TableHead className="w-[160px]">Ruolo piattaforma</TableHead>
             <TableHead className="w-[80px]" />
+            <TableHead className="w-[100px]" />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {users.map((user) => {
+          {userList.map((user) => {
             const currentRole = roles[user.id] ?? user.role;
             const originalRole = user.role;
             const isDirty = currentRole !== originalRole;
             const isSelf = user.id === currentUserId;
             const isSaving = saving === user.id && isPending;
+            const isDeleting = deleting === user.id && isPending;
+            const isConfirming = confirmDelete === user.id;
 
             return (
-              <TableRow key={user.id}>
+              <TableRow key={user.id} className={isDeleting ? "opacity-50" : ""}>
                 {/* User info */}
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -110,7 +131,7 @@ export function PlatformUsersClient({ users, currentUserId }: Props) {
                   <Select
                     value={currentRole}
                     onValueChange={(val) => handleRoleChange(user.id, val)}
-                    disabled={isSaving}
+                    disabled={isSaving || isDeleting}
                   >
                     <SelectTrigger className="h-8 w-[140px] text-xs">
                       <SelectValue />
@@ -152,20 +173,57 @@ export function PlatformUsersClient({ users, currentUserId }: Props) {
                       variant="default"
                       className="h-8 gap-1.5 text-xs"
                       onClick={() => handleSave(user.id)}
-                      disabled={isSaving}
+                      disabled={isSaving || isDeleting}
                     >
                       <Save className="h-3.5 w-3.5" />
                       {isSaving ? "…" : "Salva"}
                     </Button>
                   )}
                 </TableCell>
+
+                {/* Delete button */}
+                <TableCell>
+                  {!isSelf &&
+                    (isConfirming ? (
+                      <div className="flex items-center gap-1">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="h-8 text-xs px-2"
+                          onClick={() => handleDeleteConfirm(user.id)}
+                          disabled={isDeleting}
+                        >
+                          Conferma
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-8 text-xs px-2"
+                          onClick={() => setConfirmDelete(null)}
+                        >
+                          Annulla
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                        onClick={() => setConfirmDelete(user.id)}
+                        disabled={isDeleting}
+                        title="Elimina utente"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    ))}
+                </TableCell>
               </TableRow>
             );
           })}
 
-          {users.length === 0 && (
+          {userList.length === 0 && (
             <TableRow>
-              <TableCell colSpan={4} className="py-12 text-center text-sm text-gray-400">
+              <TableCell colSpan={5} className="py-12 text-center text-sm text-gray-400">
                 Nessun utente trovato.
               </TableCell>
             </TableRow>

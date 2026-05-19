@@ -5,14 +5,15 @@ import { revalidatePath } from "next/cache";
 import path from "node:path";
 
 import { neon } from "@neondatabase/serverless";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
 import { migrate } from "drizzle-orm/neon-http/migrator";
 
 import { auth } from "@/auth";
 import { createTenantDb, invalidateTenantDbCache, platformDb } from "@/db";
-import { billingPlans, billingSubscriptions, tenantMembers, tenants, users } from "@/db/schema";
+import { billingPlans, billingSubscriptions, tenantMembers, tenants, userInvitations, users } from "@/db/schema";
 import { requireAdminPanelAccess } from "@/lib/auth-guard";
+import { sendInvitationEmail } from "@/lib/email";
 import { invalidateTenantCache } from "@/lib/get-tenant";
 import { decryptDbUrl, encryptDbUrl } from "@/lib/tenant-db";
 
@@ -181,6 +182,14 @@ export async function createTenant(name: string, subdomain: string, dbUrl: strin
     status: "free",
   });
 
+  // Run migrations immediately — idempotent, so safe to retry via "Migrate DB" if this fails.
+  let migrationError: string | null = null;
+  try {
+    await runMigrations(id, dbUrl);
+  } catch (err) {
+    migrationError = err instanceof Error ? err.message : "Migration failed";
+  }
+
   invalidateTenantCache(subdomain.toLowerCase());
   revalidatePath("/admin/tenants");
 
@@ -188,6 +197,7 @@ export async function createTenant(name: string, subdomain: string, dbUrl: strin
     id,
     name: name.trim(),
     subdomain: subdomain.toLowerCase(),
+    migrationError,
   };
 }
 
@@ -287,6 +297,14 @@ export async function deleteTenant(subdomain: string) {
 
 const TENANT_MIGRATIONS_FOLDER = path.join(process.cwd(), "src/db/migrations-tenant");
 
+/** Core migration logic — runs migrations and stamps lastMigratedAt. */
+async function runMigrations(tenantId: string, dbUrl: string) {
+  const sql = neon(dbUrl);
+  const db = drizzle(sql);
+  await migrate(db, { migrationsFolder: TENANT_MIGRATIONS_FOLDER });
+  await platformDb.update(tenants).set({ lastMigratedAt: new Date() }).where(eq(tenants.id, tenantId));
+}
+
 /**
  * Applies pending Drizzle migrations to a single tenant's database.
  * Idempotent: Drizzle tracks applied migrations in the __drizzle_migrations journal table.
@@ -304,13 +322,7 @@ export async function migrateTenantDb(subdomain: string) {
     throw new Error("Tenant not found.");
   }
 
-  const dbUrl = decryptDbUrl(tenant.dbUrl);
-  const sql = neon(dbUrl);
-  const db = drizzle(sql);
-
-  await migrate(db, { migrationsFolder: TENANT_MIGRATIONS_FOLDER });
-
-  await platformDb.update(tenants).set({ lastMigratedAt: new Date() }).where(eq(tenants.id, tenant.id));
+  await runMigrations(tenant.id, decryptDbUrl(tenant.dbUrl));
 
   return { success: true };
 }
@@ -353,6 +365,9 @@ export async function addTenantMember(subdomain: string, email: string, role: st
 
   const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
   if (!tenant) throw new Error("Tenant not found.");
+  if (!tenant.lastMigratedAt) {
+    throw new Error("Tenant database has not been migrated yet. Run 'Migrate DB' first.");
+  }
 
   // Resolve user by email in platform DB
   const [user] = await platformDb.select().from(users).where(eq(users.email, email.toLowerCase().trim()));
@@ -417,6 +432,9 @@ export async function updateTenantMemberRole(subdomain: string, userId: string, 
 
   const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
   if (!tenant) throw new Error("Tenant not found.");
+  if (!tenant.lastMigratedAt) {
+    throw new Error("Tenant database has not been migrated yet. Run 'Migrate DB' first.");
+  }
 
   // Prevent demoting the last owner
   if (role !== "owner") {
@@ -440,4 +458,193 @@ export async function updateTenantMemberRole(subdomain: string, userId: string, 
 
   revalidatePath("/admin/tenants");
   return { success: true };
+}
+
+// ─── Tenant invitation management ────────────────────────────────────────────
+
+/**
+ * Smart invite: if the email belongs to an existing platform user, adds them
+ * directly as a member. If not, sends a tenant-scoped invitation email so they
+ * can register and are auto-provisioned on acceptance.
+ */
+export async function inviteTenantMember(
+  subdomain: string,
+  email: string,
+  role: string,
+): Promise<{ added: true } | { invited: true; emailSent: boolean; inviteUrl: string }> {
+  const adminSession = await requireAdminPanelAccess();
+
+  if (!validateSubdomain(subdomain)) throw new Error("Invalid subdomain.");
+
+  const validRoles = ["owner", "admin", "editor", "viewer"];
+  if (!validRoles.includes(role)) throw new Error("Invalid role.");
+
+  const normalizedEmail = email.toLowerCase().trim();
+  if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    throw new Error("Invalid email address.");
+  }
+
+  const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
+  if (!tenant) throw new Error("Tenant not found.");
+
+  // If user already exists: add directly
+  const [existing] = await platformDb.select().from(users).where(eq(users.email, normalizedEmail));
+  if (existing) {
+    if (!tenant.lastMigratedAt) {
+      throw new Error("Tenant database has not been migrated yet. Run 'Migrate DB' first.");
+    }
+    // Prevent silently demoting the last owner via re-invite
+    if (role !== "owner") {
+      const owners = await platformDb
+        .select()
+        .from(tenantMembers)
+        .where(and(eq(tenantMembers.tenantId, tenant.id), eq(tenantMembers.role, "owner")));
+      if (owners.length === 1 && owners[0].userId === existing.id) {
+        throw new Error("Cannot demote the last owner of a tenant.");
+      }
+    }
+
+    await platformDb
+      .insert(tenantMembers)
+      .values({ tenantId: tenant.id, userId: existing.id, role })
+      .onConflictDoUpdate({
+        target: [tenantMembers.tenantId, tenantMembers.userId],
+        set: { role },
+      });
+
+    const tenantDb = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
+    await tenantDb
+      .insert(users)
+      .values({ id: existing.id, name: existing.name ?? "", email: existing.email ?? "", role })
+      .onConflictDoUpdate({ target: users.id, set: { name: existing.name ?? "", role } });
+
+    revalidatePath(`/admin/tenants/${subdomain}`);
+    return { added: true };
+  }
+
+  // User doesn't exist: create tenant-scoped invitation
+  const [adminUser] = await platformDb
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, adminSession.user.id));
+  const inviterName = adminUser?.name ?? "An administrator";
+
+  // Revoke any existing pending invitation for this email+tenant
+  await platformDb
+    .delete(userInvitations)
+    .where(
+      and(
+        eq(userInvitations.email, normalizedEmail),
+        eq(userInvitations.tenantId, tenant.id),
+        isNull(userInvitations.acceptedAt),
+      ),
+    );
+
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  await platformDb.insert(userInvitations).values({
+    email: normalizedEmail,
+    token,
+    role: "user",
+    invitedById: adminSession.user.id,
+    expiresAt,
+    tenantId: tenant.id,
+    tenantRole: role,
+  });
+
+  const emailResult = await sendInvitationEmail(normalizedEmail, token, inviterName, role);
+
+  revalidatePath(`/admin/tenants/${subdomain}`);
+
+  return { invited: true, emailSent: emailResult.success, inviteUrl: emailResult.inviteUrl };
+}
+
+/** Returns pending (not yet accepted, not expired) tenant-scoped invitations. */
+export async function listTenantPendingInvitations(subdomain: string) {
+  await requireAdminPanelAccess();
+
+  const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
+  if (!tenant) throw new Error("Tenant not found.");
+
+  return platformDb
+    .select({
+      id: userInvitations.id,
+      email: userInvitations.email,
+      tenantRole: userInvitations.tenantRole,
+      expiresAt: userInvitations.expiresAt,
+      createdAt: userInvitations.createdAt,
+    })
+    .from(userInvitations)
+    .where(
+      and(
+        eq(userInvitations.tenantId, tenant.id),
+        isNull(userInvitations.acceptedAt),
+        gt(userInvitations.expiresAt, new Date()),
+      ),
+    )
+    .orderBy(userInvitations.createdAt);
+}
+
+/** Revokes a pending tenant invitation (cannot revoke accepted ones). */
+export async function revokeTenantInvitation(subdomain: string, invitationId: string) {
+  await requireAdminPanelAccess();
+
+  if (!validateSubdomain(subdomain)) throw new Error("Invalid subdomain.");
+
+  const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
+  if (!tenant) throw new Error("Tenant not found.");
+
+  const [inv] = await platformDb
+    .select()
+    .from(userInvitations)
+    .where(and(eq(userInvitations.id, invitationId), eq(userInvitations.tenantId, tenant.id)));
+
+  if (!inv) throw new Error("Invitation not found.");
+  if (inv.acceptedAt) throw new Error("Cannot revoke an already accepted invitation.");
+
+  await platformDb
+    .delete(userInvitations)
+    .where(and(eq(userInvitations.id, invitationId), eq(userInvitations.tenantId, tenant.id)));
+
+  revalidatePath(`/admin/tenants/${subdomain}`);
+  return { success: true };
+}
+
+/** Resends the invitation email with a fresh token and extended expiry. */
+export async function resendTenantInvitation(
+  subdomain: string,
+  invitationId: string,
+): Promise<{ success: true; emailSent: boolean; inviteUrl: string }> {
+  const adminSession = await requireAdminPanelAccess();
+
+  if (!validateSubdomain(subdomain)) throw new Error("Invalid subdomain.");
+
+  const [adminUser] = await platformDb
+    .select({ name: users.name })
+    .from(users)
+    .where(eq(users.id, adminSession.user.id));
+  const inviterName = adminUser?.name ?? "An administrator";
+
+  const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.subdomain, subdomain));
+  if (!tenant) throw new Error("Tenant not found.");
+
+  const [inv] = await platformDb
+    .select()
+    .from(userInvitations)
+    .where(and(eq(userInvitations.id, invitationId), eq(userInvitations.tenantId, tenant.id)));
+
+  if (!inv) throw new Error("Invitation not found.");
+  if (inv.acceptedAt) throw new Error("Invitation already accepted.");
+
+  const token = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  await platformDb.update(userInvitations).set({ token, expiresAt }).where(eq(userInvitations.id, invitationId));
+
+  const emailResult = await sendInvitationEmail(inv.email, token, inviterName, inv.tenantRole ?? "editor");
+
+  revalidatePath(`/admin/tenants/${subdomain}`);
+
+  return { success: true, emailSent: emailResult.success, inviteUrl: emailResult.inviteUrl };
 }

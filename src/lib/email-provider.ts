@@ -4,8 +4,10 @@
  * Config is loaded from DB (email_settings table), falling back to env vars.
  */
 
+import { platformDb } from "@/db";
 import { emailSettings } from "@/db/schema";
 import { getDb } from "@/lib/tenant-context";
+import { tryDecryptSecret } from "@/lib/tenant-db";
 
 export interface EmailConfig {
   provider: "resend" | "smtp";
@@ -45,8 +47,8 @@ export interface SendResult {
 // ─── Config loader ────────────────────────────────────────────────────────────
 
 export async function getEmailConfig(): Promise<EmailConfig> {
-  const db = await getDb();
   try {
+    const db = await getDb(); // throws when no tenant context (e.g. admin panel)
     const [row] = await db.select().from(emailSettings).limit(1);
     if (row) {
       return {
@@ -62,10 +64,44 @@ export async function getEmailConfig(): Promise<EmailConfig> {
       };
     }
   } catch {
-    // table may not exist yet — fall through to env vars
+    // No tenant context (admin panel, cron jobs) or table doesn't exist — fall through to env vars
   }
 
   // Fallback to environment variables
+  return {
+    provider: (process.env.EMAIL_PROVIDER as "resend" | "smtp") ?? "resend",
+    resendApiKey: process.env.RESEND_API_KEY,
+    smtpHost: process.env.SMTP_HOST,
+    smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587,
+    smtpUser: process.env.SMTP_USER,
+    smtpPassword: process.env.SMTP_PASSWORD,
+    smtpSecure: process.env.SMTP_SECURE === "true",
+    fromEmail: process.env.EMAIL_FROM_ADDRESS ?? "noreply@yourdomain.com",
+    fromName: process.env.EMAIL_FROM_NAME ?? "CRM",
+  };
+}
+
+/** Reads email config from the platform DB (admin panel use). Falls back to env vars. */
+export async function getPlatformEmailConfig(): Promise<EmailConfig> {
+  try {
+    const [row] = await platformDb.select().from(emailSettings).limit(1);
+    if (row) {
+      return {
+        provider: (row.provider as "resend" | "smtp") ?? "resend",
+        resendApiKey: tryDecryptSecret(row.resendApiKey),
+        smtpHost: row.smtpHost,
+        smtpPort: row.smtpPort,
+        smtpUser: row.smtpUser,
+        smtpPassword: tryDecryptSecret(row.smtpPassword),
+        smtpSecure: row.smtpSecure,
+        fromEmail: row.fromEmail,
+        fromName: row.fromName,
+      };
+    }
+  } catch {
+    // table may not exist yet — fall through to env vars
+  }
+
   return {
     provider: (process.env.EMAIL_PROVIDER as "resend" | "smtp") ?? "resend",
     resendApiKey: process.env.RESEND_API_KEY,

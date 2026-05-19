@@ -1488,6 +1488,400 @@ export const openApiSpec = {
         },
       },
     },
+
+    // ─── Entity-scoped Activity Endpoints ────────────────────────────────
+    "/api/crm/leads/{leadId}/activities": {
+      post: {
+        tags: ["CRM Import API"],
+        operationId: "createLeadActivity",
+        summary: "Add activity to a lead",
+        description:
+          "Creates a single activity linked to the specified lead. The `leadId` is taken from the URL — no need to include it in the request body. Additional entity links (contactId, companyId, dealId) may be provided in the body.",
+        security: session(),
+        parameters: [
+          {
+            name: "leadId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            description: "Lead ID",
+            example: "lead_01JX",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["type"],
+                properties: {
+                  type: { type: "string", enum: ["note", "call", "meeting", "email"], example: "note" },
+                  content: { type: "string", maxLength: 5000, example: "Primo contatto via email" },
+                  date: { type: "string", format: "date-time", example: "2026-05-15T10:00:00.000Z" },
+                  durationMinutes: { type: "integer", example: 30 },
+                  participants: { type: "string", example: "anna@startup.io" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "Activity created", content: { "application/json": { schema: { type: "object" } } } },
+          "401": {
+            description: "Unauthorized",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+          "422": {
+            description: "Validation error",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+        },
+      },
+    },
+    "/api/crm/leads/{leadId}/activities/bulk": {
+      post: {
+        tags: ["CRM Import API"],
+        operationId: "bulkCreateLeadActivities",
+        summary: "Bulk import activities for a lead",
+        description:
+          "Imports up to 500 activities all linked to the specified lead. The `leadId` from the URL is automatically injected into every record.",
+        security: session(),
+        parameters: [
+          {
+            name: "leadId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            description: "Lead ID",
+            example: "lead_01JX",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["records"],
+                properties: { records: { type: "array", maxItems: 500, items: { type: "object" } } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Processing completed",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { summary: { $ref: "#/components/schemas/BulkSummary" }, results: { type: "array" } },
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Unauthorized",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+        },
+      },
+    },
+    "/api/crm/contacts/{contactId}/activities": {
+      post: {
+        tags: ["CRM Import API"],
+        operationId: "createContactActivity",
+        summary: "Add activity to a contact",
+        description:
+          "Creates a single activity linked to the specified contact. The `contactId` is taken from the URL — no need to include it in the request body.",
+        security: session(),
+        parameters: [
+          {
+            name: "contactId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            description: "Contact ID",
+            example: "cnt_01JX",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["type"],
+                properties: {
+                  type: { type: "string", enum: ["note", "call", "meeting", "email"], example: "call" },
+                  content: { type: "string", maxLength: 5000, example: "Chiamata di follow-up" },
+                  date: { type: "string", format: "date-time", example: "2026-05-15T14:30:00.000Z" },
+                  durationMinutes: { type: "integer", example: 45 },
+                  participants: { type: "string", example: "mario@acme.it" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "Activity created", content: { "application/json": { schema: { type: "object" } } } },
+          "401": {
+            description: "Unauthorized",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+          "422": {
+            description: "Validation error",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+        },
+      },
+    },
+    "/api/crm/contacts/{contactId}/activities/bulk": {
+      post: {
+        tags: ["CRM Import API"],
+        operationId: "bulkCreateContactActivities",
+        summary: "Bulk import activities for a contact",
+        description:
+          "Imports up to 500 activities all linked to the specified contact. The `contactId` from the URL is automatically injected into every record.",
+        security: session(),
+        parameters: [
+          {
+            name: "contactId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            description: "Contact ID",
+            example: "cnt_01JX",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["records"],
+                properties: { records: { type: "array", maxItems: 500, items: { type: "object" } } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Processing completed",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { summary: { $ref: "#/components/schemas/BulkSummary" }, results: { type: "array" } },
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Unauthorized",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+        },
+      },
+    },
+    "/api/crm/companies/{companyId}/activities": {
+      post: {
+        tags: ["CRM Import API"],
+        operationId: "createCompanyActivity",
+        summary: "Add activity to a company",
+        description:
+          "Creates a single activity linked to the specified company. The `companyId` is taken from the URL — no need to include it in the request body.",
+        security: session(),
+        parameters: [
+          {
+            name: "companyId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            description: "Company ID",
+            example: "cmp_01JX",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["type"],
+                properties: {
+                  type: { type: "string", enum: ["note", "call", "meeting", "email"], example: "meeting" },
+                  content: { type: "string", maxLength: 5000, example: "Riunione con il team acquisti" },
+                  date: { type: "string", format: "date-time", example: "2026-05-20T09:00:00.000Z" },
+                  durationMinutes: { type: "integer", example: 60 },
+                  participants: { type: "string", example: "info@acme.it" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "Activity created", content: { "application/json": { schema: { type: "object" } } } },
+          "401": {
+            description: "Unauthorized",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+          "422": {
+            description: "Validation error",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+        },
+      },
+    },
+    "/api/crm/companies/{companyId}/activities/bulk": {
+      post: {
+        tags: ["CRM Import API"],
+        operationId: "bulkCreateCompanyActivities",
+        summary: "Bulk import activities for a company",
+        description:
+          "Imports up to 500 activities all linked to the specified company. The `companyId` from the URL is automatically injected into every record.",
+        security: session(),
+        parameters: [
+          {
+            name: "companyId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            description: "Company ID",
+            example: "cmp_01JX",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["records"],
+                properties: { records: { type: "array", maxItems: 500, items: { type: "object" } } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Processing completed",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { summary: { $ref: "#/components/schemas/BulkSummary" }, results: { type: "array" } },
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Unauthorized",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+        },
+      },
+    },
+    "/api/crm/deals/{dealId}/activities": {
+      post: {
+        tags: ["CRM Import API"],
+        operationId: "createDealActivity",
+        summary: "Add activity to a deal",
+        description:
+          "Creates a single activity linked to the specified deal. The `dealId` is taken from the URL — no need to include it in the request body.",
+        security: session(),
+        parameters: [
+          {
+            name: "dealId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            description: "Deal ID",
+            example: "deal_01JX",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["type"],
+                properties: {
+                  type: { type: "string", enum: ["note", "call", "meeting", "email"], example: "note" },
+                  content: { type: "string", maxLength: 5000, example: "Proposta inviata, in attesa di feedback" },
+                  date: { type: "string", format: "date-time", example: "2026-05-18T16:00:00.000Z" },
+                  durationMinutes: { type: "integer", example: 20 },
+                  participants: { type: "string", example: "giulia@beta.it" },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "201": { description: "Activity created", content: { "application/json": { schema: { type: "object" } } } },
+          "401": {
+            description: "Unauthorized",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+          "422": {
+            description: "Validation error",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+        },
+      },
+    },
+    "/api/crm/deals/{dealId}/activities/bulk": {
+      post: {
+        tags: ["CRM Import API"],
+        operationId: "bulkCreateDealActivities",
+        summary: "Bulk import activities for a deal",
+        description:
+          "Imports up to 500 activities all linked to the specified deal. The `dealId` from the URL is automatically injected into every record.",
+        security: session(),
+        parameters: [
+          {
+            name: "dealId",
+            in: "path",
+            required: true,
+            schema: { type: "string" },
+            description: "Deal ID",
+            example: "deal_01JX",
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["records"],
+                properties: { records: { type: "array", maxItems: 500, items: { type: "object" } } },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Processing completed",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { summary: { $ref: "#/components/schemas/BulkSummary" }, results: { type: "array" } },
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Unauthorized",
+            content: { "application/json": { schema: { $ref: "#/components/schemas/Error" } } },
+          },
+        },
+      },
+    },
   },
 } as const;
 

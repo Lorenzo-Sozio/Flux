@@ -210,7 +210,17 @@
       "Bash(npx @biomejs/biome check src/actions/crm.ts src/actions/pipeline.ts src/lib/billing/usage.ts src/components/crm/automation/rule-engine.ts)",
       "Bash(npx @biomejs/biome check --write src/actions/crm.ts src/actions/pipeline.ts)",
       "Bash(node -e \"require\\('drizzle-orm/neon-http/migrator'\\); console.log\\('OK'\\)\")",
-      "PowerShell(Get-ChildItem -Path \"c:\\\\React\\\\Flux\" -Recurse -Directory | Select-Object -First 30 | ForEach-Object { $_.FullName })"
+      "PowerShell(Get-ChildItem -Path \"c:\\\\React\\\\Flux\" -Recurse -Directory | Select-Object -First 30 | ForEach-Object { $_.FullName })",
+      "PowerShell(npm install 2>&1)",
+      "PowerShell(cmd /c \"dir /al .next\\\\node_modules 2>&1\")",
+      "PowerShell(cmd /c \"dir .next\\\\node_modules 2>&1\")",
+      "PowerShell(cmd /c \"rmdir /s /q .next\" 2>&1; Write-Host \"Exit: $LASTEXITCODE\"; Test-Path .next)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\Lorenzos\\\\Documents\\\\Claude_Code\\\\Progetti\\\\Flux\" -Recurse -Directory | Where-Object { $_.FullName -match \"\\(admin|tenants\\)\" } | Select-Object -ExpandProperty FullName)",
+      "PowerShell(cd \"c:\\\\Users\\\\Lorenzos\\\\Documents\\\\Claude_Code\\\\Progetti\\\\Flux\"; $env:DRIZZLE_KIT_NON_INTERACTIVE = \"1\"; \"0`n0`n0`n\" | npx drizzle-kit generate 2>&1)",
+      "Bash(Get-Content .env)",
+      "Bash(Select-String \"EMAIL|RESEND|SMTP\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Lorenzos\\\\Documents\\\\Claude_Code\\\\Progetti\\\\Flux\\\\src\\\\app\\\\\\(main\\\\\\)\\\\admin\\\\\" -Recurse -File | Select-Object FullName)",
+      "Bash(Find /mnt/c/Users/Lorenzos/Documents/Claude_Code/Progetti/Flux/src/actions -name \"*.ts\" -type f)"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",

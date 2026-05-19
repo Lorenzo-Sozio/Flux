@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { getTenant, listTenantMembers } from "@/actions/tenants";
+import { getTenant, listTenantMembers, listTenantPendingInvitations } from "@/actions/tenants";
 
 import { MembersPanel } from "./_components/members-panel";
 
@@ -13,9 +13,14 @@ export default async function TenantDetailPage({ params }: Props) {
 
   let tenant: Awaited<ReturnType<typeof getTenant>>;
   let members: Awaited<ReturnType<typeof listTenantMembers>>;
+  let invitations: Awaited<ReturnType<typeof listTenantPendingInvitations>>;
 
   try {
-    [tenant, members] = await Promise.all([getTenant(subdomain), listTenantMembers(subdomain)]);
+    [tenant, members, invitations] = await Promise.all([
+      getTenant(subdomain),
+      listTenantMembers(subdomain),
+      listTenantPendingInvitations(subdomain),
+    ]);
   } catch {
     return notFound();
   }
@@ -25,11 +30,11 @@ export default async function TenantDetailPage({ params }: Props) {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{tenant.name}</h1>
         <p className="text-sm text-gray-500 mt-1">
-          <code className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs">{subdomain}</code>
+          Identifier: <code className="rounded bg-gray-100 px-2 py-0.5 font-mono text-xs">{subdomain}</code>
         </p>
       </div>
 
-      <MembersPanel subdomain={subdomain} initialMembers={members} />
+      <MembersPanel subdomain={subdomain} initialMembers={members} initialInvitations={invitations} />
     </div>
   );
 }

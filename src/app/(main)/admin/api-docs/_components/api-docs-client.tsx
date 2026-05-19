@@ -2380,6 +2380,634 @@ const GROUPS: ApiGroup[] = [
           { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
         ],
       },
+      // ─── Entity-scoped activity endpoints ─────────────────────────────
+      {
+        id: "crm-lead-activities-create",
+        method: "POST",
+        path: "/api/crm/leads/{leadId}/activities",
+        summary: "Aggiungi attività a un lead",
+        description:
+          "Crea una singola attività collegata al lead specificato nell'URL. Non è necessario includere leadId nel body — viene iniettato automaticamente dall'URL.",
+        auth: "session",
+        parameters: [
+          {
+            name: "leadId",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "ID del lead",
+            example: "lead_01JX",
+          },
+          {
+            name: "type",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Tipo di attività",
+            enum: ["note", "call", "meeting", "email"],
+            example: "note",
+          },
+          {
+            name: "content",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Corpo/descrizione (max 5000 caratteri)",
+            example: "Primo contatto via email",
+          },
+          {
+            name: "date",
+            in: "body",
+            required: false,
+            type: "string (ISO 8601)",
+            description: "Data/ora dell'attività",
+            example: "2026-05-15T10:00:00.000Z",
+          },
+          {
+            name: "durationMinutes",
+            in: "body",
+            required: false,
+            type: "integer",
+            description: "Durata in minuti",
+            example: "30",
+          },
+          {
+            name: "participants",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Partecipanti",
+            example: "anna@startup.io",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              type: "note",
+              content: "Primo contatto via email — interesse per piano Enterprise",
+              date: "2026-05-15T10:00:00.000Z",
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 201,
+            description: "Attività creata",
+            example: JSON.stringify(
+              { status: "created", id: "act_03CD", data: { id: "act_03CD", type: "note", leadId: "lead_01JX" } },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 422,
+            description: "Errore di validazione",
+            example: JSON.stringify(
+              { error: "Validation failed", errors: [{ field: "type", message: "type is required" }] },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-lead-activities-bulk",
+        method: "POST",
+        path: "/api/crm/leads/{leadId}/activities/bulk",
+        summary: "Import bulk attività per un lead",
+        description:
+          "Importa fino a 500 attività tutte collegate al lead specificato. Il leadId viene iniettato automaticamente in ogni record dall'URL.",
+        auth: "session",
+        parameters: [
+          {
+            name: "leadId",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "ID del lead",
+            example: "lead_01JX",
+          },
+          {
+            name: "records",
+            in: "body",
+            required: true,
+            type: "ActivityBodyInput[]",
+            description: "Array di attività (max 500). Stessi campi dell'endpoint singolo eccetto leadId.",
+            example: "[{ type: 'note', ... }]",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              records: [
+                { type: "note", content: "Email di benvenuto inviata", date: "2026-05-10T09:00:00.000Z" },
+                { type: "call", content: "Demo prodotto", durationMinutes: 30, date: "2026-05-15T14:30:00.000Z" },
+              ],
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Elaborazione completata",
+            example: JSON.stringify(
+              {
+                summary: { total: 2, created: 2, updated: 0, skipped: 0, errors: 0, durationMs: 38 },
+                results: [
+                  { index: 0, status: "created", id: "act_04EF" },
+                  { index: 1, status: "created", id: "act_05GH" },
+                ],
+              },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-contact-activities-create",
+        method: "POST",
+        path: "/api/crm/contacts/{contactId}/activities",
+        summary: "Aggiungi attività a un contatto",
+        description:
+          "Crea una singola attività collegata al contatto specificato nell'URL. Non è necessario includere contactId nel body.",
+        auth: "session",
+        parameters: [
+          {
+            name: "contactId",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "ID del contatto",
+            example: "cnt_01JX",
+          },
+          {
+            name: "type",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Tipo di attività",
+            enum: ["note", "call", "meeting", "email"],
+            example: "call",
+          },
+          {
+            name: "content",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Corpo/descrizione (max 5000 caratteri)",
+            example: "Chiamata di follow-up",
+          },
+          {
+            name: "date",
+            in: "body",
+            required: false,
+            type: "string (ISO 8601)",
+            description: "Data/ora dell'attività",
+            example: "2026-05-15T14:30:00.000Z",
+          },
+          {
+            name: "durationMinutes",
+            in: "body",
+            required: false,
+            type: "integer",
+            description: "Durata in minuti",
+            example: "45",
+          },
+          {
+            name: "participants",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Partecipanti",
+            example: "mario@acme.it",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              type: "call",
+              content: "Chiamata di follow-up — conferma interesse per Q3",
+              durationMinutes: 45,
+              date: "2026-05-15T14:30:00.000Z",
+              participants: "mario@acme.it",
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 201,
+            description: "Attività creata",
+            example: JSON.stringify(
+              { status: "created", id: "act_06IJ", data: { id: "act_06IJ", type: "call", contactId: "cnt_01JX" } },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 422,
+            description: "Errore di validazione",
+            example: JSON.stringify(
+              { error: "Validation failed", errors: [{ field: "type", message: "type is required" }] },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-contact-activities-bulk",
+        method: "POST",
+        path: "/api/crm/contacts/{contactId}/activities/bulk",
+        summary: "Import bulk attività per un contatto",
+        description:
+          "Importa fino a 500 attività tutte collegate al contatto specificato. Il contactId viene iniettato automaticamente in ogni record dall'URL.",
+        auth: "session",
+        parameters: [
+          {
+            name: "contactId",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "ID del contatto",
+            example: "cnt_01JX",
+          },
+          {
+            name: "records",
+            in: "body",
+            required: true,
+            type: "ActivityBodyInput[]",
+            description: "Array di attività (max 500). Stessi campi dell'endpoint singolo eccetto contactId.",
+            example: "[{ type: 'note', ... }]",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              records: [
+                { type: "note", content: "Prima presa di contatto", date: "2026-05-10T09:00:00.000Z" },
+                {
+                  type: "meeting",
+                  content: "Riunione presentazione offerta",
+                  durationMinutes: 60,
+                  date: "2026-05-20T11:00:00.000Z",
+                },
+              ],
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Elaborazione completata",
+            example: JSON.stringify(
+              {
+                summary: { total: 2, created: 2, updated: 0, skipped: 0, errors: 0, durationMs: 41 },
+                results: [
+                  { index: 0, status: "created", id: "act_07KL" },
+                  { index: 1, status: "created", id: "act_08MN" },
+                ],
+              },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-company-activities-create",
+        method: "POST",
+        path: "/api/crm/companies/{companyId}/activities",
+        summary: "Aggiungi attività a un'azienda",
+        description:
+          "Crea una singola attività collegata all'azienda specificata nell'URL. Non è necessario includere companyId nel body.",
+        auth: "session",
+        parameters: [
+          {
+            name: "companyId",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "ID dell'azienda",
+            example: "cmp_01JX",
+          },
+          {
+            name: "type",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Tipo di attività",
+            enum: ["note", "call", "meeting", "email"],
+            example: "meeting",
+          },
+          {
+            name: "content",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Corpo/descrizione (max 5000 caratteri)",
+            example: "Riunione con il team acquisti",
+          },
+          {
+            name: "date",
+            in: "body",
+            required: false,
+            type: "string (ISO 8601)",
+            description: "Data/ora dell'attività",
+            example: "2026-05-20T09:00:00.000Z",
+          },
+          {
+            name: "durationMinutes",
+            in: "body",
+            required: false,
+            type: "integer",
+            description: "Durata in minuti",
+            example: "60",
+          },
+          {
+            name: "participants",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Partecipanti",
+            example: "info@acme.it",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              type: "meeting",
+              content: "Riunione con il team acquisti — discussione budget 2026",
+              durationMinutes: 60,
+              date: "2026-05-20T09:00:00.000Z",
+              participants: "info@acme.it",
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 201,
+            description: "Attività creata",
+            example: JSON.stringify(
+              { status: "created", id: "act_09OP", data: { id: "act_09OP", type: "meeting", companyId: "cmp_01JX" } },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 422,
+            description: "Errore di validazione",
+            example: JSON.stringify(
+              { error: "Validation failed", errors: [{ field: "type", message: "type is required" }] },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-company-activities-bulk",
+        method: "POST",
+        path: "/api/crm/companies/{companyId}/activities/bulk",
+        summary: "Import bulk attività per un'azienda",
+        description:
+          "Importa fino a 500 attività tutte collegate all'azienda specificata. Il companyId viene iniettato automaticamente in ogni record dall'URL.",
+        auth: "session",
+        parameters: [
+          {
+            name: "companyId",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "ID dell'azienda",
+            example: "cmp_01JX",
+          },
+          {
+            name: "records",
+            in: "body",
+            required: true,
+            type: "ActivityBodyInput[]",
+            description: "Array di attività (max 500). Stessi campi dell'endpoint singolo eccetto companyId.",
+            example: "[{ type: 'note', ... }]",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              records: [
+                {
+                  type: "note",
+                  content: "Contatto iniziale con responsabile acquisti",
+                  date: "2026-05-05T10:00:00.000Z",
+                },
+                {
+                  type: "call",
+                  content: "Call di follow-up post-offerta",
+                  durationMinutes: 20,
+                  date: "2026-05-22T15:00:00.000Z",
+                },
+              ],
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Elaborazione completata",
+            example: JSON.stringify(
+              {
+                summary: { total: 2, created: 2, updated: 0, skipped: 0, errors: 0, durationMs: 36 },
+                results: [
+                  { index: 0, status: "created", id: "act_10QR" },
+                  { index: 1, status: "created", id: "act_11ST" },
+                ],
+              },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-deal-activities-create",
+        method: "POST",
+        path: "/api/crm/deals/{dealId}/activities",
+        summary: "Aggiungi attività a un deal",
+        description:
+          "Crea una singola attività collegata al deal specificato nell'URL. Non è necessario includere dealId nel body.",
+        auth: "session",
+        parameters: [
+          {
+            name: "dealId",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "ID del deal",
+            example: "deal_01JX",
+          },
+          {
+            name: "type",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Tipo di attività",
+            enum: ["note", "call", "meeting", "email"],
+            example: "note",
+          },
+          {
+            name: "content",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Corpo/descrizione (max 5000 caratteri)",
+            example: "Proposta inviata, in attesa di feedback",
+          },
+          {
+            name: "date",
+            in: "body",
+            required: false,
+            type: "string (ISO 8601)",
+            description: "Data/ora dell'attività",
+            example: "2026-05-18T16:00:00.000Z",
+          },
+          {
+            name: "durationMinutes",
+            in: "body",
+            required: false,
+            type: "integer",
+            description: "Durata in minuti",
+            example: "20",
+          },
+          {
+            name: "participants",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Partecipanti",
+            example: "giulia@beta.it",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              type: "note",
+              content: "Proposta inviata, in attesa di feedback entro fine mese",
+              date: "2026-05-18T16:00:00.000Z",
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 201,
+            description: "Attività creata",
+            example: JSON.stringify(
+              { status: "created", id: "act_12UV", data: { id: "act_12UV", type: "note", dealId: "deal_01JX" } },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 422,
+            description: "Errore di validazione",
+            example: JSON.stringify(
+              { error: "Validation failed", errors: [{ field: "type", message: "type is required" }] },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "crm-deal-activities-bulk",
+        method: "POST",
+        path: "/api/crm/deals/{dealId}/activities/bulk",
+        summary: "Import bulk attività per un deal",
+        description:
+          "Importa fino a 500 attività tutte collegate al deal specificato. Il dealId viene iniettato automaticamente in ogni record dall'URL.",
+        auth: "session",
+        parameters: [
+          {
+            name: "dealId",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "ID del deal",
+            example: "deal_01JX",
+          },
+          {
+            name: "records",
+            in: "body",
+            required: true,
+            type: "ActivityBodyInput[]",
+            description: "Array di attività (max 500). Stessi campi dell'endpoint singolo eccetto dealId.",
+            example: "[{ type: 'note', ... }]",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              records: [
+                { type: "note", content: "Proposta inviata", date: "2026-05-18T16:00:00.000Z" },
+                {
+                  type: "call",
+                  content: "Chiamata di chiarimento condizioni contrattuali",
+                  durationMinutes: 25,
+                  date: "2026-05-25T10:00:00.000Z",
+                },
+              ],
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Elaborazione completata",
+            example: JSON.stringify(
+              {
+                summary: { total: 2, created: 2, updated: 0, skipped: 0, errors: 0, durationMs: 33 },
+                results: [
+                  { index: 0, status: "created", id: "act_13WX" },
+                  { index: 1, status: "created", id: "act_14YZ" },
+                ],
+              },
+              null,
+              2,
+            ),
+          },
+          { status: 401, description: "Non autenticato", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
     ],
   },
 ];
@@ -2904,7 +3532,9 @@ function PostmanToolbar() {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export function ApiDocsClient() {
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(["authentication", "tenant", "contacts"]));
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
+    new Set(["authentication", "tenant", "contacts", "crm-import"]),
+  );
   const [activeId, setActiveId] = useState<string>("authentication");
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
 

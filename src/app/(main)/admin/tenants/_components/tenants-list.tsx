@@ -349,7 +349,7 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
             <thead className="border-gray-200 border-b bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Tenant</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Subdomain</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Identifier</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Plan</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Last migrated</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Created</th>
@@ -476,11 +476,12 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
                               <AlertDialogTitle>Delete Tenant?</AlertDialogTitle>
                               <AlertDialogDescription className="space-y-2">
                                 <p>
-                                  This will remove <strong>{tenant.name}</strong> from the registry.
+                                  This will remove <strong>{tenant.name}</strong> from the registry. All SSO access for
+                                  members of this tenant will be revoked immediately.
                                 </p>
                                 <p className="rounded bg-orange-50 p-2 text-orange-700 text-xs">
-                                  ⚠️ The database will NOT be deleted. You must manually delete{" "}
-                                  <code>flux_tenant_{tenant.subdomain}</code> from PostgreSQL.
+                                  ⚠️ The database will NOT be deleted. You must manually drop the tenant database from
+                                  PostgreSQL (identifier: <code>{tenant.subdomain}</code>).
                                 </p>
                                 <p>This action cannot be undone.</p>
                               </AlertDialogDescription>
@@ -507,9 +508,10 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
         <div className="rounded-lg bg-amber-50 p-3 text-amber-800 text-sm">
           <p className="mb-1 font-semibold">📋 Important Notes:</p>
           <ul className="list-inside list-disc space-y-1 text-xs">
-            <li>Database URLs are encrypted but never shown in the UI</li>
-            <li>Deleting a tenant only removes it from the registry</li>
-            <li>The tenant database must be deleted manually via PostgreSQL</li>
+            <li>Database URLs are encrypted and never exposed in the UI</li>
+            <li>Users access tenants via centralized SSO — no subdomain routing is used</li>
+            <li>Deleting a tenant removes it from the registry and revokes all member access</li>
+            <li>The tenant database must be dropped manually via PostgreSQL</li>
             <li>Data of deleted tenants cannot be recovered</li>
           </ul>
         </div>

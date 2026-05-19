@@ -3,8 +3,8 @@ import Link from "next/link";
 import { and, eq, gt } from "drizzle-orm";
 import { Command } from "lucide-react";
 
+import { platformDb } from "@/db";
 import { userInvitations } from "@/db/schema";
-import { getDb } from "@/lib/tenant-context";
 
 import { AcceptInvitationForm } from "../../_components/accept-invitation-form";
 
@@ -13,10 +13,11 @@ interface Props {
 }
 
 export default async function AcceptInvitationPage({ searchParams }: Props) {
-  const db = await getDb();
   const { token } = await searchParams;
 
-  if (!token) {
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  if (!token || !UUID_RE.test(token)) {
     return (
       <div className="flex h-dvh items-center justify-center">
         <div className="text-center space-y-4">
@@ -27,7 +28,7 @@ export default async function AcceptInvitationPage({ searchParams }: Props) {
     );
   }
 
-  const [invitation] = await db
+  const [invitation] = await platformDb
     .select()
     .from(userInvitations)
     .where(and(eq(userInvitations.token, token), gt(userInvitations.expiresAt, new Date())));

@@ -2,7 +2,7 @@
  * email.ts — system email helpers (auth, invitations, task reminders).
  * Campaign email is handled separately via email-provider + marketing.ts.
  */
-import { sendEmail } from "@/lib/email-provider";
+import { getPlatformEmailConfig, sendEmail } from "@/lib/email-provider";
 
 const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 
@@ -38,10 +38,12 @@ function safeHref(url: string): string {
 // ─── Admin OTP ────────────────────────────────────────────────────────────────
 
 export async function sendAdminOtpEmail(email: string, otp: string): Promise<{ success: boolean; error?: string }> {
-  const result = await sendEmail({
-    to: sanitizeHeader(email),
-    subject: "Codice di accesso al pannello admin — Flux CRM",
-    html: `
+  const config = await getPlatformEmailConfig();
+  const result = await sendEmail(
+    {
+      to: sanitizeHeader(email),
+      subject: "Codice di accesso al pannello admin — Flux CRM",
+      html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2 style="color:#111827">Accesso pannello di amministrazione</h2>
         <p style="color:#374151">Usa il codice seguente per completare la verifica. Scade tra <strong>10 minuti</strong>.</p>
@@ -50,7 +52,9 @@ export async function sendAdminOtpEmail(email: string, otp: string): Promise<{ s
         </div>
         <p style="color:#6b7280;font-size:13px">Se non hai richiesto questo codice, ignora questa email. Il tuo account è al sicuro.</p>
       </div>`,
-  });
+    },
+    config,
+  );
 
   if (!result.success) console.error("[EMAIL] Admin OTP send failed:", result.error);
   return result;
@@ -63,11 +67,12 @@ export async function sendPasswordResetEmail(
   token: string,
 ): Promise<{ success: boolean; error?: string }> {
   const resetUrl = `${APP_URL}/auth/v1/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
-
-  const result = await sendEmail({
-    to: sanitizeHeader(email),
-    subject: "Reset your password",
-    html: `
+  const config = await getPlatformEmailConfig();
+  const result = await sendEmail(
+    {
+      to: sanitizeHeader(email),
+      subject: "Reset your password",
+      html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2>Reset your password</h2>
         <p>Click the button below to reset your password. This link expires in 24 hours.</p>
@@ -76,7 +81,9 @@ export async function sendPasswordResetEmail(
         </a>
         <p style="margin-top:16px;color:#6b7280;font-size:13px">If you didn't request this, you can safely ignore it.</p>
       </div>`,
-  });
+    },
+    config,
+  );
 
   if (!result.success) console.error("[EMAIL] Password reset send failed:", result.error);
   else console.log("[EMAIL] Password reset sent to", email, "| link:", resetUrl);
@@ -93,13 +100,15 @@ export async function sendInvitationEmail(
   role: string,
 ): Promise<{ success: boolean; inviteUrl: string; error?: string }> {
   const inviteUrl = `${APP_URL}/auth/v1/accept-invitation?token=${token}`;
-  const safeName = sanitizeHeader(invitedByName);
-  const safeRole = sanitizeHeader(role);
+  const safeName = esc(sanitizeHeader(invitedByName));
+  const safeRole = esc(sanitizeHeader(role));
+  const config = await getPlatformEmailConfig();
 
-  const result = await sendEmail({
-    to: sanitizeHeader(email),
-    subject: `${safeName} invited you to join the CRM`,
-    html: `
+  const result = await sendEmail(
+    {
+      to: sanitizeHeader(email),
+      subject: `${safeName} invited you to join the CRM`,
+      html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2>You've been invited</h2>
         <p><strong>${safeName}</strong> invited you as <strong>${safeRole}</strong>.</p>
@@ -108,7 +117,9 @@ export async function sendInvitationEmail(
         </a>
         <p style="margin-top:16px;color:#6b7280;font-size:13px">This invitation expires in 7 days.</p>
       </div>`,
-  });
+    },
+    config,
+  );
 
   if (!result.success) {
     console.error("[EMAIL] Invitation send failed:", result.error);
@@ -166,12 +177,12 @@ export async function sendCallInviteEmail(to: string, contactName: string, descr
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2>Call Appointment</h2>
-        <p>Hi ${contactName},</p>
+        <p>Hi ${esc(contactName)},</p>
         <p>A call has been scheduled with you.</p>
         <table style="border-collapse:collapse;width:100%;margin:16px 0">
           <tr>
             <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;border-radius:4px 0 0 4px;white-space:nowrap">Topic</td>
-            <td style="padding:8px 12px;border:1px solid #e5e7eb">${description}</td>
+            <td style="padding:8px 12px;border:1px solid #e5e7eb">${esc(description)}</td>
           </tr>
           <tr>
             <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;border-radius:4px 0 0 4px;white-space:nowrap">Date & Time</td>
@@ -218,7 +229,7 @@ export async function sendActivityReminderEmail(
         <table style="border-collapse:collapse;width:100%;margin:16px 0">
           <tr>
             <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">Topic</td>
-            <td style="padding:8px 12px;border:1px solid #e5e7eb">${description}</td>
+            <td style="padding:8px 12px;border:1px solid #e5e7eb">${esc(description)}</td>
           </tr>
           <tr>
             <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;white-space:nowrap">Time</td>
@@ -397,7 +408,7 @@ export async function sendTaskDueEmail(email: string, taskTitle: string, taskLin
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2>Task Reminder</h2>
-        <p>Your task <strong>${taskTitle}</strong> is due today.</p>
+        <p>Your task <strong>${esc(taskTitle)}</strong> is due today.</p>
         <a href="${APP_URL}${taskLink}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">
           View Task
         </a>

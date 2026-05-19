@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
 import { platformDb } from "@/db";
 import { accounts, users } from "@/db/schema";
@@ -80,6 +80,33 @@ export async function updatePlatformUserRole(userId: string, newRole: string): P
   }
 
   await platformDb.update(users).set({ role: newRole }).where(eq(users.id, userId));
+
+  revalidatePath("/admin/users");
+}
+
+export async function deletePlatformUser(userId: string): Promise<void> {
+  const session = await requireAdminPanelAccess();
+
+  if (userId === session.user.id) {
+    throw new Error("Non puoi eliminare il tuo account.");
+  }
+
+  const [target] = await platformDb.select({ role: users.role }).from(users).where(eq(users.id, userId));
+  if (!target) throw new Error("Utente non trovato.");
+
+  if (target.role === "owner") {
+    const otherOwners = await platformDb
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.role, "owner"), ne(users.id, userId)));
+
+    if (otherOwners.length === 0) {
+      throw new Error("Impossibile eliminare l'unico owner della piattaforma. Promuovi prima un altro utente.");
+    }
+  }
+
+  // Deleting from users cascades to tenantMembers, accounts, sessions automatically.
+  await platformDb.delete(users).where(eq(users.id, userId));
 
   revalidatePath("/admin/users");
 }

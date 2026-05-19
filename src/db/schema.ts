@@ -699,6 +699,9 @@ export const userInvitations = pgTable("user_invitation", {
   expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
   acceptedAt: timestamp("accepted_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  // Tenant-scoped invitation: when set, user is auto-provisioned as tenant member on accept
+  tenantId: text("tenant_id"), // FK to tenants.id — enforced at app level (avoids forward-ref)
+  tenantRole: text("tenant_role").default("editor"),
 });
 
 // --- IN-APP NOTIFICATIONS ---

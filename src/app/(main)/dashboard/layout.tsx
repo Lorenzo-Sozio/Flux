@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
 import { getNotificationsAction } from "@/actions/auth";
 import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sidebar";
@@ -55,18 +55,22 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
   // Upsert the user into the tenant DB so tenant-side FK constraints work.
   // Fast no-op on subsequent visits (onConflictDoUpdate is idempotent).
   const db = await getDb();
+  const uid = session.user.id;
+  const uname = session.user.name ?? "";
+  const uemail = session.user.email ?? "";
+  const urole = member.role;
+
+  // Remove any stale row created with the same email but a wrong platform ID.
+  // This can happen when a previous invitation acceptance bug inserted the user
+  // directly into the tenant DB instead of the platform DB, generating a mismatch.
+  if (uemail) {
+    await db.delete(users).where(and(eq(users.email, uemail), ne(users.id, uid)));
+  }
+
   await db
     .insert(users)
-    .values({
-      id: session.user.id,
-      name: session.user.name ?? "",
-      email: session.user.email ?? "",
-      role: member.role,
-    })
-    .onConflictDoUpdate({
-      target: users.id,
-      set: { name: session.user.name ?? "", role: member.role },
-    });
+    .values({ id: uid, name: uname, email: uemail, role: urole })
+    .onConflictDoUpdate({ target: users.id, set: { name: uname, role: urole } });
   // ─────────────────────────────────────────────────────────────────────────────
 
   const cookieStore = await cookies();

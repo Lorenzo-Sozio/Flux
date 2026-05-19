@@ -6,10 +6,11 @@ import bcrypt from "bcryptjs";
 import { and, eq, gt, isNull } from "drizzle-orm";
 
 import { auth, signIn, signOut } from "@/auth";
-import { platformDb } from "@/db";
+import { createTenantDb, platformDb } from "@/db";
 import { notifications, passwordResetTokens, tenantMembers, tenants, userInvitations, users } from "@/db/schema";
 import { sendInvitationEmail, sendPasswordResetEmail } from "@/lib/email";
 import { getDb } from "@/lib/tenant-context";
+import { decryptDbUrl } from "@/lib/tenant-db";
 
 // ─── Logout ─────────────────────────────────────────────────────────────────
 export async function logoutAction() {
@@ -148,23 +149,24 @@ export async function inviteUserAction(data: {
   invitedById: string;
   invitedByName: string;
 }) {
-  const db = await getDb();
   const { email, role, invitedById, invitedByName } = data;
 
-  // Check user doesn't already exist
-  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, email));
+  // Check user doesn't already exist on the platform
+  const [existing] = await platformDb.select({ id: users.id }).from(users).where(eq(users.email, email));
 
   if (existing) {
     return { error: "This email is already registered." };
   }
 
-  // Revoke existing pending invitations
-  await db.delete(userInvitations).where(and(eq(userInvitations.email, email), isNull(userInvitations.acceptedAt)));
+  // Revoke existing pending invitations on the platform
+  await platformDb
+    .delete(userInvitations)
+    .where(and(eq(userInvitations.email, email), isNull(userInvitations.acceptedAt)));
 
   const token = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
-  await db.insert(userInvitations).values({
+  await platformDb.insert(userInvitations).values({
     email,
     token,
     role,
@@ -189,10 +191,9 @@ export async function inviteUserAction(data: {
 
 // ─── Accept Invitation ────────────────────────────────────────────────────────
 export async function acceptInvitationAction(data: { token: string; name: string; password: string }) {
-  const db = await getDb();
   const { token, name, password } = data;
 
-  const [invitation] = await db
+  const [invitation] = await platformDb
     .select()
     .from(userInvitations)
     .where(and(eq(userInvitations.token, token), gt(userInvitations.expiresAt, new Date())));
@@ -205,17 +206,53 @@ export async function acceptInvitationAction(data: { token: string; name: string
     return { error: "This invitation has already been used." };
   }
 
-  const hashedPassword = await bcrypt.hash(password, 12);
+  // Reuse existing platform account if one already exists for this email
+  // (handles double-submit retries and re-invites of existing users)
+  const [existingUser] = await platformDb.select().from(users).where(eq(users.email, invitation.email));
 
-  await db.insert(users).values({
-    name,
-    email: invitation.email,
-    password: hashedPassword,
-    role: invitation.role,
-  });
+  let userId: string;
+  if (existingUser) {
+    userId = existingUser.id;
+  } else {
+    const hashedPassword = await bcrypt.hash(password, 12);
+    userId = crypto.randomUUID();
+    await platformDb.insert(users).values({
+      id: userId,
+      name,
+      email: invitation.email,
+      password: hashedPassword,
+      role: invitation.role,
+    });
+  }
 
-  // Mark invitation as accepted
-  await db.update(userInvitations).set({ acceptedAt: new Date() }).where(eq(userInvitations.id, invitation.id));
+  // Auto-provision tenant membership if this was a tenant-scoped invitation
+  if (invitation.tenantId && invitation.tenantRole) {
+    const [tenant] = await platformDb.select().from(tenants).where(eq(tenants.id, invitation.tenantId));
+
+    if (tenant) {
+      await platformDb
+        .insert(tenantMembers)
+        .values({ tenantId: tenant.id, userId, role: invitation.tenantRole })
+        .onConflictDoNothing();
+
+      // Best-effort: sync user record to tenant DB for FK constraints.
+      // Non-fatal — membership is recorded in the platform DB above; the tenant
+      // DB row will be created on the user's first authenticated request if missed here.
+      try {
+        const tenantDb = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
+        await tenantDb
+          .insert(users)
+          .values({ id: userId, name, email: invitation.email, role: invitation.tenantRole })
+          .onConflictDoNothing();
+      } catch (err) {
+        console.error("[acceptInvitation] tenant DB sync failed, membership still recorded:", err);
+      }
+
+      revalidatePath(`/admin/tenants/${tenant.subdomain}`);
+    }
+  }
+
+  await platformDb.update(userInvitations).set({ acceptedAt: new Date() }).where(eq(userInvitations.id, invitation.id));
 
   return { success: true, email: invitation.email };
 }
@@ -224,8 +261,7 @@ export async function acceptInvitationAction(data: { token: string; name: string
 export async function updateUserRoleAction(userId: string, role: string) {
   const { requireAdminAccess } = await import("@/lib/auth-guard");
   await requireAdminAccess();
-  const db = await getDb();
-  await db.update(users).set({ role }).where(eq(users.id, userId));
+  await platformDb.update(users).set({ role }).where(eq(users.id, userId));
   revalidatePath("/dashboard/users");
   return { success: true };
 }
@@ -234,16 +270,14 @@ export async function updateUserRoleAction(userId: string, role: string) {
 export async function deleteUserAction(userId: string) {
   const { requireAdminAccess } = await import("@/lib/auth-guard");
   await requireAdminAccess();
-  const db = await getDb();
-  await db.delete(users).where(eq(users.id, userId));
+  await platformDb.delete(users).where(eq(users.id, userId));
   revalidatePath("/dashboard/users");
   return { success: true };
 }
 
 // ─── Get All Users ────────────────────────────────────────────────────────────
 export async function getAllUsersAction() {
-  const db = await getDb();
-  return await db
+  return await platformDb
     .select({
       id: users.id,
       name: users.name,
@@ -257,8 +291,7 @@ export async function getAllUsersAction() {
 
 // ─── Get Pending Invitations ──────────────────────────────────────────────────
 export async function getPendingInvitationsAction() {
-  const db = await getDb();
-  return await db
+  return await platformDb
     .select()
     .from(userInvitations)
     .where(and(isNull(userInvitations.acceptedAt), gt(userInvitations.expiresAt, new Date())));
