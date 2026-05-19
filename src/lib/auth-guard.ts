@@ -28,27 +28,37 @@ async function getSessionOrThrow() {
 }
 
 /**
- * Requires at least "user" role.
- * Viewers are read-only and cannot mutate any record.
+ * Requires write access within the active tenant.
+ * Blocks tenant "viewer" role. Platform owner/admin always pass (superadmin override).
  */
 export async function requireWriteAccess() {
   const session = await getSessionOrThrow();
-  const role = session.user.role as string | undefined;
-  if (role === "viewer") {
+  const platformRole = session.user.role as string | undefined;
+  const tenantRole = (session.user as { tenantRole?: string | null }).tenantRole ?? undefined;
+
+  // Platform owner/admin bypass tenant-level restrictions
+  if (platformRole === "owner" || platformRole === "admin") return session;
+
+  if (tenantRole === "viewer") {
     throw new ForbiddenError("Viewers cannot make changes.");
   }
   return session;
 }
 
 /**
- * Requires "admin" or "owner" role.
+ * Requires tenant "admin" or "owner" role.
  * Used for privileged CRM operations within a tenant: user management, webhooks, custom fields, settings.
- * Does NOT verify the admin panel 2FA cookie — use requireAdminPanelAccess() for /admin/* server actions.
+ * Platform owner/admin always pass. Does NOT verify the admin panel cookie — use requireAdminPanelAccess() for /admin/* actions.
  */
 export async function requireAdminAccess() {
   const session = await getSessionOrThrow();
-  const role = session.user.role as string | undefined;
-  if (role !== "admin" && role !== "owner") {
+  const platformRole = session.user.role as string | undefined;
+  const tenantRole = (session.user as { tenantRole?: string | null }).tenantRole ?? undefined;
+
+  // Platform owner/admin bypass tenant-level restrictions
+  if (platformRole === "owner" || platformRole === "admin") return session;
+
+  if (tenantRole !== "admin" && tenantRole !== "owner") {
     throw new ForbiddenError("Only administrators can perform this action.");
   }
   return session;
