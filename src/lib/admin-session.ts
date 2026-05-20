@@ -63,7 +63,7 @@ export async function setAdminSession(userId: string, role: string): Promise<voi
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    path: "/admin",
+    path: "/",
     maxAge: TTL_MS / 1000,
   });
 }
@@ -77,6 +77,15 @@ export async function getAdminSession(): Promise<{ userId: string; role: string 
 
 export async function clearAdminSession(): Promise<void> {
   const store = await cookies();
+  // Clear current path
+  store.set(COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    path: "/",
+    maxAge: 0,
+  });
+  // Also clear the legacy /admin-scoped cookie (set before the path was broadened)
   store.set(COOKIE_NAME, "", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

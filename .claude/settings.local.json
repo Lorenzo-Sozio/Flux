@@ -220,7 +220,9 @@
       "Bash(Get-Content .env)",
       "Bash(Select-String \"EMAIL|RESEND|SMTP\")",
       "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\Lorenzos\\\\Documents\\\\Claude_Code\\\\Progetti\\\\Flux\\\\src\\\\app\\\\\\(main\\\\\\)\\\\admin\\\\\" -Recurse -File | Select-Object FullName)",
-      "Bash(Find /mnt/c/Users/Lorenzos/Documents/Claude_Code/Progetti/Flux/src/actions -name \"*.ts\" -type f)"
+      "Bash(Find /mnt/c/Users/Lorenzos/Documents/Claude_Code/Progetti/Flux/src/actions -name \"*.ts\" -type f)",
+      "Bash(node -e \"const s = require\\('./src/db/migrations-tenant/meta/0000_snapshot.json'\\); console.log\\(Object.keys\\(s.tables\\).sort\\(\\).join\\('\\\\n'\\)\\)\")",
+      "PowerShell($content = Get-Content \"src/db/migrations-tenant/0000_parallel_the_liberteens.sql\"; $i = 0; foreach \\($line in $content\\) { $i++; if \\($line -match \"company_type|company_category\"\\) { Write-Output \"$\\($i\\): $line\" } })"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",
