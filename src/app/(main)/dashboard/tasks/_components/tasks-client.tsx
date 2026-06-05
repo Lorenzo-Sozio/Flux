@@ -8,16 +8,21 @@ import { useRouter } from "next/navigation";
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
 import {
   AlertCircle,
+  ArrowDown,
+  ArrowUp,
   Building2,
   CheckCircle2,
   ChevronDown,
+  ChevronsUp,
   Circle,
   Clock,
   Filter,
+  Flame,
   Headphones,
   Kanban,
   List,
   Lock,
+  Minus,
   Trash2,
   User,
   UserCheck,
@@ -90,6 +95,38 @@ const PRIORITY_CLASS: Record<string, string> = {
   high: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
   normal: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400",
   low: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
+};
+
+const PRIORITY_ORDER: Record<string, number> = {
+  blocker: 0,
+  critical: 1,
+  high: 2,
+  normal: 3,
+  low: 4,
+};
+
+const PRIORITY_ICON: Record<string, React.ElementType> = {
+  blocker: Flame,
+  critical: ChevronsUp,
+  high: ArrowUp,
+  normal: Minus,
+  low: ArrowDown,
+};
+
+const PRIORITY_COLOR: Record<string, string> = {
+  blocker: "text-red-600 dark:text-red-500",
+  critical: "text-orange-500",
+  high: "text-red-400",
+  normal: "text-yellow-500",
+  low: "text-slate-400 dark:text-slate-500",
+};
+
+const PRIORITY_BORDER: Record<string, string> = {
+  blocker: "border-l-red-600",
+  critical: "border-l-orange-500",
+  high: "border-l-red-400",
+  normal: "border-l-yellow-400",
+  low: "border-l-slate-300 dark:border-l-slate-600",
 };
 
 const BOARD_COLUMN_IDS = ["todo", "in_progress", "done"] as const;
@@ -165,9 +202,11 @@ function TaskCard({
   const today = isDueToday(task);
   const done = task.status === "done";
   const entity = entityLink(task);
-  const priorityClass = PRIORITY_CLASS[task.priority] ?? PRIORITY_CLASS.normal;
   const priorityKey = task.priority as "low" | "normal" | "high" | "critical" | "blocker";
   const priorityLabel = t(`priorities.${priorityKey}`);
+  const PriorityIcon = PRIORITY_ICON[task.priority] ?? Minus;
+  const priorityColor = PRIORITY_COLOR[task.priority] ?? "text-muted-foreground";
+  const priorityBorder = PRIORITY_BORDER[task.priority] ?? "border-l-slate-200";
   const hasProgress = task.progressPct > 0 || task.status === "done";
   const estH = task.estimatedHours ? parseFloat(task.estimatedHours) : null;
   const actH = task.actualHours ? parseFloat(task.actualHours) : null;
@@ -181,7 +220,8 @@ function TaskCard({
           {...provided.draggableProps}
           {...provided.dragHandleProps}
           className={cn(
-            "cursor-grab select-none space-y-2 rounded-lg border bg-background p-3 shadow-xs active:cursor-grabbing",
+            "cursor-grab select-none space-y-2 rounded-lg border border-l-[3px] bg-background p-3 shadow-xs active:cursor-grabbing",
+            priorityBorder,
             snapshot.isDragging && "shadow-lg ring-2 ring-primary/20",
             done && "opacity-60",
           )}
@@ -207,9 +247,10 @@ function TaskCard({
           {task.description && <p className="line-clamp-2 pl-5 text-muted-foreground text-xs">{task.description}</p>}
 
           <div className="flex flex-wrap items-center gap-1.5 pl-5">
-            <Badge variant="outline" className={cn("h-4 px-1.5 py-0 text-[10px]", priorityClass)}>
+            <span className={cn("flex items-center gap-0.5 font-semibold text-[10px]", priorityColor)}>
+              <PriorityIcon className="h-2.5 w-2.5 shrink-0" />
               {priorityLabel}
-            </Badge>
+            </span>
             {task.dueDate && (
               <span
                 className={cn(
@@ -617,11 +658,24 @@ export function TasksClient({
                 `statuses.${colId === "in_progress" ? "inProgress" : colId === "todo" ? "todo" : "done"}`,
               );
               const colColor = BOARD_COLUMN_COLORS[colId];
-              const colTasks = filtered.filter((tk) => {
-                if (colId === "todo") return tk.status !== "done" && tk.status !== "in_progress";
-                if (colId === "in_progress") return tk.status === "in_progress";
-                return tk.status === "done";
-              });
+              const colTasks = filtered
+                .filter((tk) => {
+                  if (colId === "todo") return tk.status !== "done" && tk.status !== "in_progress";
+                  if (colId === "in_progress") return tk.status === "in_progress";
+                  return tk.status === "done";
+                })
+                .sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3));
+
+              const priorityGroups: { priority: string; tasks: Task[] }[] = [];
+              for (const task of colTasks) {
+                const last = priorityGroups[priorityGroups.length - 1];
+                if (last?.priority === task.priority) {
+                  last.tasks.push(task);
+                } else {
+                  priorityGroups.push({ priority: task.priority, tasks: [task] });
+                }
+              }
+
               return (
                 <div key={colId} className="flex flex-col gap-2">
                   <div className="flex items-center justify-between px-1">
@@ -637,25 +691,57 @@ export function TasksClient({
                         ref={provided.innerRef}
                         {...provided.droppableProps}
                         className={cn(
-                          "flex min-h-[200px] flex-col gap-2 rounded-xl border-2 border-dashed p-2 transition-colors",
+                          "flex min-h-[200px] flex-col gap-1.5 rounded-xl border-2 border-dashed p-2 transition-colors",
                           snapshot.isDraggingOver ? "border-primary/40 bg-primary/5" : "border-transparent bg-muted/20",
                         )}
                       >
-                        {colTasks.map((task, idx) => (
-                          <TaskCard
-                            key={task.id}
-                            task={task}
-                            index={idx}
-                            onToggle={handleToggleStatus}
-                            onDelete={handleDelete}
-                            onUpdated={(updated) =>
-                              setTasks((prev) => prev.map((tk) => (tk.id === updated.id ? { ...tk, ...updated } : tk)))
+                        {(() => {
+                          const elements: React.ReactNode[] = [];
+                          let runningIndex = 0;
+                          for (const { priority, tasks: groupTasks } of priorityGroups) {
+                            const PIcon = PRIORITY_ICON[priority] ?? Minus;
+                            const pColor = PRIORITY_COLOR[priority] ?? "text-muted-foreground";
+                            const pKey = priority as "blocker" | "critical" | "high" | "normal" | "low";
+                            elements.push(
+                              <div
+                                key={`grp-${priority}`}
+                                className="flex items-center gap-1 px-0.5 pt-1 pb-0.5 first:pt-0"
+                              >
+                                <PIcon className={cn("h-3 w-3 shrink-0", pColor)} />
+                                <span
+                                  className={cn("font-semibold uppercase tracking-wider text-[9px]", pColor)}
+                                >
+                                  {t(`priorities.${pKey}`)}
+                                </span>
+                                <span className="ml-auto font-medium text-[9px] text-muted-foreground/50 tabular-nums">
+                                  {groupTasks.length}
+                                </span>
+                              </div>,
+                            );
+                            for (let i = 0; i < groupTasks.length; i++) {
+                              const task = groupTasks[i];
+                              elements.push(
+                                <TaskCard
+                                  key={task.id}
+                                  task={task}
+                                  index={runningIndex + i}
+                                  onToggle={handleToggleStatus}
+                                  onDelete={handleDelete}
+                                  onUpdated={(updated) =>
+                                    setTasks((prev) =>
+                                      prev.map((tk) => (tk.id === updated.id ? { ...tk, ...updated } : tk)),
+                                    )
+                                  }
+                                  users={users}
+                                  currentUserId={currentUserId}
+                                  defaultOpen={task.id === initialOpenTaskId}
+                                />,
+                              );
                             }
-                            users={users}
-                            currentUserId={currentUserId}
-                            defaultOpen={task.id === initialOpenTaskId}
-                          />
-                        ))}
+                            runningIndex += groupTasks.length;
+                          }
+                          return elements;
+                        })()}
                         {provided.placeholder}
                         {colTasks.length === 0 && !snapshot.isDraggingOver && (
                           <p className="py-6 text-center text-muted-foreground/40 text-xs">{t("dropTasksHere")}</p>

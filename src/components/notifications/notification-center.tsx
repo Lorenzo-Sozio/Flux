@@ -123,9 +123,12 @@ export function NotificationCenter({ notifications: initial, userId }: Props) {
                 <div
                   key={n.id}
                   className={cn(
-                    "flex gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50",
+                    "group flex gap-3 px-3 py-2.5 transition-colors hover:bg-muted/50",
                     !n.isRead && "bg-primary/5",
+                    !n.isRead && "cursor-pointer",
                   )}
+                  onClick={() => !n.isRead && handleMarkRead(n.id)}
+                  title={!n.isRead ? "Clicca per segnare come letta" : undefined}
                 >
                   <span className="mt-0.5 text-base" aria-hidden>
                     {TYPE_ICONS[n.type] ?? "📌"}
@@ -135,13 +138,9 @@ export function NotificationCenter({ notifications: initial, userId }: Props) {
                     {n.message && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-2">{n.message}</p>}
                     <p className="mt-1 text-[10px] text-muted-foreground">{new Date(n.createdAt).toLocaleString()}</p>
                   </div>
-                  <div className="flex flex-col items-center gap-1">
+                  <div className="flex flex-col items-center gap-1" onClick={(e) => e.stopPropagation()}>
                     {!n.isRead && (
-                      <button
-                        className="h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-1"
-                        title="Mark as read"
-                        onClick={() => handleMarkRead(n.id)}
-                      />
+                      <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-1 group-hover:opacity-50 transition-opacity" />
                     )}
                     {n.link && (
                       <Link href={n.link} className="text-muted-foreground hover:text-foreground">
