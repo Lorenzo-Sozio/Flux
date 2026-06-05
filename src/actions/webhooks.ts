@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
-import crypto from "crypto";
+import crypto from "node:crypto";
+
 import { eq } from "drizzle-orm";
 
 import { webhookLogs, webhooks } from "@/db/schema";

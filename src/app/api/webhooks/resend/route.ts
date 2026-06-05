@@ -9,7 +9,8 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 import { eq } from "drizzle-orm";
 
 import { campaignLogs, emailSuppressions } from "@/db/schema";
@@ -29,7 +30,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  let event: any;
+  let event: { type?: string; data?: Record<string, unknown> };
   try {
     event = JSON.parse(body);
   } catch {
@@ -104,7 +105,7 @@ function verifySvixSignature(payload: string, headers: Headers, secret: string):
 
     // Reject if timestamp is older than 5 minutes
     const ts = parseInt(msgTimestamp, 10);
-    if (isNaN(ts) || Math.abs(Date.now() / 1000 - ts) > 300) return false;
+    if (Number.isNaN(ts) || Math.abs(Date.now() / 1000 - ts) > 300) return false;
 
     const signed = `${msgId}.${msgTimestamp}.${payload}`;
 

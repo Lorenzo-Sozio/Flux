@@ -12,12 +12,13 @@
  * for the "Run in Postman" button.
  */
 
+import * as fs from "node:fs";
+import * as path from "node:path";
+
 // tsx handles TypeScript path aliases if tsconfig.json has paths configured.
 // We import directly by relative path to avoid needing tsconfig-paths.
 import { openApiSpec } from "../src/lib/openapi/spec";
 import { toPostmanCollection } from "../src/lib/openapi/to-postman";
-import * as fs from "node:fs";
-import * as path from "node:path";
 
 const outDir = path.join(process.cwd(), "public");
 const outFile = path.join(outDir, "flux-crm-postman-collection.json");

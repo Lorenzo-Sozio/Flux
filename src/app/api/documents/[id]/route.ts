@@ -12,9 +12,10 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import { readFile } from "node:fs/promises";
+import { join, normalize } from "node:path";
+
 import { eq } from "drizzle-orm";
-import { readFile } from "fs/promises";
-import { basename, join, normalize } from "path";
 
 import { auth } from "@/auth";
 import { documents } from "@/db/schema";
@@ -53,7 +54,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   // Extra safety: normalize and confirm the resolved path stays inside <cwd>/uploads/
   const uploadsRoot = join(process.cwd(), "uploads");
   const resolved = normalize(join(process.cwd(), doc.url));
-  if (!resolved.startsWith(uploadsRoot + "/") && !resolved.startsWith(uploadsRoot + "\\")) {
+  if (!resolved.startsWith(`${uploadsRoot}/`) && !resolved.startsWith(`${uploadsRoot}\\`)) {
     console.error("Path traversal attempt blocked:", doc.url);
     return new NextResponse("Forbidden", { status: 403 });
   }

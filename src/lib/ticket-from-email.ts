@@ -6,6 +6,10 @@
 
 import { after } from "next/server";
 
+import crypto from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
 import { eq } from "drizzle-orm";
 
 import { runAutomations } from "@/components/crm/automation/rule-engine";
@@ -18,10 +22,6 @@ import {
   stripPlainTextQuotes,
 } from "@/lib/email-parser";
 import { getDb } from "@/lib/tenant-context";
-
-import crypto from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 
 // ─── Attachment handling ──────────────────────────────────────────────────────
 
@@ -238,7 +238,9 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
             ...ticket,
             status: ticket.status === "waiting" ? "open" : ticket.status,
           } as Record<string, unknown>,
-        }).catch(() => {}),
+        }).catch(() => {
+          /* best-effort */
+        }),
       );
 
       return { ok: true, action: "message_appended", ticketId: ticket.id, messageId: message.id };
@@ -290,7 +292,9 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
       event: "onCreate",
       oldData: {},
       newData: newTicket as Record<string, unknown>,
-    }).catch(() => {}),
+    }).catch(() => {
+      /* best-effort */
+    }),
   );
 
   return { ok: true, action: "ticket_created", ticketId: newTicket.id, ticketNumber };

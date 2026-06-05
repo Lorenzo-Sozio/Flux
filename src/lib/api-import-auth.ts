@@ -1,7 +1,7 @@
+import { timingSafeEqual } from "node:crypto";
+
 import { auth } from "@/auth";
 import { getTenantById } from "@/lib/get-tenant";
-
-import { timingSafeEqual } from "node:crypto";
 
 export interface ApiAuthResult {
   via: "session" | "apikey";

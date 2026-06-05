@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 
-import crypto from "crypto";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import crypto from "node:crypto";
+
+import { desc, eq, inArray } from "drizzle-orm";
 import type { z } from "zod";
 
 import { createNotificationAction, createNotificationsBatch } from "@/actions/auth";
@@ -12,7 +13,7 @@ import { auth } from "@/auth";
 import { companies, deals, products, quoteActivities, quoteItems, quotes, users } from "@/db/schema";
 import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
 import { sendEmail } from "@/lib/email-provider";
-import { convertToEur, getExchangeRates } from "@/lib/exchange-rates";
+import { getExchangeRates } from "@/lib/exchange-rates";
 import { getDb } from "@/lib/tenant-context";
 
 // --- HELPERS ---
@@ -445,7 +446,7 @@ export async function markQuoteAsViewedAction(quoteId: string, email?: string, i
     }
 
     // Update viewed timestamp
-    const [updated] = await db.update(quotes).set({ viewedAt: new Date() }).where(eq(quotes.id, quoteId)).returning();
+    const [_updated] = await db.update(quotes).set({ viewedAt: new Date() }).where(eq(quotes.id, quoteId)).returning();
 
     // Log activity
     await logQuoteActivity(quoteId, "viewed", undefined, email, ipAddress);

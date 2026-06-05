@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ArrowUpRightIcon, DollarSignIcon, FileTextIcon, KanbanIcon, Loader2Icon, UserIcon } from "lucide-react";
+import { ArrowUpRightIcon, DollarSignIcon, FileTextIcon, KanbanIcon, Loader2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -61,12 +61,12 @@ function F({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
         {label}
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
@@ -188,15 +188,21 @@ export function DealModal({
         )}
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-[640px] max-h-[90vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-[640px]">
+        <DialogHeader className="border-b px-6 pt-6 pb-4">
           <div className="flex items-center justify-between gap-2">
             <DialogTitle className="text-lg">
               {isEditing ? t("modal.editTitle", { name: deal.name }) : t("modal.newTitle")}
             </DialogTitle>
             {isEditing && deal && (
               <Link href={`/dashboard/pipeline/${deal.id}`} onClick={() => setOpen(false)}>
-                <Button variant="ghost" size="icon" type="button" title="Apri scheda completa" className="h-8 w-8 shrink-0">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  type="button"
+                  title="Apri scheda completa"
+                  className="h-8 w-8 shrink-0"
+                >
                   <ArrowUpRightIcon className="h-4 w-4" />
                 </Button>
               </Link>
@@ -204,10 +210,10 @@ export function DealModal({
           </div>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 overflow-y-auto px-6 py-4">
             <Tabs defaultValue="deal">
-              <TabsList className="w-full mb-5">
+              <TabsList className="mb-5 w-full">
                 <TabsTrigger value="deal" className="relative flex-1 gap-1.5">
                   <DollarSignIcon className="h-3.5 w-3.5" />
                   {t("modal.tabDeal")}
@@ -226,7 +232,7 @@ export function DealModal({
               </TabsList>
 
               {/* ── Deal Tab ──────────────────────────────────────────────── */}
-              <TabsContent value="deal" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+              <TabsContent value="deal" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
                 <div className="col-span-2">
                   <F label={t("modal.fieldDealName")} required error={e.name?.message}>
                     <Input {...register("name")} placeholder={t("modal.namePlaceholder")} />
@@ -268,7 +274,7 @@ export function DealModal({
                                 key={s.value}
                                 type="button"
                                 onClick={() => field.onChange(s.value)}
-                                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-medium transition-all ${
+                                className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 font-medium text-sm transition-all ${
                                   field.value === s.value
                                     ? s.value === "won"
                                       ? "border-emerald-500 bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
@@ -290,7 +296,7 @@ export function DealModal({
               </TabsContent>
 
               {/* ── Pipeline Tab ──────────────────────────────────────────── */}
-              <TabsContent value="details" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+              <TabsContent value="details" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
                 <div className="col-span-2">
                   <F label={t("modal.fieldStageLabel")} required error={e.stageId?.message}>
                     <Controller
@@ -306,7 +312,7 @@ export function DealModal({
                               <SelectItem key={s.id} value={s.id}>
                                 <div className="flex items-center gap-2">
                                   <span
-                                    className="h-2 w-2 rounded-full shrink-0"
+                                    className="h-2 w-2 shrink-0 rounded-full"
                                     style={{ background: s.color ?? "#94a3b8" }}
                                   />
                                   {s.name}
@@ -397,7 +403,7 @@ export function DealModal({
             </Tabs>
           </div>
 
-          <DialogFooter className="px-6 py-4 border-t bg-muted/30">
+          <DialogFooter className="border-t bg-muted/30 px-6 py-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               {t("modal.cancel")}
             </Button>

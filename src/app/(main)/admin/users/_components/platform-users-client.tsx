@@ -90,7 +90,7 @@ export function PlatformUsersClient({ users: initialUsers, currentUserId, curren
 
   return (
     <TooltipProvider>
-      <div className="rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <Table>
           <TableHeader>
             <TableRow className="bg-gray-50">
@@ -126,48 +126,48 @@ export function PlatformUsersClient({ users: initialUsers, currentUserId, curren
                     <div className="flex items-center gap-3">
                       <Avatar className="h-8 w-8">
                         <AvatarImage src={user.image ?? undefined} />
-                        <AvatarFallback className="text-xs bg-gray-100">
+                        <AvatarFallback className="bg-gray-100 text-xs">
                           {initials(user.name, user.email)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="truncate font-medium text-gray-900 text-sm">
                           {user.name ?? <span className="text-gray-400 italic">Nessun nome</span>}
-                          {isSelf && <span className="ml-1.5 text-xs font-normal text-gray-400">(tu)</span>}
+                          {isSelf && <span className="ml-1.5 font-normal text-gray-400 text-xs">(tu)</span>}
                         </p>
-                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                        <p className="truncate text-gray-500 text-xs">{user.email}</p>
                       </div>
                     </div>
                   </TableCell>
 
                   {/* Auth method */}
                   <TableCell>
-                    <div className="flex gap-1.5 flex-wrap">
+                    <div className="flex flex-wrap gap-1.5">
                       {user.hasPassword && (
-                        <Badge variant="outline" className="text-xs font-normal">
+                        <Badge variant="outline" className="font-normal text-xs">
                           Password
                         </Badge>
                       )}
                       {user.hasGoogle && (
-                        <Badge variant="outline" className="text-xs font-normal">
+                        <Badge variant="outline" className="font-normal text-xs">
                           Google
                         </Badge>
                       )}
-                      {!user.hasPassword && !user.hasGoogle && <span className="text-xs text-gray-400">—</span>}
+                      {!user.hasPassword && !user.hasGoogle && <span className="text-gray-400 text-xs">—</span>}
                     </div>
                   </TableCell>
 
                   {/* Tenant memberships */}
                   <TableCell>
                     {tenantCount === 0 ? (
-                      <span className="text-xs text-gray-400 italic">Nessun tenant</span>
+                      <span className="text-gray-400 text-xs italic">Nessun tenant</span>
                     ) : (
                       <div className="flex flex-wrap gap-1">
                         {user.tenantMemberships.slice(0, 3).map((m) => (
                           <Tooltip key={m.tenantId}>
                             <TooltipTrigger asChild>
                               <span
-                                className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium cursor-default ${TENANT_ROLE_COLOR[m.tenantRole] ?? "bg-gray-100 text-gray-700"}`}
+                                className={`inline-flex cursor-default items-center gap-1 rounded px-1.5 py-0.5 font-medium text-[11px] ${TENANT_ROLE_COLOR[m.tenantRole] ?? "bg-gray-100 text-gray-700"}`}
                               >
                                 <Building2 className="h-3 w-3 shrink-0" />
                                 {m.tenantName}
@@ -181,11 +181,11 @@ export function PlatformUsersClient({ users: initialUsers, currentUserId, curren
                         {tenantCount > 3 && (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="inline-flex items-center rounded px-1.5 py-0.5 text-[11px] font-medium bg-gray-100 text-gray-600 cursor-default">
+                              <span className="inline-flex cursor-default items-center rounded bg-gray-100 px-1.5 py-0.5 font-medium text-[11px] text-gray-600">
                                 +{tenantCount - 3}
                               </span>
                             </TooltipTrigger>
-                            <TooltipContent side="top" className="text-xs max-w-[200px]">
+                            <TooltipContent side="top" className="max-w-[200px] text-xs">
                               {user.tenantMemberships
                                 .slice(3)
                                 .map((m) => m.tenantName)
@@ -213,27 +213,27 @@ export function PlatformUsersClient({ users: initialUsers, currentUserId, curren
                           {isOwner && (
                             <SelectItem value="owner">
                               <div className="flex items-center gap-2">
-                                <Badge variant="default" className="text-[10px] px-1 py-0">
+                                <Badge variant="default" className="px-1 py-0 text-[10px]">
                                   Owner
                                 </Badge>
-                                <span className="text-xs text-gray-500">Controllo totale</span>
+                                <span className="text-gray-500 text-xs">Controllo totale</span>
                               </div>
                             </SelectItem>
                           )}
                           <SelectItem value="admin">
                             <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="text-[10px] px-1 py-0">
+                              <Badge variant="secondary" className="px-1 py-0 text-[10px]">
                                 Admin
                               </Badge>
-                              <span className="text-xs text-gray-500">Accesso admin</span>
+                              <span className="text-gray-500 text-xs">Accesso admin</span>
                             </div>
                           </SelectItem>
                           <SelectItem value="user">
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline" className="text-[10px] px-1 py-0">
+                              <Badge variant="outline" className="px-1 py-0 text-[10px]">
                                 Utente
                               </Badge>
-                              <span className="text-xs text-gray-500">Solo CRM</span>
+                              <span className="text-gray-500 text-xs">Solo CRM</span>
                             </div>
                           </SelectItem>
                         </SelectContent>
@@ -242,8 +242,8 @@ export function PlatformUsersClient({ users: initialUsers, currentUserId, curren
                       // Admin sees owner rows as read-only
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <div className="flex items-center gap-1.5 cursor-not-allowed opacity-60">
-                            <Badge variant="default" className="text-[10px] px-1 py-0">
+                          <div className="flex cursor-not-allowed items-center gap-1.5 opacity-60">
+                            <Badge variant="default" className="px-1 py-0 text-[10px]">
                               Owner
                             </Badge>
                           </div>
@@ -278,15 +278,13 @@ export function PlatformUsersClient({ users: initialUsers, currentUserId, curren
                       (isConfirming ? (
                         <div className="flex flex-col gap-1">
                           {tenantCount > 0 && (
-                            <p className="text-[10px] text-red-600 leading-tight">
-                              Rimosso da {tenantCount} tenant
-                            </p>
+                            <p className="text-[10px] text-red-600 leading-tight">Rimosso da {tenantCount} tenant</p>
                           )}
                           <div className="flex items-center gap-1">
                             <Button
                               size="sm"
                               variant="destructive"
-                              className="h-7 text-xs px-2"
+                              className="h-7 px-2 text-xs"
                               onClick={() => handleDeleteConfirm(user.id)}
                               disabled={isDeleting}
                             >
@@ -295,7 +293,7 @@ export function PlatformUsersClient({ users: initialUsers, currentUserId, curren
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-7 text-xs px-2"
+                              className="h-7 px-2 text-xs"
                               onClick={() => setConfirmDelete(null)}
                             >
                               Annulla
@@ -306,13 +304,11 @@ export function PlatformUsersClient({ users: initialUsers, currentUserId, curren
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-8 w-8 p-0 text-gray-400 hover:text-red-600 hover:bg-red-50"
+                          className="h-8 w-8 p-0 text-gray-400 hover:bg-red-50 hover:text-red-600"
                           onClick={() => setConfirmDelete(user.id)}
                           disabled={isDeleting}
                           title={
-                            tenantCount > 0
-                              ? `Elimina utente (membro di ${tenantCount} tenant)`
-                              : "Elimina utente"
+                            tenantCount > 0 ? `Elimina utente (membro di ${tenantCount} tenant)` : "Elimina utente"
                           }
                         >
                           <Trash2 className="h-4 w-4" />
@@ -325,7 +321,7 @@ export function PlatformUsersClient({ users: initialUsers, currentUserId, curren
 
             {userList.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-12 text-center text-sm text-gray-400">
+                <TableCell colSpan={6} className="py-12 text-center text-gray-400 text-sm">
                   Nessun utente trovato.
                 </TableCell>
               </TableRow>

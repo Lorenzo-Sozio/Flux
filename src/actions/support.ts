@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
+import crypto from "node:crypto";
+
 import { and, desc, eq, isNotNull, lt, notInArray } from "drizzle-orm";
 import type { z } from "zod";
 
@@ -32,8 +34,6 @@ import { sendEmail } from "@/lib/email-provider";
 import { getDb } from "@/lib/tenant-context";
 import { logTicketChange } from "@/lib/ticket-audit";
 import { canTransition, isSLAPauseStatus } from "@/lib/ticket-state-machine";
-
-import crypto from "node:crypto";
 
 // --- HELPERS ---
 

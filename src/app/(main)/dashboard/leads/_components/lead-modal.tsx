@@ -3,8 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -103,12 +102,12 @@ function F({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
         {label}
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
@@ -231,7 +230,7 @@ export function LeadModal({
         country: lead.country || "",
       });
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, lead, form.reset]);
 
   const e = errors;
   const tabErrors = {
@@ -306,15 +305,21 @@ export function LeadModal({
         }}
       >
         <DialogTrigger asChild>{children}</DialogTrigger>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+        <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-[700px]">
+          <DialogHeader className="border-b px-6 pt-6 pb-4">
             <div className="flex items-center justify-between gap-2">
               <DialogTitle className="text-lg">
                 {isEditing ? t("form.editTitle", { name: `${lead.firstName} ${lead.lastName}` }) : t("form.newTitle")}
               </DialogTitle>
               {isEditing && lead && (
                 <Link href={`/dashboard/leads/${lead.id}`} onClick={() => setOpen(false)}>
-                  <Button variant="ghost" size="icon" type="button" title="Apri scheda completa" className="h-8 w-8 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    title="Apri scheda completa"
+                    className="h-8 w-8 shrink-0"
+                  >
                     <ArrowUpRightIcon className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -322,10 +327,10 @@ export function LeadModal({
             </div>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+          <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <Tabs defaultValue="info">
-                <TabsList className="w-full mb-5">
+                <TabsList className="mb-5 w-full">
                   <TabsTrigger value="info" className="relative flex-1 gap-1.5">
                     <UserIcon className="h-3.5 w-3.5" />
                     {t("form.tabs.info")}
@@ -349,7 +354,7 @@ export function LeadModal({
                 </TabsList>
 
                 {/* ── Info Tab ─────────────────────────────────────────────── */}
-                <TabsContent value="info" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+                <TabsContent value="info" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
                   <F label={tc("firstName")} required error={e.firstName?.message}>
                     <Input {...register("firstName")} placeholder="Mario" />
                   </F>
@@ -382,7 +387,7 @@ export function LeadModal({
                 </TabsContent>
 
                 {/* ── CRM Tab ──────────────────────────────────────────────── */}
-                <TabsContent value="crm" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+                <TabsContent value="crm" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
                   <div className="col-span-2">
                     <F label={t("form.assignedTo")}>
                       <Controller
@@ -504,8 +509,8 @@ export function LeadModal({
                       render={({ field }) => (
                         <div className="flex items-center justify-between rounded-lg border px-4 py-3">
                           <div>
-                            <p className="text-sm font-medium">{tc("marketingConsent")}</p>
-                            <p className="text-xs text-muted-foreground">{tc("marketingConsentDesc")}</p>
+                            <p className="font-medium text-sm">{tc("marketingConsent")}</p>
+                            <p className="text-muted-foreground text-xs">{tc("marketingConsentDesc")}</p>
                           </div>
                           <Switch checked={field.value} onCheckedChange={field.onChange} />
                         </div>
@@ -515,7 +520,7 @@ export function LeadModal({
                 </TabsContent>
 
                 {/* ── Address Tab ──────────────────────────────────────────── */}
-                <TabsContent value="address" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+                <TabsContent value="address" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
                   <GeoAddressFields
                     control={control}
                     setValue={setValue}
@@ -545,13 +550,13 @@ export function LeadModal({
             </div>
 
             {duplicates.length > 0 && pendingPayload && (
-              <div className="px-6 py-4 border-t bg-amber-50 dark:bg-amber-950/30">
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
+              <div className="border-t bg-amber-50 px-6 py-4 dark:bg-amber-950/30">
+                <p className="mb-2 font-semibold text-amber-800 text-sm dark:text-amber-300">
                   Similar leads already exist:
                 </p>
                 <ul className="mb-3 space-y-1.5">
                   {duplicates.map((d) => (
-                    <li key={d.id} className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+                    <li key={d.id} className="flex items-center gap-2 text-amber-700 text-sm dark:text-amber-400">
                       <Link
                         href={`/dashboard/leads/${d.id}`}
                         className="underline underline-offset-2 hover:text-amber-900"
@@ -565,10 +570,10 @@ export function LeadModal({
                           type="button"
                           size="sm"
                           variant="outline"
-                          className="h-6 px-2 text-xs ml-auto border-amber-400 text-amber-700 hover:bg-amber-100"
+                          className="ml-auto h-6 border-amber-400 px-2 text-amber-700 text-xs hover:bg-amber-100"
                           onClick={() => setMergeTargetId(d.id)}
                         >
-                          <GitMerge className="h-3 w-3 mr-1" />
+                          <GitMerge className="mr-1 h-3 w-3" />
                           Merge
                         </Button>
                       )}
@@ -594,7 +599,7 @@ export function LeadModal({
               </div>
             )}
 
-            <DialogFooter className="px-6 py-4 border-t bg-muted/30">
+            <DialogFooter className="border-t bg-muted/30 px-6 py-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 {tc("cancel")}
               </Button>
@@ -621,31 +626,66 @@ export function LeadModal({
   );
 }
 
-export function DeleteLeadButton({ id }: { id: string }) {
+export function DeleteLeadButton({ lead, redirectTo }: { lead: any; redirectTo?: string }) {
   const t = useTranslations("leads");
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
   const handleDelete = async () => {
-    if (!confirm(t("deleteConfirm"))) return;
     try {
       setIsDeleting(true);
-      await deleteLead(id);
+      await deleteLead(lead.id);
       toast.success(t("deleteSuccess"));
+      setOpen(false);
+      if (redirectTo) router.push(redirectTo);
     } catch {
       toast.error(t("deleteFailed"));
     } finally {
       setIsDeleting(false);
     }
   };
+
+  const isConverted = !!lead.isConverted;
+  const hasContact = !!lead.convertedToContactId;
+  const hasCompany = !!lead.convertedToCompanyId;
+  const hasDeal = !!lead.convertedToDealId;
+
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="text-destructive hover:text-destructive/90"
-      onClick={handleDelete}
-      disabled={isDeleting}
-    >
-      {isDeleting ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <TrashIcon className="h-4 w-4" />}
-    </Button>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-destructive hover:text-destructive/90"
+          disabled={isDeleting}
+        >
+          {isDeleting ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <TrashIcon className="h-4 w-4" />}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{isConverted ? t("deleteConvertedTitle") : t("deleteTitle")}</DialogTitle>
+          <DialogDescription>{isConverted ? t("deleteConvertedDesc") : t("deleteConfirm")}</DialogDescription>
+        </DialogHeader>
+        {isConverted && (hasContact || hasCompany || hasDeal) && (
+          <ul className="list-inside list-disc space-y-1 text-muted-foreground text-sm">
+            {hasContact && <li>{t("deleteConvertedContact")}</li>}
+            {hasCompany && <li>{t("deleteConvertedCompany")}</li>}
+            {hasDeal && <li>{t("deleteConvertedDeal")}</li>}
+          </ul>
+        )}
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">{t("deleteCancel")}</Button>
+          </DialogClose>
+          <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+            {isDeleting && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
+            {isConverted ? t("deleteConvertedConfirm") : t("deleteTitle")}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -678,17 +718,8 @@ function QuickConvertButton({ lead }: { lead: any }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          title={t("convertLead")}
-          disabled={isPending}
-        >
-          {isPending ? (
-            <Loader2Icon className="h-4 w-4 animate-spin" />
-          ) : (
-            <SparklesIcon className="h-4 w-4" />
-          )}
+        <Button variant="ghost" size="icon" title={t("convertLead")} disabled={isPending}>
+          {isPending ? <Loader2Icon className="h-4 w-4 animate-spin" /> : <SparklesIcon className="h-4 w-4" />}
         </Button>
       </DialogTrigger>
 
@@ -699,16 +730,16 @@ function QuickConvertButton({ lead }: { lead: any }) {
         </DialogHeader>
 
         <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Verrà creato</p>
+          <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">Verrà creato</p>
           <div className="flex items-center gap-2">
-            <UserIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+            <UserIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
             <span>
               Contatto: <span className="font-medium">{leadName}</span>
             </span>
           </div>
           {lead.companyName && (
             <div className="flex items-center gap-2">
-              <BuildingIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+              <BuildingIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
               <span>
                 Azienda: <span className="font-medium">{lead.companyName}</span>
               </span>
@@ -720,10 +751,10 @@ function QuickConvertButton({ lead }: { lead: any }) {
 
         <div className="flex items-center justify-between gap-3">
           <div className="space-y-0.5">
-            <Label htmlFor="quick-create-deal" className="text-sm font-medium">
+            <Label htmlFor="quick-create-deal" className="font-medium text-sm">
               {t("convertCreateDeal")}
             </Label>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Crea un'opportunità nella pipeline collegata a questo cliente
             </p>
           </div>
@@ -773,7 +804,7 @@ export function LeadActions({
         </Button>
       </LeadModal>
       {lead.status !== "converted" && <QuickConvertButton lead={lead} />}
-      <DeleteLeadButton id={lead.id} />
+      <DeleteLeadButton lead={lead} />
     </div>
   );
 }

@@ -218,131 +218,125 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   const tLeads = await getTranslations("leads");
   const dealName = tLeads("dealForName", { firstName: lead.firstName, lastName: lead.lastName });
 
-  let result: { contactId: string; companyId: string | null; dealId: string | null } | undefined;
+  // 1. Create or find Company — copy all relevant lead fields to a new company
+  let companyId: string | null = null;
+  if (lead.companyName) {
+    const [existing] = await db
+      .select({ id: companies.id, sourceLeadId: companies.sourceLeadId })
+      .from(companies)
+      .where(eq(companies.name, lead.companyName));
 
-  await db.transaction(async (tx) => {
-    // 1. Create or find Company — copy all relevant lead fields to a new company
-    let companyId: string | null = null;
-    if (lead.companyName) {
-      const [existing] = await tx
-        .select({ id: companies.id, sourceLeadId: companies.sourceLeadId })
-        .from(companies)
-        .where(eq(companies.name, lead.companyName));
-
-      if (existing) {
-        companyId = existing.id;
-        // Link back to source lead only when not already traced
-        if (!existing.sourceLeadId) {
-          await tx.update(companies).set({ sourceLeadId: lead.id }).where(eq(companies.id, existing.id));
-        }
-      } else {
-        const [newCompany] = await tx
-          .insert(companies)
-          .values({
-            name: lead.companyName,
-            industry: lead.industry ?? undefined,
-            website: lead.website ?? undefined,
-            street: lead.street ?? undefined,
-            city: lead.city ?? undefined,
-            state: lead.state ?? undefined,
-            zipCode: lead.zipCode ?? undefined,
-            country: lead.country ?? undefined,
-            source: lead.source ?? undefined,
-            ownerId: lead.ownerId,
-            sourceLeadId: lead.id,
-            companyTypeId: lead.leadTypeId ?? undefined,
-            companyCategoryId: lead.leadCategoryId ?? undefined,
-          })
-          .returning({ id: companies.id });
-        companyId = newCompany.id;
+    if (existing) {
+      companyId = existing.id;
+      // Link back to source lead only when not already traced
+      if (!existing.sourceLeadId) {
+        await db.update(companies).set({ sourceLeadId: lead.id }).where(eq(companies.id, existing.id));
       }
-    }
-
-    // 2. Create Contact from full lead profile
-    const [newContact] = await tx
-      .insert(contacts)
-      .values({
-        firstName: lead.firstName,
-        lastName: lead.lastName,
-        email: lead.email ?? undefined,
-        phone: lead.phone ?? undefined,
-        mobile: lead.mobile ?? undefined,
-        jobTitle: lead.jobTitle ?? undefined,
-        street: lead.street ?? undefined,
-        city: lead.city ?? undefined,
-        state: lead.state ?? undefined,
-        zipCode: lead.zipCode ?? undefined,
-        country: lead.country ?? undefined,
-        source: lead.source ?? undefined,
-        notes: lead.notes ?? undefined,
-        ownerId: lead.ownerId,
-        companyId: companyId ?? undefined,
-        marketingConsent: lead.marketingConsent,
-        consentDate: lead.consentDate ?? undefined,
-        tags: lead.tags,
-        sourceLeadId: lead.id,
-      })
-      .returning({ id: contacts.id });
-
-    const contactId = newContact.id;
-
-    // 3. Migrate activities — relink from lead to new contact + company
-    await tx.update(activities).set({ leadId: null, contactId, companyId }).where(eq(activities.leadId, leadId));
-
-    // 4. Migrate tasks — relink from lead to new contact + company
-    await tx.update(tasks).set({ leadId: null, contactId, companyId }).where(eq(tasks.leadId, leadId));
-
-    // 5. Migrate tickets — preserve existing contactId if already assigned
-    await tx
-      .update(tickets)
-      .set({ leadId: null, contactId, companyId })
-      .where(and(eq(tickets.leadId, leadId), isNull(tickets.contactId)));
-    // Tickets that already had a contactId: just clear the leadId
-    await tx.update(tickets).set({ leadId: null }).where(eq(tickets.leadId, leadId));
-
-    // 6. Optionally create Deal
-    let dealId: string | null = null;
-    if (shouldCreateDeal) {
-      const [firstStage] = await tx
-        .select({ id: pipelineStages.id })
-        .from(pipelineStages)
-        .orderBy(pipelineStages.order)
-        .limit(1);
-      if (!firstStage) throw new Error("No pipeline stages found. Please create one first.");
-
-      const [newDeal] = await tx
-        .insert(deals)
+    } else {
+      const [newCompany] = await db
+        .insert(companies)
         .values({
-          name: dealName,
-          amount: "0",
-          currency: "EUR",
-          stageId: firstStage.id,
-          companyId: companyId ?? undefined,
-          contactId,
+          name: lead.companyName,
+          industry: lead.industry ?? undefined,
+          website: lead.website ?? undefined,
+          street: lead.street ?? undefined,
+          city: lead.city ?? undefined,
+          state: lead.state ?? undefined,
+          zipCode: lead.zipCode ?? undefined,
+          country: lead.country ?? undefined,
+          source: lead.source ?? undefined,
           ownerId: lead.ownerId,
-          status: "open",
+          sourceLeadId: lead.id,
+          companyTypeId: lead.leadTypeId ?? undefined,
+          companyCategoryId: lead.leadCategoryId ?? undefined,
         })
-        .returning({ id: deals.id });
-      dealId = newDeal.id;
+        .returning({ id: companies.id });
+      companyId = newCompany.id;
     }
+  }
 
-    // 7. Mark lead as converted with full traceability
-    await tx
-      .update(leads)
-      .set({
-        status: "converted",
-        isConverted: true,
-        convertedAt: new Date(),
-        convertedToContactId: contactId,
-        convertedToCompanyId: companyId,
-        convertedToDealId: dealId,
+  // 2. Create Contact from full lead profile
+  const [newContact] = await db
+    .insert(contacts)
+    .values({
+      firstName: lead.firstName,
+      lastName: lead.lastName,
+      email: lead.email ?? undefined,
+      phone: lead.phone ?? undefined,
+      mobile: lead.mobile ?? undefined,
+      jobTitle: lead.jobTitle ?? undefined,
+      street: lead.street ?? undefined,
+      city: lead.city ?? undefined,
+      state: lead.state ?? undefined,
+      zipCode: lead.zipCode ?? undefined,
+      country: lead.country ?? undefined,
+      source: lead.source ?? undefined,
+      notes: lead.notes ?? undefined,
+      ownerId: lead.ownerId,
+      companyId: companyId ?? undefined,
+      marketingConsent: lead.marketingConsent,
+      consentDate: lead.consentDate ?? undefined,
+      tags: lead.tags,
+      sourceLeadId: lead.id,
+    })
+    .returning({ id: contacts.id });
+
+  const contactId = newContact.id;
+
+  // 3. Migrate activities — relink from lead to new contact + company
+  await db.update(activities).set({ leadId: null, contactId, companyId }).where(eq(activities.leadId, leadId));
+
+  // 4. Migrate tasks — relink from lead to new contact + company
+  await db.update(tasks).set({ leadId: null, contactId, companyId }).where(eq(tasks.leadId, leadId));
+
+  // 5. Migrate tickets — preserve existing contactId if already assigned
+  await db
+    .update(tickets)
+    .set({ leadId: null, contactId, companyId })
+    .where(and(eq(tickets.leadId, leadId), isNull(tickets.contactId)));
+  // Tickets that already had a contactId: just clear the leadId
+  await db.update(tickets).set({ leadId: null }).where(eq(tickets.leadId, leadId));
+
+  // 6. Optionally create Deal
+  let dealId: string | null = null;
+  if (shouldCreateDeal) {
+    const [firstStage] = await db
+      .select({ id: pipelineStages.id })
+      .from(pipelineStages)
+      .orderBy(pipelineStages.order)
+      .limit(1);
+    if (!firstStage) throw new Error("No pipeline stages found. Please create one first.");
+
+    const [newDeal] = await db
+      .insert(deals)
+      .values({
+        name: dealName,
+        amount: "0",
+        currency: "EUR",
+        stageId: firstStage.id,
+        companyId: companyId ?? undefined,
+        contactId,
+        ownerId: lead.ownerId,
+        status: "open",
       })
-      .where(eq(leads.id, leadId));
+      .returning({ id: deals.id });
+    dealId = newDeal.id;
+  }
 
-    result = { contactId, companyId, dealId };
-  });
+  // 7. Mark lead as converted with full traceability
+  await db
+    .update(leads)
+    .set({
+      status: "converted",
+      isConverted: true,
+      convertedAt: new Date(),
+      convertedToContactId: contactId,
+      convertedToCompanyId: companyId,
+      convertedToDealId: dealId,
+    })
+    .where(eq(leads.id, leadId));
 
-  if (!result) throw new Error("Conversion transaction failed");
+  const result = { contactId, companyId, dealId };
 
   dispatchWebhook("lead.converted", {
     leadId,
@@ -530,6 +524,20 @@ export async function updateCompany(id: string, data: any) {
 export async function deleteCompany(id: string) {
   await requireWriteAccess();
   const db = await getDb();
+
+  // Free any lead that was converted into this company so it can be re-converted
+  await db
+    .update(leads)
+    .set({
+      isConverted: false,
+      status: "open",
+      convertedAt: null,
+      convertedToCompanyId: null,
+      convertedToContactId: null,
+      convertedToDealId: null,
+    })
+    .where(eq(leads.convertedToCompanyId, id));
+
   await db.delete(companies).where(eq(companies.id, id));
   revalidatePath("/dashboard/companies");
 }
@@ -686,20 +694,18 @@ type LeadMergeFields = {
 export async function mergeLeads(keepId: string, mergeId: string, fields: LeadMergeFields) {
   await requireWriteAccess();
   const db = await getDb();
-  await db.transaction(async (tx) => {
-    await tx
-      .update(leads)
-      .set({ ...fields, updatedAt: new Date() })
-      .where(eq(leads.id, keepId));
-    await Promise.all([
-      tx.update(activities).set({ leadId: keepId }).where(eq(activities.leadId, mergeId)),
-      tx.update(tasks).set({ leadId: keepId }).where(eq(tasks.leadId, mergeId)),
-      tx.update(campaignLogs).set({ leadId: keepId }).where(eq(campaignLogs.leadId, mergeId)),
-      tx.update(tickets).set({ leadId: keepId }).where(eq(tickets.leadId, mergeId)),
-      tx.update(appointments).set({ leadId: keepId }).where(eq(appointments.leadId, mergeId)),
-    ]);
-    await tx.delete(leads).where(eq(leads.id, mergeId));
-  });
+  await db
+    .update(leads)
+    .set({ ...fields, updatedAt: new Date() })
+    .where(eq(leads.id, keepId));
+  await Promise.all([
+    db.update(activities).set({ leadId: keepId }).where(eq(activities.leadId, mergeId)),
+    db.update(tasks).set({ leadId: keepId }).where(eq(tasks.leadId, mergeId)),
+    db.update(campaignLogs).set({ leadId: keepId }).where(eq(campaignLogs.leadId, mergeId)),
+    db.update(tickets).set({ leadId: keepId }).where(eq(tickets.leadId, mergeId)),
+    db.update(appointments).set({ leadId: keepId }).where(eq(appointments.leadId, mergeId)),
+  ]);
+  await db.delete(leads).where(eq(leads.id, mergeId));
   revalidatePath("/dashboard/leads");
 }
 
@@ -739,21 +745,19 @@ type ContactMergeFields = {
 export async function mergeContacts(keepId: string, mergeId: string, fields: ContactMergeFields) {
   await requireWriteAccess();
   const db = await getDb();
-  await db.transaction(async (tx) => {
-    await tx
-      .update(contacts)
-      .set({ ...fields, updatedAt: new Date() })
-      .where(eq(contacts.id, keepId));
-    await Promise.all([
-      tx.update(activities).set({ contactId: keepId }).where(eq(activities.contactId, mergeId)),
-      tx.update(tasks).set({ contactId: keepId }).where(eq(tasks.contactId, mergeId)),
-      tx.update(deals).set({ contactId: keepId }).where(eq(deals.contactId, mergeId)),
-      tx.update(quotes).set({ contactId: keepId }).where(eq(quotes.contactId, mergeId)),
-      tx.update(tickets).set({ contactId: keepId }).where(eq(tickets.contactId, mergeId)),
-      tx.update(appointments).set({ contactId: keepId }).where(eq(appointments.contactId, mergeId)),
-    ]);
-    await tx.delete(contacts).where(eq(contacts.id, mergeId));
-  });
+  await db
+    .update(contacts)
+    .set({ ...fields, updatedAt: new Date() })
+    .where(eq(contacts.id, keepId));
+  await Promise.all([
+    db.update(activities).set({ contactId: keepId }).where(eq(activities.contactId, mergeId)),
+    db.update(tasks).set({ contactId: keepId }).where(eq(tasks.contactId, mergeId)),
+    db.update(deals).set({ contactId: keepId }).where(eq(deals.contactId, mergeId)),
+    db.update(quotes).set({ contactId: keepId }).where(eq(quotes.contactId, mergeId)),
+    db.update(tickets).set({ contactId: keepId }).where(eq(tickets.contactId, mergeId)),
+    db.update(appointments).set({ contactId: keepId }).where(eq(appointments.contactId, mergeId)),
+  ]);
+  await db.delete(contacts).where(eq(contacts.id, mergeId));
   revalidatePath("/dashboard/contacts");
 }
 
@@ -778,21 +782,19 @@ type CompanyMergeFields = {
 export async function mergeCompanies(keepId: string, mergeId: string, fields: CompanyMergeFields) {
   await requireWriteAccess();
   const db = await getDb();
-  await db.transaction(async (tx) => {
-    await tx
-      .update(companies)
-      .set({ ...fields, updatedAt: new Date() })
-      .where(eq(companies.id, keepId));
-    await Promise.all([
-      tx.update(contacts).set({ companyId: keepId }).where(eq(contacts.companyId, mergeId)),
-      tx.update(activities).set({ companyId: keepId }).where(eq(activities.companyId, mergeId)),
-      tx.update(tasks).set({ companyId: keepId }).where(eq(tasks.companyId, mergeId)),
-      tx.update(deals).set({ companyId: keepId }).where(eq(deals.companyId, mergeId)),
-      tx.update(quotes).set({ companyId: keepId }).where(eq(quotes.companyId, mergeId)),
-      tx.update(tickets).set({ companyId: keepId }).where(eq(tickets.companyId, mergeId)),
-      tx.update(appointments).set({ companyId: keepId }).where(eq(appointments.companyId, mergeId)),
-    ]);
-    await tx.delete(companies).where(eq(companies.id, mergeId));
-  });
+  await db
+    .update(companies)
+    .set({ ...fields, updatedAt: new Date() })
+    .where(eq(companies.id, keepId));
+  await Promise.all([
+    db.update(contacts).set({ companyId: keepId }).where(eq(contacts.companyId, mergeId)),
+    db.update(activities).set({ companyId: keepId }).where(eq(activities.companyId, mergeId)),
+    db.update(tasks).set({ companyId: keepId }).where(eq(tasks.companyId, mergeId)),
+    db.update(deals).set({ companyId: keepId }).where(eq(deals.companyId, mergeId)),
+    db.update(quotes).set({ companyId: keepId }).where(eq(quotes.companyId, mergeId)),
+    db.update(tickets).set({ companyId: keepId }).where(eq(tickets.companyId, mergeId)),
+    db.update(appointments).set({ companyId: keepId }).where(eq(appointments.companyId, mergeId)),
+  ]);
+  await db.delete(companies).where(eq(companies.id, mergeId));
   revalidatePath("/dashboard/companies");
 }

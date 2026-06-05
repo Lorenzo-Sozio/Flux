@@ -77,19 +77,19 @@ function F({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
         {label}
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
 
-function Section({ title }: { title: string }) {
+function _Section({ title }: { title: string }) {
   return (
-    <p className="col-span-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/60 mt-2 mb-0.5 border-b pb-1">
+    <p className="col-span-2 mt-2 mb-0.5 border-b pb-1 font-semibold text-[11px] text-muted-foreground/60 uppercase tracking-widest">
       {title}
     </p>
   );
@@ -193,7 +193,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
         country: contact.country || "",
       });
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, contact, form.reset]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const e = errors;
   const tabErrors = {
@@ -267,8 +267,8 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
         }}
       >
         <DialogTrigger asChild>{children}</DialogTrigger>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+        <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-[700px]">
+          <DialogHeader className="border-b px-6 pt-6 pb-4">
             <div className="flex items-center justify-between gap-2">
               <DialogTitle className="text-lg">
                 {isEditing
@@ -277,7 +277,13 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
               </DialogTitle>
               {isEditing && contact && (
                 <Link href={`/dashboard/contacts/${contact.id}`} onClick={() => setOpen(false)}>
-                  <Button variant="ghost" size="icon" type="button" title="Apri scheda completa" className="h-8 w-8 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    title="Apri scheda completa"
+                    className="h-8 w-8 shrink-0"
+                  >
                     <ArrowUpRightIcon className="h-4 w-4" />
                   </Button>
                 </Link>
@@ -285,10 +291,10 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
             </div>
           </DialogHeader>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+          <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <Tabs defaultValue="info">
-                <TabsList className="w-full mb-5">
+                <TabsList className="mb-5 w-full">
                   <TabsTrigger value="info" className="relative flex-1 gap-1.5">
                     <UserIcon className="h-3.5 w-3.5" />
                     {t("form.tabs.info")}
@@ -312,7 +318,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                 </TabsList>
 
                 {/* ── Info Tab ─────────────────────────────────────────────── */}
-                <TabsContent value="info" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+                <TabsContent value="info" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
                   <F label={t("firstName")} required error={e.firstName?.message}>
                     <Input {...register("firstName")} placeholder="Mario" />
                   </F>
@@ -366,7 +372,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                 </TabsContent>
 
                 {/* ── CRM Tab ──────────────────────────────────────────────── */}
-                <TabsContent value="crm" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+                <TabsContent value="crm" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
                   <div className="col-span-2">
                     <F label={t("form.assignedTo")}>
                       <Controller
@@ -426,8 +432,8 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                       render={({ field }) => (
                         <div className="flex items-center justify-between rounded-lg border px-4 py-3">
                           <div>
-                            <p className="text-sm font-medium">{t("form.marketingConsent")}</p>
-                            <p className="text-xs text-muted-foreground">{t("form.marketingConsentDesc")}</p>
+                            <p className="font-medium text-sm">{t("form.marketingConsent")}</p>
+                            <p className="text-muted-foreground text-xs">{t("form.marketingConsentDesc")}</p>
                           </div>
                           <Switch checked={field.value} onCheckedChange={field.onChange} />
                         </div>
@@ -437,7 +443,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                 </TabsContent>
 
                 {/* ── Address Tab ──────────────────────────────────────────── */}
-                <TabsContent value="address" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+                <TabsContent value="address" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
                   <GeoAddressFields
                     control={control}
                     setValue={setValue}
@@ -467,13 +473,13 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
             </div>
 
             {duplicates.length > 0 && pendingPayload && (
-              <div className="px-6 py-4 border-t bg-amber-50 dark:bg-amber-950/30">
-                <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
+              <div className="border-t bg-amber-50 px-6 py-4 dark:bg-amber-950/30">
+                <p className="mb-2 font-semibold text-amber-800 text-sm dark:text-amber-300">
                   Similar contacts already exist:
                 </p>
                 <ul className="mb-3 space-y-1.5">
                   {duplicates.map((d) => (
-                    <li key={d.id} className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+                    <li key={d.id} className="flex items-center gap-2 text-amber-700 text-sm dark:text-amber-400">
                       <Link
                         href={`/dashboard/contacts/${d.id}`}
                         className="underline underline-offset-2 hover:text-amber-900"
@@ -487,10 +493,10 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                           type="button"
                           size="sm"
                           variant="outline"
-                          className="h-6 px-2 text-xs ml-auto border-amber-400 text-amber-700 hover:bg-amber-100"
+                          className="ml-auto h-6 border-amber-400 px-2 text-amber-700 text-xs hover:bg-amber-100"
                           onClick={() => setMergeTargetId(d.id)}
                         >
-                          <GitMerge className="h-3 w-3 mr-1" />
+                          <GitMerge className="mr-1 h-3 w-3" />
                           Merge
                         </Button>
                       )}
@@ -516,7 +522,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
               </div>
             )}
 
-            <DialogFooter className="px-6 py-4 border-t bg-muted/30">
+            <DialogFooter className="border-t bg-muted/30 px-6 py-4">
               <Button type="button" variant="outline" onClick={() => setOpen(false)}>
                 {tc("cancel")}
               </Button>
@@ -573,7 +579,7 @@ export function DeleteContactButton({ id }: { id: string }) {
 
 export function ContactActions({ contact }: { contact: any }) {
   return (
-    <div className="flex items-center gap-2 justify-end">
+    <div className="flex items-center justify-end gap-2">
       <Link href={`/dashboard/contacts/${contact.id}`}>
         <Button variant="ghost" size="icon">
           <EyeIcon className="h-4 w-4" />

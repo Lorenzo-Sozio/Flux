@@ -15,8 +15,8 @@ import {
   marketingCampaigns,
 } from "@/db/schema";
 import { getDb } from "@/lib/tenant-context";
-import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
 import { signTrackingUrl } from "@/lib/tracking-token";
+import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
 
 const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
 

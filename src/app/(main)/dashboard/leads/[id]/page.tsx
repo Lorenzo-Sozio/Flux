@@ -30,7 +30,7 @@ import { getCompanyCategories, getCompanyTypes } from "@/actions/crm";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { getEmailTemplates } from "@/actions/marketing";
 import { deleteTask, getAllUsers, getTasksByLead, updateTaskStatus } from "@/actions/tasks";
-import { LeadModal } from "@/app/(main)/dashboard/leads/_components/lead-modal";
+import { DeleteLeadButton, LeadModal } from "@/app/(main)/dashboard/leads/_components/lead-modal";
 import { auth } from "@/auth";
 import { ActivityTimeline } from "@/components/crm/activity-timeline";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
@@ -61,8 +61,8 @@ const STATUS_STYLES: Record<string, string> = {
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-0.5">
-      <p className="text-[11px] uppercase tracking-wider font-medium text-muted-foreground">{label}</p>
-      <div className="text-sm font-medium">{children}</div>
+      <p className="font-medium text-[11px] text-muted-foreground uppercase tracking-wider">{label}</p>
+      <div className="font-medium text-sm">{children}</div>
     </div>
   );
 }
@@ -70,21 +70,21 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 function RatingBadge({ rating, label }: { rating: string; label: string }) {
   if (rating === "hot")
     return (
-      <Badge className="gap-1 bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800">
-        <FlameIcon className="w-3 h-3" />
+      <Badge className="gap-1 border-red-200 bg-red-100 text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400">
+        <FlameIcon className="h-3 w-3" />
         {label}
       </Badge>
     );
   if (rating === "warm")
     return (
-      <Badge className="gap-1 bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800">
-        <ThermometerIcon className="w-3 h-3" />
+      <Badge className="gap-1 border-amber-200 bg-amber-100 text-amber-700 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+        <ThermometerIcon className="h-3 w-3" />
         {label}
       </Badge>
     );
   return (
-    <Badge className="gap-1 bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
-      <SnowflakeIcon className="w-3 h-3" />
+    <Badge className="gap-1 border-blue-200 bg-blue-100 text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+      <SnowflakeIcon className="h-3 w-3" />
       {label}
     </Badge>
   );
@@ -96,8 +96,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const userId = session?.user?.id;
   const db = await getDb();
 
-  let lead;
-  let templates: any[] = [];
+  let lead: typeof leads.$inferSelect | undefined;
+  let templates: Awaited<ReturnType<typeof getEmailTemplates>> = [];
 
   try {
     [lead, templates] = await Promise.all([
@@ -189,27 +189,27 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       {/* ── Hero ── */}
       <Card>
         <CardContent className="pt-6 pb-5">
-          <div className="flex flex-col sm:flex-row items-start gap-4">
-            <div className="flex-shrink-0 w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center font-bold text-xl text-primary select-none">
-              {initials || <UserIcon className="w-7 h-7" />}
+          <div className="flex flex-col items-start gap-4 sm:flex-row">
+            <div className="flex h-16 w-16 flex-shrink-0 select-none items-center justify-center rounded-full bg-primary/10 font-bold text-primary text-xl">
+              {initials || <UserIcon className="h-7 w-7" />}
             </div>
 
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold leading-tight">{fullName}</h1>
+                <h1 className="font-bold text-2xl leading-tight">{fullName}</h1>
                 {lead.isConverted && (
-                  <Badge className="gap-1 bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800">
-                    <CheckCircle2Icon className="w-3 h-3" />
+                  <Badge className="gap-1 border-emerald-200 bg-emerald-100 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                    <CheckCircle2Icon className="h-3 w-3" />
                     {tD("convertedStatus")}
                   </Badge>
                 )}
               </div>
               {(lead.jobTitle || lead.companyName) && (
-                <p className="text-muted-foreground text-sm mt-0.5">
+                <p className="mt-0.5 text-muted-foreground text-sm">
                   {[lead.jobTitle, lead.companyName].filter(Boolean).join(" · ")}
                 </p>
               )}
-              <div className="flex flex-wrap items-center gap-2 mt-3">
+              <div className="mt-3 flex flex-wrap items-center gap-2">
                 <Badge variant="outline" className={`capitalize ${STATUS_STYLES[lead.status] ?? ""}`}>
                   {lead.status}
                 </Badge>
@@ -221,17 +221,17 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 )}
                 {lead.leadScore != null && (
                   <Badge variant="secondary" className="gap-1">
-                    <StarIcon className="w-3 h-3" />
+                    <StarIcon className="h-3 w-3" />
                     {tD("fieldScore")}: {lead.leadScore}
                   </Badge>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex flex-shrink-0 items-center gap-2">
               <LeadModal lead={lead} categories={allCategories} companyTypes={allCompanyTypes}>
                 <Button variant="outline" size="sm">
-                  <PencilIcon className="w-4 h-4 mr-1.5" />
+                  <PencilIcon className="mr-1.5 h-4 w-4" />
                   {t("editLead")}
                 </Button>
               </LeadModal>
@@ -245,13 +245,14 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                   taskCount={leadTasks.length}
                 />
               )}
+              <DeleteLeadButton lead={lead} redirectTo="/dashboard/leads" />
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* ── 3-column body ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
         {/* Sidebar */}
         <div className="flex flex-col gap-6">
           {/* Contact Info */}
@@ -264,9 +265,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 <InfoRow label={tD("fieldEmail")}>
                   <a
                     href={`mailto:${lead.email}`}
-                    className="flex items-center gap-1.5 text-primary hover:underline break-all"
+                    className="flex items-center gap-1.5 break-all text-primary hover:underline"
                   >
-                    <MailIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <MailIcon className="h-3.5 w-3.5 flex-shrink-0" />
                     {lead.email}
                   </a>
                 </InfoRow>
@@ -274,7 +275,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {lead.phone && (
                 <InfoRow label={tD("fieldPhone")}>
                   <a href={`tel:${lead.phone}`} className="flex items-center gap-1.5 text-primary hover:underline">
-                    <PhoneIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <PhoneIcon className="h-3.5 w-3.5 flex-shrink-0" />
                     {lead.phone}
                   </a>
                 </InfoRow>
@@ -282,7 +283,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {lead.mobile && (
                 <InfoRow label={tD("fieldMobile")}>
                   <a href={`tel:${lead.mobile}`} className="flex items-center gap-1.5 text-primary hover:underline">
-                    <SmartphoneIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <SmartphoneIcon className="h-3.5 w-3.5 flex-shrink-0" />
                     {lead.mobile}
                   </a>
                 </InfoRow>
@@ -293,15 +294,15 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                     href={lead.website}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1.5 text-primary hover:underline truncate"
+                    className="flex items-center gap-1.5 truncate text-primary hover:underline"
                   >
-                    <GlobeIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <GlobeIcon className="h-3.5 w-3.5 flex-shrink-0" />
                     {lead.website.replace(/^https?:\/\//, "")}
                   </a>
                 </InfoRow>
               )}
               {!lead.email && !lead.phone && !lead.mobile && !lead.website && (
-                <p className="text-sm text-muted-foreground italic">{tD("notApplicable")}</p>
+                <p className="text-muted-foreground text-sm italic">{tD("notApplicable")}</p>
               )}
             </CardContent>
           </Card>
@@ -327,9 +328,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               )}
               {lead.leadScore != null && (
                 <InfoRow label={tD("fieldScore")}>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="mt-1 flex items-center gap-2">
                     <Progress value={lead.leadScore} className="h-2 flex-1" />
-                    <span className="text-sm font-semibold tabular-nums w-8 text-right">{lead.leadScore}</span>
+                    <span className="w-8 text-right font-semibold text-sm tabular-nums">{lead.leadScore}</span>
                   </div>
                 </InfoRow>
               )}
@@ -351,7 +352,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               {ownerName && (
                 <InfoRow label={tD("fieldOwner")}>
                   <span className="flex items-center gap-1.5">
-                    <UserIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                    <UserIcon className="h-3.5 w-3.5 text-muted-foreground" />
                     {ownerName}
                   </span>
                 </InfoRow>
@@ -369,7 +370,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 {lead.companyName && (
                   <InfoRow label={tD("fieldCompany")}>
                     <span className="flex items-center gap-1.5">
-                      <BuildingIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                      <BuildingIcon className="h-3.5 w-3.5 text-muted-foreground" />
                       {lead.companyName}
                     </span>
                   </InfoRow>
@@ -377,7 +378,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 {lead.jobTitle && (
                   <InfoRow label={tD("fieldJobTitle")}>
                     <span className="flex items-center gap-1.5">
-                      <BriefcaseIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                      <BriefcaseIcon className="h-3.5 w-3.5 text-muted-foreground" />
                       {lead.jobTitle}
                     </span>
                   </InfoRow>
@@ -391,13 +392,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           {hasAddressInfo && (
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <MapPinIcon className="w-4 h-4 text-muted-foreground" />
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <MapPinIcon className="h-4 w-4 text-muted-foreground" />
                   {tD("sectionAddress")}
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <address className="not-italic text-sm space-y-0.5 text-foreground/80">
+                <address className="space-y-0.5 text-foreground/80 text-sm not-italic">
                   {lead.street && <p>{lead.street}</p>}
                   {(lead.city || lead.state || lead.zipCode) && (
                     <p>{[lead.city, lead.state, lead.zipCode].filter(Boolean).join(", ")}</p>
@@ -412,8 +413,8 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           {lead.tags && lead.tags.length > 0 && (
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <TagIcon className="w-4 h-4 text-muted-foreground" />
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <TagIcon className="h-4 w-4 text-muted-foreground" />
                   {tD("fieldTags")}
                 </CardTitle>
               </CardHeader>
@@ -433,7 +434,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
           <Card className="bg-muted/30">
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">
+                <span className="font-medium text-muted-foreground text-xs uppercase tracking-wider">
                   {tD("marketingLabel")}
                 </span>
                 <Badge variant={lead.marketingConsent ? "default" : "outline"} className="text-[10px]">
@@ -441,7 +442,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </Badge>
               </div>
               {lead.marketingConsent && lead.consentDate && (
-                <p className="text-[10px] text-muted-foreground mt-1">
+                <p className="mt-1 text-[10px] text-muted-foreground">
                   <FormattedDate date={lead.consentDate} />
                 </p>
               )}
@@ -455,7 +456,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 <CardTitle className="text-base">{tD("fieldNotes")}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-foreground/80 whitespace-pre-wrap">{lead.notes}</p>
+                <p className="whitespace-pre-wrap text-foreground/80 text-sm">{lead.notes}</p>
               </CardContent>
             </Card>
           )}
@@ -471,10 +472,10 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
           {/* Converted-to traceability card */}
           {lead.isConverted && (convertedContact || convertedCompany || convertedDeal) && (
-            <Card className="border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
+            <Card className="border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20">
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-                  <CheckCircle2Icon className="w-4 h-4" />
+                <CardTitle className="flex items-center gap-2 text-base text-emerald-700 dark:text-emerald-400">
+                  <CheckCircle2Icon className="h-4 w-4" />
                   Convertito in
                 </CardTitle>
               </CardHeader>
@@ -482,32 +483,32 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 {convertedContact && (
                   <a
                     href={`/dashboard/contacts?contactId=${lead.convertedToContactId}`}
-                    className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                    className="flex items-center gap-2 font-medium text-primary text-sm hover:underline"
                   >
-                    <UserIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <UserIcon className="h-3.5 w-3.5 flex-shrink-0" />
                     {convertedContact.firstName} {convertedContact.lastName}
                   </a>
                 )}
                 {convertedCompany && (
                   <a
                     href={`/dashboard/companies/${lead.convertedToCompanyId}`}
-                    className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                    className="flex items-center gap-2 font-medium text-primary text-sm hover:underline"
                   >
-                    <BuildingIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <BuildingIcon className="h-3.5 w-3.5 flex-shrink-0" />
                     {convertedCompany.name}
                   </a>
                 )}
                 {convertedDeal && (
                   <a
                     href={`/dashboard/pipeline?dealId=${lead.convertedToDealId}`}
-                    className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+                    className="flex items-center gap-2 font-medium text-primary text-sm hover:underline"
                   >
-                    <BriefcaseIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                    <BriefcaseIcon className="h-3.5 w-3.5 flex-shrink-0" />
                     {convertedDeal.name}
                   </a>
                 )}
                 {lead.convertedAt && (
-                  <p className="text-[10px] text-muted-foreground pt-1 border-t">
+                  <p className="border-t pt-1 text-[10px] text-muted-foreground">
                     Convertito il <FormattedDate date={lead.convertedAt} />
                   </p>
                 )}
@@ -517,18 +518,18 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
         </div>
 
         {/* ── Main: Timeline + Tasks ── */}
-        <div className="lg:col-span-2 flex flex-col gap-6">
+        <div className="flex flex-col gap-6 lg:col-span-2">
           {/* Timeline */}
           <Card>
             <CardHeader>
               <CardTitle>{tD("timelineTitle")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <form action={handleAddActivity} className="flex flex-col gap-3 p-4 border rounded-lg bg-muted/20">
+              <form action={handleAddActivity} className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-4">
                 <Textarea name="content" placeholder={tD("activityPlaceholder")} required className="bg-background" />
                 <div className="flex items-center justify-between gap-4">
                   <div className="flex items-center gap-2">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground">{tD("typeLabel")}</p>
+                    <p className="font-bold text-[10px] text-muted-foreground uppercase">{tD("typeLabel")}</p>
                     <select
                       name="type"
                       className="h-8 rounded-md border border-input bg-background px-2 text-xs shadow-sm"
@@ -556,36 +557,36 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
             <CardContent className="space-y-4">
               <QuickTaskForm entityType="lead" entityId={leadId} userId={userId ?? ""} />
 
-              <div className="space-y-3 mt-2">
+              <div className="mt-2 space-y-3">
                 {leadTasks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-6 text-center">{tD("noTasks")}</p>
+                  <p className="py-6 text-center text-muted-foreground text-sm">{tD("noTasks")}</p>
                 ) : (
                   leadTasks.map((task) => (
                     <div
                       key={task.id}
-                      className={`border rounded-lg p-4 transition-all ${task.status === "done" ? "opacity-60 bg-muted/20" : "bg-card shadow-sm"}`}
+                      className={`rounded-lg border p-4 transition-all ${task.status === "done" ? "bg-muted/20 opacity-60" : "bg-card shadow-sm"}`}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="flex items-start gap-3 min-w-0">
+                        <div className="flex min-w-0 items-start gap-3">
                           <div
-                            className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                            className={`mt-0.5 flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border-2 ${
                               task.status === "done" ? "border-primary bg-primary" : "border-muted-foreground"
                             }`}
                           >
-                            {task.status === "done" && <div className="w-1.5 h-1.5 bg-white rounded-full" />}
+                            {task.status === "done" && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
                           </div>
                           <div className="min-w-0">
                             <p
-                              className={`font-medium text-sm leading-tight ${task.status === "done" ? "line-through text-muted-foreground" : ""}`}
+                              className={`font-medium text-sm leading-tight ${task.status === "done" ? "text-muted-foreground line-through" : ""}`}
                             >
                               {task.title}
                             </p>
                             {task.description && (
-                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{task.description}</p>
+                              <p className="mt-0.5 line-clamp-2 text-muted-foreground text-xs">{task.description}</p>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <div className="flex flex-shrink-0 items-center gap-1.5">
                           <Badge
                             variant={
                               task.priority === "blocker" || task.priority === "high"
@@ -607,30 +608,30 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                           >
                             <button
                               type="submit"
-                              className="p-1 text-muted-foreground hover:text-destructive transition-colors"
+                              className="p-1 text-muted-foreground transition-colors hover:text-destructive"
                               title="Delete"
                             >
-                              <Trash2Icon className="w-3.5 h-3.5" />
+                              <Trash2Icon className="h-3.5 w-3.5" />
                             </button>
                           </form>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between mt-3 pt-3 border-t border-dashed">
+                      <div className="mt-3 flex items-center justify-between border-t border-dashed pt-3">
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground">
                           <span className="flex items-center gap-1">
-                            <ClockIcon className="w-3 h-3" />
+                            <ClockIcon className="h-3 w-3" />
                             {tD("createdLabel")} <FormattedDate date={task.createdAt} />
                           </span>
                           {task.status === "done" && task.completedAt && (
-                            <span className="flex items-center gap-1 text-green-600 font-medium">
-                              <CheckCircle2Icon className="w-3 h-3" />
+                            <span className="flex items-center gap-1 font-medium text-green-600">
+                              <CheckCircle2Icon className="h-3 w-3" />
                               {tD("completedLabel")} <FormattedDate date={task.completedAt} />
                             </span>
                           )}
                           {task.startDate && (
                             <span className="flex items-center gap-1">
-                              <CalendarIcon className="w-3 h-3" />
+                              <CalendarIcon className="h-3 w-3" />
                               {tD("startLabel")} <FormattedDate date={task.startDate} includeTime={!task.allDay} />
                             </span>
                           )}
@@ -640,12 +641,12 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                                 task.status !== "done" && new Date(task.dueDate) < new Date() ? "text-destructive" : ""
                               }`}
                             >
-                              <CalendarIcon className="w-3 h-3" />
+                              <CalendarIcon className="h-3 w-3" />
                               {tD("dueLabel")} <FormattedDate date={task.dueDate} includeTime={!task.allDay} />
                             </span>
                           )}
                           <span className="flex items-center gap-1">
-                            <UserCheckIcon className="w-3 h-3" />
+                            <UserCheckIcon className="h-3 w-3" />
                             {tD("toLabel")} {task.assigneeName || tD("myself")}
                           </span>
                         </div>
@@ -655,7 +656,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                             await toggleTask(task.id, task.status);
                           }}
                         >
-                          <Button variant="outline" size="sm" className="h-6 px-2 text-[10px] bg-background">
+                          <Button variant="outline" size="sm" className="h-6 bg-background px-2 text-[10px]">
                             {task.status === "done" ? tD("undo") : tD("markDone")}
                           </Button>
                         </form>

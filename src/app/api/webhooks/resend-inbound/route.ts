@@ -14,13 +14,13 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import { createHmac, timingSafeEqual } from "node:crypto";
+
 import { simpleParser } from "mailparser";
 import { Resend } from "resend";
 
 import type { InboundAttachment } from "@/lib/ticket-from-email";
 import { processInboundEmail } from "@/lib/ticket-from-email";
-
-import { createHmac, timingSafeEqual } from "node:crypto";
 
 // ─── Svix signature verification ─────────────────────────────────────────────
 
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  let event: any;
+  let event: { type?: string; data?: Record<string, unknown> };
   try {
     event = JSON.parse(body);
   } catch {
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
   let inReplyTo: string | null = null;
   const attachments: InboundAttachment[] = [];
 
-  const rawUrl: string | undefined = (emailMeta as any).raw?.download_url;
+  const rawUrl: string | undefined = (emailMeta as { raw?: { download_url?: string } }).raw?.download_url;
   if (rawUrl) {
     try {
       const rawResponse = await fetch(rawUrl);
@@ -148,8 +148,8 @@ export async function POST(req: NextRequest) {
     }
   } else {
     // Raw email not available — use html/text from SDK response if present
-    htmlBody = (emailMeta as any).html ?? "";
-    textBody = (emailMeta as any).text ?? "";
+    htmlBody = (emailMeta as { html?: string }).html ?? "";
+    textBody = (emailMeta as { text?: string }).text ?? "";
   }
 
   const result = await processInboundEmail({

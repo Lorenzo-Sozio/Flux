@@ -7,9 +7,10 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
+import { unlink } from "node:fs/promises";
+import { join } from "node:path";
+
 import { and, eq } from "drizzle-orm";
-import { unlink } from "fs/promises";
-import { join } from "path";
 
 import { auth } from "@/auth";
 import { documents } from "@/db/schema";
@@ -66,7 +67,9 @@ export async function DELETE(req: NextRequest) {
 
   // Delete the file from disk (best-effort)
   if (doc.url) {
-    await unlink(join(process.cwd(), doc.url)).catch(() => {});
+    await unlink(join(process.cwd(), doc.url)).catch(() => {
+      /* best-effort */
+    });
   }
 
   await db.delete(documents).where(eq(documents.id, id));

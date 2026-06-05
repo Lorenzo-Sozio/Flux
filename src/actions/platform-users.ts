@@ -42,10 +42,7 @@ export async function listPlatformUsers(): Promise<PlatformUser[]> {
       .from(users)
       .orderBy(users.email),
 
-    platformDb
-      .select({ userId: accounts.userId })
-      .from(accounts)
-      .where(eq(accounts.provider, "google")),
+    platformDb.select({ userId: accounts.userId }).from(accounts).where(eq(accounts.provider, "google")),
 
     platformDb
       .select({
