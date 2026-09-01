@@ -172,7 +172,12 @@ export function validateLeadInput(body: unknown): { errors: ValidationError[]; d
       rating: str(b.rating),
       leadScore: b.leadScore != null ? Number(b.leadScore) : null,
       notes: str(b.notes),
-      marketingConsent: chkBool(b.marketingConsent, "x") === null ? parseBool(b.marketingConsent) : false,
+      // The ternary that used to be here asked chkBool a question already answered:
+      // `chkBool(b.marketingConsent, ...)` is in the checks above, and a failure returns
+      // early with `data: null`. Reaching this line meant it had passed, so the false
+      // branch could not run. A mutation flipping it to `true` survived, which is how
+      // the dead branch was found — a guarantee no test can break is not a guarantee.
+      marketingConsent: parseBool(b.marketingConsent),
       tags: parseTags(b.tags),
     },
   };
@@ -387,7 +392,12 @@ export function validateContactInput(body: unknown): { errors: ValidationError[]
       leadScore: b.leadScore != null ? Number(b.leadScore) : null,
       notes: str(b.notes),
       companyId: str(b.companyId),
-      marketingConsent: chkBool(b.marketingConsent, "x") === null ? parseBool(b.marketingConsent) : false,
+      // The ternary that used to be here asked chkBool a question already answered:
+      // `chkBool(b.marketingConsent, ...)` is in the checks above, and a failure returns
+      // early with `data: null`. Reaching this line meant it had passed, so the false
+      // branch could not run. A mutation flipping it to `true` survived, which is how
+      // the dead branch was found — a guarantee no test can break is not a guarantee.
+      marketingConsent: parseBool(b.marketingConsent),
       tags: parseTags(b.tags),
     },
   };

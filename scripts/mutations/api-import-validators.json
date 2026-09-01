@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/lib/api-import-validators.ts",
+    "description": "a lead with no first name is accepted: the required-field check stops being required",
+    "find": "    chkRequired(b.firstName, \"firstName\"),\n    chkRequired(b.lastName, \"lastName\"),\n    chkStr(b.jobTitle, \"jobTitle\", 200),\n    chkEmail(b.email, \"email\"),",
+    "replace": "    chkRequired(b.lastName, \"lastName\"),\n    chkStr(b.jobTitle, \"jobTitle\", 200),\n    chkEmail(b.email, \"email\"),"
+  },
+  {
+    "file": "src/lib/api-import-validators.ts",
+    "description": "the name keeps whatever spaces were pasted around it, and \" Anna \" and \"Anna\" become two people",
+    "find": "      firstName: (b.firstName as string).trim(),\n      lastName: (b.lastName as string).trim(),\n      jobTitle: str(b.jobTitle),\n      email: emailVal ? emailVal.toLowerCase() : null,",
+    "replace": "      firstName: b.firstName as string,\n      lastName: (b.lastName as string).trim(),\n      jobTitle: str(b.jobTitle),\n      email: emailVal ? emailVal.toLowerCase() : null,"
+  },
+  {
+    "file": "src/lib/api-import-validators.ts",
+    "description": "marketing consent is ON whatever the caller said: a contact is opted in by silence",
+    "find": "      notes: str(b.notes),\n      // The ternary that used to be here asked chkBool a question already answered:\n      // `chkBool(b.marketingConsent, ...)` is in the checks above, and a failure returns\n      // early with `data: null`. Reaching this line meant it had passed, so the false\n      // branch could not run. A mutation flipping it to `true` survived, which is how\n      // the dead branch was found — a guarantee no test can break is not a guarantee.\n      marketingConsent: parseBool(b.marketingConsent),",
+    "replace": "      notes: str(b.notes),\n      // The ternary that used to be here asked chkBool a question already answered:\n      // `chkBool(b.marketingConsent, ...)` is in the checks above, and a failure returns\n      // early with `data: null`. Reaching this line meant it had passed, so the false\n      // branch could not run. A mutation flipping it to `true` survived, which is how\n      // the dead branch was found — a guarantee no test can break is not a guarantee.\n      marketingConsent: true,"
+  },
+  {
+    "file": "src/lib/api-import-validators.ts",
+    "description": "an unknown onDuplicate silently becomes \"update\": a retry overwrites a lead instead of leaving it alone",
+    "find": "  return \"skip\";\n}",
+    "replace": "  return \"update\";\n}"
+  },
+  {
+    "file": "src/lib/api-import-validators.ts",
+    "description": "a field of only spaces counts as filled in: a lead called \"   \" gets created",
+    "find": "  if (!isStr(v) || v.trim().length === 0) return mkErr(field, `${field} is required`);",
+    "replace": "  if (!isStr(v) || v.length === 0) return mkErr(field, `${field} is required`);"
+  }
+]

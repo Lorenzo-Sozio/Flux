@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/lib/api-import-auth.ts",
+    "description": "the header naming another tenant is ignored instead of refused: the silent cross-tenant write comes back",
+    "find": "        if (claimed && claimed !== tenant.id) return null;\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/api-import-auth.ts",
+    "description": "the key is looked up raw instead of by its SHA-256: the secret itself becomes the database lookup value",
+    "find": "      const hash = createHash(\"sha256\").update(provided).digest(\"hex\");",
+    "replace": "      const hash = provided;"
+  },
+  {
+    "file": "src/lib/api-import-auth.ts",
+    "description": "the tenant id from the header is trusted without checking the registry: it becomes forgeable again",
+    "find": "            const tenant = await getTenantById(rawTenantId);\n            tenantId = tenant?.id ?? null;",
+    "replace": "            tenantId = rawTenantId;"
+  },
+  {
+    "file": "src/lib/api-import-auth.ts",
+    "description": "a wrong bearer token falls through to the session instead of stopping: a bad key gets upgraded by whatever cookie rides along",
+    "find": "    return null;\n  }\n\n  const session = await auth();",
+    "replace": "  }\n\n  const session = await auth();"
+  },
+  {
+    "file": "src/lib/api-import-auth.ts",
+    "description": "a viewer session is accepted for writes",
+    "find": "  if (role === \"viewer\") return null;",
+    "replace": "  if (false) return null;"
+  }
+]

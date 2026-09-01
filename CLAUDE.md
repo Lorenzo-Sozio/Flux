@@ -13,7 +13,26 @@ npm run lint         # Biome lint only
 npm run format       # Biome format only
 ```
 
-There are no automated tests in this project.
+There are tests, and only where a bug is expensive.
+
+```bash
+npm test             # vitest, runs in under a second
+npm run test:mutations   # do the tests know how to fail?
+```
+
+They cover the **boundary surface** and nothing else: who a machine-to-machine caller
+is, which tenant it may write into, and what the import API accepts. Everywhere else a
+bug costs a wrong screen; here it costs one customer's data written into another
+customer's database, and it does not look like a failure — it looks like a 201.
+
+`npm run test:mutations` breaks one line at a time and requires the suite to go red for
+each break. A green suite proves the code passes the tests; it does not prove the tests
+would notice if the code were wrong. Adding a test to this surface means adding a
+mutation for it in `scripts/mutations/` — it has already found one dead branch.
+
+Tests marked `it.fails` are **known gaps**, not failures: they pass while the behaviour
+is still broken and start failing the day someone fixes it, which is exactly when the
+note is worth reading.
 
 ### Database (Drizzle ORM + Neon Postgres)
 
