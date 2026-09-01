@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
   }
 
   const eventData = event.data ?? {};
-  const emailId: string = eventData.email_id ?? "";
+  const emailId = typeof eventData.email_id === "string" ? eventData.email_id : "";
 
   if (!emailId) {
     return NextResponse.json({ error: "Missing email_id" }, { status: 400 });
@@ -103,8 +103,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to fetch email metadata" }, { status: 502 });
   }
 
-  const fromRaw: string = eventData.from ?? "";
-  const subject: string = (eventData.subject ?? "").trim();
+  const fromRaw = typeof eventData.from === "string" ? eventData.from : "";
+  const subject = typeof eventData.subject === "string" ? eventData.subject.trim() : "";
 
   if (!fromRaw || !subject) {
     return NextResponse.json({ error: "Missing from or subject" }, { status: 400 });
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
   // Parse the raw email to extract html, text and real attachments
   let htmlBody = "";
   let textBody = "";
-  let inboundMessageId: string | null = eventData.message_id ?? null;
+  let inboundMessageId: string | null = typeof eventData.message_id === "string" ? eventData.message_id : null;
   let inReplyTo: string | null = null;
   const attachments: InboundAttachment[] = [];
 

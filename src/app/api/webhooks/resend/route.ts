@@ -37,9 +37,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const type: string = event.type ?? "";
+  const type = typeof event.type === "string" ? event.type : "";
   const data = event.data ?? {};
-  const messageId: string = data.email_id ?? data.id ?? "";
+  const messageId =
+    typeof data.email_id === "string"
+      ? data.email_id
+      : typeof data.id === "string"
+        ? data.id
+        : "";
 
   try {
     switch (type) {
@@ -49,7 +54,14 @@ export async function POST(req: NextRequest) {
       }
 
       case "email.bounced": {
-        const email: string = data.to?.[0] ?? data.to ?? "";
+        const toValue = data.to;
+        const email = Array.isArray(toValue)
+          ? typeof toValue[0] === "string"
+            ? toValue[0]
+            : ""
+          : typeof toValue === "string"
+            ? toValue
+            : "";
         if (email) {
           // Add to suppressions
           await db
@@ -67,7 +79,14 @@ export async function POST(req: NextRequest) {
 
       case "email.complained": {
         // Spam complaint — add to suppressions immediately
-        const email: string = data.to?.[0] ?? data.to ?? "";
+        const toValue = data.to;
+        const email = Array.isArray(toValue)
+          ? typeof toValue[0] === "string"
+            ? toValue[0]
+            : ""
+          : typeof toValue === "string"
+            ? toValue
+            : "";
         if (email) {
           await db
             .insert(emailSuppressions)
