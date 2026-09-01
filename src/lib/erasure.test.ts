@@ -1,61 +1,71 @@
 /**
  * Erasing a person: the shape of the operation, without a database.
  *
- * What is tested here is what the code **decides** — which rows it touches, which it
- * anonymises, which it deliberately leaves alone — because those are the decisions that
- * turn a 200 into a true or a false statement to someone who asked to be forgotten.
+ * What is pinned here is what the code **decides** — which trails it removes, which it
+ * strips the person out of, which it leaves alone, and in what **order** — because those
+ * are the decisions that turn a 200 into a true or a false statement to someone who asked
+ * to be forgotten.
  *
- * The database handle is a double that records the queries it was given. That is enough to
+ * The database handle is a double that records the calls it was given. That is enough to
  * pin the decisions and it runs in milliseconds, so it runs before every commit; a test
  * that needs a seeded tenant is a test that gets skipped on the day it matters.
  */
+import { getTableName } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 
 import { ANONIMO, eraseByContactPoint } from "@/lib/erasure";
 
-interface Traccia {
-  delete: number;
-  update: number;
-  select: number;
-  impostati: Record<string, unknown> | null;
+interface Chiamata {
+  verbo: "select" | "delete" | "update";
+  tabella: string;
+  impostati?: Record<string, unknown>;
 }
 
-function dbFinto(trovati: { id: string }[] = [], tolti: { id: string }[] = []) {
-  const traccia: Traccia = { delete: 0, update: 0, select: 0, impostati: null };
+/**
+ * Un doppio che **dichiara** che cosa restituisce, invece di ereditare un ripiego.
+ *
+ * `presenti` decide se la persona esiste: senza, ogni test proverebbe soltanto il caso in
+ * cui non c'è nessuno — che è il caso in cui non succede niente.
+ */
+function dbFinto(presenti = true) {
+  const chiamate: Chiamata[] = [];
+  // ⚠️ `getTableName` e non una lettura a mano: drizzle tiene il nome dietro un simbolo, e
+  // un accesso indovinato tornava "?" per tutte — cioè ogni asserzione di questo file
+  // sarebbe passata su qualunque tabella.
+  const nome = (t: unknown) => getTableName(t as Parameters<typeof getTableName>[0]);
 
-  const catenaDelete = {
-    where: () => catenaDelete,
-    returning: async () => tolti,
-  };
-  const catenaUpdate = {
-    set: (valori: Record<string, unknown>) => {
-      traccia.impostati = valori;
-      return catenaUpdate;
-    },
-    where: () => catenaUpdate,
-    returning: async () => trovati,
-  };
-  const catenaSelect = {
-    from: () => catenaSelect,
-    where: async () => trovati,
-  };
+  const righe = presenti ? [{ id: "x1" }] : [];
 
   const db = {
-    delete: () => {
-      traccia.delete += 1;
-      return catenaDelete;
+    select: () => ({
+      from: (t: unknown) => {
+        chiamate.push({ verbo: "select", tabella: nome(t) });
+        return { where: async () => righe };
+      },
+    }),
+    delete: (t: unknown) => {
+      chiamate.push({ verbo: "delete", tabella: nome(t) });
+      const c = { where: () => c, returning: async () => righe };
+      return c;
     },
-    update: () => {
-      traccia.update += 1;
-      return catenaUpdate;
-    },
-    select: () => {
-      traccia.select += 1;
-      return catenaSelect;
+    update: (t: unknown) => {
+      const chiamata: Chiamata = { verbo: "update", tabella: nome(t) };
+      chiamate.push(chiamata);
+      const c = {
+        set: (valori: Record<string, unknown>) => {
+          chiamata.impostati = valori;
+          return c;
+        },
+        where: () => c,
+        returning: async () => righe,
+      };
+      return c;
     },
   };
-  return { db, traccia };
+  return { db, chiamate };
 }
+
+const EMAIL = "anna@example.test";
 
 describe("what a contact point may be", () => {
   it("refuses something that is neither an email nor a phone number", async () => {
@@ -66,46 +76,150 @@ describe("what a contact point may be", () => {
     await expect(eraseByContactPoint(db, "Mario")).rejects.toThrow(/email address or a phone number/);
   });
 
-  it("refuses an empty contact point instead of erasing everything", async () => {
+  it("refuses an empty contact point instead of erasing everybody", async () => {
     const { db } = dbFinto();
 
     await expect(eraseByContactPoint(db, "   ")).rejects.toThrow(/no contact point/);
   });
 });
 
+describe("⚠️⚠️ the order, which is the part that makes the rest true", () => {
+  it("finds the person BEFORE changing anything", async () => {
+    const { db, chiamate } = dbFinto();
+
+    await eraseByContactPoint(db, EMAIL);
+
+    const primaScrittura = chiamate.findIndex((c) => c.verbo !== "select");
+    const letture = chiamate.slice(0, primaScrittura).map((c) => c.tabella);
+    expect(letture).toContain("lead");
+    expect(letture).toContain("contact");
+  });
+
+  it("anonymises the contact LAST, after every trail has been dealt with", async () => {
+    // This is the bug the first version had: anonymising the contact first destroys the
+    // index — from that moment nothing else can be found from the contact point — so the
+    // trails were left both present and unreachable. A repeat request could not have been
+    // honoured, and neither could an audit.
+    const { db, chiamate } = dbFinto();
+
+    await eraseByContactPoint(db, EMAIL);
+
+    const scritture = chiamate.filter((c) => c.verbo !== "select");
+    const ultima = scritture[scritture.length - 1];
+    expect(ultima.tabella).toBe("contact");
+    expect(ultima.verbo).toBe("update");
+    // ...and there was actually something before it, or this test proves nothing.
+    expect(scritture.length).toBeGreaterThan(5);
+    // ⚠️ **Una volta sola**: senza questa riga, anonimizzare il contatto anche all'inizio
+    // — cioè bruciare l'indice — passerebbe, perché in fondo ci sarebbe comunque.
+    const suContact = scritture.filter((c) => c.tabella === "contact");
+    expect(suContact).toHaveLength(1);
+  });
+});
+
+describe("the trails that survive anonymising a contact, and must not", () => {
+  it("removes the diary written about that person", async () => {
+    // ⚠️ `activity` and `task` cascade from a *lead*, never from an anonymised *contact*:
+    // the cascade only fires on a delete. Their free text is the person's own story, and
+    // rewriting free text always leaves something behind.
+    const { db, chiamate } = dbFinto();
+
+    const report = await eraseByContactPoint(db, EMAIL);
+
+    const cancellate = chiamate.filter((c) => c.verbo === "delete").map((c) => c.tabella);
+    expect(cancellate).toContain("activity");
+    expect(cancellate).toContain("task");
+    expect(report.deleted.activity).toBe(1);
+  });
+
+  it("removes the sending queue, which carries the address and the body", async () => {
+    const { db, chiamate } = dbFinto();
+
+    await eraseByContactPoint(db, EMAIL);
+
+    const cancellate = chiamate.filter((c) => c.verbo === "delete").map((c) => c.tabella);
+    expect(cancellate).toContain("campaign_log");
+    expect(cancellate).toContain("email_job");
+  });
+
+  it("removes the IP address left by opening a quote", async () => {
+    // An IP address is personal data. This table answers «was the quote opened?», and that
+    // fact survives without knowing who.
+    const { db, chiamate } = dbFinto();
+
+    await eraseByContactPoint(db, EMAIL);
+
+    expect(chiamate.filter((c) => c.verbo === "delete").map((c) => c.tabella)).toContain("quote_activity");
+  });
+
+  it("keeps the case and removes the person's words from it", async () => {
+    // A ticket is a business record: it happened, on a date, with an outcome. What the
+    // person wrote inside it is not.
+    const { db, chiamate } = dbFinto();
+
+    await eraseByContactPoint(db, EMAIL);
+
+    const ticket = chiamate.find((c) => c.tabella === "ticket" && c.verbo === "update");
+    expect(ticket?.impostati?.description).toBeNull();
+    expect(ticket?.impostati?.subject).toBe(ANONIMO);
+
+    const messaggio = chiamate.find((c) => c.tabella === "ticket_message");
+    expect(messaggio?.impostati?.senderEmail).toBeNull();
+    expect(messaggio?.impostati?.content).toBe("");
+  });
+
+  it("keeps the appointment and removes who was at it", async () => {
+    const { db, chiamate } = dbFinto();
+
+    await eraseByContactPoint(db, EMAIL);
+
+    const presenza = chiamate.find((c) => c.tabella === "appointment_attendee");
+    expect(presenza?.impostati?.email).toBeNull();
+    expect(presenza?.impostati?.name).toBe(ANONIMO);
+  });
+
+  it("removes the visitor from a chat session", async () => {
+    const { db, chiamate } = dbFinto();
+
+    await eraseByContactPoint(db, EMAIL);
+
+    const sessione = chiamate.find((c) => c.tabella === "chat_session");
+    expect(sessione?.impostati?.visitorEmail).toBeNull();
+  });
+});
+
 describe("a lead goes, a contact is anonymised", () => {
   it("deletes the lead outright", async () => {
-    // ⚠️ Everything that points at a lead cascades — activity, task, campaign_log — so the
-    // person's own words go with them, which is what art. 17 asks for.
-    const { db, traccia } = dbFinto([], [{ id: "l1" }, { id: "l2" }]);
+    const { db, chiamate } = dbFinto();
 
-    const report = await eraseByContactPoint(db, "anna@example.test");
+    const report = await eraseByContactPoint(db, EMAIL);
 
-    expect(traccia.delete).toBe(1);
-    expect(report.deleted.lead).toBe(2);
+    expect(chiamate.filter((c) => c.verbo === "delete").map((c) => c.tabella)).toContain("lead");
+    expect(report.deleted.lead).toBe(1);
   });
 
   it("⚠️ does NOT delete a contact, because the schema will not let it", async () => {
     // Measured on the schema, not assumed: deal, quote, order, opportunity, ticket and
     // appointment reference a contact with no cascade, so a DELETE fails with a foreign
-    // key violation the moment the person has any commercial history. Deleting those too
-    // would destroy the business's own accounts.
-    const { db, traccia } = dbFinto([{ id: "c1" }]);
+    // key violation the moment the person has any commercial history.
+    const { db, chiamate } = dbFinto();
 
-    const report = await eraseByContactPoint(db, "anna@example.test");
+    await eraseByContactPoint(db, EMAIL);
 
-    expect(traccia.update).toBe(1);
-    expect(report.anonymised.contact).toBe(1);
-    // Exactly one delete, and it was the lead.
-    expect(traccia.delete).toBe(1);
+    expect(chiamate.filter((c) => c.verbo === "delete").map((c) => c.tabella)).not.toContain("contact");
   });
 
-  it("removes every field that identifies the person, and keeps the record", async () => {
-    const { db, traccia } = dbFinto([{ id: "c1" }]);
+  it("removes every field that identifies the person, and keeps the relationship", async () => {
+    const { db, chiamate } = dbFinto();
 
-    await eraseByContactPoint(db, "anna@example.test");
+    await eraseByContactPoint(db, EMAIL);
 
-    const impostati = traccia.impostati as Record<string, unknown>;
+    // ⚠️ Anche il verbo: su `contact` c'è prima una **lettura** — è il passo che trova la
+    // persona prima di toccarla — e cercare per sola tabella prendeva quella.
+    const impostati = chiamate.find((c) => c.tabella === "contact" && c.verbo === "update")?.impostati as Record<
+      string,
+      unknown
+    >;
     expect(impostati.firstName).toBe(ANONIMO);
     for (const campo of ["email", "phone", "mobile", "street", "notes", "linkedinUrl"]) {
       expect(impostati[campo], `${campo} still identifies the person`).toBeNull();
@@ -116,48 +230,57 @@ describe("a lead goes, a contact is anonymised", () => {
     }
   });
 
-  it("does not update anything when there is nobody to anonymise", async () => {
-    // An UPDATE with no match is harmless, but issuing one anyway would make the report
-    // say "anonymised: 0" through a write, and a preview built on the same code path would
-    // then have a side effect.
-    const { db, traccia } = dbFinto([]);
+  it("touches nothing linked to a contact when there is no contact", async () => {
+    // A person may exist only as a lead. Issuing the updates anyway would make the report
+    // claim work that never happened.
+    const { db, chiamate } = dbFinto(false);
 
-    const report = await eraseByContactPoint(db, "anna@example.test");
+    const report = await eraseByContactPoint(db, EMAIL);
 
-    expect(traccia.update).toBe(0);
+    expect(chiamate.filter((c) => c.tabella === "contact" && c.verbo === "update")).toHaveLength(0);
     expect(report.anonymised.contact).toBe(0);
+    expect(report.deleted.activity).toBe(0);
   });
 });
 
 describe("what survives on purpose", () => {
   it("⚠️⚠️ keeps the email suppression, and says why", async () => {
-    // This is the one place where erasing *more* would be the harm: the suppression list is
-    // what stops the next campaign reaching the person who asked to be forgotten. Deleting
-    // it would mean the erasure request itself caused them to be contacted again.
+    // The one place where erasing *more* would be the harm: the suppression list is what
+    // stops the next campaign reaching the person who asked to be forgotten. Deleting it
+    // would mean the erasure request itself caused them to be contacted again.
     const { db } = dbFinto();
 
-    const report = await eraseByContactPoint(db, "anna@example.test");
+    const report = await eraseByContactPoint(db, EMAIL);
 
     expect(report.kept.email_suppression).toMatch(/written to again|forgotten/);
+  });
+
+  it("lists the internal discussion instead of rewriting it", async () => {
+    // An algorithm editing a conversation either destroys its meaning or leaves the name
+    // in. Listing it puts the decision where it belongs — with a person.
+    const { db } = dbFinto();
+
+    const report = await eraseByContactPoint(db, EMAIL);
+
+    const voce = Object.keys(report.kept).find((k) => k.includes("deal_comment"));
+    expect(voce, "the internal discussion is not declared anywhere").toBeDefined();
+    expect(report.kept[voce as string]).toMatch(/case by case|person can decide/);
   });
 });
 
 describe("finding the person", () => {
-  it("matches a phone number however it was typed", async () => {
-    // An erasure that missed one of the two spellings would leave the person in the
-    // database while telling them they are gone — the worst possible pair.
-    const { db } = dbFinto([], [{ id: "l1" }]);
+  it("accepts a phone-only contact point", async () => {
+    // The guard that insists on an at-sign would reject it, and the erasure of somebody
+    // who only ever gave a number would never happen.
+    const { db } = dbFinto();
 
-    // Ciò che si fissa qui è che un recapito **telefonico** venga accettato: la guardia
-    // che pretende una chiocciola lo rifiuterebbe, e l'art. 17 di chi ha solo un numero
-    // non arriverebbe da nessuna parte.
     const report = await eraseByContactPoint(db, "+39 333 111 2223");
 
     expect(report.deleted.lead).toBe(1);
   });
 
   it("accepts an email with stray case and spaces", async () => {
-    const { db } = dbFinto([], [{ id: "l1" }]);
+    const { db } = dbFinto();
 
     const report = await eraseByContactPoint(db, "  Anna@Example.TEST  ");
 

@@ -1,13 +1,31 @@
 [
   {
     "file": "src/lib/erasure.ts",
-    "description": "un contatto viene cancellato invece che anonimizzato: con una trattativa, un preventivo o un ticket il DELETE fallisce per vincolo, e senza fallire distrugge i conti dell'azienda",
-    "find": "    const anonimizzati = await db\n      .update(contacts)",
-    "replace": "    const anonimizzati = await db\n      .delete(contacts)"
+    "description": "⚠️⚠️ il contatto viene anonimizzato PER PRIMO: brucia l'indice, e da quel momento nessuna traccia e' piu' raggiungibile dal recapito — il dato resta e la capacita' di finire il lavoro se ne va",
+    "find": "  // ── 1. Il lead se ne va per intero",
+    "replace": "  if (persona.contactIds.length > 0) {\n    await db.update(contacts).set({ ...CAMPI_DELLA_PERSONA }).where(inArray(contacts.id, persona.contactIds)).returning({ id: contacts.id });\n  }\n  // ── 1. Il lead se ne va per intero"
   },
   {
     "file": "src/lib/erasure.ts",
-    "description": "l'email della persona sopravvive all'anonimizzazione: la riga resta e la persona e' ancora identificabile",
+    "description": "la persona si cerca DOPO aver cancellato: gli id dei contatti arrivano vuoti e nessuna traccia viene ripulita",
+    "find": "  const persona = await trova(db, email, digits);\n  const report: ErasureReport",
+    "replace": "  const persona: Persona = { leadIds: [], contactIds: [], email, digits };\n  const report: ErasureReport"
+  },
+  {
+    "file": "src/lib/erasure.ts",
+    "description": "il diario scritto su quella persona sopravvive all'anonimizzazione: il nome resta nel testo libero",
+    "find": "    report.deleted.activity = quanti(\n      await db.delete(activities)",
+    "replace": "    report.deleted.activity = 0 * quanti(\n      await db.select(activities)"
+  },
+  {
+    "file": "src/lib/erasure.ts",
+    "description": "un contatto viene cancellato invece che anonimizzato: con una trattativa o un ticket il DELETE fallisce per vincolo, e senza fallire distrugge i conti dell'azienda",
+    "find": "      await db\n        .update(contacts)\n        .set({ ...CAMPI_DELLA_PERSONA, updatedAt: new Date() })",
+    "replace": "      await db\n        .delete(contacts)\n        .set({ ...CAMPI_DELLA_PERSONA, updatedAt: new Date() })"
+  },
+  {
+    "file": "src/lib/erasure.ts",
+    "description": "l'email della persona sopravvive all'anonimizzazione del contatto: la riga resta e la persona e' ancora identificabile",
     "find": "  email: null,\n  phone: null,\n  mobile: null,",
     "replace": "  phone: null,\n  mobile: null,"
   },
@@ -16,6 +34,30 @@
     "description": "il nome non viene sovrascritto: la colonna e' NOT NULL, quindi la persona resta chiamata com'era",
     "find": "  firstName: ANONIMO,",
     "replace": "  city: null,"
+  },
+  {
+    "file": "src/lib/erasure.ts",
+    "description": "le parole della persona restano dentro il ticket: subject e description non vengono toccati",
+    "find": "        .set({ subject: ANONIMO, description: null })",
+    "replace": "        .set({ description: null })"
+  },
+  {
+    "file": "src/lib/erasure.ts",
+    "description": "il testo scritto dalla persona nel ticket_message sopravvive",
+    "find": "        .set({ senderEmail: null, senderName: ANONIMO, content: \"\" })",
+    "replace": "        .set({ senderName: ANONIMO })"
+  },
+  {
+    "file": "src/lib/erasure.ts",
+    "description": "l'indirizzo IP lasciato aprendo un preventivo sopravvive alla cancellazione",
+    "find": "      await db\n        .delete(quoteActivities)",
+    "replace": "      await db\n        .select(quoteActivities)"
+  },
+  {
+    "file": "src/lib/erasure.ts",
+    "description": "la coda di invio sopravvive, con l'indirizzo e il corpo dei messaggi mandati a quella persona",
+    "find": "      await db\n        .delete(emailJobs)",
+    "replace": "      await db\n        .select(emailJobs)"
   },
   {
     "file": "src/lib/erasure.ts",
@@ -31,14 +73,20 @@
   },
   {
     "file": "src/lib/erasure.ts",
-    "description": "la lista di soppressione non viene piu' dichiarata come conservata: chi risponde alla persona non sa che quel dato resta, e non puo' dirglielo",
-    "find": "  report.kept.email_suppression =",
-    "replace": "  report.kept.altro ="
+    "description": "la lista di soppressione non viene piu' dichiarata come conservata: chi risponde alla persona non sa che quel dato resta",
+    "find": "  email_suppression:",
+    "replace": "  altro_qualsiasi:"
   },
   {
     "file": "src/lib/erasure.ts",
-    "description": "si aggiorna anche quando non c'e' nessuno da anonimizzare: una scrittura inutile su un percorso che l'anteprima condivide",
-    "find": "  if (contattiTrovati.length > 0) {",
-    "replace": "  if (true) {"
+    "description": "la discussione interna del team non viene piu' elencata: nessuno sa che c'e' una decisione da prendere a mano",
+    "find": "  \"deal_comment, dm_message, notification\":",
+    "replace": "  \"qualcosa\":"
+  },
+  {
+    "file": "src/lib/erasure.ts",
+    "description": "si scrive sul contatto anche quando non ce n'e' nessuno: il rapporto dichiara un lavoro mai avvenuto",
+    "find": "  if (contactIds.length > 0) {\n    report.anonymised.contact = quanti(",
+    "replace": "  if (true) {\n    report.anonymised.contact = quanti("
   }
 ]
