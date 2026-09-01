@@ -11,7 +11,7 @@ export const openApiSpec = {
     title: "Flux CRM API",
     version: "1.0.0",
     description:
-      "REST API reference for Flux CRM. Multi-tenant: each request must be directed to the correct subdomain (e.g. `https://acme.fluxcrm.com/api/...`). The server resolves the tenant from the `Host` header automatically — no explicit tenant parameter needed. Session-based endpoints accept either the `authjs.session-token` cookie (browser) or a Bearer `IMPORT_API_KEY` header (machine-to-machine). Cron endpoints require `Authorization: Bearer $CRON_SECRET`. Public endpoints need no authentication.",
+      "REST API reference for Flux CRM. Multi-tenant: each request must be directed to the correct subdomain (e.g. `https://acme.fluxcrm.com/api/...`). Browser requests resolve the tenant from the `Host` header. Machine-to-machine requests resolve it from the API key: with a per-tenant key no tenant parameter is sent at all, and only the platform `IMPORT_API_KEY` names a tenant, through `X-Tenant-ID`. Session-based endpoints accept either the `authjs.session-token` cookie (browser) or a Bearer `IMPORT_API_KEY` header (machine-to-machine). Cron endpoints require `Authorization: Bearer $CRON_SECRET`. Public endpoints need no authentication.",
     contact: { name: "Flux CRM Support", email: "supporto@gsccomputers.it" },
   },
   servers: [
@@ -37,8 +37,9 @@ export const openApiSpec = {
       apiKeyBearer: {
         type: "http",
         scheme: "bearer",
-        bearerFormat: "IMPORT_API_KEY",
-        description: "Bearer token for machine-to-machine access (`Authorization: Bearer <IMPORT_API_KEY>`)",
+        bearerFormat: "API key",
+        description:
+          "Bearer token for machine-to-machine access. Prefer a **per-tenant key** (`flx_…`, minted with `scripts/mint-tenant-api-key.ts`): the tenant is resolved from the key, `X-Tenant-ID` must be omitted, and a header naming a different tenant is refused. The global `IMPORT_API_KEY` is the **platform** key — it still works, it requires `X-Tenant-ID`, and it can name any tenant, so keep it out of per-customer integrations.",
       },
       cronSecret: {
         type: "http",

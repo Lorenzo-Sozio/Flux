@@ -1372,6 +1372,14 @@ export const tenants = pgTable("tenants", {
   subdomain: text("subdomain").notNull().unique(),
   dbUrl: text("db_url").notNull(), // AES-256-GCM encrypted Neon connection string
   settings: text("settings"), // JSON: { emoji?, logo?, primaryColor? }
+  // SHA-256 of this tenant's own API key. The key itself is never stored: it is
+  // shown once when minted and cannot be recovered.
+  //
+  // Before this column there was a single global IMPORT_API_KEY, and whoever held it
+  // could write into ANY tenant's database by changing the X-Tenant-ID header — the
+  // header was only checked for existence, never bound to the caller. A per-tenant key
+  // makes the tenant a property of the credential instead of a claim of the request.
+  apiKeyHash: text("api_key_hash").unique(),
   lastMigratedAt: timestamp("last_migrated_at", { mode: "date" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),

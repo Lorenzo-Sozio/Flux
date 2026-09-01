@@ -1,7 +1,7 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 
 import { auth } from "@/auth";
-import { getTenantById } from "@/lib/get-tenant";
+import { getTenantByApiKeyHash, getTenantById } from "@/lib/get-tenant";
 
 export interface ApiAuthResult {
   via: "session" | "apikey";
@@ -10,7 +10,10 @@ export interface ApiAuthResult {
   /**
    * Resolved tenant ID for the request.
    * - Session-based requests: taken from the JWT activeTenantId (set by middleware).
-   * - API-key requests: validated from the X-Tenant-ID request header.
+   * - Per-tenant API keys: resolved FROM THE KEY. The X-Tenant-ID header is not
+   *   consulted, and a header naming a different tenant is refused rather than ignored.
+   * - The platform API key (IMPORT_API_KEY): validated from the X-Tenant-ID header. It is
+   *   the only credential allowed to name a tenant, and it can name any of them.
    * Null when called outside a tenant context (e.g., platform-level operations).
    */
   tenantId: string | null;
@@ -41,6 +44,22 @@ export async function authenticateApiRequest(req: Request): Promise<ApiAuthResul
         }
       } catch (_err) {
         // ignore buffer/comparison errors
+      }
+    }
+
+    // Not the platform key. It may still be a tenant's own key: the tenant is then a
+    // property of the credential, which is the whole point of this branch.
+    if (provided) {
+      const hash = createHash("sha256").update(provided).digest("hex");
+      const tenant = await getTenantByApiKeyHash(hash);
+      if (tenant) {
+        // A header that disagrees with the key is refused, not ignored. Ignoring it would
+        // let a misconfigured integration write happily into its own tenant while its
+        // operator believes it is writing into another one — and nobody would find out
+        // until the wrong customer got a message.
+        const claimed = req.headers.get("x-tenant-id")?.trim();
+        if (claimed && claimed !== tenant.id) return null;
+        return { via: "apikey", userId: null, role: "editor", tenantId: tenant.id };
       }
     }
 

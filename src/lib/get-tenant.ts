@@ -36,6 +36,23 @@ export async function getTenantById(id: string): Promise<Tenant | null> {
   return tenant ?? null;
 }
 
+/**
+ * Runtime lookup for machine-to-machine callers: the tenant is a property of the
+ * credential, not a claim of the request.
+ *
+ * Deliberately NOT cached. The other lookups are keyed by a tenant id the caller already
+ * proved it may use; this one is keyed by a secret's fingerprint, and a cache here would
+ * keep a revoked key working for up to five minutes — revocation that takes effect
+ * "shortly" is not revocation.
+ */
+export async function getTenantByApiKeyHash(hash: string): Promise<Tenant | null> {
+  if (!hash) return null;
+  const tenant = await platformDb.query.tenants.findFirst({
+    where: eq(tenants.apiKeyHash, hash),
+  });
+  return tenant ?? null;
+}
+
 export function invalidateTenantCache(id: string): void {
   cacheById.delete(id);
 }
