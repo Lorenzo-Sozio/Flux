@@ -1,15 +1,27 @@
 [
   {
     "file": "src/lib/api-import-validators.ts",
-    "description": "a lead with no first name is accepted: the required-field check stops being required",
-    "find": "    chkRequired(b.firstName, \"firstName\"),\n    chkRequired(b.lastName, \"lastName\"),\n    chkStr(b.jobTitle, \"jobTitle\", 200),\n    chkEmail(b.email, \"email\"),",
-    "replace": "    chkRequired(b.lastName, \"lastName\"),\n    chkStr(b.jobTitle, \"jobTitle\", 200),\n    chkEmail(b.email, \"email\"),"
+    "description": "qualunque corpo identifica un lead: torna la riga senza nome, senza email e senza telefono, cioe' una persona che non si puo' ricontattare",
+    "find": "  return Boolean(str(b.firstName) || str(b.lastName) || str(b.email) || str(b.phone));",
+    "replace": "  return true;"
   },
   {
     "file": "src/lib/api-import-validators.ts",
-    "description": "the name keeps whatever spaces were pasted around it, and \" Anna \" and \"Anna\" become two people",
-    "find": "      firstName: (b.firstName as string).trim(),\n      lastName: (b.lastName as string).trim(),\n      jobTitle: str(b.jobTitle),\n      email: emailVal ? emailVal.toLowerCase() : null,",
-    "replace": "      firstName: b.firstName as string,\n      lastName: (b.lastName as string).trim(),\n      jobTitle: str(b.jobTitle),\n      email: emailVal ? emailVal.toLowerCase() : null,"
+    "description": "il recapito non diventa piu' il nome di chi non ne ha uno: il lead nasce con due colonne vuote, e in 63 punti dell'interfaccia si legge una riga senza niente sopra",
+    "find": "  return { firstName: str(b.phone) ?? str(b.email) ?? \"\", lastName: \"\" };",
+    "replace": "  return { firstName: \"\", lastName: \"\" };"
+  },
+  {
+    "file": "src/lib/api-import-validators.ts",
+    "description": "il recapito vince sul nome vero: chi si e' presentato come Anna diventa il proprio numero di telefono",
+    "find": "  if (nome || cognome) return { firstName: nome, lastName: cognome };\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/api-import-validators.ts",
+    "description": "il messaggio di rifiuto non elenca piu' le alternative: chi integra va a cercare un nome che non ha, quando basterebbe un numero",
+    "find": "\"a lead needs at least one of firstName, lastName, email or phone\"",
+    "replace": "\"firstName is required\""
   },
   {
     "file": "src/lib/api-import-validators.ts",
@@ -28,5 +40,23 @@
     "description": "a field of only spaces counts as filled in: a lead called \"   \" gets created",
     "find": "  if (!isStr(v) || v.trim().length === 0) return mkErr(field, `${field} is required`);",
     "replace": "  if (!isStr(v) || v.length === 0) return mkErr(field, `${field} is required`);"
+  },
+  {
+    "file": "src/lib/api-import-validators.ts",
+    "description": "la normalizzazione non toglie piu' il prefisso internazionale 00: 0039... e +39... tornano due persone",
+    "find": "  if (digits.startsWith(\"00\")) digits = digits.slice(2);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/api-import-validators.ts",
+    "description": "due cifre bastano per essere un numero: due lead il cui telefono e' 12 diventano la stessa persona",
+    "find": "  return digits.length >= 9 ? digits : null;",
+    "replace": "  return digits;"
+  },
+  {
+    "file": "src/lib/api-import-validators.ts",
+    "description": "il numero viene riscritto normalizzato anche in ciò che si conserva: il titolare vede un numero che non ha scritto nessuno",
+    "find": "      ...nomeDaRecapito(b),\n      jobTitle: str(b.jobTitle),\n      email: emailVal ? emailVal.toLowerCase() : null,\n      phone: str(b.phone),",
+    "replace": "      ...nomeDaRecapito(b),\n      jobTitle: str(b.jobTitle),\n      email: emailVal ? emailVal.toLowerCase() : null,\n      phone: digitsForMatching(b.phone) ?? str(b.phone),"
   }
 ]

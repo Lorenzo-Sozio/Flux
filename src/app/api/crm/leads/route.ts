@@ -1,12 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { dispatchWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { leads } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
-import { buildLeadPayload, parseOnDuplicate, validateLeadInput } from "@/lib/api-import-validators";
+import { buildLeadPayload, digitsForMatching, parseOnDuplicate, validateLeadInput } from "@/lib/api-import-validators";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
@@ -50,13 +50,29 @@ export async function POST(req: NextRequest) {
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
 
-  if (data.email) {
-    const [existing] = await db.select({ id: leads.id }).from(leads).where(eq(leads.email, data.email));
+  // ⚠️ **Also by phone, and that is what makes a retry safe on a phone-only contact.**
+  //
+  // Matching on `email` alone meant that a lead who arrived by phone — which is most of
+  // them, when the caller is a phone system — had nothing to be matched on: every retry of
+  // the same request created another row. And the column is free text, so the same number
+  // typed two ways was two people.
+  //
+  // The comparison strips everything that is not a digit on both sides. It is a scan today;
+  // the day it needs to be fast, the same expression becomes an index. Correct first.
+  const digits = digitsForMatching(data.phone);
+  const criterio = data.email
+    ? eq(leads.email, data.email)
+    : digits
+      ? sql`regexp_replace(coalesce(${leads.phone}, ''), '[^0-9]+', '', 'g') = ${digits}`
+      : null;
+
+  if (criterio) {
+    const [existing] = await db.select({ id: leads.id }).from(leads).where(criterio);
 
     if (existing) {
       if (onDuplicate === "error") {
         return NextResponse.json(
-          { error: "Conflict", reason: "duplicate_email", existingId: existing.id },
+          { error: "Conflict", reason: data.email ? "duplicate_email" : "duplicate_phone", existingId: existing.id },
           { status: 409 },
         );
       }
@@ -71,7 +87,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ status: "updated", id: updated.id, data: updated });
       }
 
-      return NextResponse.json({ status: "skipped", reason: "duplicate_email", existingId: existing.id });
+      return NextResponse.json({
+        status: "skipped",
+        reason: data.email ? "duplicate_email" : "duplicate_phone",
+        existingId: existing.id,
+      });
     }
   }
 

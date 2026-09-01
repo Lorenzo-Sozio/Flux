@@ -89,6 +89,66 @@ function parseTags(v: unknown): string[] {
   return (v as unknown[]).map(String).filter(Boolean);
 }
 
+/**
+ * The digits of a phone number, for **matching** — never for storing.
+ *
+ * What is stored stays exactly as the caller typed it: people recognise their own number
+ * by its spacing, and rewriting it would make the CRM show something nobody entered. This
+ * is only used to answer "is this the same number as that one?".
+ *
+ * ## ⚠️ Deliberately conservative, and this is the important part
+ *
+ * Two spellings of the same **international** number match: `+39 333 111 2223` and
+ * `+393331112223` both become `393331112223`, and a leading `00` is treated as the `+` it
+ * stands for. Measured on the running instance on 2026-09-01, those two produced two
+ * separate leads with two ids.
+ *
+ * A **national** number does not match its international form: `3331112223` stays
+ * `3331112223`. Making it match would mean guessing a country, and a wrong guess merges
+ * two different people into one record — which is far worse than keeping two records for
+ * one person. A duplicate is visible and fixable; a merge silently destroys the fact that
+ * there were two, and the next message goes to whichever one survived.
+ *
+ * Returns null when there is nothing to match on, so a caller cannot accidentally treat
+ * "no number" as a value that equals another "no number".
+ */
+export function digitsForMatching(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  let digits = value.replace(/\D+/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  // Under nine digits is not a phone number anywhere, and matching on "12" would put
+  // strangers in the same record.
+  return digits.length >= 9 ? digits : null;
+}
+
+/**
+ * A lead is identified by whatever we actually know about it — a name, an email, or a
+ * phone number. Requiring `firstName` and `lastName` was requiring the one thing a phone
+ * call rarely offers: nobody gives a surname before saying hello.
+ */
+function identifica(b: Record<string, unknown>): boolean {
+  return Boolean(str(b.firstName) || str(b.lastName) || str(b.email) || str(b.phone));
+}
+
+/**
+ * The display name for a lead that has no name yet.
+ *
+ * ⚠️ The two columns stay NOT NULL, and that is the whole point: 63 places in this
+ * codebase compose a lead's name by hand, with no shared helper. Making them nullable
+ * would print "null null" across the app in exchange for a data model nobody asked for.
+ *
+ * So a nameless lead is called by its contact point, which is honest — it is exactly what
+ * is known about the person — and it is what a CRM shows for an unknown caller anyway.
+ * The last name is empty rather than a placeholder: an invented "Unknown" would be a fact
+ * this code made up, and someone would eventually filter on it.
+ */
+function nomeDaRecapito(b: Record<string, unknown>): { firstName: string; lastName: string } {
+  const nome = str(b.firstName) ?? "";
+  const cognome = str(b.lastName) ?? "";
+  if (nome || cognome) return { firstName: nome, lastName: cognome };
+  return { firstName: str(b.phone) ?? str(b.email) ?? "", lastName: "" };
+}
+
 // ─── Lead ─────────────────────────────────────────────────────────────────────
 
 export interface LeadInput {
@@ -125,8 +185,11 @@ export function validateLeadInput(body: unknown): { errors: ValidationError[]; d
   const b = body as Record<string, unknown>;
 
   const errors = collect(
-    chkRequired(b.firstName, "firstName"),
-    chkRequired(b.lastName, "lastName"),
+    identifica(b)
+      ? null
+      : mkErr("identity", "a lead needs at least one of firstName, lastName, email or phone"),
+    chkStr(b.firstName, "firstName", 200),
+    chkStr(b.lastName, "lastName", 200),
     chkStr(b.jobTitle, "jobTitle", 200),
     chkEmail(b.email, "email"),
     chkStr(b.phone, "phone", 50),
@@ -153,8 +216,7 @@ export function validateLeadInput(body: unknown): { errors: ValidationError[]; d
   return {
     errors: [],
     data: {
-      firstName: (b.firstName as string).trim(),
-      lastName: (b.lastName as string).trim(),
+      ...nomeDaRecapito(b),
       jobTitle: str(b.jobTitle),
       email: emailVal ? emailVal.toLowerCase() : null,
       phone: str(b.phone),
