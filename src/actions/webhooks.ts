@@ -95,13 +95,53 @@ export async function getWebhookLogs(webhookId: string) {
  * @example
  * await dispatchWebhook("contact.created", { id: contact.id, ... });
  */
-export async function dispatchWebhook(event: string, payload: Record<string, unknown>) {
+/** Who caused the change that produced this event. */
+export interface Origin {
+  /** `api` = a machine wrote through the API; `user` = somebody in the interface. */
+  via: "api" | "user" | "system";
+  /** The user id, when there is one. Machines do not have one. */
+  actor?: string | null;
+}
+
+/**
+ * The envelope every event travels in.
+ *
+ * ⚠️ **`id` exists so a receiver can tell a retry from a second event.** Without it, an
+ * integration that receives the same delivery twice — which any at-least-once transport
+ * eventually does — has no way to know, and acts twice. It is generated once per event
+ * occurrence and stays the same across every attempt.
+ *
+ * ⚠️ **`origin` exists so nobody chases their own tail.** An integration writes a lead
+ * through the API, this CRM emits `lead.created`, and the integration receives it: if it
+ * cannot tell the change was its own, it reacts to itself, forever. Saying who caused the
+ * change is the only thing that breaks that loop at the source.
+ */
+export interface BustaEvento {
+  id: string;
+  event: string;
+  payload: Record<string, unknown>;
+  timestamp: string;
+  origin: Origin;
+}
+
+export async function dispatchWebhook(
+  event: string,
+  payload: Record<string, unknown>,
+  origin: Origin = { via: "user" },
+) {
   const db = await getDb();
   const activeWebhooks = await db.select().from(webhooks).where(eq(webhooks.isActive, true));
 
   const eligible = activeWebhooks.filter((wh) => wh.events.includes(event) || wh.events.includes("*"));
 
-  const body = JSON.stringify({ event, payload, timestamp: new Date().toISOString() });
+  const busta: BustaEvento = {
+    id: crypto.randomUUID(),
+    event,
+    payload,
+    timestamp: new Date().toISOString(),
+    origin,
+  };
+  const body = JSON.stringify(busta);
 
   await Promise.allSettled(
     eligible.map(async (wh) => {
@@ -117,16 +157,37 @@ export async function dispatchWebhook(event: string, payload: Record<string, unk
         return;
       }
 
-      const signature = wh.secret
-        ? `sha256=${crypto.createHmac("sha256", wh.secret).update(body).digest("hex")}`
-        : undefined;
+      // ⚠️⚠️ **No secret, no delivery.** An unsigned event is one the receiver cannot tell
+      // apart from anything else that can reach its URL, so acting on it means acting on
+      // whatever a stranger sends. Delivering it anyway and letting the receiver decide
+      // would put the choice in the place with the least context.
+      //
+      // Refusing is recorded, not silent: the log row is how the owner finds out that a
+      // webhook they configured is not delivering, and why.
+      if (!wh.secret) {
+        await db.insert(webhookLogs).values({
+          webhookId: wh.id,
+          event,
+          payload: body,
+          statusCode: null,
+          response:
+            "not delivered: this webhook has no secret, so the event could not be signed. " +
+            "Add one — an unsigned event is indistinguishable from one sent by anybody.",
+          success: false,
+        });
+        return;
+      }
+      const signature = `sha256=${crypto.createHmac("sha256", wh.secret).update(body).digest("hex")}`;
 
       try {
         const res = await fetch(wh.url, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...(signature ? { "X-Webhook-Signature": signature } : {}),
+            "X-Webhook-Signature": signature,
+            // The id travels in a header too, so a receiver that dedupes before parsing
+            // does not have to parse the body to do it.
+            "X-Webhook-Id": busta.id,
           },
           body,
           signal: AbortSignal.timeout(10_000),

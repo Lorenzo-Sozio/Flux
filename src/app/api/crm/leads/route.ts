@@ -11,6 +11,15 @@ import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
+/**
+ * ⚠️ Ogni evento che esce da questa rotta dice di essere stato causato da una **macchina**.
+ *
+ * È la riga che ferma l'eco alla fonte: un'integrazione scrive un lead qui, questo CRM
+ * emette `lead.created`, e l'integrazione lo riceve. Senza sapere che il cambiamento è
+ * suo, reagisce a sé stessa — e non smette.
+ */
+const ORIGINE_API = { via: "api" as const, actor: null };
+
 export async function POST(req: NextRequest) {
   const authResult = await authenticateApiRequest(req);
   if (!authResult) {
@@ -83,7 +92,7 @@ export async function POST(req: NextRequest) {
           .set(buildLeadPayload(data, authResult.userId))
           .where(eq(leads.id, existing.id))
           .returning();
-        dispatchWebhook("lead.updated", { lead: updated });
+        dispatchWebhook("lead.updated", { lead: updated }, ORIGINE_API);
         return NextResponse.json({ status: "updated", id: updated.id, data: updated });
       }
 
@@ -96,7 +105,7 @@ export async function POST(req: NextRequest) {
   }
 
   const [created] = await db.insert(leads).values(buildLeadPayload(data, authResult.userId)).returning();
-  dispatchWebhook("lead.created", { lead: created });
+  dispatchWebhook("lead.created", { lead: created }, ORIGINE_API);
 
   return NextResponse.json({ status: "created", id: created.id, data: created }, { status: 201 });
 }

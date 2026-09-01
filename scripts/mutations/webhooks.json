@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/actions/webhooks.ts",
+    "description": "⚠️⚠️ un evento senza firma parte lo stesso: il ricevente non puo' distinguerlo da qualunque cosa raggiunga il suo indirizzo, e agirebbe su cio' che gli manda uno sconosciuto",
+    "find": "      if (!wh.secret) {",
+    "replace": "      if (false) {"
+  },
+  {
+    "file": "src/actions/webhooks.ts",
+    "description": "il rifiuto per firma mancante viene registrato come una consegna riuscita: il webhook non consegna e il registro dice di si'",
+    "find": "          statusCode: null,\n          response:\n            \"not delivered:",
+    "replace": "          statusCode: 200,\n          response:\n            \"not delivered:"
+  },
+  {
+    "file": "src/actions/webhooks.ts",
+    "description": "la firma copre solo il carico e non la busta: chi riceve puo' cambiare l'origine o l'identificativo dell'evento senza invalidare la firma",
+    "find": "crypto.createHmac(\"sha256\", wh.secret).update(body).digest(\"hex\")",
+    "replace": "crypto.createHmac(\"sha256\", wh.secret).update(JSON.stringify(busta.payload)).digest(\"hex\")"
+  },
+  {
+    "file": "src/actions/webhooks.ts",
+    "description": "l'identificativo dell'evento e' fisso: un ricevente che deduplica su di esso scarta ogni evento successivo al primo",
+    "find": "    id: crypto.randomUUID(),",
+    "replace": "    id: \"00000000-0000-0000-0000-000000000000\","
+  },
+  {
+    "file": "src/actions/webhooks.ts",
+    "description": "l'identificativo non viaggia nell'intestazione: chi deduplica prima di leggere il corpo non ha su che cosa farlo",
+    "find": "            \"X-Webhook-Id\": busta.id,",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/webhooks.ts",
+    "description": "l'origine sparisce dalla busta: chi scrive tramite l'API riceve il proprio stesso evento e reagisce a se' stesso, senza smettere",
+    "find": "    origin,\n  };",
+    "replace": "  };"
+  },
+  {
+    "file": "src/actions/webhooks.ts",
+    "description": "il predefinito dell'origine diventa «macchina»: un cambiamento fatto da una persona viene ignorato da chi filtra le proprie scritture, e un evento vero si perde",
+    "find": "  origin: Origin = { via: \"user\" },",
+    "replace": "  origin: Origin = { via: \"api\" },"
+  },
+  {
+    "file": "src/app/api/crm/leads/route.ts",
+    "description": "la scrittura via API non si dichiara piu' di macchina: torna l'eco che P9 teme",
+    "find": "const ORIGINE_API = { via: \"api\" as const, actor: null };",
+    "replace": "const ORIGINE_API = { via: \"user\" as const, actor: null };"
+  }
+]
