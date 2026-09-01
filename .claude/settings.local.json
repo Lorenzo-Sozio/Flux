@@ -227,7 +227,10 @@
       "Bash(cat .gitattributes)",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d.get\\('lint-staged', {}\\), indent=2\\)\\)\")",
       "Bash(node -e \"const d=require\\('./package.json'\\); console.log\\(JSON.stringify\\(d['lint-staged'], null, 2\\)\\)\")",
-      "Bash(echo \"Exit code: $?\")"
+      "Bash(echo \"Exit code: $?\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\React\\\\Flux\\\\src\\\\app\\\\\\(main\\)\\\\dashboard\" -Directory)",
+      "Bash(Get-ChildItem -Path \"c:\\\\React\\\\Flux\\\\src\\\\actions\" -File -Filter \"*.ts\")",
+      "Bash(grep \"\\\\.ts$\")"
     ],
     "additionalDirectories": [
       "c:\\React\\Flux\\src\\app\\api\\quotes\\[id]\\pdf",
