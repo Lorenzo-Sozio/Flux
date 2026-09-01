@@ -1107,6 +1107,36 @@ export const openApiSpec = {
     },
 
     // ─── CRM Import API ──────────────────────────────────────────────────
+    "/api/crm/erasure": {
+      post: {
+        tags: ["CRM Import API"],
+        operationId: "eraseByContactPoint",
+        summary: "Erase a person (GDPR art. 17)",
+        description:
+          "Erases the person reachable at a contact point — an email address or a phone number, matched the same way deduplication matches. A `lead` is deleted outright (its activities, tasks and campaign logs cascade); a `contact` is **anonymised** rather than deleted, because deals, quotes, orders, tickets and appointments reference it without cascade and deleting them would destroy the business's own records. The email suppression entry is kept on purpose: removing it would let the next campaign reach the person who asked to be forgotten. The response is a **report** of what was deleted, anonymised and kept, so that whoever answers the person can answer truthfully. Send `preview: true` to count without erasing.",
+        security: session(),
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                required: ["contactPoint"],
+                properties: {
+                  contactPoint: { type: "string", example: "+39 333 111 2223" },
+                  preview: { type: "boolean", default: false },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": { description: "Erased, with the report of what was done" },
+          "401": { description: "Unauthorized" },
+          "422": { description: "The contact point is missing or is neither an email nor a phone number" },
+        },
+      },
+    },
     "/api/crm/leads": {
       post: {
         tags: ["CRM Import API"],
