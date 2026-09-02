@@ -14,10 +14,10 @@ import { companies, deals, products, quoteActivities, quoteItems, quotes, users 
 import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
 import { sendEmail } from "@/lib/email-provider";
 import { getExchangeRates } from "@/lib/exchange-rates";
+import { announceQuoteSent } from "@/lib/quote-events";
 import { getDb } from "@/lib/tenant-context";
 
 // --- HELPERS ---
-
 function calculateLineTotal(quantity: number, unitPrice: number, discountPercent: number, taxPercent: number) {
   const subtotal = quantity * unitPrice;
   const discountAmount = (subtotal * discountPercent) / 100;
@@ -331,6 +331,23 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
     // Log activity
     if (validated.status) {
       await logQuoteActivity(quoteId, validated.status, session.user.id);
+    }
+
+    // ⚠️⚠️ The moment the owner says the quote is ready to leave, and the only one an
+    // integration can act on. Until now nothing was emitted here at all: an assistant
+    // waiting to hand this document to the customer would have waited forever, and
+    // nothing would have failed.
+    //
+    // The address is a PDF the recipient can actually open: the public-token route
+    // returns the rendered document without a session. Sending the HTML page instead
+    // would arrive at the customer labelled as a PDF and open as something else.
+    if (validated.status === "sent") {
+      // ⚠️ Awaited, unlike the fire-and-forget dispatches elsewhere in this codebase.
+      // On Workers a promise still running after the response can be killed, and the row
+      // this event's redelivery is derived from would never be written: the event would be
+      // lost with nothing to retry from. Everywhere else that costs a log line; here it
+      // costs a customer never receiving their quote.
+      await announceQuoteSent(updated, session.user.id);
     }
 
     revalidatePath("/dashboard/sales/quotes");

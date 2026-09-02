@@ -1,0 +1,38 @@
+[
+  {
+    "file": "src/lib/quote-events.ts",
+    "description": "⚠️⚠️ un preventivo che parte non lo racconta piu' a nessuno: un'integrazione in attesa di consegnarlo aspetta per sempre, e non fallisce niente",
+    "find": "  await dispatchWebhook(\n    \"quote.sent\",",
+    "replace": "  if (false)\n  await dispatchWebhook(\n    \"quote.sent\","
+  },
+  {
+    "file": "src/lib/quote-events.ts",
+    "description": "⚠️⚠️ senza indirizzo di base si inventa un localhost: al cliente arriva il link a una macchina che non e' la sua, e la consegna riesce verso il posto sbagliato",
+    "find": "  const base = process.env.NEXTAUTH_URL;",
+    "replace": "  const base = process.env.NEXTAUTH_URL ?? \"http://localhost:3000\";"
+  },
+  {
+    "file": "src/lib/quote-events.ts",
+    "description": "l'indirizzo diventa la pagina HTML: arriva al cliente etichettato come PDF e si apre come altro",
+    "find": "/api/quotes/${quote.id}/pdf?token=${quote.publicToken}`",
+    "replace": "/q/${quote.publicToken}`"
+  },
+  {
+    "file": "src/lib/quote-events.ts",
+    "description": "il recapito non viaggia: chi riceve l'evento non ha modo di sapere di quale persona si tratti, perche' il nostro id da lui non significa niente",
+    "find": "      email: contact?.email ?? undefined,\n      phone: contact?.phone ?? undefined,",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/quote-events.ts",
+    "description": "l'origine diventa «macchina»: un'integrazione che filtra le proprie scritture ignora l'unico evento che sta aspettando",
+    "find": "    { via: \"user\", actor },",
+    "replace": "    { via: \"api\", actor },"
+  },
+  {
+    "file": "src/lib/quote-events.ts",
+    "description": "il documento perde il nome: al destinatario arriva un allegato senza nome, che somiglia a qualcosa da non aprire",
+    "find": "      nome: `Preventivo ${quote.quoteNumber}.pdf`,",
+    "replace": ""
+  }
+]
