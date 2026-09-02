@@ -6,6 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
+    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:mutations": "node scripts/verify-mutations.mjs",
@@ -23,9 +28,7 @@
     "generate:tenant-migrations": "drizzle-kit generate --config=drizzle.tenant.config.ts"
   },
   "lint-staged": {
-    "*.{js,ts,jsx,tsx}": [
-      "biome check --write --no-errors-on-unmatched"
-    ]
+    "*.{js,ts,jsx,tsx}": ["biome check --write --no-errors-on-unmatched"]
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
@@ -64,7 +67,7 @@
     "input-otp": "^1.4.2",
     "lucide-react": "^0.562.0",
     "mailparser": "^3.9.8",
-    "next": "^16.1.6",
+    "next": "^16.2.12",
     "next-auth": "^5.0.0-beta.30",
     "next-intl": "^4.9.1",
     "next-themes": "^0.4.6",
@@ -91,6 +94,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.8",
+    "@opennextjs/cloudflare": "^1.20.5",
     "@tailwindcss/postcss": "^4.2.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.19.15",
@@ -108,6 +112,7 @@
     "tsx": "^4.21.0",
     "tw-animate-css": "^1.4.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "wrangler": "^4.128.0"
   }
 }

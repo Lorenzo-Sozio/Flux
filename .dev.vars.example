@@ -1,0 +1,24 @@
+# Variabili lette dal Worker in locale (`npm run cf:preview`).
+# Copia in `.dev.vars` — che è gitignorato — e compila.
+#
+# In produzione NON si usa questo file: i segreti vanno messi sul Worker con
+#   npx wrangler secret put DATABASE_URL
+#   npx wrangler secret put AUTH_SECRET
+#   npx wrangler secret put CRON_SECRET
+#   npx wrangler secret put RESEND_API_KEY
+#   npx wrangler secret put STRIPE_SECRET_KEY
+#   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+#   npx wrangler secret put AUTH_GOOGLE_ID
+#   npx wrangler secret put AUTH_GOOGLE_SECRET
+#
+# NEXT_PUBLIC_APP_URL serve due volte: a build time (Next la inlinea nel bundle
+# client) e a runtime (custom-worker.ts la usa come base URL dei cron). Va quindi
+# impostata sia fra le build env vars sia fra le vars del Worker.
+
+NEXTJS_ENV=development
+
+DATABASE_URL=""
+AUTH_SECRET=""
+CRON_SECRET=""
+NEXT_PUBLIC_APP_URL="http://localhost:8788"
+NEXT_PUBLIC_ROOT_DOMAIN="localhost:8788"

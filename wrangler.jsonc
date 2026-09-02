@@ -1,0 +1,65 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // ⚠️ Deve coincidere con il nome del Worker su Cloudflare, e con il `service`
+  // del binding WORKER_SELF_REFERENCE qui sotto. Se i tre nomi divergono il
+  // deploy fallisce con:
+  //   Service binding 'WORKER_SELF_REFERENCE' references Worker '…' which was not found.
+  // Il nome NON viene dedotto da package.json ("studio-admin"): quello è il nome
+  // del pacchetto npm, non del Worker.
+  "name": "flux",
+
+  // Entrypoint custom: riusa il fetch handler generato da OpenNext e vi aggiunge
+  // l'handler `scheduled`, senza il quale i Cron Triggers non hanno dove atterrare.
+  "main": "custom-worker.ts",
+
+  "compatibility_date": "2026-06-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".open-next/assets"
+  },
+
+  "services": [
+    {
+      // Auto-riferimento: il Worker chiama sé stesso per la revalidation ISR.
+      // `service` deve essere identico a `name`.
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "flux"
+    }
+  ],
+
+  "images": {
+    "binding": "IMAGES"
+  },
+
+  "observability": {
+    "enabled": true
+  },
+
+  // Sostituiscono i crons di vercel.json: su Cloudflare i job non sono richieste
+  // HTTP schedulate dalla piattaforma, ma invocazioni dell'handler `scheduled`.
+  // Chi mappa cron → path è custom-worker.ts: le due liste vanno tenute allineate.
+  //
+  // ⚠️ Il piano Free consente 5 Cron Trigger per account. I sette job dell'app sono
+  // raggruppati in cinque schedule proprio per starci dentro; aggiungerne uno sesto
+  // richiede Workers Paid.
+  "triggers": {
+    "crons": ["* * * * *", "*/5 * * * *", "*/15 * * * *", "0 6 * * *", "0 3 * * *"]
+  }
+
+  // Cache incrementale su R2 (ISR/data cache persistente fra le invocazioni).
+  // Disattivata di default perché richiede un bucket già esistente, altrimenti il
+  // deploy fallisce. Per abilitarla:
+  //   1. npx wrangler r2 bucket create flux-opennext-cache
+  //   2. togli il commento al blocco qui sotto
+  //   3. togli il commento a `incrementalCache` in open-next.config.ts
+  //
+  // "r2_buckets": [
+  //   {
+  //     "binding": "NEXT_INC_CACHE_R2_BUCKET",
+  //     "bucket_name": "flux-opennext-cache"
+  //   }
+  // ]
+}

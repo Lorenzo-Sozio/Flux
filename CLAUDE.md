@@ -63,6 +63,55 @@ ticket-autoclose     daily at 03:00    closes resolved tickets
 at-most-once. Without it a lost event is lost, and whoever was waiting for it has no
 way of knowing.
 
+### Deploy: Vercel e Cloudflare Workers
+
+The app deploys to either. Vercel is configured by [vercel.json](vercel.json); Cloudflare
+by [wrangler.jsonc](wrangler.jsonc) + [open-next.config.ts](open-next.config.ts), through
+the OpenNext adapter.
+
+```bash
+npm run cf:build     # next build + bundle the Worker into .open-next/
+npm run cf:preview   # build, then run it locally on workerd
+npm run cf:deploy    # build + wrangler deploy
+npm run cf:typegen   # regenerate cloudflare-env.d.ts from the bindings
+```
+
+⚠️ **The Worker name lives in three places and they must agree**: `name` in
+wrangler.jsonc, the `service` of the `WORKER_SELF_REFERENCE` binding, and the Worker
+on the Cloudflare account. It is *not* derived from `package.json` — that name is
+`studio-admin`, the Worker is `flux`, and letting Cloudflare auto-detect the config
+produces exactly one error:
+
+```
+Service binding 'WORKER_SELF_REFERENCE' references Worker 'studio-admin' which was not found.
+```
+
+⚠️ Cron jobs are **not** portable between the two. Vercel schedules HTTP requests; on
+Cloudflare a trigger invokes the `scheduled` export, which OpenNext's generated worker
+does not have. [custom-worker.ts](custom-worker.ts) adds it and re-issues each job as a
+real request with the `Authorization: Bearer $CRON_SECRET` header, so the routes under
+`src/app/api/cron/` stay unchanged. **The schedule strings in custom-worker.ts must match
+`triggers.crons` in wrangler.jsonc exactly** — Cloudflare passes the cron as a string,
+and a mismatch is a silent no-op.
+
+⚠️ The Free plan allows 5 cron triggers per account. The seven jobs are grouped into five
+schedules to fit; an eighth job on a new schedule needs Workers Paid.
+
+⚠️ The bundle is ~8 MB gzipped. That fits Workers Paid (10 MB) but **not** Free (3 MB).
+
+What does **not** work on Workers, because there is no filesystem and no long-lived
+process:
+
+- `src/instrumentation.ts` skips the node-cron scheduler there (it detects
+  `navigator.userAgent === "Cloudflare-Workers"`); scheduled automation rules do not run.
+- `src/actions/tenants.ts` and `src/app/api/admin/migrate-all/route.ts` read tenant
+  migration SQL from `process.cwd()`.
+- `src/app/api/documents/[id]/route.ts` reads uploads from disk.
+
+Secrets go on the Worker with `wrangler secret put`, not in `.env`. `NEXT_PUBLIC_APP_URL`
+is needed twice: at build time (Next inlines it) and at runtime (custom-worker.ts uses it
+as the cron base URL).
+
 ### Database (Drizzle ORM + Neon Postgres)
 
 ```bash
