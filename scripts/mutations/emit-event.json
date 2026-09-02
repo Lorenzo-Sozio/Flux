@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ l'evento di una regola torna a essere una POST grezza: senza firma, senza id e senza origine, e l'integrazione che lo pretende lo rifiuta — la regola sembra non essere mai scattata",
+    "find": "      case \"emit_event\":\n        await this.emitEvent(action, context);",
+    "replace": "      case \"emit_event\":\n        await this.sendWebhookAction(action as never, context);"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "si manda l'entita' com'era PRIMA del cambiamento: chi riceve agisce su qualcosa che non e' piu' vero",
+    "find": "        [context.entityType]: context.newData,",
+    "replace": "        [context.entityType]: context.oldData,"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "l'origine diventa «macchina»: un'integrazione che filtra le proprie scritture ignora l'evento, e la regola sembra non essere mai scattata",
+    "find": "      { via: \"user\", actor: context.currentUserId ?? null },",
+    "replace": "      { via: \"api\", actor: context.currentUserId ?? null },"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "i campi in piu' scritti nella regola si perdono: chi riceve non ha l'indirizzo del documento di cui la regola parlava",
+    "find": "        ...(payload ?? {}),",
+    "replace": ""
+  }
+]

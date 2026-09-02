@@ -123,12 +123,52 @@ export const SendWebhookActionSchema = z.object({
   }),
 });
 
+/**
+ * Emit a **named event** to every configured webhook — signed, with an id and an origin.
+ *
+ * ## ⚠️⚠️ Why this exists next to `send_webhook`
+ *
+ * `send_webhook` posts a raw request: a URL, headers and a body typed by hand. That is the
+ * right tool for calling something that expects a particular shape, and the wrong one for
+ * talking to an integration that requires a signature — nobody is going to compute an HMAC
+ * in a rule builder, and an unsigned event is one the receiver cannot tell apart from
+ * anything else that reaches its address.
+ *
+ * This action goes through `dispatchWebhook` instead, so the event carries what makes it
+ * trustworthy and idempotent: a signature over the exact bytes, an id that stays the same
+ * across retries, and who caused the change. It is also redelivered by the retry worker,
+ * which a raw POST is not.
+ *
+ * ## What it makes possible
+ *
+ * A rule can say «when the deal is over 10.000 and the customer is new, tell the assistant
+ * to hand this to a person» — the condition lives here, where the fields are, and what to do
+ * with it lives in the integration. Neither side has to learn the other's vocabulary.
+ */
+export const EmitEventActionSchema = z.object({
+  type: z.literal("emit_event"),
+  params: z.object({
+    // ⚠️ Dotted and lowercase, like the built-in events (`lead.converted`). The receiving
+    // integration maps this name onto its own vocabulary, so a free-form name is a name
+    // nobody on the other side recognises — and an unrecognised event is silently ignored,
+    // which looks exactly like a rule that did not fire.
+    event: z
+      .string()
+      .min(3)
+      .max(80)
+      .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/, "use a dotted name, e.g. lead.escalate"),
+    // Extra fields merged into the payload alongside the entity. Supports merge fields.
+    payload: z.record(z.any()).optional(),
+  }),
+});
+
 export const ActionSchema = z.discriminatedUnion("type", [
   CreateTaskActionSchema,
   SendNotificationActionSchema,
   UpdateFieldActionSchema,
   SendEmailActionSchema,
   SendWebhookActionSchema,
+  EmitEventActionSchema,
 ]);
 
 export type AutomationAction = z.infer<typeof ActionSchema>;

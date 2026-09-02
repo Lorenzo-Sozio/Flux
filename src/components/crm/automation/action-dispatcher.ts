@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
 
+import { dispatchWebhook } from "@/actions/webhooks";
 import { companies, contacts, deals, emailTemplates, leads, notifications, tasks, tickets } from "@/db/schema";
 import { getDb } from "@/lib/tenant-context";
 
@@ -63,8 +64,45 @@ export class ActionDispatcher {
       case "update_field":
         await this.updateField(action, context, executionCtx);
         return 0;
+      case "emit_event":
+        await this.emitEvent(action, context);
+        return 0;
       // TypeScript exhaustiveness: no `default` — new action types require an explicit case.
     }
+  }
+
+  // ─── Action: emit_event ───────────────────────────────────────────────────────
+
+  /**
+   * Emit a named event through the normal webhook path.
+   *
+   * ⚠️ **Not `sendWebhookAction`.** That one posts a raw request typed by hand, which is
+   * right for calling something with a fixed shape and wrong for an integration that
+   * requires a signature: nobody computes an HMAC in a rule builder. Going through
+   * `dispatchWebhook` gives the event a signature over the exact bytes, an id that survives
+   * retries, and who caused it — and puts it in the retry worker's hands if delivery fails.
+   *
+   * ⚠️ The origin is **`user`**: a rule fires because a person did something in the CRM, so
+   * the change is not machine-made. Marking it `api` would make an integration that filters
+   * its own writes ignore it, and the rule would look like it never fired.
+   */
+  private async emitEvent(
+    action: Extract<AutomationAction, { type: "emit_event" }>,
+    context: RuleContext,
+  ): Promise<void> {
+    const { event, payload } = action.params;
+    await dispatchWebhook(
+      event,
+      {
+        // The entity as it is **after** the change: a rule reacts to the new state, and
+        // sending the old one would make the receiver act on what is no longer true.
+        [context.entityType]: context.newData,
+        entityType: context.entityType,
+        entityId: context.entityId,
+        ...(payload ?? {}),
+      },
+      { via: "user", actor: context.currentUserId ?? null },
+    );
   }
 
   // ─── Action: create_task ──────────────────────────────────────────────────────
