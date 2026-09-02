@@ -8,8 +8,8 @@
   {
     "file": "src/actions/webhooks.ts",
     "description": "il rifiuto per firma mancante viene registrato come una consegna riuscita: il webhook non consegna e il registro dice di si'",
-    "find": "          statusCode: null,\n          response:\n            \"not delivered:",
-    "replace": "          statusCode: 200,\n          response:\n            \"not delivered:"
+    "find": "          statusCode: null,\n          response:\n            `${NON_FIRMABILE}",
+    "replace": "          statusCode: 200,\n          response:\n            `${NON_FIRMABILE}"
   },
   {
     "file": "src/actions/webhooks.ts",

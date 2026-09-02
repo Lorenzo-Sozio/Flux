@@ -34,6 +34,22 @@ Tests marked `it.fails` are **known gaps**, not failures: they pass while the be
 is still broken and start failing the day someone fixes it, which is exactly when the
 note is worth reading.
 
+### Scheduled work
+
+Cron endpoints live under `src/app/api/cron/` and are authorised with
+`Authorization: Bearer $CRON_SECRET`. There is no `vercel.json`, so **each one has to
+be scheduled wherever this is deployed** — a route nobody calls is a job that silently
+does not run.
+
+```
+webhook-retry        every 5 minutes   redelivers failed webhook events
+email-worker         every minute      sends queued emails
+```
+
+⚠️ `webhook-retry` is what makes outgoing events at-least-once instead of
+at-most-once. Without it a lost event is lost, and whoever was waiting for it has no
+way of knowing.
+
 ### Database (Drizzle ORM + Neon Postgres)
 
 ```bash

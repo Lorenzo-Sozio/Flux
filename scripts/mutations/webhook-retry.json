@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/lib/webhook-retry.ts",
+    "description": "un evento gia' arrivato viene rispedito per sempre: qualunque tentativo riuscito doveva chiudere la partita",
+    "find": "    if (tentativi.some((t) => t.success)) continue;",
+    "replace": "    if (false) continue;"
+  },
+  {
+    "file": "src/lib/webhook-retry.ts",
+    "description": "⚠️⚠️ si ritenta un evento mai partito per mancanza di segreto: si ripete per giorni una riga che chiede una configurazione, e il registro si riempie di rumore dove si cerca il motivo",
+    "find": "    if ((ultimo.response ?? \"\").startsWith(NON_FIRMABILE)) continue;",
+    "replace": "    if (false) continue;"
+  },
+  {
+    "file": "src/lib/webhook-retry.ts",
+    "description": "sparisce il limite dei tentativi: un indirizzo che non esiste piu' viene chiamato per sempre",
+    "find": "    if (tentativi.length >= TENTATIVI_MASSIMI) continue;",
+    "replace": "    if (false) continue;"
+  },
+  {
+    "file": "src/lib/webhook-retry.ts",
+    "description": "sparisce l'attesa: si martella un fornitore appena caduto, e ogni ritentativo consuma un tentativo per niente",
+    "find": "    if (adesso.getTime() - ultimo.sentAt.getTime() < attesa) continue;",
+    "replace": "    if (false) continue;"
+  },
+  {
+    "file": "src/lib/webhook-retry.ts",
+    "description": "l'attesa non cresce piu' con i tentativi: al decimo fallimento si riprova con la stessa fretta del primo",
+    "find": "    const attesa = ATTESE_MS[Math.min(tentativi.length - 1, ATTESE_MS.length - 1)];",
+    "replace": "    const attesa = ATTESE_MS[0];"
+  },
+  {
+    "file": "src/lib/webhook-retry.ts",
+    "description": "l'attesa si misura dal PRIMO tentativo invece che dall'ultimo: tutti i ritentativi scattano insieme subito dopo il primo fallimento",
+    "find": "    const ordinati = [...tentativi].sort((a, b) => b.sentAt.getTime() - a.sentAt.getTime());",
+    "replace": "    const ordinati = [...tentativi].sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());"
+  },
+  {
+    "file": "src/lib/webhook-retry.ts",
+    "description": "una riga senza identificativo diventa un evento con identificativo vuoto: tentativi di eventi diversi finiscono nello stesso gruppo, e il conteggio mente",
+    "find": "    if (!id) continue;",
+    "replace": "    if (false) continue;"
+  },
+  {
+    "file": "src/lib/webhook-retry.ts",
+    "description": "l'identificativo si inventa quando il corpo non e' leggibile",
+    "find": "    return typeof busta?.id === \"string\" ? busta.id : \"\";",
+    "replace": "    return typeof busta?.id === \"string\" ? busta.id : \"sconosciuto\";"
+  }
+]

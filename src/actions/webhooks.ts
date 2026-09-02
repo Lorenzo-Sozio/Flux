@@ -9,6 +9,9 @@ import { eq } from "drizzle-orm";
 import { webhookLogs, webhooks } from "@/db/schema";
 import { ForbiddenError, requireAdminAccess } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
+// ⚠️ La busta vive in una libreria **senza dipendenze**: chi la usa per
+// ritentare non deve importare l'autenticazione per leggere una costante.
+import { type BustaEvento, NON_FIRMABILE, type Origin } from "@/lib/webhook-envelope";
 import { validateWebhookUrl } from "@/lib/webhook-validator";
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────
@@ -95,35 +98,6 @@ export async function getWebhookLogs(webhookId: string) {
  * @example
  * await dispatchWebhook("contact.created", { id: contact.id, ... });
  */
-/** Who caused the change that produced this event. */
-export interface Origin {
-  /** `api` = a machine wrote through the API; `user` = somebody in the interface. */
-  via: "api" | "user" | "system";
-  /** The user id, when there is one. Machines do not have one. */
-  actor?: string | null;
-}
-
-/**
- * The envelope every event travels in.
- *
- * ⚠️ **`id` exists so a receiver can tell a retry from a second event.** Without it, an
- * integration that receives the same delivery twice — which any at-least-once transport
- * eventually does — has no way to know, and acts twice. It is generated once per event
- * occurrence and stays the same across every attempt.
- *
- * ⚠️ **`origin` exists so nobody chases their own tail.** An integration writes a lead
- * through the API, this CRM emits `lead.created`, and the integration receives it: if it
- * cannot tell the change was its own, it reacts to itself, forever. Saying who caused the
- * change is the only thing that breaks that loop at the source.
- */
-export interface BustaEvento {
-  id: string;
-  event: string;
-  payload: Record<string, unknown>;
-  timestamp: string;
-  origin: Origin;
-}
-
 export async function dispatchWebhook(
   event: string,
   payload: Record<string, unknown>,
@@ -171,7 +145,7 @@ export async function dispatchWebhook(
           payload: body,
           statusCode: null,
           response:
-            "not delivered: this webhook has no secret, so the event could not be signed. " +
+            `${NON_FIRMABILE}, so the event could not be signed. ` +
             "Add one — an unsigned event is indistinguishable from one sent by anybody.",
           success: false,
         });
