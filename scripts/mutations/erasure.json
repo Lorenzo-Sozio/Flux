@@ -60,13 +60,13 @@
     "replace": "      await db\n        .select(emailJobs)"
   },
   {
-    "file": "src/lib/erasure.ts",
+    "file": "src/lib/contact-point.ts",
     "description": "un recapito che non e' ne' email ne' telefono viene accettato: un refuso riceve «non trovato», che a chi ha chiesto di sparire dice una cosa diversa",
     "find": "  if (!email && !digits) {\n    throw new Error(\"a contact point must be an email address or a phone number\");\n  }",
     "replace": ""
   },
   {
-    "file": "src/lib/erasure.ts",
+    "file": "src/lib/contact-point.ts",
     "description": "un recapito vuoto cancella tutti: la richiesta di una persona sola porta via l'anagrafica intera",
     "find": "  if (!grezzo) throw new Error(\"no contact point to erase\");",
     "replace": ""

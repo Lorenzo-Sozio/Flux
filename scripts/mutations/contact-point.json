@@ -1,0 +1,20 @@
+[
+  {
+    "file": "src/lib/contact-point.ts",
+    "description": "⚠️⚠️ la nota va sul lead anche quando la persona e' gia' un contatto: l'assistente registra cio' che ha fatto sulla pagina che nessuno apre piu'",
+    "find": "  const contactId = persona.contactIds[0] ?? null;\n  if (contactId) return { contactId, leadId: null };",
+    "replace": "  const contactId = null;\n  if (contactId) return { contactId, leadId: null };"
+  },
+  {
+    "file": "src/lib/contact-point.ts",
+    "description": "⚠️ una persona che non esiste riceve comunque una destinazione: si scrive una riga orfana, e la traccia persa e' invisibile per definizione",
+    "find": "  return leadId ? { contactId: null, leadId } : null;",
+    "replace": "  return { contactId: null, leadId };"
+  },
+  {
+    "file": "src/lib/contact-point.ts",
+    "description": "il numero non si confronta piu' sulle sole cifre: lo stesso numero scritto con gli spazi diventa un'altra persona",
+    "find": "  const digits = digitsForMatching(contactPoint);",
+    "replace": "  const digits = grezzo.includes(\"@\") ? null : grezzo;"
+  }
+]

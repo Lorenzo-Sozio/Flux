@@ -45,8 +45,7 @@ import {
   ticketMessages,
   tickets,
 } from "@/db/schema";
-
-import { digitsForMatching } from "./api-import-validators";
+import { leggiRecapito, type Persona, perRecapito, trova } from "@/lib/contact-point";
 
 export interface ErasureReport {
   /** Rows removed outright, by table. */
@@ -100,63 +99,6 @@ const CONSERVATI: Record<string, string> = {
     "the business's own commercial records. They survive without the person: the contact " +
     "they point at no longer identifies anybody.",
 };
-
-interface Persona {
-  leadIds: string[];
-  contactIds: string[];
-  email: string | null;
-  digits: string | null;
-}
-
-function perRecapito(table: typeof leads | typeof contacts, email: string | null, digits: string | null) {
-  const clausole = [];
-  if (email) clausole.push(sql`lower(btrim(${table.email})) = ${email}`);
-  if (digits) {
-    // The same expression as the deduplication: a number typed with spaces and one typed
-    // without are the same person, and an erasure that missed one of the two spellings
-    // would leave them in the database while telling them they are gone.
-    clausole.push(
-      sql`regexp_replace(coalesce(${table.phone}, ''), '[^0-9]+', '', 'g') = ${digits}`,
-      sql`regexp_replace(coalesce(${table.mobile}, ''), '[^0-9]+', '', 'g') = ${digits}`,
-    );
-  }
-  return clausole.length === 1 ? clausole[0] : or(...clausole);
-}
-
-function leggiRecapito(contactPoint: string): { email: string | null; digits: string | null } {
-  const grezzo = contactPoint.trim().toLowerCase();
-  if (!grezzo) throw new Error("no contact point to erase");
-  const email = grezzo.includes("@") ? grezzo : null;
-  const digits = digitsForMatching(contactPoint);
-  if (!email && !digits) {
-    throw new Error("a contact point must be an email address or a phone number");
-  }
-  return { email, digits };
-}
-
-/**
- * Find the person **before** anything is changed.
- *
- * ⚠️ This is the step whose absence made the earlier version unfinishable: after the
- * contact is anonymised these ids can no longer be obtained from a contact point.
- */
-// biome-ignore lint/suspicious/noExplicitAny: the tenant db handle is built per request
-async function trova(db: any, email: string | null, digits: string | null): Promise<Persona> {
-  const l = await db
-    .select({ id: leads.id })
-    .from(leads)
-    .where(perRecapito(leads, email, digits));
-  const c = await db
-    .select({ id: contacts.id })
-    .from(contacts)
-    .where(perRecapito(contacts, email, digits));
-  return {
-    leadIds: l.map((r: { id: string }) => r.id),
-    contactIds: c.map((r: { id: string }) => r.id),
-    email,
-    digits,
-  };
-}
 
 /**
  * Erase the person reachable at this contact point.
