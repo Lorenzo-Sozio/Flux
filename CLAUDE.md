@@ -37,13 +37,26 @@ note is worth reading.
 ### Scheduled work
 
 Cron endpoints live under `src/app/api/cron/` and are authorised with
-`Authorization: Bearer $CRON_SECRET`. There is no `vercel.json`, so **each one has to
-be scheduled wherever this is deployed** — a route nobody calls is a job that silently
-does not run.
+`Authorization: Bearer $CRON_SECRET`. On Vercel they are declared in `vercel.json`, and
+Vercel sends that header itself as long as the `CRON_SECRET` environment variable is set —
+so **setting it is not optional**: `verifyCronRequest` fails closed, and an unset secret
+means every job returns 500 forever.
+
+⚠️ **The schedules in `vercel.json` need the Pro plan.** On Hobby, Vercel allows two cron
+jobs and runs them once a day at an hour of its choosing, which turns `email-worker` from a
+queue into a daily batch. Anywhere else, call the same URLs from any scheduler with the
+Bearer header — they are plain GET endpoints.
+
+⚠️ A route nobody calls is a job that silently does not run: nothing logs the absence.
 
 ```
 webhook-retry        every 5 minutes   redelivers failed webhook events
 email-worker         every minute      sends queued emails
+campaign-scheduler   every 5 minutes   starts due campaigns
+task-reminders       every 15 minutes  reminds about tasks
+ticket-sla-check     every 15 minutes  flags tickets past their SLA
+task-overdue-check   daily at 06:00    flags overdue tasks
+ticket-autoclose     daily at 03:00    closes resolved tickets
 ```
 
 ⚠️ `webhook-retry` is what makes outgoing events at-least-once instead of

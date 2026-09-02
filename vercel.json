@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    { "path": "/api/cron/webhook-retry", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/email-worker", "schedule": "* * * * *" },
+    { "path": "/api/cron/campaign-scheduler", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/task-reminders", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/task-overdue-check", "schedule": "0 6 * * *" },
+    { "path": "/api/cron/ticket-sla-check", "schedule": "*/15 * * * *" },
+    { "path": "/api/cron/ticket-autoclose", "schedule": "0 3 * * *" }
+  ]
+}
