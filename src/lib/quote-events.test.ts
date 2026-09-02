@@ -22,7 +22,7 @@ vi.mock("@/lib/tenant-context", () => ({
   getDb: async () => ({ query: { contacts: { findFirst: async () => contatto } } }),
 }));
 
-const { announceQuoteSent } = await import("@/lib/quote-events");
+const { announceQuoteDecision, announceQuoteSent } = await import("@/lib/quote-events");
 
 // biome-ignore lint/suspicious/noExplicitAny: a row shape the test does not need in full
 const PREVENTIVO: any = {
@@ -97,5 +97,37 @@ describe("il preventivo che parte", () => {
 
     expect(emessi).toHaveLength(1);
     expect(emessi[0].carico.email).toBeUndefined();
+  });
+});
+
+describe("la risposta del cliente", () => {
+  it("⚠️⚠️ viene annunciata, ed e' cio' che un assistente non puo' scoprire da solo", async () => {
+    await announceQuoteDecision(PREVENTIVO, "accepted", null);
+
+    expect(emessi).toHaveLength(1);
+    expect(emessi[0].evento).toBe("quote.accepted");
+  });
+
+  it("annuncia anche il NO, non solo il si'", async () => {
+    // Chi sente parlare solo delle accettazioni deve trattare il silenzio come un rifiuto,
+    // e il silenzio significa anche una consegna che non e' mai arrivata.
+    await announceQuoteDecision(PREVENTIVO, "declined", null);
+
+    expect(emessi[0].evento).toBe("quote.declined");
+  });
+
+  it("⚠️ dichiara l'origine «persona» anche quando a premere e' il cliente senza account", async () => {
+    // Quel campo serve a scartare gli eventi che un'integrazione ha causato lei. Questo
+    // non lo ha causato: marcarlo «macchina» le farebbe scartare la risposta che aspetta.
+    await announceQuoteDecision(PREVENTIVO, "accepted", null);
+
+    expect(emessi[0].origin).toEqual({ via: "user", actor: null });
+  });
+
+  it("porta il recapito, perche' l'id del preventivo dall'altra parte non significa niente", async () => {
+    await announceQuoteDecision(PREVENTIVO, "accepted", "u7");
+
+    expect(emessi[0].carico.email).toBe("mario@example.it");
+    expect(emessi[0].carico.phone).toBe("+393330000001");
   });
 });

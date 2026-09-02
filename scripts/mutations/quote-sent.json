@@ -20,14 +20,14 @@
   {
     "file": "src/lib/quote-events.ts",
     "description": "il recapito non viaggia: chi riceve l'evento non ha modo di sapere di quale persona si tratti, perche' il nostro id da lui non significa niente",
-    "find": "      email: contact?.email ?? undefined,\n      phone: contact?.phone ?? undefined,",
-    "replace": ""
+    "find": "      ...(await reachOf(quote)),\n      url,",
+    "replace": "      url,"
   },
   {
     "file": "src/lib/quote-events.ts",
     "description": "l'origine diventa «macchina»: un'integrazione che filtra le proprie scritture ignora l'unico evento che sta aspettando",
-    "find": "    { via: \"user\", actor },",
-    "replace": "    { via: \"api\", actor },"
+    "find": "    // own writes ignore the one event it is waiting for.\n    { via: \"user\", actor },",
+    "replace": "    // own writes ignore the one event it is waiting for.\n    { via: \"api\", actor },"
   },
   {
     "file": "src/lib/quote-events.ts",

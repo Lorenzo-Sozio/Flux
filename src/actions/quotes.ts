@@ -14,7 +14,7 @@ import { companies, deals, products, quoteActivities, quoteItems, quotes, users 
 import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
 import { sendEmail } from "@/lib/email-provider";
 import { getExchangeRates } from "@/lib/exchange-rates";
-import { announceQuoteSent } from "@/lib/quote-events";
+import { announceQuoteDecision, announceQuoteSent } from "@/lib/quote-events";
 import { getDb } from "@/lib/tenant-context";
 
 // --- HELPERS ---
@@ -348,6 +348,12 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
       // lost with nothing to retry from. Everywhere else that costs a log line; here it
       // costs a customer never receiving their quote.
       await announceQuoteSent(updated, session.user.id);
+    }
+    // The same answer can arrive from the customer's own page or be recorded here by whoever
+    // heard it on the phone. Both are the answer, and an integration must not have to guess
+    // which door it came through.
+    if (validated.status === "accepted" || validated.status === "declined") {
+      await announceQuoteDecision(updated, validated.status, session.user.id);
     }
 
     revalidatePath("/dashboard/sales/quotes");

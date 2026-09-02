@@ -16,12 +16,48 @@ import { getDb } from "@/lib/tenant-context";
  * ⚠️ The contact's phone and email travel because that is the only thing both systems have
  * in common: our id for this person means nothing on the other side.
  */
-export async function announceQuoteSent(quote: typeof quotes.$inferSelect, actor: string) {
+async function reachOf(quote: typeof quotes.$inferSelect) {
   const db = await getDb();
   const contact = quote.contactId
     ? await db.query.contacts.findFirst({ where: eq(contacts.id, quote.contactId) })
     : null;
+  // ⚠️ The contact's phone and email travel because that is the only thing both systems
+  // have in common: our id for this person means nothing on the other side.
+  return { email: contact?.email ?? undefined, phone: contact?.phone ?? undefined };
+}
 
+/**
+ * The customer answered: yes or no.
+ *
+ * ⚠️⚠️ This is the piece an assistant cannot find out on its own, and without it it keeps
+ * asking «did you see the quote?» to someone who has already accepted. Nothing fails when
+ * it is missing, which is why it went unnoticed until now.
+ *
+ * ⚠️ Both answers are announced, not just the good one. A receiver that only hears about
+ * acceptances has to treat silence as a refusal, and silence also means a delivery that
+ * never arrived.
+ *
+ * ⚠️ `via: "user"` even when the customer clicked it from the public page with no account:
+ * that field exists so an integration can drop the events it caused itself, and this one
+ * it certainly did not. Marking it `api` would make it discard the answer it is waiting
+ * for. The actor is null because the person who clicked has no user id here.
+ */
+export async function announceQuoteDecision(
+  quote: typeof quotes.$inferSelect,
+  decision: "accepted" | "declined",
+  actor: string | null,
+) {
+  await dispatchWebhook(
+    decision === "accepted" ? "quote.accepted" : "quote.declined",
+    {
+      quote: { id: quote.id, number: quote.quoteNumber, version: quote.version },
+      ...(await reachOf(quote)),
+    },
+    { via: "user", actor },
+  ).catch((e) => console.error(`[quotes] quote.${decision} not dispatched`, e));
+}
+
+export async function announceQuoteSent(quote: typeof quotes.$inferSelect, actor: string) {
   const base = process.env.NEXTAUTH_URL;
   if (!base) {
     console.warn("[quotes] NEXTAUTH_URL is unset: the quote event carries no address");
@@ -35,8 +71,7 @@ export async function announceQuoteSent(quote: typeof quotes.$inferSelect, actor
     "quote.sent",
     {
       quote: { id: quote.id, number: quote.quoteNumber, version: quote.version },
-      email: contact?.email ?? undefined,
-      phone: contact?.phone ?? undefined,
+      ...(await reachOf(quote)),
       url,
       // ⚠️ What the recipient sees instead of a preview. Without it an attachment arrives
       // nameless, which looks a lot like something not to open.

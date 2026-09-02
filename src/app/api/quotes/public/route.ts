@@ -4,6 +4,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 
 import { quoteActivities, quoteItems, quotes } from "@/db/schema";
+import { announceQuoteDecision } from "@/lib/quote-events";
 import { getDb } from "@/lib/tenant-context";
 
 // GET /api/quotes/public?token=xxx  — fetch quote by public token (no auth)
@@ -62,6 +63,13 @@ export async function POST(req: NextRequest) {
 
   await db.update(quotes).set(updateData).where(eq(quotes.id, quote.id));
   await db.insert(quoteActivities).values({ quoteId: quote.id, type: action, ipAddress: ip ?? undefined });
+
+  // ⚠️⚠️ The customer's own answer, which until now stayed inside this database. An
+  // assistant that delivered the quote had no way to learn it, and kept chasing someone who
+  // had already accepted. Awaited for the same reason the send is: on Workers a promise
+  // still running after the response can be killed, and there would be nothing to retry
+  // from. The actor is null because whoever clicked has no account here.
+  await announceQuoteDecision({ ...quote, ...updateData }, action, null);
 
   return NextResponse.json({ success: true });
 }

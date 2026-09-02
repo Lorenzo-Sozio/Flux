@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/lib/quote-events.ts",
+    "description": "⚠️⚠️ la risposta del cliente non esce piu' da questo database: chi ha consegnato il preventivo continua a chiedere «l'hai visto?» a chi ha gia' accettato",
+    "find": "  await dispatchWebhook(\n    decision === \"accepted\" ? \"quote.accepted\" : \"quote.declined\",",
+    "replace": "  if (false)\n  await dispatchWebhook(\n    decision === \"accepted\" ? \"quote.accepted\" : \"quote.declined\","
+  },
+  {
+    "file": "src/lib/quote-events.ts",
+    "description": "si annuncia solo il si': chi riceve deve trattare il silenzio come un rifiuto, e il silenzio significa anche una consegna mai arrivata",
+    "find": "    decision === \"accepted\" ? \"quote.accepted\" : \"quote.declined\",",
+    "replace": "    \"quote.accepted\","
+  },
+  {
+    "file": "src/lib/quote-events.ts",
+    "description": "⚠️ l'origine della risposta diventa «macchina»: l'integrazione che filtra le proprie scritture scarta la risposta che sta aspettando",
+    "find": "    { via: \"user\", actor },\n  ).catch((e) => console.error(`[quotes] quote.${decision} not dispatched`, e));",
+    "replace": "    { via: \"api\", actor },\n  ).catch((e) => console.error(`[quotes] quote.${decision} not dispatched`, e));"
+  },
+  {
+    "file": "src/lib/quote-events.ts",
+    "description": "il recapito non viaggia con la risposta: chi riceve non sa di quale persona si tratti, perche' il nostro id da lui non significa niente",
+    "find": "  return { email: contact?.email ?? undefined, phone: contact?.phone ?? undefined };",
+    "replace": "  return {};"
+  }
+]
