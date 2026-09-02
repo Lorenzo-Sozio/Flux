@@ -22,7 +22,7 @@ vi.mock("@/lib/tenant-context", () => ({
   getDb: async () => ({ query: { contacts: { findFirst: async () => contatto } } }),
 }));
 
-const { announceQuoteDecision, announceQuoteSent } = await import("@/lib/quote-events");
+const { announceQuoteDecision, announceQuoteSent, hasAlreadyLeft } = await import("@/lib/quote-events");
 
 // biome-ignore lint/suspicious/noExplicitAny: a row shape the test does not need in full
 const PREVENTIVO: any = {
@@ -129,5 +129,21 @@ describe("la risposta del cliente", () => {
 
     expect(emessi[0].carico.email).toBe("mario@example.it");
     expect(emessi[0].carico.phone).toBe("+393330000001");
+  });
+});
+
+describe("un preventivo che parte una seconda volta", () => {
+  it("⚠️⚠️ uno gia' inviato che viene solo risalvato non e' una partenza", () => {
+    // Senza questa distinzione l'evento significa «lo stato dice inviato» invece di
+    // «e' appena partito»: modificare una nota su un preventivo gia' mandato consegna al
+    // cliente lo stesso PDF una seconda volta, e non fallisce niente.
+    for (const stato of ["sent", "viewed", "accepted", "declined", "converted"]) {
+      expect(hasAlreadyLeft(stato), `«${stato}» non e' riconosciuto come gia' uscito`).toBe(true);
+    }
+  });
+
+  it("una bozza che diventa inviata e' una partenza vera", () => {
+    expect(hasAlreadyLeft("draft")).toBe(false);
+    expect(hasAlreadyLeft("expired")).toBe(false);
   });
 });

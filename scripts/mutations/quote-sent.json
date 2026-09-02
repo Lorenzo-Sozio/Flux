@@ -34,5 +34,11 @@
     "description": "il documento perde il nome: al destinatario arriva un allegato senza nome, che somiglia a qualcosa da non aprire",
     "find": "      nome: `Preventivo ${quote.quoteNumber}.pdf`,",
     "replace": ""
+  },
+  {
+    "file": "src/lib/quote-events.ts",
+    "description": "⚠️⚠️ un preventivo gia' inviato che viene solo risalvato torna a contare come partenza: al cliente arriva lo stesso PDF una seconda volta, e non fallisce niente",
+    "find": "const ALREADY_OUT = new Set([\"sent\", \"viewed\", \"accepted\", \"declined\", \"converted\"]);",
+    "replace": "const ALREADY_OUT = new Set([\"converted\"]);"
   }
 ]

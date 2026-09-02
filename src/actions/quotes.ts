@@ -14,10 +14,11 @@ import { companies, deals, products, quoteActivities, quoteItems, quotes, users 
 import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
 import { sendEmail } from "@/lib/email-provider";
 import { getExchangeRates } from "@/lib/exchange-rates";
-import { announceQuoteDecision, announceQuoteSent } from "@/lib/quote-events";
+import { announceQuoteDecision, announceQuoteSent, hasAlreadyLeft } from "@/lib/quote-events";
 import { getDb } from "@/lib/tenant-context";
 
 // --- HELPERS ---
+
 function calculateLineTotal(quantity: number, unitPrice: number, discountPercent: number, taxPercent: number) {
   const subtotal = quantity * unitPrice;
   const discountAmount = (subtotal * discountPercent) / 100;
@@ -341,7 +342,7 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
     // The address is a PDF the recipient can actually open: the public-token route
     // returns the rendered document without a session. Sending the HTML page instead
     // would arrive at the customer labelled as a PDF and open as something else.
-    if (validated.status === "sent") {
+    if (validated.status === "sent" && !hasAlreadyLeft(quote.status)) {
       // ⚠️ Awaited, unlike the fire-and-forget dispatches elsewhere in this codebase.
       // On Workers a promise still running after the response can be killed, and the row
       // this event's redelivery is derived from would never be written: the event would be
@@ -352,7 +353,7 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
     // The same answer can arrive from the customer's own page or be recorded here by whoever
     // heard it on the phone. Both are the answer, and an integration must not have to guess
     // which door it came through.
-    if (validated.status === "accepted" || validated.status === "declined") {
+    if ((validated.status === "accepted" || validated.status === "declined") && quote.status !== validated.status) {
       await announceQuoteDecision(updated, validated.status, session.user.id);
     }
 

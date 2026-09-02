@@ -27,6 +27,22 @@ async function reachOf(quote: typeof quotes.$inferSelect) {
 }
 
 /**
+ * Statuses a quote can only be in once it has already left.
+ *
+ * ⚠️⚠️ Announcing on `status === "sent"` alone announces a **save**, not a departure.
+ * Editing a note on a quote that was already sent posts the same status back, and the
+ * assistant on the other side would hand the customer the same PDF a second time. Nothing
+ * fails: the request succeeds, the log looks normal, and the customer gets it twice.
+ *
+ * It lives here and not next to the caller because it is part of what the event means.
+ */
+const ALREADY_OUT = new Set(["sent", "viewed", "accepted", "declined", "converted"]);
+
+export function hasAlreadyLeft(status: string): boolean {
+  return ALREADY_OUT.has(status);
+}
+
+/**
  * The customer answered: yes or no.
  *
  * ⚠️⚠️ This is the piece an assistant cannot find out on its own, and without it it keeps
