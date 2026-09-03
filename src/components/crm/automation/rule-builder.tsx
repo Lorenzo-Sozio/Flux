@@ -228,6 +228,15 @@ const ACTION_META: Record<string, { label: string; icon: React.ReactNode; color:
   },
 };
 
+/**
+ * The prefix of a condition on something an assistant collected.
+ *
+ * ⚠️ It matches the `customFields` jsonb column, and the evaluator resolves dotted paths,
+ * so `customFields.budget` reads the value written by whoever asked for it. The key is the
+ * owner's own — a fixed list could never contain it.
+ */
+const RACCOLTO = "customFields.";
+
 const NO_VALUE_OPERATORS = new Set(["is_empty", "is_not_empty", "changed"]);
 
 // ── Field Helper (identical style to LeadModal) ───────────────────────────────
@@ -658,24 +667,48 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                               C{index}
                             </span>
 
-                            {/* Field selector */}
+                            {/* Field selector.
+                                ⚠️⚠️ **The collected-information option is what makes the
+                                assistant's questions usable in a rule.** The registry above
+                                lists the columns this CRM has; what an assistant collects is
+                                named by whoever configured it — «metratura», «budget» — and
+                                no fixed list can know those names in advance. The condition
+                                path is a free string and the evaluator already walks dots,
+                                so the only thing that was missing was a way to type one. */}
                             <Controller
                               control={control}
                               name={`conditions.${index}.field`}
-                              render={({ field: f }) => (
-                                <Select value={f.value} onValueChange={f.onChange}>
-                                  <SelectTrigger className="h-8 flex-1 text-xs">
-                                    <SelectValue placeholder="Select field..." />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {entityFields.map((ef) => (
-                                      <SelectItem key={ef.key} value={ef.key}>
-                                        {ef.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              )}
+                              render={({ field: f }) => {
+                                const raccolto = String(f.value ?? "").startsWith(RACCOLTO);
+                                return (
+                                  <div className="flex flex-1 items-center gap-2">
+                                    <Select
+                                      value={raccolto ? RACCOLTO : f.value}
+                                      onValueChange={(v) => f.onChange(v === RACCOLTO ? RACCOLTO : v)}
+                                    >
+                                      <SelectTrigger className="h-8 flex-1 text-xs">
+                                        <SelectValue placeholder="Select field..." />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {entityFields.map((ef) => (
+                                          <SelectItem key={ef.key} value={ef.key}>
+                                            {ef.label}
+                                          </SelectItem>
+                                        ))}
+                                        <SelectItem value={RACCOLTO}>Informazione raccolta…</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    {raccolto && (
+                                      <Input
+                                        className="h-8 flex-1 text-xs"
+                                        placeholder="nome del campo (es. budget)"
+                                        value={String(f.value ?? "").slice(RACCOLTO.length)}
+                                        onChange={(e) => f.onChange(RACCOLTO + e.target.value.trim())}
+                                      />
+                                    )}
+                                  </div>
+                                );
+                              }}
                             />
 
                             {/* Operator selector */}

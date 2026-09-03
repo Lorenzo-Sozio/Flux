@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/app/api/crm/custom-fields/route.ts",
+    "description": "⚠️⚠️ i valori raccolti arrivano e le regole del titolare non partono: soglie, segmenti ed esiti restano fermi, cioe' lo stato di prima con piu' codice",
+    "find": "  after(() =>\n    runAutomations({",
+    "replace": "  if (false)\n  after(() =>\n    runAutomations({"
+  },
+  {
+    "file": "src/app/api/crm/custom-fields/route.ts",
+    "description": "⚠️⚠️ le regole non vedono piu' i valori raccolti: ogni condizione su «customFields.budget» diventa silenziosamente falsa, e il titolare crede di aver scritto una regola che non scatta",
+    "find": "      newData: { id: entityId, customFields: dopo },",
+    "replace": "      newData: { id: entityId },"
+  },
+  {
+    "file": "src/app/api/crm/custom-fields/route.ts",
+    "description": "⚠️ le regole ricevono i valori nuovi anche come vecchi: nessuna condizione «e' cambiato» scatta piu', e sono quelle che il costruttore propone per prime",
+    "find": "      oldData: { id: entityId, customFields: prima },",
+    "replace": "      oldData: { id: entityId, customFields: dopo },"
+  },
+  {
+    "file": "src/app/api/crm/custom-fields/route.ts",
+    "description": "⚠️ una definizione che esiste viene duplicata a ogni raccolta: il titolare si ritrova lo stesso campo tre volte nelle impostazioni, e i valori sparsi fra le copie",
+    "find": "    if (perSlug.has(nome)) continue;",
+    "replace": "    if (false) continue;"
+  },
+  {
+    "file": "src/app/api/crm/custom-fields/route.ts",
+    "description": "un recapito senza nessuno dietro diventa un successo silenzioso: l'assistente crede di aver registrato quello che ha raccolto su una scheda che non esiste",
+    "find": "  if (!dove) {\n    return NextResponse.json({ error: \"No person reachable at that contact point\" }, { status: 404 });\n  }\n  const entityId",
+    "replace": "  if (!dove) {\n    return NextResponse.json({ status: \"updated\" }, { status: 200 });\n  }\n  const entityId"
+  },
+  {
+    "file": "src/app/api/crm/custom-fields/route.ts",
+    "description": "un oggetto annidato passa: la scheda prende una forma che nessuna condizione sa confrontare, e chi ha chiamato non lo scopre",
+    "find": "    if (typeof valore !== \"string\" && typeof valore !== \"number\") continue;",
+    "replace": "    if (false) continue;"
+  },
+  {
+    "file": "src/app/api/crm/custom-fields/route.ts",
+    "description": "una richiesta senza campi utilizzabili scrive comunque: si creano definizioni vuote nelle impostazioni del titolare e le regole onUpdate scattano per nulla",
+    "find": "  if (Object.keys(campi).length === 0) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/app/api/crm/custom-fields/route.ts",
+    "description": "⚠️ una definizione di UN'ALTRA entita' viene riusata: il valore si attacca a un campo che le schermate di questa entita' non interrogano, e il titolare lo vede vuoto pur avendolo ricevuto",
+    "find": "  const perSlug = new Map(candidate.filter((d) => d.entityType === entityType).map((d) => [d.slug, d.id]));",
+    "replace": "  const perSlug = new Map(candidate.map((d) => [d.slug, d.id]));"
+  }
+]
