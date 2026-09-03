@@ -1,0 +1,38 @@
+[
+  {
+    "file": "src/app/api/crm/close/route.ts",
+    "description": "⚠️⚠️ un processo arrivato a destinazione segna la trattativa come persa: nel fatturato del titolare finisce una sconfitta al posto di una vendita che magari c'e' stata",
+    "find": "  if (outcome === LASCIA_APERTO) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/app/api/crm/close/route.ts",
+    "description": "⚠️⚠️ le regole del titolare non scattano sulla trattativa chiusa: chi la sorvegliava non lo sa, comprese le regole che la riaprirebbero",
+    "find": "    after(() =>\n      runAutomations({",
+    "replace": "    if (false)\n    after(() =>\n      runAutomations({"
+  },
+  {
+    "file": "src/app/api/crm/close/route.ts",
+    "description": "la ragione della chiusura sparisce: chi apre quella trattativa vede «persa» e non sa che l'ha chiusa un assistente, ne' perche'",
+    "find": "        lostReason: CHIUDONO[outcome],",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/close/route.ts",
+    "description": "una trattativa gia' chiusa viene richiusa: la data di chiusura si sposta, e «vinte questo mese» conta cose finite mesi fa",
+    "find": "  const aperti = suoi.filter((d) => d.status === \"open\");",
+    "replace": "  const aperti = suoi;"
+  },
+  {
+    "file": "src/app/api/crm/close/route.ts",
+    "description": "⚠️ un esito sconosciuto passa: chi ha chiamato crede di aver chiuso una trattativa che e' rimasta aperta",
+    "find": "  const noto = outcome === LASCIA_APERTO || outcome in CHIUDONO;",
+    "replace": "  const noto = true;"
+  },
+  {
+    "file": "src/app/api/crm/close/route.ts",
+    "description": "nessuna trattativa da chiudere diventa un successo silenzioso: chi ha chiamato non distingue «non c'era niente» da «l'ho chiusa»",
+    "find": "  if (aperti.length === 0) {\n    return NextResponse.json({ error: \"No deal to close for that contact point\" }, { status: 404 });\n  }",
+    "replace": "  if (aperti.length === 0) {\n    return NextResponse.json({ status: \"closed\", ids: [] }, { status: 200 });\n  }"
+  }
+]
