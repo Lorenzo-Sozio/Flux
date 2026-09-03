@@ -1,0 +1,38 @@
+[
+  {
+    "file": "src/app/api/crm/opt-out/route.ts",
+    "description": "⚠️⚠️ si zittisce solo il contatto e il lead resta iscritto: quella persona resta esattamente nel pubblico da cui ha chiesto di uscire",
+    "find": "    ...suoiLead.filter((r) => r.marketingConsent).map((r) => ({ ...r, entityType: \"lead\" as const })),",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/opt-out/route.ts",
+    "description": "⚠️⚠️ si zittisce solo il lead e il contatto resta iscritto: stessa persona, stesso pubblico, altro record",
+    "find": "    ...suoiContatti.filter((r) => r.marketingConsent).map((r) => ({ ...r, entityType: \"contact\" as const })),",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/opt-out/route.ts",
+    "description": "⚠️ si riscrive `false` sopra `false`: il passo viene ritentato, e chi ha una regola sulle disiscrizioni riceve un avviso a ogni tentativo",
+    "find": "    ...suoiLead.filter((r) => r.marketingConsent).map((r) => ({ ...r, entityType: \"lead\" as const })),\n    ...suoiContatti.filter((r) => r.marketingConsent).map((r) => ({ ...r, entityType: \"contact\" as const })),",
+    "replace": "    ...suoiLead.map((r) => ({ ...r, entityType: \"lead\" as const })),\n    ...suoiContatti.map((r) => ({ ...r, entityType: \"contact\" as const })),"
+  },
+  {
+    "file": "src/app/api/crm/opt-out/route.ts",
+    "description": "le regole del titolare non scattano sulla revoca: chi sorvegliava quel consenso non lo sa",
+    "find": "    after(() =>\n      runAutomations({",
+    "replace": "    if (false)\n    after(() =>\n      runAutomations({"
+  },
+  {
+    "file": "src/app/api/crm/opt-out/route.ts",
+    "description": "una persona che questo CRM non conosce riceve un 200: chi chiama non distingue «non c'e'» da «l'ho zittita»",
+    "find": "  if (persona.leadIds.length === 0 && persona.contactIds.length === 0) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/app/api/crm/opt-out/route.ts",
+    "description": "un corpo senza recapito passa: si finisce a cercare «nessuno» e a rispondere qualcosa a chi non ha chiesto niente di valido",
+    "find": "  if (!contactPoint) {",
+    "replace": "  if (false) {"
+  }
+]

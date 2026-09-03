@@ -246,4 +246,13 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nDROP TABLE IF EXISTS "opportunity" CASCADE;\n',
     ],
   },
+  {
+    tag: "0004_order_line_from_quote",
+    folderMillis: 1788900000000,
+    hash: "baf11ecfddf1f14d11fd8a6307574fb62b67f29d4a25f957dc75e57f0efc7665",
+    sql: [
+      '-- Una riga d\'ordine può ora dire cosa vende senza essere a catalogo (rilievo S-03).\n--\n-- `order_item.product_id` era NOT NULL mentre `quote_item.product_id` è sempre\n-- stato nullable: un preventivo con una riga a testo libero — una personalizzazione,\n-- una giornata di consulenza, uno sconto una tantum — non poteva quindi diventare\n-- un ordine. È la forma più comune di preventivo, quindi la conversione sarebbe\n-- fallita proprio dove serve.\n--\n-- La riga d\'ordine prende anche `description`, come quella di preventivo, altrimenti\n-- una riga senza prodotto non avrebbe modo di dire cosa sia.\n--\n-- ⚠️ Il driver Neon HTTP non tiene una transazione fra istruzioni: ogni istruzione\n-- è scritta per poter essere rieseguita senza fallire.\nALTER TABLE "order_item" ALTER COLUMN "product_id" DROP NOT NULL;',
+      '\nALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "description" text;\n',
+    ],
+  },
 ];

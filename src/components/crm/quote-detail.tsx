@@ -19,6 +19,7 @@ import {
   Hash,
   Link2,
   Mail,
+  Package,
   Pencil,
   Printer,
   ShieldCheck,
@@ -29,6 +30,7 @@ import {
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
+import { convertQuoteToOrderAction } from "@/actions/orders";
 import {
   approveQuoteAction,
   type getQuoteById,
@@ -127,6 +129,27 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
 
   const handleApprove = () =>
     runAction(() => approveQuoteAction(quote.id), "Preventivo approvato.", "Errore nell'approvazione.");
+
+  /**
+   * The last manual re-typing in the sales month.
+   *
+   * An accepted quote already holds every figure the order needs, so it writes the
+   * order itself and lands the user on it — and closes the deal behind the quote,
+   * which is the step people forgot and which kept won business in the forecast.
+   */
+  const handleConvert = async () => {
+    setIsLoading(true);
+    try {
+      const result = await convertQuoteToOrderAction(quote.id);
+      toast.success(`Order ${result.orderNumber} created from this quote.`);
+      router.push(`/dashboard/sales/orders/${result.orderId}`);
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not create the order.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   async function handleReject() {
     await runAction(() => rejectQuoteAction(quote.id, rejectNote), "Preventivo rifiutato.", "Errore nel rifiuto.");
@@ -286,6 +309,20 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
                 <Mail className="mr-2 h-4 w-4" />
                 Send Quote
               </Button>
+            )}
+
+            {quote.status === "accepted" && (
+              <Button className="w-full justify-start" onClick={handleConvert} disabled={isLoading}>
+                <Package className="mr-2 h-4 w-4" />
+                Create Order
+              </Button>
+            )}
+
+            {quote.status === "converted" && (
+              <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-800 text-sm dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+                <Package className="h-4 w-4 shrink-0" />
+                <span>This quote has become an order.</span>
+              </div>
             )}
 
             <Button

@@ -7,16 +7,14 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
-import { unlink } from "node:fs/promises";
-import { join } from "node:path";
-
 import { and, eq } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { documents } from "@/db/schema";
+import { getStorage } from "@/lib/storage";
 import { getDb } from "@/lib/tenant-context";
 
-const VALID_ENTITY_TYPES = new Set(["contact", "lead", "company", "deal", "ticket"]);
+const VALID_ENTITY_TYPES = new Set(["contact", "lead", "company", "deal", "ticket", "quote", "order"]);
 
 export async function GET(req: NextRequest) {
   const db = await getDb();
@@ -65,13 +63,16 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden." }, { status: 403 });
   }
 
-  // Delete the file from disk (best-effort)
+  // Remove the row first: it is what makes the file reachable. If the object then
+  // fails to delete, the result is unreferenced bytes rather than a document the
+  // user was told was gone and can still open.
+  await db.delete(documents).where(eq(documents.id, id));
+
   if (doc.url) {
-    await unlink(join(process.cwd(), doc.url)).catch(() => {
-      /* best-effort */
+    const storage = await getStorage();
+    await storage.delete(doc.url).catch((err) => {
+      console.error("[documents] object delete failed, row already removed", { id, err });
     });
   }
-
-  await db.delete(documents).where(eq(documents.id, id));
   return NextResponse.json({ success: true });
 }

@@ -7,7 +7,6 @@
 import { after } from "next/server";
 
 import crypto from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { eq } from "drizzle-orm";
@@ -21,6 +20,7 @@ import {
   stripHtmlQuotesAndSignature,
   stripPlainTextQuotes,
 } from "@/lib/email-parser";
+import { getStorage, newStorageKey } from "@/lib/storage";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Attachment handling ──────────────────────────────────────────────────────
@@ -64,18 +64,17 @@ async function saveAttachments(attachments: InboundAttachment[], ticketId: strin
     if (!ALLOWED_MIME_TYPES.has(mime)) continue;
     if (att.content.length === 0 || att.content.length > MAX_ATTACHMENT_BYTES) continue;
 
-    // Derive a safe extension from the MIME type — never trust the original filename extension
+    // The extension comes from the MIME type, never from the sender's filename.
     const ext = MIME_TO_EXT[mime] ?? "";
-    const storageId = crypto.randomUUID();
-    const storageName = `${storageId}${ext}`;
-    const storagePath = join("uploads", storageName);
-    const diskPath = join(process.cwd(), storagePath);
+    const storageKey = newStorageKey(`attachment${ext}`);
 
     try {
-      await mkdir(join(process.cwd(), "uploads"), { recursive: true });
-      await writeFile(diskPath, att.content);
+      // Object storage, not the disk: on Workers there is none, and on Vercel the
+      // one that exists does not survive a deploy (audit rilievo B-06).
+      const storage = await getStorage();
+      await storage.put(storageKey, new Uint8Array(att.content), mime);
     } catch (err) {
-      console.error("[ticket-from-email] Failed to write attachment to disk:", err);
+      console.error("[ticket-from-email] could not store attachment:", err);
       continue;
     }
 
@@ -83,8 +82,8 @@ async function saveAttachments(attachments: InboundAttachment[], ticketId: strin
       const [doc] = await db
         .insert(documents)
         .values({
-          name: sanitizeFilename(att.filename) || storageName,
-          url: storagePath,
+          name: sanitizeFilename(att.filename) || `attachment${ext}`,
+          url: storageKey,
           mimeType: mime,
           size: att.content.length,
           entityType: "ticket",

@@ -161,11 +161,21 @@ errori che non nominano la variabile mancante.
 **Rimedio.** Allineare l'esempio, raggrupparlo per funzione, e aggiungere una verifica
 all'avvio che elenchi in un colpo solo tutte le variabili assenti.
 
-### B-06 — Gli allegati vivono sul filesystem locale
+### B-06 — Gli allegati vivono sul filesystem locale ✅
 
 **Cosa.** L'endpoint di caricamento scrive su disco con `writeFile`. Su Vercel il
 filesystem è effimero e per-istanza; su Workers non esiste. La documentazione segnala
 solo il secondo caso.
+
+**✅ Risolto.** `src/lib/storage.ts` sceglie il deposito da ciò che l'ambiente offre
+invece che da un flag: bucket R2 legato come `DOCUMENTS`, altrimenti object storage
+S3-compatibile se le credenziali ci sono, altrimenti il disco locale — che in
+produzione lo dice a voce alta nei log. La chiave è generata qui e non porta nulla del
+nome caricato tranne un'estensione validata, quindi un nome ostile non raggiunge mai un
+percorso; il percorso di lettura la ricontrolla prima di toccare il deposito. Le tre
+rotte dei documenti e `ticket-from-email.ts` ci passano sopra, la quota `storageGb` del
+piano è verificata al caricamento, e le righe scritte prima continuano a essere lette
+dove il disco esiste ancora.
 
 **Perché è un limite.** Un file può risultare illeggibile già alla richiesta successiva,
 e sparisce a ogni deploy.
@@ -687,11 +697,19 @@ Notifiche: 50 righe complete ogni minuto, senza cursore. Chat: una interrogazion
 **Rimedio.** Interrogazione incrementale con cursore, preferenze per tipo e canale, e un
 flusso di eventi per la chat.
 
-### U-12 — Non esiste un primo avvio
+### U-12 — Non esiste un primo avvio ◐
 
 Nessuna procedura di configurazione iniziale, nessuno stato vuoto che spieghi cosa fare,
 nessun dato di esempio. Senza fasi pipeline la prima conversione fallisce con un
 messaggio tecnico.
+
+**◐ Parziale.** `src/db/seed-workspace.ts` riempie ciò senza cui il prodotto non parte:
+sei fasi di pipeline (con «Won» e «Lost» marcate, che è ciò che fa davvero chiudere una
+trattativa trascinata dentro), quattro politiche SLA per priorità, tipi e categorie
+azienda. Gira su ogni percorso di migrazione e semina solo le tabelle vuote, quindi è
+sicuro riapplicarlo e non resuscita ciò che il cliente ha cancellato apposta. **Restano
+aperti** la procedura guidata di primo accesso e gli stati vuoti che spiegano cosa
+fare: sono decisioni di prodotto, non di codice.
 
 **Rimedio.** Fasi, SLA e categorie predefiniti alla creazione del workspace. Una lista di
 avvio in cinque passi con avanzamento visibile. Stati vuoti che propongono l'azione.
@@ -727,11 +745,25 @@ lavoro ordinato per urgenza.
 
 La dashboard oggi elenca ciò che esiste; questa versione dice cosa fare adesso.
 
-### S-03 — Chiudere il ciclo preventivo → ordine → trattativa
+### S-03 — Chiudere il ciclo preventivo → ordine → trattativa ✅
 
 Un preventivo accettato genera l'ordine con un click — lo stato `converted` è già
 previsto e non lo scrive nessuno. L'ordine porta la trattativa a «vinta» con la data di
 chiusura. La trattativa vinta registra l'attività sulla scheda del cliente.
+
+**✅ Risolto.** `convertQuoteToOrderAction` in `src/actions/orders.ts`: un solo commit
+scrive l'ordine con le sue righe, porta il preventivo a `converted` e chiude la
+trattativa a «vinta» con la data. Le righe sono copiate, non ricalcolate — il cliente
+ha accettato quelle cifre, e il listino può essersi mosso da allora. Il pulsante
+compare sulla scheda del preventivo solo quando è accettato, e un secondo click porta
+all'ordine già esistente invece di fallire.
+
+Serviva una migrazione (`0004_order_line_from_quote`): `order_item.product_id` era NOT
+NULL mentre quella di preventivo è sempre stata nullable, quindi un preventivo con una
+riga a testo libero — una personalizzazione, una giornata di consulenza — non poteva
+diventare un ordine. È la forma più comune di preventivo, quindi la conversione sarebbe
+fallita proprio dove serve. La riga d'ordine prende anche `description`, altrimenti una
+riga senza prodotto non avrebbe modo di dire cosa sia.
 
 ### S-04 — Una libreria di automazioni pronte all'uso
 

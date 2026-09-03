@@ -295,9 +295,12 @@ export const orderItems = pgTable("order_item", {
   orderId: text("order_id")
     .notNull()
     .references(() => orders.id, { onDelete: "cascade" }),
-  productId: text("product_id")
-    .notNull()
-    .references(() => products.id, { onDelete: "restrict" }),
+  // Nullable, like the quote line it is copied from. A quote can bill a one-off —
+  // a customisation, a day of consulting — that is not in the catalogue, and an
+  // order that could not carry one could not be produced from that quote at all
+  // (rilievo S-03).
+  productId: text("product_id").references(() => products.id, { onDelete: "restrict" }),
+  description: text("description"),
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
   discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }).default("0"),

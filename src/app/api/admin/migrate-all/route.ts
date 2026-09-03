@@ -5,6 +5,7 @@ import { drizzle } from "drizzle-orm/neon-http";
 import { platformDb } from "@/db";
 import { applyTenantMigrations } from "@/db/migrate-tenant";
 import { tenants } from "@/db/schema";
+import { seedWorkspace } from "@/db/seed-workspace";
 import { requireAdminPanelAccess } from "@/lib/auth-guard";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
@@ -42,6 +43,14 @@ export async function GET() {
           // failed for every tenant with "Can't find meta/_journal.json file".
           const { applied, skipped } = await applyTenantMigrations(db);
 
+          // A migrated workspace with no pipeline stages still cannot convert a
+          // lead. Seeding only fills empty tables, so this never overwrites a
+          // customer's own setup (audit rilievo U-12).
+          const seeded = await seedWorkspace(db).catch((err) => {
+            console.error(`[migrate-all] seed failed for ${tenant.subdomain}`, err);
+            return null;
+          });
+
           await platformDb.update(tenants).set({ lastMigratedAt: new Date() }).where(eq(tenants.id, tenant.id));
 
           passed++;
@@ -54,6 +63,7 @@ export async function GET() {
                 // migrations" both used to render as a bare tick.
                 applied,
                 alreadyApplied: skipped.length,
+                seeded: seeded ?? undefined,
               }),
             ),
           );

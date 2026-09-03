@@ -171,12 +171,31 @@ process:
 - ~~`src/actions/tenants.ts` and `src/app/api/admin/migrate-all/route.ts` read tenant
   migration SQL from `process.cwd()`.~~ Fixed: migrations are embedded in the build,
   see below.
-- `src/app/api/documents/[id]/route.ts` reads uploads from disk.
+- ~~`src/app/api/documents/[id]/route.ts` reads uploads from disk.~~ Fixed: uploads go
+  to object storage, see below.
 
-⚠️ Document uploads are broken on **Vercel** too, not only on Workers, and the failure
-is quieter there: the filesystem is per-instance and per-deploy, so a file written by
-one request can be missing from the next and is certainly gone after a redeploy. This
-needs object storage before attachments can be relied on.
+### Document storage
+
+[src/lib/storage.ts](src/lib/storage.ts) picks a store from what the environment
+provides, rather than from a flag that can disagree with reality:
+
+1. an R2 bucket bound as `DOCUMENTS` — production on Workers, declared in wrangler.jsonc;
+2. any S3-compatible endpoint, when `S3_ENDPOINT` / `S3_BUCKET` / `S3_ACCESS_KEY_ID` /
+   `S3_SECRET_ACCESS_KEY` are set — Vercel, or self-hosting;
+3. the local disk, development only, and it logs an error if it ends up there in
+   production.
+
+⚠️ Create the bucket once: `npx wrangler r2 bucket create flux-documents`.
+
+⚠️ The storage key carries **nothing** from the uploaded filename except an extension
+matched against a strict pattern, and the read path re-checks the key's shape before
+using it — a filename is attacker-controlled and has no business reaching a path.
+`src/lib/storage.test.ts` holds that line.
+
+Documents uploaded before this change hold a relative disk path in `document.url`
+instead of a key. They are still read through the local driver, which is the only
+place those bytes could be; on a deployed server they are almost certainly gone
+already, and the download route now says so instead of returning a broken file.
 
 Secrets go on the Worker with `wrangler secret put`, not in `.env`.
 

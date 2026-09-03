@@ -19,6 +19,7 @@ import { drizzle } from "drizzle-orm/neon-http";
 
 import { applyTenantMigrations } from "../src/db/migrate-tenant";
 import { tenants } from "../src/db/schema";
+import { seedWorkspace } from "../src/db/seed-workspace";
 import { decryptDbUrl } from "../src/lib/tenant-db";
 
 const isDryRun = process.argv.includes("--dry-run");
@@ -30,6 +31,8 @@ async function migrateTenant(dbUrl: string): Promise<string[]> {
   const sql = neon(dbUrl);
   const db = drizzle(sql);
   const { applied } = await applyTenantMigrations(db);
+  // Fills only empty tables, so an existing workspace keeps its own setup.
+  await seedWorkspace(db);
   return applied;
 }
 

@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { dispatchWebhook } from "@/actions/webhooks";
-import { companies, contacts, orderItems, orders, products, users } from "@/db/schema";
+import { companies, contacts, deals, orderItems, orders, products, quoteItems, quotes, users } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { computeDocument } from "@/lib/document-totals";
 import { getDb } from "@/lib/tenant-context";
@@ -51,10 +51,18 @@ async function nextOrderNumber(db: Awaited<ReturnType<typeof getDb>>): Promise<s
  */
 async function orderTotals(
   db: Awaited<ReturnType<typeof getDb>>,
-  items: { productId: string; quantity: number; unitPrice: number; discountPercent?: number }[],
+  // A line need not be in the catalogue: a one-off carries its own tax rate
+  // instead of borrowing a product's (rilievo S-03).
+  items: {
+    productId?: string | null;
+    quantity: number;
+    unitPrice: number;
+    discountPercent?: number;
+    taxPercent?: number;
+  }[],
   discountPercent = 0,
 ) {
-  const ids = [...new Set(items.map((i) => i.productId))];
+  const ids = [...new Set(items.map((i) => i.productId).filter((id): id is string => Boolean(id)))];
   const rows = ids.length
     ? await db
         .select({ id: products.id, taxPercent: products.taxPercent })
@@ -68,7 +76,9 @@ async function orderTotals(
       quantity: i.quantity,
       unitPrice: i.unitPrice,
       discountPercent: i.discountPercent ?? 0,
-      taxPercent: taxByProduct.get(i.productId) ?? 0,
+      // The rate written on the line wins: it is what the customer was quoted,
+      // and the product's rate may have changed since.
+      taxPercent: i.taxPercent ?? (i.productId ? (taxByProduct.get(i.productId) ?? 0) : 0),
     })),
     discountPercent,
   });
@@ -332,6 +342,7 @@ async function recalcOrder(db: Awaited<ReturnType<typeof getDb>>, orderId: strin
       quantity: r.quantity,
       unitPrice: Number(r.unitPrice),
       discountPercent: Number(r.discountPercent ?? 0),
+      taxPercent: r.taxPercent == null ? undefined : Number(r.taxPercent),
     })),
     Number(order?.discountPercent ?? 0),
   );
@@ -385,4 +396,116 @@ export async function deleteOrder(id: string) {
 
   await db.delete(orders).where(eq(orders.id, id));
   revalidatePath("/dashboard/sales/orders");
+}
+
+/**
+ * Turns an accepted quote into an order, and closes the deal behind it.
+ *
+ * The three steps all existed and none of them were connected: `converted` was a
+ * quote status nothing ever set, `order.quote_id` pointed at a quote nothing ever
+ * read, and a won deal had no close date. So the same figures were retyped into a
+ * second document by hand, which is both the slowest step in the sales month and
+ * the one where the two documents start to disagree (audit rilievi S-03, D-06).
+ *
+ * The order is a copy, not a view. A quote can be superseded or expire; an order
+ * has to keep saying what was actually agreed on the day it was agreed.
+ */
+export async function convertQuoteToOrderAction(quoteId: string) {
+  const actor = await requireCapability("order:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+
+  const [quote] = await db.select().from(quotes).where(eq(quotes.id, quoteId));
+  if (!quote) throw new Error("Quote not found.");
+
+  if (quote.status === "converted") {
+    const [existing] = await db
+      .select({ id: orders.id, orderNumber: orders.orderNumber })
+      .from(orders)
+      .where(eq(orders.quoteId, quoteId));
+    // Not an error worth stopping on: the person clicked twice, or someone else
+    // got there first. Send them to the order that already exists.
+    if (existing) return { success: true, orderId: existing.id, orderNumber: existing.orderNumber };
+    throw new Error("This quote is already marked as converted.");
+  }
+
+  if (quote.status !== "accepted") {
+    throw new Error("Only an accepted quote becomes an order. Record the customer's answer first.");
+  }
+
+  const lines = await db.select().from(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+  if (lines.length === 0) throw new Error("This quote has no lines to order.");
+
+  const orderId = crypto.randomUUID();
+  const now = new Date();
+
+  // Copied line by line rather than recomputed: the customer accepted these
+  // figures, and a product's price or tax rate may have moved since.
+  const itemRows = lines.map((line) => ({
+    orderId,
+    productId: line.productId,
+    description: line.description,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice,
+    discountPercent: line.discountPercent ?? "0",
+    discountAmount: line.discountAmount ?? "0",
+    taxPercent: line.taxPercent ?? "0",
+    taxAmount: line.taxAmount ?? "0",
+    totalPrice: line.totalPrice,
+  }));
+
+  const orderNumber = await nextOrderNumber(db);
+
+  // One commit. An order without its lines, or lines without their order, is worse
+  // than no order at all. `db.transaction()` throws on the Neon HTTP driver;
+  // `db.batch()` maps to its transaction endpoint.
+  const writes: unknown[] = [
+    db.insert(orders).values({
+      id: orderId,
+      orderNumber,
+      companyId: quote.companyId,
+      contactId: quote.contactId,
+      ownerId: quote.ownerId ?? actor.userId,
+      quoteId: quote.id,
+      dealId: quote.dealId,
+      status: "draft",
+      currency: quote.currency,
+      subtotal: quote.subtotal,
+      discountPercent: quote.discountPercent ?? "0",
+      discountAmount: quote.discountAmount ?? "0",
+      taxAmount: quote.taxAmount ?? "0",
+      totalAmount: quote.totalAmount,
+      orderDate: now,
+    }),
+    db.insert(orderItems).values(itemRows),
+    db.update(quotes).set({ status: "converted", updatedAt: now }).where(eq(quotes.id, quote.id)),
+  ];
+
+  // The deal is won the moment the customer's order exists. Leaving it open is how
+  // closed business kept weighing on the forecast for ever (rilievo C-06).
+  if (quote.dealId) {
+    writes.push(
+      db
+        .update(deals)
+        .set({ status: "won", closedAt: now, updatedAt: now })
+        .where(and(eq(deals.id, quote.dealId), ne(deals.status, "won"))),
+    );
+  }
+
+  await db.batch(writes as unknown as Parameters<typeof db.batch>[0]);
+
+  dispatchWebhook("order.created", {
+    id: orderId,
+    orderNumber,
+    total: quote.totalAmount,
+    currency: quote.currency,
+    fromQuoteId: quote.id,
+  });
+
+  revalidatePath("/dashboard/sales/quotes");
+  revalidatePath(`/dashboard/sales/quotes/${quoteId}`);
+  revalidatePath("/dashboard/sales/orders");
+  revalidatePath("/dashboard/pipeline");
+
+  return { success: true, orderId, orderNumber };
 }

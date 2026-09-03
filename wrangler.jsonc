@@ -44,6 +44,23 @@
     "binding": "IMAGES"
   },
 
+  /**
+   * Dove vivono i documenti caricati.
+   *
+   * ⚠️ Senza questo binding gli allegati finiscono sul disco locale, che su Workers
+   * non esiste e su Vercel non sopravvive al deploy successivo: il caricamento
+   * riesce e il file sparisce, lasciando una riga che punta al nulla.
+   *
+   * Il bucket va creato una volta:
+   *     npx wrangler r2 bucket create flux-documents
+   */
+  "r2_buckets": [
+    {
+      "binding": "DOCUMENTS",
+      "bucket_name": "flux-documents"
+    }
+  ],
+
   "observability": {
     "enabled": true
   },

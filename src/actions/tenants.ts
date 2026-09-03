@@ -10,6 +10,7 @@ import { auth } from "@/auth";
 import { createTenantDb, invalidateTenantDbCache, platformDb } from "@/db";
 import { applyTenantMigrations } from "@/db/migrate-tenant";
 import { billingPlans, billingSubscriptions, tenantMembers, tenants, userInvitations, users } from "@/db/schema";
+import { seedWorkspace } from "@/db/seed-workspace";
 import { requireAdminPanelAccess } from "@/lib/auth-guard";
 import { sendInvitationEmail } from "@/lib/email";
 import { invalidateTenantCache } from "@/lib/get-tenant";
@@ -305,6 +306,22 @@ async function runMigrations(tenantId: string, dbUrl: string) {
   const sql = neon(dbUrl);
   const db = drizzle(sql);
   await applyTenantMigrations(db);
+
+  // A migrated-but-empty workspace is not a usable one: with no pipeline stages the
+  // first lead conversion fails with "No pipeline stages found", on a settings page
+  // that was not in the menu (audit rilievi U-12, D-04). Seeding only ever adds, and
+  // only into tables that are empty, so this is safe on an existing workspace too.
+  try {
+    const seeded = await seedWorkspace(createTenantDb(tenantId, dbUrl));
+    if (seeded.stages > 0) {
+      console.log(`[tenants] seeded workspace ${tenantId}:`, seeded);
+    }
+  } catch (err) {
+    // Migrating is the operation the caller asked for; failing to seed must not
+    // report it as unsuccessful.
+    console.error(`[tenants] could not seed workspace ${tenantId}:`, err);
+  }
+
   await platformDb.update(tenants).set({ lastMigratedAt: new Date() }).where(eq(tenants.id, tenantId));
 }
 

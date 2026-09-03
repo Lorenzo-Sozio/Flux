@@ -58,6 +58,14 @@ const REQUIRED: EnvSpec[] = [
     name: "TRACKING_SECRET",
     breaks: "campaign open and click links cannot be signed or verified",
   },
+  {
+    name: "S3_BUCKET",
+    alternatives: ["S3_ENDPOINT"],
+    breaks:
+      "uploaded documents fall back to the local disk, which on a deployed server is " +
+      "per-instance and per-deploy: the upload appears to succeed and the file is gone " +
+      "(not needed on Cloudflare, where the R2 binding covers it)",
+  },
 ];
 
 export interface EnvCheckResult {

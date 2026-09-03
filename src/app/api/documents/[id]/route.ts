@@ -12,13 +12,11 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 
-import { readFile } from "node:fs/promises";
-import { join, normalize } from "node:path";
-
 import { eq } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { documents } from "@/db/schema";
+import { getStorage, isValidStorageKey } from "@/lib/storage";
 import { getDb } from "@/lib/tenant-context";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -50,21 +48,33 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  // ── Resolve disk path (DB-controlled, not user-controlled) ───────────────────
-  // Extra safety: normalize and confirm the resolved path stays inside <cwd>/uploads/
-  const uploadsRoot = join(process.cwd(), "uploads");
-  const resolved = normalize(join(process.cwd(), doc.url));
-  if (!resolved.startsWith(`${uploadsRoot}/`) && !resolved.startsWith(`${uploadsRoot}\\`)) {
-    console.error("Path traversal attempt blocked:", doc.url);
+  // ── Read the bytes from object storage ───────────────────────────────────────
+  //
+  // The key is checked against the shape this application produces before it is
+  // used, so a row tampered with in the database still cannot address another
+  // object. Rows written before object storage hold a relative disk path
+  // ("uploads/<uuid>.pdf"); those are read through the local driver, which is the
+  // only place they can be.
+  const storage = await getStorage();
+  const key = doc.url;
+
+  if (!isValidStorageKey(key) && !/^uploads[/\\][0-9a-f-]{36}(\.[a-z0-9]{1,8})?$/i.test(key)) {
+    console.error("[documents] refusing an unrecognised storage key", { id: doc.id });
     return new NextResponse("Forbidden", { status: 403 });
   }
 
-  // ── Read file ─────────────────────────────────────────────────────────────────
-  let fileBuffer: Buffer;
+  let fileBuffer: Uint8Array | null;
   try {
-    fileBuffer = await readFile(resolved);
-  } catch {
-    return new NextResponse("File not found on server.", { status: 404 });
+    fileBuffer = await storage.get(key);
+  } catch (err) {
+    console.error("[documents] read failed", { driver: storage.name, err });
+    return new NextResponse("Could not read the file.", { status: 502 });
+  }
+
+  if (!fileBuffer) {
+    // A row whose bytes are gone: the ordinary case for anything uploaded before
+    // object storage, since that disk does not survive a deploy.
+    return new NextResponse("This file is no longer available.", { status: 404 });
   }
 
   // ── Safe display filename for Content-Disposition ────────────────────────────
