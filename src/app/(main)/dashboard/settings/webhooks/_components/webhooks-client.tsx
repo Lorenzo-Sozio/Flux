@@ -6,7 +6,7 @@ import { CheckCircle, Copy, Plus, Trash2, Webhook } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { createWebhook, deleteWebhook, updateWebhook } from "@/actions/webhooks";
+import { createWebhook, deleteWebhook, getWebhookSecret, updateWebhook } from "@/actions/webhooks";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -113,11 +113,30 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
     }
   };
 
-  const copySecret = (id: string, secret: string) => {
-    navigator.clipboard.writeText(secret);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
-    toast.success(t("secretCopied"));
+  /**
+   * ⚠️⚠️ **The secret was generated and then unreachable.** A webhook gets a random signing
+   * secret when it is created, and the receiving end needs the same string to verify what
+   * arrives — but the list strips it and nothing ever asked for it back, so the copy button
+   * could not render. Whoever configured an integration hit a wall with no way past it and
+   * no message explaining why.
+   *
+   * ⚠️ It is fetched **on demand**, not carried in the listing: a secret in a bulk response
+   * is a secret in every log, cache and browser history of every page that shows the table.
+   */
+  const copySecret = async (id: string) => {
+    try {
+      const secret = await getWebhookSecret(id);
+      if (!secret) {
+        toast.error(t("secretMissing"));
+        return;
+      }
+      await navigator.clipboard.writeText(secret);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+      toast.success(t("secretCopied"));
+    } catch {
+      toast.error(t("secretUnavailable"));
+    }
   };
 
   const toggleEvent = (ev: string) => {
@@ -185,12 +204,15 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {wh.secret && (
+                      {/* Always shown: the secret exists for every webhook — it is
+                          created with it — and hiding the button behind a field the
+                          listing deliberately strips meant hiding it always. */}
+                      {
                         <Button
                           variant="ghost"
                           size="sm"
                           className="h-6 gap-1 text-xs"
-                          onClick={() => copySecret(wh.id, wh.secret!)}
+                          onClick={() => copySecret(wh.id)}
                         >
                           {copiedId === wh.id ? (
                             <CheckCircle className="h-3 w-3 text-green-500" />
@@ -199,7 +221,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
                           )}
                           {t("copy")}
                         </Button>
-                      )}
+                      }
                     </TableCell>
                     <TableCell>
                       <Switch checked={wh.isActive} onCheckedChange={() => handleToggleActive(wh)} />
@@ -249,8 +271,19 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
               <Label>{t("dialog.eventsLabel")}</Label>
               <div className="grid grid-cols-2 gap-2 rounded-lg border p-3">
                 {AVAILABLE_EVENTS.map((ev) => (
-                  <label key={ev.value} className="flex items-center gap-2 cursor-pointer text-sm">
-                    <Checkbox checked={form.events.includes(ev.value)} onCheckedChange={() => toggleEvent(ev.value)} />
+                  // ⚠️ `htmlFor` and an id, not a nested control: `Checkbox` renders a
+                  // button with a role, so a label wrapping it binds to nothing — the click
+                  // works by accident and a screen reader announces an unlabelled control.
+                  <label
+                    key={ev.value}
+                    htmlFor={`webhook-event-${ev.value}`}
+                    className="flex cursor-pointer items-center gap-2 text-sm"
+                  >
+                    <Checkbox
+                      id={`webhook-event-${ev.value}`}
+                      checked={form.events.includes(ev.value)}
+                      onCheckedChange={() => toggleEvent(ev.value)}
+                    />
                     {t(`webhookEvents.${ev.key}`)}
                   </label>
                 ))}

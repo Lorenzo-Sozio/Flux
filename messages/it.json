@@ -1984,6 +1984,8 @@
         "taskCompleted": "Attività Completata"
       },
       "fillAllFields": "Compila tutti i campi e seleziona almeno un evento.",
+      "secretMissing": "Questo webhook non ha un segreto di firma: ricrealo.",
+      "secretUnavailable": "Non riesco a leggere il segreto. Può farlo solo un amministratore.",
       "secretCopied": "Segreto copiato negli appunti.",
       "deleteFailed": "Eliminazione webhook non riuscita.",
       "updateFailed": "Aggiornamento webhook non riuscito."
@@ -2172,7 +2174,15 @@
       "noResults": "Nessun risultato per i filtri correnti.",
       "runFailed": "Impossibile eseguire il report",
       "enterName": "Inserisci un nome per il report",
-      "csv": "CSV"
+      "csv": "CSV",
+      "showingFirst": "mostrate le prime {count}",
+      "buckets": {
+        "day": "Per giorno",
+        "week": "Per settimana",
+        "month": "Per mese",
+        "quarter": "Per trimestre",
+        "year": "Per anno"
+      }
     },
     "generate": "Genera Rapporto",
     "export": "Esporta Rapporto",

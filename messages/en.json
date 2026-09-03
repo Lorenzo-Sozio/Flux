@@ -1984,6 +1984,8 @@
         "taskCompleted": "Task Completed"
       },
       "fillAllFields": "Please fill all fields and select at least one event.",
+      "secretMissing": "This webhook has no signing secret: recreate it.",
+      "secretUnavailable": "Could not read the secret. Only an administrator can.",
       "secretCopied": "Secret copied to clipboard.",
       "deleteFailed": "Failed to delete webhook.",
       "updateFailed": "Failed to update webhook."
@@ -2172,7 +2174,15 @@
       "noResults": "No results for the current filters.",
       "runFailed": "Failed to run report",
       "enterName": "Enter a report name",
-      "csv": "CSV"
+      "csv": "CSV",
+      "showingFirst": "showing first {count}",
+      "buckets": {
+        "day": "By day",
+        "week": "By week",
+        "month": "By month",
+        "quarter": "By quarter",
+        "year": "By year"
+      }
     },
     "generate": "Generate Report",
     "export": "Export Report",

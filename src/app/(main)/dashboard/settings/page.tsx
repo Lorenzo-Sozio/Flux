@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CreditCard, GitMerge, Mail, MessageSquareQuote, Settings2, Webhook } from "lucide-react";
+import { CreditCard, GitMerge, KeyRound, Mail, MessageSquareQuote, Settings2, Webhook } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,6 +58,17 @@ export default async function SettingsPage() {
       title: t("webhooks.title"),
       description: t("webhooks.description"),
       need: "webhook:manage",
+    },
+    // ⚠️ Accanto ai webhook, e non altrove: chi collega un sistema esterno ha bisogno di
+    // entrambi nello stesso momento — la chiave per farsi chiamare, il segreto del webhook
+    // per verificare ciò che arriva — e trovarli in due posti diversi è dove una
+    // configurazione si ferma.
+    {
+      href: "/dashboard/settings/api",
+      icon: KeyRound,
+      title: "API",
+      description: "La chiave con cui un sistema esterno scrive qui dentro, e l'identificativo di questa attività.",
+      need: "settings:manage",
     },
   ];
 
