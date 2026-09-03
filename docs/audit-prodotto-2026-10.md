@@ -12,20 +12,32 @@ Aggiornato dopo il primo ciclo di correzioni.
 
 | | |
 |---|---|
-| ✅ Risolti | 35 |
-| ◐ Parziali | 4 |
-| Aperti | 27 |
+| ✅ Risolti | 47 |
+| ◐ Parziali | 3 |
+| Aperti | 16 |
 
 Verifiche dopo le correzioni: build di produzione riuscito, `tsc --noEmit` pulito,
-**134 test** superati (erano 91), **86 mutazioni su 86** catturate (erano 78), zero
-segnalazioni di correttezza da Biome sui file toccati. Tre nuove suite coprono il
-modello dei permessi, l'aritmetica dei documenti commerciali e l'allineamento delle
-traduzioni — cioè le tre aree dove un guasto somiglia a un successo.
+**189 test** superati (erano 91), **105 mutazioni su 105** catturate (erano 78), zero
+errori Biome sui file toccati. Le nuove suite coprono il modello dei permessi,
+l'aritmetica dei documenti commerciali, l'allineamento delle traduzioni, le
+migrazioni dei tenant, il confine server/client della sidebar, la corrispondenza fra
+nomi di aziende e la paginazione — cioè le aree dove un guasto somiglia a un
+successo.
 
-Una migrazione tenant, `0002_odd_ulik.sql`, aggiunge le colonne mancanti (data di
+I sedici punti ancora aperti sono quasi tutti opportunità (sezione 7) più quattro
+scelte di modello che richiedono una decisione di prodotto: M-01, M-02, M-06 e
+U-12. I difetti veri rimasti sono B-06 (allegati su filesystem), U-11 (polling) e
+U-13 (controllo duplicati alla digitazione).
+
+Due migrazioni tenant. `0002_odd_ulik.sql` aggiunge le colonne mancanti (data di
 chiusura e motivo di perdita sulle trattative, imponibile/imposta/valuta sugli ordini,
 fasi terminali sulla pipeline, scadenza di prima risposta sui ticket) e ripopola i dati
-esistenti. **Va applicata a ogni database tenant prima del deploy.**
+esistenti. `0003_open_jackpot.sql` rimuove la tabella `opportunity`, verificata vuota su
+ogni tenant. **Vanno applicate a ogni database tenant prima del deploy.**
+
+⚠️ Trovato durante il lavoro e non presente in questa analisi: il corpo dei messaggi
+dei ticket arriva dalle email dei clienti e viene reso senza sanitizzazione. Oggi lo
+contiene soltanto la Content-Security-Policy; il dettaglio è annotato nel codice.
 
 Legenda: ✅ risolto · ◐ risolto in parte, il resto è annotato nel rimedio.
 
@@ -173,7 +185,7 @@ la schermata bianca predefinita di Next con un codice diagnostico.
 **Rimedio.** Uno scheletro per gruppo di rotte, un `error.tsx` che distingua permesso
 negato, limite di piano ed errore tecnico, e `<Suspense>` sui riquadri secondari.
 
-### B-08 — Le liste caricano l'intera tabella, tutte le colonne
+### B-08 ✅ — Le liste caricano l'intera tabella, tutte le colonne
 
 **Cosa.** Contatti, lead e aziende selezionano ogni colonna di ogni riga e passano il
 risultato a un componente client. Nessun limite, nessuna paginazione, nessun ordinamento
@@ -338,7 +350,7 @@ pipeline.
 **Rimedio.** Assorbire i riquadri utili dentro Report e rimuovere la pagina, oppure
 inserirla in navigazione e correggere il link.
 
-### D-06 — La tabella `opportunity` è morta, ma vincola gli ordini
+### D-06 ✅ — La tabella `opportunity` è morta, ma vincola gli ordini
 
 **Cosa.** Nessuna query, nessuna azione, nessuna interfaccia la tocca. Ma la tabella
 ordini ha ancora una chiave esterna verso di essa.
@@ -349,7 +361,7 @@ preventivo che lo ha generato. È la causa strutturale di S-03.
 **Rimedio.** Migrare il riferimento verso trattativa e preventivo, poi eliminare la
 tabella.
 
-### D-07 — I limiti di piano quasi non esistono
+### D-07 ✅ — I limiti di piano quasi non esistono
 
 **Cosa.** `requirePlanModule` non è invocato da nessuna azione server.
 `requirePlanLimit` è applicato solo a contatti, lead, aziende e trattative. Task,
@@ -479,7 +491,7 @@ che il management guarda sono sottostimate.
 **Rimedio.** Intervalli espliciti «senza data» e «scaduto», cliccabili. «Impegnato» come
 somma piena, non ponderata. Valuta di presentazione unica e dichiarata.
 
-### C-09 — Il totale dei report è il numero di righe troncate
+### C-09 ✅ — Il totale dei report è il numero di righe troncate
 
 **Cosa.** Il costruttore restituisce come totale la lunghezza dell'array già limitato a
 mille righe. Il raggruppamento su una data raggruppa per timestamp esatto.
@@ -523,7 +535,7 @@ indirizzo, sorgente, punteggio e consensi marketing duplicati tra lead e contatt
 **Rimedio.** Eliminare l'opportunità. Valutare il lead come stato del contatto anziché
 tabella parallela.
 
-### M-03 — La conversione del lead non è atomica e non riconosce i duplicati
+### M-03 ✅ — La conversione del lead non è atomica e non riconosce i duplicati
 
 Otto scritture in sequenza senza transazione — un commento nel codice ne annuncia una
 che non c'è. L'azienda è cercata per uguaglianza esatta del nome. Il contatto non è
@@ -533,7 +545,7 @@ nasce a zero, senza data attesa.
 **Rimedio.** Transazione. Riusare il rilevamento duplicati con nome normalizzato e
 partita IVA. Chiedere valore e data attesa nello stesso passaggio.
 
-### M-04 — Nessuna azione usa una transazione
+### M-04 ◐ — Nessuna azione usa una transazione
 
 Preventivi, ordini e conversioni scrivono le righe in ciclo. L'aggiornamento di un
 preventivo cancella tutte le righe e le reinserisce: un errore dopo la cancellazione
@@ -557,14 +569,14 @@ dall'altro. La seconda ha una pagina; la prima solo azioni server.
 
 **Rimedio.** Completare la chat verso il cliente come canale del supporto, o rimuoverla.
 
-### M-07 — Due interfacce di autenticazione e tre percorsi di login
+### M-07 ✅ — Due interfacce di autenticazione e tre percorsi di login
 
 `/auth/v1/*` e `/auth/v2/*` coesistono, `/login` reindirizza. Nel codice il
 reindirizzamento verso `/login` compare in 13 punti e verso il percorso completo in 3.
 
 **Rimedio.** Una sola versione, e un'unica costante per il percorso di login.
 
-### M-08 — Validazione a due velocità
+### M-08 ✅ — Validazione a due velocità
 
 Preventivi, ticket e SLA validano con Zod. Lead, contatti e aziende accettano
 `data: any` e lo passano all'ORM.
@@ -626,7 +638,7 @@ funziona e non esiste alternativa da tastiera.
 **Rimedio.** Larghezza minima con scorrimento orizzontale, totali con valuta esplicita, e
 un'azione «sposta in fase» dal menu della scheda.
 
-### U-06 ◐ — Le date parlano tre lingue diverse, nessuna scelta dall'utente
+### U-06 ✅ — Le date parlano tre lingue diverse, nessuna scelta dall'utente
 
 La dashboard formatta con `it-IT` cablato, il forecast con `en-US`, il worker email con
 `en-GB`. Il fuso orario è quello del server, in produzione UTC.
@@ -650,7 +662,7 @@ amministratore e documentazione API.
 **Rimedio.** Preferenza nel profilo, rilevamento iniziale dall'intestazione, e le stringhe
 rimaste nel codice portate nei file di traduzione.
 
-### U-09 — I campi personalizzati non sono dove servono
+### U-09 ✅ — I campi personalizzati non sono dove servono
 
 Solo come pannello nella scheda di dettaglio di contatti, lead e aziende. Non nella
 trattativa, benché il tipo sia previsto. Non nelle modali di creazione, non nei report,
@@ -659,7 +671,7 @@ non nelle esportazioni, non su preventivi, ticket e ordini.
 **Rimedio.** Campi personalizzati nei form di creazione, come colonne opzionali nelle
 liste, nei filtri, nei report e nelle esportazioni.
 
-### U-10 ◐ — Il costruttore di report è riservato agli amministratori e legge una tabella per volta
+### U-10 ✅ — Il costruttore di report è riservato agli amministratori e legge una tabella per volta
 
 Ogni azione, inclusa la lettura, richiede `requireAdminAccess`. Non esistono join.
 Ticket e ordini non sono tra le entità disponibili.
