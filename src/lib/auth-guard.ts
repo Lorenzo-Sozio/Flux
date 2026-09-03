@@ -1,86 +1,162 @@
 /**
  * auth-guard.ts
- * Server-side helpers to enforce role-based access in Server Actions.
- * Call these at the top of any mutation action.
+ * Server-side enforcement of the capability model defined in `permissions.ts`.
+ * Call these at the top of any Server Action, route handler or Server Component.
+ *
+ * The rule that makes this work: **nothing outside this file reads a role
+ * directly**. Pages, actions and UI all ask for a capability, so the three
+ * layers cannot drift apart — which is exactly what happened before (audit
+ * rilievi P-01 → P-06, U-02).
  */
 import { auth } from "@/auth";
 import { getAdminSession } from "@/lib/admin-session";
 import { assertLimit, EntitlementError, getEntitlements, requireModule } from "@/lib/billing/licensing";
 import type { PlanLimits, PlanModule } from "@/lib/billing/plans-config";
 import { getTenantById } from "@/lib/get-tenant";
+import {
+  type Actor,
+  type Capability,
+  can,
+  isPlatformStaffRole,
+  normalizeTenantRole,
+  type TenantRole,
+} from "@/lib/permissions";
 import { getCurrentTenantId } from "@/lib/tenant-context";
 
 export class ForbiddenError extends Error {
-  constructor(message = "You do not have permission to perform this action.") {
+  /** Machine-readable so the client can tell "not allowed" from "network died". */
+  readonly code = "FORBIDDEN" as const;
+  readonly capability?: Capability;
+
+  constructor(message = "You do not have permission to perform this action.", capability?: Capability) {
     super(message);
     this.name = "ForbiddenError";
+    this.capability = capability;
+  }
+}
+
+export class UnauthenticatedError extends Error {
+  readonly code = "UNAUTHENTICATED" as const;
+
+  constructor(message = "You must be signed in to continue.") {
+    super(message);
+    this.name = "UnauthenticatedError";
   }
 }
 
 // Re-export for convenience
 export { EntitlementError, requireModule, assertLimit };
+export type { Actor, Capability, TenantRole };
 
-/** Returns the current session or throws if unauthenticated. */
-async function getSessionOrThrow() {
+// ─── Actor resolution ─────────────────────────────────────────────────────────
+
+/**
+ * Resolves the current actor from the session, or null when unauthenticated.
+ *
+ * `tenantRole` is the authority inside the workspace. `isPlatformStaff` is Flux's
+ * own staff, granted owner-equivalent data access so support can reproduce
+ * customer issues — and nothing more: no product feature may branch on it.
+ */
+export async function getActor(): Promise<Actor | null> {
   const session = await auth();
-  if (!session?.user?.id) throw new ForbiddenError("You must be logged in.");
-  return session;
+  if (!session?.user?.id) return null;
+
+  const user = session.user as { id: string; role?: string | null; tenantRole?: string | null };
+
+  return {
+    userId: session.user.id,
+    tenantRole: normalizeTenantRole(user.tenantRole),
+    isPlatformStaff: isPlatformStaffRole(user.role),
+    name: session.user.name ?? null,
+    email: session.user.email ?? null,
+  };
+}
+
+/** Resolves the current actor or throws. */
+export async function requireActor(): Promise<Actor> {
+  const actor = await getActor();
+  if (!actor) throw new UnauthenticatedError();
+  return actor;
 }
 
 /**
- * Requires write access within the active tenant.
- * Blocks tenant "viewer" role. Platform owner/admin always pass (superadmin override).
+ * The primary guard. Throws `UnauthenticatedError` when there is no session and
+ * `ForbiddenError` when the actor lacks the capability.
+ *
+ *   await requireCapability("quote:write");
  */
+export async function requireCapability(capability: Capability): Promise<Actor> {
+  const actor = await requireActor();
+  if (!can(actor, capability)) {
+    throw new ForbiddenError(FORBIDDEN_MESSAGES[capability] ?? DEFAULT_FORBIDDEN, capability);
+  }
+  return actor;
+}
+
+/** Non-throwing form, for deciding what to render. */
+export async function hasCapability(capability: Capability): Promise<boolean> {
+  const actor = await getActor();
+  return can(actor, capability);
+}
+
+/**
+ * Messages worth writing by hand, because the generic one leaves the user with
+ * nothing to do next. Anything absent falls back to DEFAULT_FORBIDDEN.
+ */
+const DEFAULT_FORBIDDEN = "You do not have permission to perform this action.";
+
+const FORBIDDEN_MESSAGES: Partial<Record<Capability, string>> = {
+  "record:write": "Your role is read-only. Ask a workspace admin for edit access.",
+  "record:delete": "Your role is read-only. Ask a workspace admin for edit access.",
+  "quote:write": "Your role is read-only. Ask a workspace admin for edit access.",
+  "quote:approve": "Only workspace admins can approve quotes.",
+  "ticket:write": "Your role is read-only. Ask a workspace admin for edit access.",
+  "ticket:delete": "Only workspace admins can delete tickets.",
+  "sla:manage": "Only workspace admins can change SLA policies.",
+  "settings:manage": "Only workspace admins can change settings.",
+  "pipeline:manage": "Only workspace admins can change the pipeline.",
+  "customField:manage": "Only workspace admins can manage custom fields.",
+  "webhook:manage": "Only workspace admins can manage webhooks.",
+  "automation:manage": "Only workspace admins can manage automation rules.",
+  "user:manage": "Only workspace admins can manage users.",
+  "group:manage": "Only workspace admins can manage groups.",
+  "billing:manage": "Only the workspace owner can change the subscription.",
+  "report:manage": "Only workspace admins can save or delete shared reports.",
+};
+
+// ─── Backwards-compatible aliases ─────────────────────────────────────────────
+//
+// Dozens of call sites use these two names. They now resolve through the
+// capability model, so behaviour is consistent everywhere without a sweeping
+// rename. Prefer `requireCapability` in new code — it says what it protects.
+
+/** Requires edit rights within the active workspace. Blocks `viewer`. */
 export async function requireWriteAccess() {
-  const session = await getSessionOrThrow();
-  const platformRole = session.user.role as string | undefined;
-  const tenantRole = (session.user as { tenantRole?: string | null }).tenantRole ?? undefined;
-
-  // Platform owner/admin bypass tenant-level restrictions
-  if (platformRole === "owner" || platformRole === "admin") return session;
-
-  if (tenantRole === "viewer") {
-    throw new ForbiddenError("Viewers cannot make changes.");
-  }
-  return session;
+  const actor = await requireCapability("record:write");
+  return { user: { id: actor.userId, role: actor.tenantRole } };
 }
 
-/**
- * Requires tenant "admin" or "owner" role.
- * Used for privileged CRM operations within a tenant: user management, webhooks, custom fields, settings.
- * Platform owner/admin always pass. Does NOT verify the admin panel cookie — use requireAdminPanelAccess() for /admin/* actions.
- */
+/** Requires workspace `admin` or `owner`. */
 export async function requireAdminAccess() {
-  const session = await getSessionOrThrow();
-  const platformRole = session.user.role as string | undefined;
-  const tenantRole = (session.user as { tenantRole?: string | null }).tenantRole ?? undefined;
-
-  // Platform owner/admin bypass tenant-level restrictions
-  if (platformRole === "owner" || platformRole === "admin") return session;
-
-  if (tenantRole !== "admin" && tenantRole !== "owner") {
-    throw new ForbiddenError("Only administrators can perform this action.");
-  }
-  return session;
+  const actor = await requireCapability("settings:manage");
+  return { user: { id: actor.userId, role: actor.tenantRole } };
 }
 
 /**
- * Verifies the admin_sess HMAC cookie (independent of the customer NextAuth session).
- * Use this in every /admin/* server action.
- * Returns { user: { id, role } } so callers can log the acting admin's identity.
+ * Verifies the admin_sess HMAC cookie (independent of the customer session).
+ * Use in every /admin/* server action. This is Flux staff, not a customer role.
  */
 export async function requireAdminPanelAccess(): Promise<{ user: { id: string; role: string } }> {
   const adminSession = await getAdminSession();
-  if (!adminSession || (adminSession.role !== "admin" && adminSession.role !== "owner")) {
-    throw new ForbiddenError("Admin panel authentication required. Please log in at /admin/login.");
+  if (!adminSession || !isPlatformStaffRole(adminSession.role)) {
+    throw new ForbiddenError("Admin panel authentication required. Please sign in at /admin/login.");
   }
   return { user: { id: adminSession.userId, role: adminSession.role } };
 }
 
-/**
- * Returns the current tenant's entitlements.
- * Returns null when called outside a tenant context (e.g., admin panel).
- */
+// ─── Entitlements ─────────────────────────────────────────────────────────────
+
+/** Returns the active tenant's entitlements, or null outside a tenant context. */
 export async function getTenantEntitlements() {
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return null;
@@ -91,10 +167,7 @@ export async function getTenantEntitlements() {
   return getEntitlements(tenant.id);
 }
 
-/**
- * Requires the tenant's subscription to be active (not suspended/canceled).
- * Call at the top of any action that requires a paid or free plan to be operational.
- */
+/** Requires the subscription to be operational. */
 export async function requireActiveSubscription() {
   const ent = await getTenantEntitlements();
   if (!ent) return; // outside tenant context — no subscription check
@@ -107,10 +180,7 @@ export async function requireActiveSubscription() {
   }
 }
 
-/**
- * Requires that a specific module is enabled on the tenant's plan.
- * Usage: await requirePlanModule("marketing");
- */
+/** Requires a module to be included in the tenant's plan. */
 export async function requirePlanModule(module: PlanModule) {
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return; // outside tenant context
@@ -121,10 +191,7 @@ export async function requirePlanModule(module: PlanModule) {
   await requireModule(tenant.id, module);
 }
 
-/**
- * Asserts a quantitative plan limit hasn't been reached.
- * Usage: await requirePlanLimit("maxRecords", currentCount);
- */
+/** Asserts a quantitative plan limit hasn't been reached. */
 export async function requirePlanLimit(metric: keyof PlanLimits, currentValue: number) {
   const tenantId = await getCurrentTenantId();
   if (!tenantId) return; // outside tenant context

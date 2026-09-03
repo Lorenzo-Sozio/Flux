@@ -1,8 +1,19 @@
 import { eq } from "drizzle-orm";
 
-import { dispatchWebhook } from "@/actions/webhooks";
+import { dispatchWebhook, type WebhookDispatchDb } from "@/actions/webhooks";
 import { contacts, type quotes } from "@/db/schema";
+import { getAppUrlOrNull } from "@/lib/app-url";
 import { getDb } from "@/lib/tenant-context";
+
+/**
+ * The workspace these events belong to.
+ *
+ * Server actions leave it out and the active tenant comes from the request. The
+ * public quote page has no request tenant at all, so it passes one explicitly —
+ * without this the customer's own accept/decline could not be announced, and the
+ * page itself returned a 500 before reaching this point (audit rilievo B-01).
+ */
+type EventDb = WebhookDispatchDb | undefined;
 
 /**
  * Tell the integrations that a quote has left, with an address they can hand to the person.
@@ -16,8 +27,8 @@ import { getDb } from "@/lib/tenant-context";
  * ⚠️ The contact's phone and email travel because that is the only thing both systems have
  * in common: our id for this person means nothing on the other side.
  */
-async function reachOf(quote: typeof quotes.$inferSelect) {
-  const db = await getDb();
+async function reachOf(quote: typeof quotes.$inferSelect, explicitDb?: EventDb) {
+  const db = explicitDb ?? (await getDb());
   const contact = quote.contactId
     ? await db.query.contacts.findFirst({ where: eq(contacts.id, quote.contactId) })
     : null;
@@ -62,32 +73,33 @@ export async function announceQuoteDecision(
   quote: typeof quotes.$inferSelect,
   decision: "accepted" | "declined",
   actor: string | null,
+  explicitDb?: EventDb,
 ) {
   await dispatchWebhook(
     decision === "accepted" ? "quote.accepted" : "quote.declined",
     {
       quote: { id: quote.id, number: quote.quoteNumber, version: quote.version },
-      ...(await reachOf(quote)),
+      ...(await reachOf(quote, explicitDb)),
     },
     { via: "user", actor },
+    explicitDb,
   ).catch((e) => console.error(`[quotes] quote.${decision} not dispatched`, e));
 }
 
-export async function announceQuoteSent(quote: typeof quotes.$inferSelect, actor: string) {
-  const base = process.env.NEXTAUTH_URL;
+export async function announceQuoteSent(quote: typeof quotes.$inferSelect, actor: string, explicitDb?: EventDb) {
+  // One accessor for the public origin, shared with every other outbound link.
+  // Three variables used to answer this question and disagreed (audit rilievo B-04).
+  const base = getAppUrlOrNull();
   if (!base) {
-    console.warn("[quotes] NEXTAUTH_URL is unset: the quote event carries no address");
+    console.warn("[quotes] NEXT_PUBLIC_APP_URL is unset: the quote event carries no address");
   }
-  const url =
-    base && quote.publicToken
-      ? `${base.replace(/\/$/, "")}/api/quotes/${quote.id}/pdf?token=${quote.publicToken}`
-      : undefined;
+  const url = base && quote.publicToken ? `${base}/api/quotes/${quote.id}/pdf?token=${quote.publicToken}` : undefined;
 
   await dispatchWebhook(
     "quote.sent",
     {
       quote: { id: quote.id, number: quote.quoteNumber, version: quote.version },
-      ...(await reachOf(quote)),
+      ...(await reachOf(quote, explicitDb)),
       url,
       // ⚠️ What the recipient sees instead of a preview. Without it an attachment arrives
       // nameless, which looks a lot like something not to open.
@@ -96,5 +108,6 @@ export async function announceQuoteSent(quote: typeof quotes.$inferSelect, actor
     // A person pressed send. Marking this `api` would make an integration that filters its
     // own writes ignore the one event it is waiting for.
     { via: "user", actor },
+    explicitDb,
   ).catch((e) => console.error("[quotes] quote.sent not dispatched", e));
 }

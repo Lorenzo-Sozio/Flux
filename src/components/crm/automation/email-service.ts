@@ -15,18 +15,24 @@
 import { eq } from "drizzle-orm";
 
 import { campaignLogs, companies, contacts, deals, leads, users } from "@/db/schema";
+import { getAppUrl } from "@/lib/app-url";
 import { getDb } from "@/lib/tenant-context";
 
 import { executeWithRetryTracked } from "../../crm/automation/retry-engine";
 import type { RuleContext } from "../../crm/automation/types";
 
-const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+// Resolved per call, not at import: `getAppUrl()` refuses to guess in production,
+// and a module-scope call would make that refusal a build failure rather than a
+// clear error on the request that was about to send a wrong link (rilievo B-04).
+function appBase(): string {
+  return getAppUrl();
+}
 
 /** Wraps external links for click tracking (same helper as marketing.ts). */
 function wrapLinksForTracking(html: string, logId: string): string {
   return html.replace(/href="(https?:\/\/[^"]+)"/gi, (match, url: string) => {
     if (url.includes("/api/track/") || url.includes("/api/unsubscribe")) return match;
-    const tracked = `${APP_URL}/api/track/click?log=${encodeURIComponent(logId)}&url=${encodeURIComponent(url)}`;
+    const tracked = `${appBase()}/api/track/click?log=${encodeURIComponent(logId)}&url=${encodeURIComponent(url)}`;
     return `href="${tracked}"`;
   });
 }
@@ -198,7 +204,7 @@ export async function sendAutomationEmailWithContext(
     finalBody = wrapLinksForTracking(finalBody, log.id);
   }
   if (trackOpens) {
-    finalBody = `${finalBody}\n<img src="${APP_URL}/api/track/open?log=${encodeURIComponent(log.id)}" width="1" height="1" alt="" style="display:none" />`;
+    finalBody = `${finalBody}\n<img src="${appBase()}/api/track/open?log=${encodeURIComponent(log.id)}" width="1" height="1" alt="" style="display:none" />`;
   }
 
   const result = await sendAutomationEmail(finalTo, finalCc, finalBcc, finalSubject, finalBody);

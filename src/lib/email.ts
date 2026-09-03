@@ -2,9 +2,16 @@
  * email.ts — system email helpers (auth, invitations, task reminders).
  * Campaign email is handled separately via email-provider + marketing.ts.
  */
+
+import { getAppUrl } from "@/lib/app-url";
 import { getPlatformEmailConfig, sendEmail } from "@/lib/email-provider";
 
-const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+// Resolved per call, not at import: `getAppUrl()` refuses to guess in production,
+// and a module-scope call would make that refusal a build failure rather than a
+// clear error on the request that was about to send a wrong link (rilievo B-04).
+function appBase(): string {
+  return getAppUrl();
+}
 
 /**
  * Strip CR/LF from any string used in email headers (To, Subject, From…).
@@ -66,7 +73,7 @@ export async function sendPasswordResetEmail(
   email: string,
   token: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const resetUrl = `${APP_URL}/auth/v1/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
+  const resetUrl = `${appBase()}/auth/v1/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
   const config = await getPlatformEmailConfig();
   const result = await sendEmail(
     {
@@ -99,7 +106,7 @@ export async function sendInvitationEmail(
   invitedByName: string,
   role: string,
 ): Promise<{ success: boolean; inviteUrl: string; error?: string }> {
-  const inviteUrl = `${APP_URL}/auth/v1/accept-invitation?token=${token}`;
+  const inviteUrl = `${appBase()}/auth/v1/accept-invitation?token=${token}`;
   const safeName = esc(sanitizeHeader(invitedByName));
   const safeRole = esc(sanitizeHeader(role));
   const config = await getPlatformEmailConfig();
@@ -133,7 +140,7 @@ export async function sendInvitationEmail(
 // ─── Email Verification ───────────────────────────────────────────────────────
 
 export async function sendVerificationEmail(email: string, token: string) {
-  const verifyUrl = `${APP_URL}/auth/verify-email?token=${token}&email=${encodeURIComponent(email)}`;
+  const verifyUrl = `${appBase()}/auth/verify-email?token=${token}&email=${encodeURIComponent(email)}`;
 
   if (!process.env.RESEND_API_KEY && !process.env.SMTP_HOST) {
     console.log("[DEV] Email verification link:", verifyUrl);
@@ -236,7 +243,7 @@ export async function sendActivityReminderEmail(
             <td style="padding:8px 12px;border:1px solid #e5e7eb">${dateStr}</td>
           </tr>
         </table>
-        <a href="${APP_URL}${link}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">
+        <a href="${appBase()}${link}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">
           View in CRM
         </a>
       </div>`,
@@ -409,7 +416,7 @@ export async function sendTaskDueEmail(email: string, taskTitle: string, taskLin
       <div style="font-family:sans-serif;max-width:480px;margin:0 auto">
         <h2>Task Reminder</h2>
         <p>Your task <strong>${esc(taskTitle)}</strong> is due today.</p>
-        <a href="${APP_URL}${taskLink}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">
+        <a href="${appBase()}${taskLink}" style="display:inline-block;padding:12px 24px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-weight:600">
           View Task
         </a>
       </div>`,

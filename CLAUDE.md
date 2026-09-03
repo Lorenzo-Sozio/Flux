@@ -49,6 +49,27 @@ Bearer header — they are plain GET endpoints.
 
 ⚠️ A route nobody calls is a job that silently does not run: nothing logs the absence.
 
+**A cron route is one function, run once per workspace.** Write it as a body and hand
+it to `runCronJob`, which authenticates the request, iterates the tenant registry and
+sets the active workspace around each call — so anything it invokes, including server
+actions written for the dashboard, resolves `getDb()` to the right database:
+
+```ts
+export async function GET(req: Request) {
+  return runCronJob("ticket-autoclose", req, async (db, tenant) => ({ closed: await closeThem(db) }));
+}
+```
+
+⚠️ **Never call `getDb()` from a cron route, a webhook, or any public page.** It reads
+the `x-tenant-id` header the proxy injects only for authenticated dashboard requests,
+and throws when it is absent. Every one of these entry points used to call it anyway:
+all seven jobs, the public quote page, click and open tracking, unsubscribe, RSVP and
+the Resend delivery callback. None of them worked, and none of them said so.
+
+Outside the dashboard the tenant comes from the data, not from the request:
+`forEachTenant` / `runCronJob` for scheduled work, and `resolveTenantByProbe` for an
+opaque token (see [src/lib/tenant-resolve.ts](src/lib/tenant-resolve.ts)).
+
 ```
 webhook-retry        every 5 minutes   redelivers failed webhook events
 email-worker         every minute      sends queued emails
@@ -75,6 +96,49 @@ npm run cf:preview   # build, then run it locally on workerd
 npm run cf:deploy    # build + wrangler deploy
 npm run cf:typegen   # regenerate cloudflare-env.d.ts from the bindings
 ```
+
+**Cloudflare Workers Builds** (deploy from the dashboard) must be configured as:
+
+| | |
+|---|---|
+| Build command | `npx opennextjs-cloudflare build` |
+| Deploy command | `npx wrangler deploy --keep-vars` |
+
+⚠️⚠️ **`--keep-vars` is not optional.** Without it `wrangler deploy` treats
+wrangler.jsonc as the complete list of the Worker's variables and **deletes every
+secret that is not in it** — `DATABASE_URL`, `AUTH_SECRET`, `PLATFORM_ENCRYPTION_KEY`,
+`CRON_SECRET`, `RESEND_API_KEY` and the rest, all of which are set with
+`wrangler secret put` and therefore appear nowhere in the config file.
+
+Nothing fails at deploy time. The next request is what fails: without
+`PLATFORM_ENCRYPTION_KEY` no tenant database can be decrypted, so the Worker answers
+every page with an error, and the deploy that caused it looks like it succeeded. The
+`cf:deploy` and `cf:upload` scripts already pass the flag; the dashboard uses whatever
+is typed in that box, so it has to be typed there too.
+
+⚠️ `NEXT_PUBLIC_*` variables are inlined by Next at **build** time, so the `vars` block
+in wrangler.jsonc reaches the runtime but not the build. `NEXT_PUBLIC_APP_URL` and
+`NEXT_PUBLIC_ROOT_DOMAIN` must also exist as **build** environment variables in the
+Workers Builds settings, or the client bundle is compiled with them empty.
+
+⚠️ Leaving the build command at the auto-detected `npm run build` produces `.next/`
+but not `.open-next/`, and the deploy fails with:
+
+```
+ERROR Could not find compiled Open Next config, did you run the build command?
+```
+
+The message is confusing because it comes from a command nobody typed. Since
+[open-next.config.ts](open-next.config.ts) exists, `wrangler deploy` detects an OpenNext
+project and silently re-dispatches to `opennextjs-cloudflare deploy`, which needs
+`.open-next/.build/open-next.config.edge.mjs` — an artifact only `opennextjs-cloudflare
+build` produces. Detection needs all three of `next.config.*`, `open-next.config.*`, and
+an installed `@opennextjs/cloudflare`; it is skipped for `--dry-run`, `--config`, and
+`--no-autoconfig`, which is why `wrangler deploy --dry-run` validates fine while the real
+deploy does not.
+
+If the dashboard build command cannot be changed, setting the **deploy** command to
+`npm run cf:deploy` also works — it builds and deploys in one step.
 
 ⚠️ **The Worker name lives in three places and they must agree**: `name` in
 wrangler.jsonc, the `service` of the `WORKER_SELF_REFERENCE` binding, and the Worker
@@ -108,9 +172,24 @@ process:
   migration SQL from `process.cwd()`.
 - `src/app/api/documents/[id]/route.ts` reads uploads from disk.
 
-Secrets go on the Worker with `wrangler secret put`, not in `.env`. `NEXT_PUBLIC_APP_URL`
-is needed twice: at build time (Next inlines it) and at runtime (custom-worker.ts uses it
-as the cron base URL).
+⚠️ Document uploads are broken on **Vercel** too, not only on Workers, and the failure
+is quieter there: the filesystem is per-instance and per-deploy, so a file written by
+one request can be missing from the next and is certainly gone after a redeploy. This
+needs object storage before attachments can be relied on.
+
+Secrets go on the Worker with `wrangler secret put`, not in `.env`.
+
+⚠️ **One accessor for the public origin**: [src/lib/app-url.ts](src/lib/app-url.ts).
+Three variables used to answer that question in different files, all falling back to
+`http://localhost:3000`, so invitations, password resets, unsubscribe links, tracking
+pixels and public quote links went out pointing at a developer's machine — delivered
+successfully, to nowhere. `getAppUrl()` throws in production rather than guess;
+`getAppUrlOrNull()` is for callers that would rather omit a link than send a wrong one.
+`NEXT_PUBLIC_APP_URL` is needed twice: at build time (Next inlines it) and at runtime
+(custom-worker.ts uses it as the cron base URL).
+
+`src/lib/env-check.ts` reports every missing variable at once during boot, instead of
+one cryptic failure per deploy.
 
 ### Database (Drizzle ORM + Neon Postgres)
 
@@ -172,10 +251,41 @@ All mutations go through Server Actions in [src/actions/](src/actions/). They fo
 
 - **NextAuth v5** with Drizzle adapter ([src/auth.ts](src/auth.ts))
 - Providers: Google OAuth + Credentials (email/password with bcrypt)
-- Four roles: `owner` > `admin` > `editor` > `viewer`
-- Route protection in middleware ([src/middleware.ts](src/middleware.ts)): `/dashboard/users`, `/dashboard/roles`, `/dashboard/settings` require admin/owner
-- Server Action protection via `requireWriteAccess()` (blocks `viewer`) and `requireAdminAccess()` (requires `admin`/`owner`)
-- `viewer` role is **read-only** everywhere — always guard mutations
+
+⚠️ **There are two role scales and they mean different things.** Conflating them
+was the most damaging defect this codebase has had, so the distinction is now
+enforced in one place:
+
+| | Where | Who | Read it via |
+|---|---|---|---|
+| **Workspace role** | `tenant_members.role` | the customer's own people: `owner` > `admin` > `editor` > `viewer` | `session.user.tenantRole` |
+| **Platform role** | `user.role` | Flux's own staff, who operate `/admin` across all tenants | `session.user.role` |
+
+A workspace role is never a platform credential, and the customer-facing UI must
+never write `user.role` — that was a one-click path from "tenant admin" to
+"superadmin over every customer".
+
+**Never compare a role string.** Ask for a capability:
+
+```ts
+// server action / route handler
+const actor = await requireCapability("quote:write");   // throws ForbiddenError
+
+// server component
+const actor = await requirePageCapability("settings:manage");  // redirects, with a reason
+
+// client component, from a role prop
+{can(tenantRole, "record:write") && <Button>New contact</Button>}
+```
+
+The capability table lives in [src/lib/permissions.ts](src/lib/permissions.ts) —
+a pure module imported by actions, pages *and* client components, which is what
+stops the three layers drifting apart. Add a capability there rather than writing
+a comparison at the call site. `requireWriteAccess()` and `requireAdminAccess()`
+remain as aliases over `record:write` and `settings:manage`.
+
+`viewer` is **read-only** everywhere. `src/lib/permissions.test.ts` and
+`scripts/mutations/permissions.json` hold that line.
 
 ### Automation Engine
 

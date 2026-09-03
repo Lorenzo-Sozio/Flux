@@ -11,6 +11,7 @@ import {
   FileText,
   Headphones,
   Kanban,
+  Lock,
   MessageSquare,
   PlusCircleIcon,
   ShoppingCart,
@@ -40,7 +41,7 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
-import type { NavGroup, NavMainItem } from "@/navigation/sidebar/sidebar-items";
+import type { NavGroup, NavMainItem, NavSubItem } from "@/navigation/sidebar/sidebar-items";
 
 interface NavMainProps {
   readonly items: readonly NavGroup[];
@@ -50,6 +51,20 @@ const IsComingSoon = () => (
   <span className="ml-auto rounded-md bg-gray-200 px-2 py-1 text-xs dark:text-gray-800">Soon</span>
 );
 
+/**
+ * A module the plan does not include.
+ *
+ * Shown and locked rather than hidden: clicking used to bounce through billing
+ * and back to the dashboard with nothing said, which is both confusing and the
+ * biggest missed upgrade prompt in the product (audit rilievo D-08). The link
+ * goes straight to the plan comparison, carrying which module was wanted.
+ */
+const LockedBadge = () => <Lock className="ml-auto size-3.5 shrink-0 text-muted-foreground" />;
+
+function lockHref(module: string | undefined) {
+  return `/dashboard/settings/billing${module ? `?upgrade=${encodeURIComponent(module)}` : ""}`;
+}
+
 const NavItemExpanded = ({
   item,
   isActive,
@@ -57,11 +72,12 @@ const NavItemExpanded = ({
   t,
 }: {
   item: NavMainItem;
-  isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
-  isSubmenuOpen: (subItems?: NavMainItem["subItems"]) => boolean;
+  isActive: (url: string, subItems?: NavSubItem[]) => boolean;
+  isSubmenuOpen: (subItems?: NavSubItem[]) => boolean;
   t: ReturnType<typeof useTranslations<"nav">>;
 }) => {
   const title = t(`items.${item.titleKey}` as any);
+  const locked = Boolean(item.locked);
   return (
     <Collapsible key={item.titleKey} asChild defaultOpen={isSubmenuOpen(item.subItems)} className="group/collapsible">
       <SidebarMenuItem>
@@ -87,11 +103,22 @@ const NavItemExpanded = ({
           </>
         ) : (
           <CollapsibleTrigger asChild>
-            <SidebarMenuButton asChild aria-disabled={item.comingSoon} isActive={isActive(item.url)} tooltip={title}>
-              <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
+            <SidebarMenuButton
+              asChild
+              aria-disabled={item.comingSoon}
+              isActive={isActive(item.url)}
+              tooltip={locked ? `${title} — not included in your plan` : title}
+            >
+              <Link
+                prefetch={false}
+                href={locked ? lockHref(item.lockedModule) : item.url}
+                target={item.newTab && !locked ? "_blank" : undefined}
+                className={locked ? "opacity-60" : undefined}
+              >
                 {item.icon && <item.icon />}
                 <span>{title}</span>
                 {item.comingSoon && <IsComingSoon />}
+                {locked && <LockedBadge />}
               </Link>
             </SidebarMenuButton>
           </CollapsibleTrigger>
@@ -102,10 +129,16 @@ const NavItemExpanded = ({
               {item.subItems.map((subItem) => (
                 <SidebarMenuSubItem key={subItem.titleKey}>
                   <SidebarMenuSubButton aria-disabled={subItem.comingSoon} isActive={isActive(subItem.url)} asChild>
-                    <Link prefetch={false} href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
+                    <Link
+                      prefetch={false}
+                      href={subItem.locked ? lockHref(subItem.lockedModule) : subItem.url}
+                      target={subItem.newTab && !subItem.locked ? "_blank" : undefined}
+                      className={subItem.locked ? "opacity-60" : undefined}
+                    >
                       {subItem.icon && <subItem.icon />}
                       <span>{t(`items.${subItem.titleKey}` as any)}</span>
                       {subItem.comingSoon && <IsComingSoon />}
+                      {subItem.locked && <LockedBadge />}
                     </Link>
                   </SidebarMenuSubButton>
                 </SidebarMenuSubItem>
@@ -124,7 +157,7 @@ const NavItemCollapsed = ({
   t,
 }: {
   item: NavMainItem;
-  isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
+  isActive: (url: string, subItems?: NavSubItem[]) => boolean;
   t: ReturnType<typeof useTranslations<"nav">>;
 }) => {
   const title = t(`items.${item.titleKey}` as any);
@@ -195,7 +228,7 @@ export function NavMain({ items }: NavMainProps) {
                   </SidebarMenuButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-52" side="right" align="start">
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                  <DropdownMenuLabel className="text-muted-foreground text-xs">
                     {t("quickCreate.crm")}
                   </DropdownMenuLabel>
                   <DropdownMenuItem asChild>
@@ -219,7 +252,7 @@ export function NavMain({ items }: NavMainProps) {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                  <DropdownMenuLabel className="text-muted-foreground text-xs">
                     {t("quickCreate.sales")}
                   </DropdownMenuLabel>
                   <DropdownMenuItem asChild>
@@ -233,7 +266,7 @@ export function NavMain({ items }: NavMainProps) {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-xs text-muted-foreground">
+                  <DropdownMenuLabel className="text-muted-foreground text-xs">
                     {t("quickCreate.work")}
                   </DropdownMenuLabel>
                   <DropdownMenuItem asChild>

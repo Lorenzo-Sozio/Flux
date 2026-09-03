@@ -10,24 +10,23 @@
  *
  * The scheduler should pass the header: Authorization: Bearer <CRON_SECRET>
  */
-import { type NextRequest, NextResponse } from "next/server";
-
 import { eq } from "drizzle-orm";
 
 import { getActivitiesDueToday } from "@/actions/activities";
 import { createNotificationAction } from "@/actions/auth";
 import { getTasksDueToday } from "@/actions/tasks";
 import { users } from "@/db/schema";
-import { verifyCronRequest } from "@/lib/cron-auth";
+import { runCronJob } from "@/lib/cron-runner";
 import { sendActivityReminderEmail, sendTaskDueEmail } from "@/lib/email";
-import { getDb } from "@/lib/tenant-context";
+import type { TenantDb } from "@/lib/tenant-resolve";
 
-export async function GET(req: NextRequest) {
-  const authError = verifyCronRequest(req);
-  if (authError) return authError;
+// Runs once per workspace, with the active tenant set around the call so the
+// dashboard actions it reuses resolve to the right database (rilievo B-02).
+export async function GET(req: Request) {
+  return runCronJob("task-reminders", req, runForTenant);
+}
 
-  const db = await getDb();
-
+async function runForTenant(db: TenantDb) {
   const dueTasks = await getTasksDueToday();
   let notified = 0;
 
@@ -56,6 +55,8 @@ export async function GET(req: NextRequest) {
 
     // Email notification
     if (user.email) {
+      // One recipient whose mail bounces must not stop the sweep for everyone else.
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: best-effort delivery
       await sendTaskDueEmail(user.email, task.title, link).catch(() => {});
     }
 
@@ -90,21 +91,22 @@ export async function GET(req: NextRequest) {
       title: `${typeLabel} today: "${description}"`,
       message: `You have a ${typeLabel.toLowerCase()} scheduled today.`,
       link,
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
     }).catch(() => {});
 
     if (user.email && activity.date) {
+      // One recipient whose mail bounces must not stop the sweep for everyone else.
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: best-effort delivery
       await sendActivityReminderEmail(user.email, activity.type, description, activity.date, link).catch(() => {});
     }
 
     activitiesNotified++;
   }
 
-  return NextResponse.json({
-    ok: true,
+  return {
     tasksFound: dueTasks.length,
     notified,
     activitiesFound: dueActivities.length,
     activitiesNotified,
-    timestamp: new Date().toISOString(),
-  });
+  };
 }

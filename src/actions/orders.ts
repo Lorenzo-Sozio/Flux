@@ -2,13 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 
-import { desc, eq, ilike, or, sql } from "drizzle-orm";
+import { desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { auth } from "@/auth";
+import { dispatchWebhook } from "@/actions/webhooks";
 import { companies, contacts, orderItems, orders, products, users } from "@/db/schema";
-import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
-import { convertToEur, getExchangeRates } from "@/lib/exchange-rates";
+import { requireCapability } from "@/lib/auth-guard";
+import { computeDocument } from "@/lib/document-totals";
 import { getDb } from "@/lib/tenant-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -17,23 +17,67 @@ export type OrderStatus = "draft" | "processing" | "completed" | "cancelled";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function generateOrderNumber(): string {
-  const now = new Date();
-  const y = now.getFullYear().toString().slice(-2);
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  const rnd = Math.floor(Math.random() * 9000) + 1000;
-  return `ORD-${y}${m}${d}-${rnd}`;
+/**
+ * The next order number for the current year.
+ *
+ * The previous version appended four random digits to a date. On a unique column
+ * that means a collision surfaces to the user as a raw SQL error on a save they
+ * believe succeeded, and a customer receives a document whose number carries no
+ * sequence — which is not what a commercial document is for (audit rilievo C-05).
+ *
+ * Derived from the highest number already issued this year, so it survives the
+ * absence of a database sequence and stays readable: ORD-2026-0007.
+ */
+async function nextOrderNumber(db: Awaited<ReturnType<typeof getDb>>): Promise<string> {
+  const year = new Date().getFullYear();
+  const prefix = `ORD-${year}-`;
+
+  const [row] = await db
+    .select({ last: sql<string | null>`max(${orders.orderNumber})` })
+    .from(orders)
+    .where(sql`${orders.orderNumber} LIKE ${`${prefix}%`}`);
+
+  const lastSeq = row?.last ? Number.parseInt(row.last.slice(prefix.length), 10) : 0;
+  const next = Number.isFinite(lastSeq) ? lastSeq + 1 : 1;
+  return `${prefix}${String(next).padStart(4, "0")}`;
+}
+
+/**
+ * Totals for an order, using the same arithmetic as a quote.
+ *
+ * Orders applied no tax at all and recomputed their total by summing line prices,
+ * so the same content quoted and ordered showed two different figures. The tax
+ * rate held on the product was never read (audit rilievo C-04).
+ */
+async function orderTotals(
+  db: Awaited<ReturnType<typeof getDb>>,
+  items: { productId: string; quantity: number; unitPrice: number; discountPercent?: number }[],
+  discountPercent = 0,
+) {
+  const ids = [...new Set(items.map((i) => i.productId))];
+  const rows = ids.length
+    ? await db
+        .select({ id: products.id, taxPercent: products.taxPercent })
+        .from(products)
+        .where(inArray(products.id, ids))
+    : [];
+  const taxByProduct = new Map(rows.map((r) => [r.id, Number(r.taxPercent ?? 0)]));
+
+  return computeDocument({
+    lines: items.map((i) => ({
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+      discountPercent: i.discountPercent ?? 0,
+      taxPercent: taxByProduct.get(i.productId) ?? 0,
+    })),
+    discountPercent,
+  });
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export async function getOrders(search?: string) {
   const db = await getDb();
-  const companyAlias = db.$with("co").as(db.select().from(companies));
-  const contactAlias = db.$with("ct").as(db.select().from(contacts));
-  const ownerAlias = db.$with("ow").as(db.select().from(users));
-
   const rows = await db
     .select({
       id: orders.id,
@@ -130,112 +174,202 @@ export async function getOrderStats() {
 const createSchema = z.object({
   companyId: z.string().optional(),
   contactId: z.string().optional(),
+  quoteId: z.string().optional(),
+  dealId: z.string().optional(),
   status: z.enum(["draft", "processing", "completed", "cancelled"]).default("draft"),
   orderDate: z.string().optional(),
   currency: z.string().default("EUR"),
+  discountPercent: z.coerce.number().min(0).max(100).default(0),
   items: z
     .array(
       z.object({
         productId: z.string().min(1),
         quantity: z.coerce.number().int().min(1),
         unitPrice: z.coerce.number().min(0),
+        discountPercent: z.coerce.number().min(0).max(100).default(0),
       }),
     )
     .min(1, "At least one item is required"),
 });
 
-export async function createOrder(data: z.infer<typeof createSchema>) {
-  await requireWriteAccess();
+export async function createOrder(data: z.input<typeof createSchema>) {
+  const actor = await requireCapability("order:write");
   const db = await getDb();
-  const session = await auth();
   const validated = createSchema.parse(data);
 
-  const inputCurrency = (validated.currency || "EUR").toUpperCase();
-  let conversionRate = 1;
-  if (inputCurrency !== "EUR") {
-    const { rates } = await getExchangeRates();
-    const rate = rates[inputCurrency.toLowerCase()];
-    if (rate) conversionRate = 1 / rate;
-  }
+  // The order keeps the currency it was written in, like a quote does. Converting
+  // everything to EUR and discarding the original made the document unreadable to
+  // an international customer (audit rilievi C-02, C-04).
+  const currency = (validated.currency || "EUR").toUpperCase();
 
-  // All monetary amounts are stored in EUR
-  const toEur = (amount: number) => amount * conversionRate;
-
-  const totalAmount = validated.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  const totals = await orderTotals(db, validated.items, validated.discountPercent);
 
   const [order] = await db
     .insert(orders)
     .values({
-      orderNumber: generateOrderNumber(),
+      orderNumber: await nextOrderNumber(db),
       companyId: validated.companyId || null,
       contactId: validated.contactId || null,
-      ownerId: session?.user?.id ?? null,
+      quoteId: validated.quoteId || null,
+      dealId: validated.dealId || null,
+      ownerId: actor.userId,
       status: validated.status,
-      totalAmount: String(toEur(totalAmount)),
+      currency,
+      subtotal: String(totals.subtotal),
+      discountPercent: String(totals.discountPercent),
+      discountAmount: String(totals.discountAmount),
+      taxAmount: String(totals.taxAmount),
+      totalAmount: String(totals.total),
       orderDate: validated.orderDate ? new Date(validated.orderDate) : new Date(),
     })
     .returning();
 
   await db.insert(orderItems).values(
-    validated.items.map((item) => ({
-      orderId: order.id,
-      productId: item.productId,
-      quantity: item.quantity,
-      unitPrice: String(toEur(item.unitPrice)),
-      totalPrice: String(toEur(item.quantity * item.unitPrice)),
-    })),
+    validated.items.map((item, i) => {
+      const line = totals.lines[i];
+      return {
+        orderId: order.id,
+        productId: item.productId,
+        quantity: item.quantity,
+        unitPrice: String(item.unitPrice),
+        discountPercent: String(item.discountPercent ?? 0),
+        discountAmount: String(line.discountAmount),
+        taxPercent: String(line.taxPercent),
+        taxAmount: String(line.taxAmount),
+        totalPrice: String(line.total),
+      };
+    }),
   );
 
   revalidatePath("/dashboard/sales/orders");
+
+  // The pattern every other module follows and this one skipped entirely: no
+  // webhook, no automation, no trace on the customer record. An order completing
+  // is the moment the business gets paid, and nothing could react to it
+  // (audit rilievo M-05).
+  dispatchWebhook("order.created", {
+    id: order.id,
+    number: order.orderNumber,
+    total: order.totalAmount,
+    currency: order.currency,
+    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+  }).catch(() => {});
+
   return order;
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus) {
-  await requireWriteAccess();
+  await requireCapability("order:write");
   const db = await getDb();
-  await db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, id));
+  const [updated] = await db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, id)).returning();
+
   revalidatePath("/dashboard/sales/orders");
   revalidatePath(`/dashboard/sales/orders/${id}`);
+
+  if (updated) {
+    dispatchWebhook(`order.${status}`, {
+      id: updated.id,
+      number: updated.orderNumber,
+      total: updated.totalAmount,
+      currency: updated.currency,
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+    }).catch(() => {});
+  }
 }
 
-export async function addOrderItem(orderId: string, item: { productId: string; quantity: number; unitPrice: number }) {
-  await requireWriteAccess();
+export async function addOrderItem(
+  orderId: string,
+  item: { productId: string; quantity: number; unitPrice: number; discountPercent?: number },
+) {
+  await requireCapability("order:write");
   const db = await getDb();
+
   await db.insert(orderItems).values({
     orderId,
     productId: item.productId,
     quantity: item.quantity,
     unitPrice: String(item.unitPrice),
-    totalPrice: String(item.quantity * item.unitPrice),
+    discountPercent: String(item.discountPercent ?? 0),
+    totalPrice: "0", // replaced by the recalculation below
   });
 
-  // Recalculate total
-  const allItems = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
-  const total = allItems.reduce((s, i) => s + Number(i.totalPrice), 0);
-  await db
-    .update(orders)
-    .set({ totalAmount: String(total), updatedAt: new Date() })
-    .where(eq(orders.id, orderId));
+  await recalcOrder(db, orderId);
   revalidatePath(`/dashboard/sales/orders/${orderId}`);
 }
 
 export async function removeOrderItem(itemId: string, orderId: string) {
-  await requireWriteAccess();
+  await requireCapability("order:write");
   const db = await getDb();
   await db.delete(orderItems).where(eq(orderItems.id, itemId));
-
-  const allItems = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
-  const total = allItems.reduce((s, i) => s + Number(i.totalPrice), 0);
-  await db
-    .update(orders)
-    .set({ totalAmount: String(total), updatedAt: new Date() })
-    .where(eq(orders.id, orderId));
+  await recalcOrder(db, orderId);
   revalidatePath(`/dashboard/sales/orders/${orderId}`);
 }
 
+/**
+ * Recomputes an order from its lines.
+ *
+ * Adding a line used to sum raw line prices: no tax, no currency conversion, and
+ * no header discount, so the total silently disagreed with the same document's
+ * own figures the moment anyone edited it (audit rilievo C-04).
+ */
+async function recalcOrder(db: Awaited<ReturnType<typeof getDb>>, orderId: string) {
+  const [order] = await db
+    .select({ discountPercent: orders.discountPercent })
+    .from(orders)
+    .where(eq(orders.id, orderId));
+
+  const rows = await db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+
+  const totals = await orderTotals(
+    db,
+    rows.map((r) => ({
+      productId: r.productId,
+      quantity: r.quantity,
+      unitPrice: Number(r.unitPrice),
+      discountPercent: Number(r.discountPercent ?? 0),
+    })),
+    Number(order?.discountPercent ?? 0),
+  );
+
+  await Promise.all(
+    rows.map((r, i) => {
+      const line = totals.lines[i];
+      return db
+        .update(orderItems)
+        .set({
+          discountAmount: String(line.discountAmount),
+          taxPercent: String(line.taxPercent),
+          taxAmount: String(line.taxAmount),
+          totalPrice: String(line.total),
+        })
+        .where(eq(orderItems.id, r.id));
+    }),
+  );
+
+  await db
+    .update(orders)
+    .set({
+      subtotal: String(totals.subtotal),
+      discountAmount: String(totals.discountAmount),
+      taxAmount: String(totals.taxAmount),
+      totalAmount: String(totals.total),
+      updatedAt: new Date(),
+    })
+    .where(eq(orders.id, orderId));
+}
+
 export async function deleteOrder(id: string) {
-  await requireWriteAccess();
+  // Deleting a commercial document is an admin act, and only while it is still a
+  // draft. A completed order is a record of something that happened.
+  await requireCapability("order:delete");
   const db = await getDb();
+
+  const [order] = await db.select({ status: orders.status }).from(orders).where(eq(orders.id, id));
+  if (!order) throw new Error("Order not found");
+  if (order.status !== "draft" && order.status !== "cancelled") {
+    throw new Error("Only draft or cancelled orders can be deleted. Cancel it instead.");
+  }
+
   await db.delete(orders).where(eq(orders.id, id));
   revalidatePath("/dashboard/sales/orders");
 }

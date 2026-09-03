@@ -124,7 +124,10 @@ export function SearchDialog() {
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === "j" && (e.metaKey || e.ctrlKey)) {
+      // ⌘K is the shortcut every comparable product uses, and it is what someone
+      // arriving from one of them will press. ⌘J stays bound as well so nobody who
+      // learned the old one has it taken away (audit rilievo U-03).
+      if ((e.key === "k" || e.key === "j") && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setOpen((o) => !o);
       }
@@ -186,7 +189,7 @@ export function SearchDialog() {
         <Search data-icon="inline-start" />
         {t("buttonLabel")}
         <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-medium text-[10px]">
-          <span className="text-xs">⌘</span>J
+          <span className="text-xs">⌘</span>K
         </kbd>
       </Button>
 
@@ -213,12 +216,13 @@ export function SearchDialog() {
             />
             {query && (
               <button
+                type="button"
                 onClick={() => {
                   setQuery("");
                   setResults(null);
                   inputRef.current?.focus();
                 }}
-                className="shrink-0 rounded-sm text-xs text-muted-foreground ring-offset-background transition-colors hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="shrink-0 rounded-sm text-muted-foreground text-xs ring-offset-background transition-colors hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 {t("clear")}
               </button>
@@ -230,7 +234,7 @@ export function SearchDialog() {
             {/* Idle state */}
             {!query && (
               <div className="p-4">
-                <p className="mb-3 px-1 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="mb-3 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
                   {t("quickAccess")}
                 </p>
                 <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
@@ -238,9 +242,10 @@ export function SearchDialog() {
                     const cfg = ENTITY_CONFIG[entity];
                     return (
                       <button
+                        type="button"
                         key={entity}
                         onClick={() => handleSelect(cfg.href)}
-                        className="flex items-center gap-2.5 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted hover:border-border"
+                        className="flex items-center gap-2.5 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-left text-sm transition-colors hover:border-border hover:bg-muted"
                       >
                         <span className="text-muted-foreground">{cfg.icon}</span>
                         <span className="font-medium">{label}</span>
@@ -254,17 +259,17 @@ export function SearchDialog() {
 
             {/* Typing but < 2 chars */}
             {query.length === 1 && (
-              <div className="py-8 text-center text-sm text-muted-foreground">{t("keepTyping")}</div>
+              <div className="py-8 text-center text-muted-foreground text-sm">{t("keepTyping")}</div>
             )}
 
             {/* No results */}
             {!loading && query.length >= 2 && !hasResults && (
               <CommandEmpty>
                 <div className="py-8">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-muted-foreground text-sm">
                     {t("noResults")} <span className="font-medium text-foreground">&ldquo;{query}&rdquo;</span>
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground/60">{t("noResultsTip")}</p>
+                  <p className="mt-1 text-muted-foreground/60 text-xs">{t("noResultsTip")}</p>
                 </div>
               </CommandEmpty>
             )}
@@ -273,13 +278,13 @@ export function SearchDialog() {
             {hasResults && (
               <>
                 <div className="flex items-center justify-between px-4 pt-3 pb-1">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                     {t("resultsHeading")}
                   </p>
-                  <span className="text-xs text-muted-foreground">{t("foundCount", { count: totalCount })}</span>
+                  <span className="text-muted-foreground text-xs">{t("foundCount", { count: totalCount })}</span>
                 </div>
                 {groups.map((group, idx) => {
-                  const items = results![group.key];
+                  const items = results?.[group.key];
                   if (!items?.length) return null;
                   return (
                     <React.Fragment key={group.key}>
@@ -300,15 +305,15 @@ export function SearchDialog() {
                                 {cfg?.icon}
                               </span>
                               <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium leading-tight">{item.label}</p>
+                                <p className="truncate font-medium text-sm leading-tight">{item.label}</p>
                                 {item.sub && (
-                                  <p className="truncate text-xs text-muted-foreground leading-tight mt-0.5">
+                                  <p className="mt-0.5 truncate text-muted-foreground text-xs leading-tight">
                                     {item.sub}
                                   </p>
                                 )}
                               </div>
                               <span
-                                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${cfg?.badgeClass ?? ""}`}
+                                className={`shrink-0 rounded-full px-2 py-0.5 font-medium text-[11px] ${cfg?.badgeClass ?? ""}`}
                               >
                                 {cfg?.badge}
                               </span>

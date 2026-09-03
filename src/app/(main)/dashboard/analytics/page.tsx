@@ -12,11 +12,13 @@ import { AnalyticsOverview } from "./_components/analytics-overview";
 
 export default function Page() {
   return (
-    <div className="p-6 flex flex-col gap-6">
+    <div className="flex flex-col gap-6 p-6">
+      {/* The funnel lives under the pipeline; this button pointed at
+          /dashboard/analytics/funnel, which has never existed (audit rilievo D-05). */}
       <div className="flex items-center justify-between">
         <div />
         <Button variant="outline" size="sm" asChild>
-          <Link href="/dashboard/analytics/funnel">
+          <Link href="/dashboard/pipeline/funnel">
             <GitMerge className="mr-2 h-4 w-4" /> Sales Funnel
           </Link>
         </Button>

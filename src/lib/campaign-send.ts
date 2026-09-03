@@ -14,11 +14,17 @@ import {
   leads,
   marketingCampaigns,
 } from "@/db/schema";
+import { getAppUrl } from "@/lib/app-url";
 import { getDb } from "@/lib/tenant-context";
 import { signTrackingUrl } from "@/lib/tracking-token";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
 
-const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+// Resolved per call, not at import: `getAppUrl()` refuses to guess in production,
+// and a module-scope call would make that refusal a build failure rather than a
+// clear error on the request that was about to send a wrong link (rilievo B-04).
+function appBase(): string {
+  return getAppUrl();
+}
 
 type Recipient = { id: string; email: string | null; firstName: string; lastName: string };
 
@@ -27,7 +33,7 @@ function wrapLinksForTracking(html: string, logId: string): string {
     if (url.includes("/api/track/") || url.includes("/api/unsubscribe")) return match;
     const sig = signTrackingUrl(logId, url);
     const tracked =
-      `${APP_URL}/api/track/click` +
+      `${appBase()}/api/track/click` +
       `?log=${encodeURIComponent(logId)}` +
       `&url=${encodeURIComponent(url)}` +
       `&sig=${encodeURIComponent(sig)}`;
@@ -105,9 +111,9 @@ export async function executeCampaignSend(data: {
       .replace(/\{\{contatto\.cognome\}\}/gi, recipient.lastName ?? "");
 
     const unsubToken = generateUnsubscribeToken(recipient.email, log.id);
-    html = html.replace(/\{\{link_unsubscribe\}\}/gi, `${APP_URL}/api/unsubscribe?token=${unsubToken}`);
+    html = html.replace(/\{\{link_unsubscribe\}\}/gi, `${appBase()}/api/unsubscribe?token=${unsubToken}`);
     html = wrapLinksForTracking(html, log.id);
-    html = `${html}\n<img src="${APP_URL}/api/track/open?log=${encodeURIComponent(log.id)}" width="1" height="1" alt="" style="display:none" />`;
+    html = `${html}\n<img src="${appBase()}/api/track/open?log=${encodeURIComponent(log.id)}" width="1" height="1" alt="" style="display:none" />`;
 
     await db.insert(emailJobs).values({
       campaignId,

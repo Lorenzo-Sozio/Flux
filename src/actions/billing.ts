@@ -21,6 +21,7 @@ import {
   leads,
   tenantMembers,
 } from "@/db/schema";
+import { getAppUrl } from "@/lib/app-url";
 import { getEntitlements, invalidateEntitlementCache, logEntitlementChange } from "@/lib/billing/licensing";
 import type { AddonType, BillingCycle } from "@/lib/billing/plans-config";
 import { ADDON_CONFIGS } from "@/lib/billing/plans-config";
@@ -163,7 +164,7 @@ export async function createCheckoutSession(
 
   const customerId = await getOrCreateStripeCustomer(tenant.id, tenant.name);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
   const returnBase = `${appUrl}/dashboard/settings/billing`;
 
   const session = await getStripe().checkout.sessions.create({
@@ -192,7 +193,7 @@ export async function createBillingPortalSession(): Promise<{ url: string }> {
   });
   if (!sub?.stripeCustomerId) throw new Error("No Stripe customer found.");
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
   const session = await getStripe().billingPortal.sessions.create({
     customer: sub.stripeCustomerId,
     return_url: `${appUrl}/dashboard/settings/billing`,

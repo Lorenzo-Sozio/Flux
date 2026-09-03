@@ -26,7 +26,6 @@ import {
   adminSendPasswordResetAction,
   changePasswordAction,
   deleteUserAction,
-  getPendingInvitationsAction,
   inviteUserAction,
   updateUserRoleAction,
 } from "@/actions/auth";
@@ -53,6 +52,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { assignableRoles, normalizeTenantRole, type TenantRole } from "@/lib/permissions";
 import { getInitials } from "@/lib/utils";
 
 import { GroupModal } from "./group-modal";
@@ -74,19 +74,17 @@ type Invitation = {
   createdAt: Date;
 };
 
-const ROLE_COLORS: Record<string, string> = {
+const _ROLE_COLORS: Record<string, string> = {
   owner: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
   admin: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  user: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+  editor: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
   viewer: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
 };
 
-type RoleId = "owner" | "admin" | "user" | "viewer";
-
-const ROLES: { id: RoleId; icon: React.ElementType; color: string }[] = [
+const ROLES: { id: TenantRole; icon: React.ElementType; color: string }[] = [
   { id: "owner", icon: Crown, color: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" },
   { id: "admin", icon: Shield, color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400" },
-  { id: "user", icon: Pencil, color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
+  { id: "editor", icon: Pencil, color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" },
   { id: "viewer", icon: Eye, color: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300" },
 ];
 
@@ -100,7 +98,7 @@ function RoleSelector({
   userId: string;
   role: string;
   canChange: boolean;
-  availableRoles: string[];
+  availableRoles: TenantRole[];
   onRoleChange: (userId: string, role: string) => void;
 }) {
   const tr = useTranslations("roles");
@@ -109,7 +107,7 @@ function RoleSelector({
 
   const pill = (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium select-none ${cfg.color}`}
+      className={`inline-flex select-none items-center gap-1.5 rounded-full px-2.5 py-1 font-medium text-xs ${cfg.color}`}
     >
       <Icon className="h-3 w-3" />
       {tr(`roleLabel.${cfg.id}`)}
@@ -123,11 +121,11 @@ function RoleSelector({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-opacity hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${cfg.color}`}
+          className={`inline-flex cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1 font-medium text-xs transition-opacity hover:opacity-75 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${cfg.color}`}
         >
           <Icon className="h-3 w-3" />
           {tr(`roleLabel.${cfg.id}`)}
-          <ChevronDown className="h-3 w-3 opacity-50 ml-0.5" />
+          <ChevronDown className="ml-0.5 h-3 w-3 opacity-50" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-44 p-1">
@@ -139,15 +137,15 @@ function RoleSelector({
             <DropdownMenuItem
               key={r}
               onSelect={() => onRoleChange(userId, r)}
-              className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 cursor-pointer"
+              className="flex cursor-pointer items-center justify-between gap-2 rounded-md px-2 py-1.5"
             >
               <span
-                className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium ${rc.color}`}
+                className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-medium text-xs ${rc.color}`}
               >
                 <RIcon className="h-3 w-3" />
                 {tr(`roleLabel.${rc.id}`)}
               </span>
-              {isActive && <Check className="h-3.5 w-3.5 text-muted-foreground shrink-0" />}
+              {isActive && <Check className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
             </DropdownMenuItem>
           );
         })}
@@ -181,11 +179,14 @@ export function UsersClient({
   useEffect(() => {
     getUserGroups()
       .then(setGroups)
+      // Groups are a secondary panel; failing to load them must not take the
+      // user list down with them.
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: non-critical panel
       .catch(() => {});
   }, []);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("user");
+  const [inviteRole, setInviteRole] = useState<TenantRole>("editor");
   const [isInviting, setIsInviting] = useState(false);
   const [fallbackInviteUrl, setFallbackInviteUrl] = useState<string | null>(null);
 
@@ -205,12 +206,9 @@ export function UsersClient({
     if (!inviteEmail) return;
     setIsInviting(true);
     try {
-      const me = users.find((u) => u.id === currentUserId);
       const result = await inviteUserAction({
         email: inviteEmail,
         role: inviteRole,
-        invitedById: currentUserId,
-        invitedByName: me?.name ?? "Admin",
       });
 
       if ("error" in result && result.error) {
@@ -227,7 +225,7 @@ export function UsersClient({
       toast.success(`${t("inviteDialog.send")} → ${inviteEmail}`);
       setInviteOpen(false);
       setInviteEmail("");
-      setInviteRole("user");
+      setInviteRole("editor");
       setFallbackInviteUrl(null);
     } catch (err: any) {
       toast.error(err?.message ?? tc("errorOccurred"));
@@ -238,22 +236,30 @@ export function UsersClient({
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     try {
-      await updateUserRoleAction(userId, newRole);
+      const result = await updateUserRoleAction(userId, newRole);
+      if ("error" in result && result.error) {
+        toast.error(result.error);
+        return;
+      }
       setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)));
       toast.success(t("updateSuccess"));
-    } catch {
-      toast.error(tc("updateError"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : tc("updateError"));
     }
   };
 
   const handleDelete = async (userId: string) => {
     if (!confirm(tc("confirmDelete"))) return;
     try {
-      await deleteUserAction(userId);
+      const result = await deleteUserAction(userId);
+      if ("error" in result && result.error) {
+        toast.error(result.error);
+        return;
+      }
       setUsers((prev) => prev.filter((u) => u.id !== userId));
       toast.success(t("deleteSuccess"));
-    } catch {
-      toast.error(tc("deleteError"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : tc("deleteError"));
     }
   };
 
@@ -309,13 +315,14 @@ export function UsersClient({
     }
   };
 
-  const availableRoles = currentUserRole === "owner" ? ["owner", "admin", "user", "viewer"] : ["user", "viewer"];
+  // Nobody may hand out a role above their own — enforced again server-side.
+  const availableRoles = assignableRoles(currentUserRole);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("teamMembers")}</h1>
+          <h1 className="font-bold text-2xl tracking-tight">{t("teamMembers")}</h1>
           <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button onClick={() => setInviteOpen(true)}>
@@ -325,9 +332,9 @@ export function UsersClient({
       </div>
 
       {/* Role management notice for non-admins */}
-      {currentUserRole === "user" || currentUserRole === "viewer" ? (
-        <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 dark:bg-blue-950/30 dark:border-blue-800 px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
-          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+      {currentUserRole === "editor" || currentUserRole === "viewer" ? (
+        <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700 text-sm dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300">
+          <Info className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{t("roleManagementNotice")}</span>
         </div>
       ) : null}
@@ -487,15 +494,15 @@ export function UsersClient({
               return (
                 <div key={r.id} className="rounded-lg border p-3">
                   <span
-                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded-full mb-2 ${r.color}`}
+                    className={`mb-2 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 font-semibold text-xs ${r.color}`}
                   >
                     <Icon className="h-3 w-3" />
                     {tr(`roleLabel.${r.id}`)}
                   </span>
-                  <p className="text-xs text-muted-foreground mb-2">{tr(`roleDesc.${r.id}`)}</p>
+                  <p className="mb-2 text-muted-foreground text-xs">{tr(`roleDesc.${r.id}`)}</p>
                   <ul className="space-y-1">
                     {perms.map((perm) => (
-                      <li key={perm} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                      <li key={perm} className="flex items-start gap-1.5 text-muted-foreground text-xs">
                         <span className="mt-0.5 text-green-500">✓</span>
                         {perm}
                       </li>
@@ -529,14 +536,14 @@ export function UsersClient({
         </CardHeader>
         <CardContent>
           {groups.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-6">{t("noGroups")}</p>
+            <p className="py-6 text-center text-muted-foreground text-sm">{t("noGroups")}</p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {groups.map((g) => (
-                <div key={g.id} className="rounded-lg border p-3 flex flex-col gap-2">
+                <div key={g.id} className="flex flex-col gap-2 rounded-lg border p-3">
                   <div className="flex items-center gap-2">
-                    <span className="inline-block h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
-                    <span className="font-medium text-sm truncate flex-1">{g.name}</span>
+                    <span className="inline-block h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: g.color }} />
+                    <span className="flex-1 truncate font-medium text-sm">{g.name}</span>
                     {["admin", "owner"].includes(currentUserRole) && (
                       <GroupModal
                         group={{ ...g, description: g.description ?? null }}
@@ -548,15 +555,15 @@ export function UsersClient({
                       </GroupModal>
                     )}
                   </div>
-                  {g.description && <p className="text-xs text-muted-foreground line-clamp-2">{g.description}</p>}
+                  {g.description && <p className="line-clamp-2 text-muted-foreground text-xs">{g.description}</p>}
                   <div className="flex flex-wrap gap-1">
                     {g.members.slice(0, 4).map((m) => (
-                      <Badge key={m.id} variant="secondary" className="text-[10px] py-0 px-1.5 h-4">
+                      <Badge key={m.id} variant="secondary" className="h-4 px-1.5 py-0 text-[10px]">
                         {m.name || m.email || "—"}
                       </Badge>
                     ))}
                     {g.members.length > 4 && (
-                      <Badge variant="outline" className="text-[10px] py-0 px-1.5 h-4">
+                      <Badge variant="outline" className="h-4 px-1.5 py-0 text-[10px]">
                         {t("moreMembers", { count: g.members.length - 4 })}
                       </Badge>
                     )}
@@ -598,7 +605,11 @@ export function UsersClient({
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="invite-role">{t("inviteDialog.roleLabel")}</Label>
-              <Select value={inviteRole} onValueChange={setInviteRole} disabled={!!fallbackInviteUrl}>
+              <Select
+                value={inviteRole}
+                onValueChange={(v) => setInviteRole(normalizeTenantRole(v))}
+                disabled={!!fallbackInviteUrl}
+              >
                 <SelectTrigger id="invite-role">
                   <SelectValue />
                 </SelectTrigger>
@@ -615,12 +626,12 @@ export function UsersClient({
             </div>
 
             {fallbackInviteUrl && (
-              <div className="rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-950/30 dark:border-orange-800 p-3 space-y-2">
-                <p className="text-sm font-medium text-orange-800 dark:text-orange-300">
+              <div className="space-y-2 rounded-lg border border-orange-200 bg-orange-50 p-3 dark:border-orange-800 dark:bg-orange-950/30">
+                <p className="font-medium text-orange-800 text-sm dark:text-orange-300">
                   {t("inviteDialog.deliveryFailed")}
                 </p>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 text-xs bg-background rounded border px-2 py-1.5 truncate select-all">
+                  <code className="flex-1 select-all truncate rounded border bg-background px-2 py-1.5 text-xs">
                     {fallbackInviteUrl}
                   </code>
                   <Button
@@ -636,7 +647,7 @@ export function UsersClient({
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground">{t("inviteDialog.emailConfig")}</p>
+                <p className="text-muted-foreground text-xs">{t("inviteDialog.emailConfig")}</p>
               </div>
             )}
           </div>
@@ -736,7 +747,7 @@ export function UsersClient({
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs bg-muted rounded border px-2 py-1.5 truncate select-all break-all">
+              <code className="flex-1 select-all truncate break-all rounded border bg-muted px-2 py-1.5 text-xs">
                 {resetFallbackUrl}
               </code>
               <Button
@@ -751,7 +762,7 @@ export function UsersClient({
                 <Copy className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">{t("resetFallback.expires")}</p>
+            <p className="text-muted-foreground text-xs">{t("resetFallback.expires")}</p>
           </div>
           <DialogFooter>
             <Button

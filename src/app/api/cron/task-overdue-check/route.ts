@@ -5,21 +5,20 @@
  * Protected by CRON_SECRET env variable.
  */
 
-import { type NextRequest, NextResponse } from "next/server";
-
 import { and, eq, isNotNull, lt } from "drizzle-orm";
 
 import { createNotificationAction } from "@/actions/auth";
 import { taskDependencies, tasks } from "@/db/schema";
-import { verifyCronRequest } from "@/lib/cron-auth";
-import { getDb } from "@/lib/tenant-context";
+import { runCronJob } from "@/lib/cron-runner";
+import type { TenantDb } from "@/lib/tenant-resolve";
 
-export async function GET(req: NextRequest) {
-  const authError = verifyCronRequest(req);
-  if (authError) return authError;
+// Runs once per workspace. It used to run once for no workspace at all: getDb()
+// reads a request header that a scheduled request never carries (rilievo B-02).
+export async function GET(req: Request) {
+  return runCronJob("task-overdue-check", req, runForTenant);
+}
 
-  const db = await getDb();
-
+async function runForTenant(db: TenantDb) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
@@ -54,10 +53,5 @@ export async function GET(req: NextRequest) {
     notified++;
   }
 
-  return NextResponse.json({
-    ok: true,
-    overdueWithDeps: overdueTasks.length,
-    notified,
-    timestamp: new Date().toISOString(),
-  });
+  return { overdueWithDeps: overdueTasks.length, notified };
 }

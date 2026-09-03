@@ -286,7 +286,19 @@ export const orders = pgTable("order", {
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   opportunityId: text("opportunity_id").references(() => opportunities.id, { onDelete: "set null" }),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  // An order used to carry a single tax-free number and no currency at all, so the
+  // same content quoted and ordered showed two different totals (rilievo C-04).
+  subtotal: numeric("subtotal", { precision: 12, scale: 2 }).default("0").notNull(),
+  discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }).default("0"),
+  discountAmount: numeric("discount_amount", { precision: 12, scale: 2 }).default("0"),
+  taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
   totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
+  currency: text("currency").default("EUR").notNull(),
+  // Where the order came from. `opportunityId` pointed at a table nothing reads,
+  // so an order could not be traced to the quote or deal that produced it
+  // (rilievi D-06, S-03).
+  quoteId: text("quote_id"), // FK set via migration → quote.id (set null)
+  dealId: text("deal_id"), // FK set via migration → deal.id (set null)
   status: text("status").default("draft").notNull(), // draft, processing, completed, cancelled
   orderDate: timestamp("order_date", { mode: "date" }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -305,6 +317,10 @@ export const orderItems = pgTable("order_item", {
     .references(() => products.id, { onDelete: "restrict" }),
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+  discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }).default("0"),
+  discountAmount: numeric("discount_amount", { precision: 12, scale: 2 }).default("0"),
+  taxPercent: numeric("tax_percent", { precision: 5, scale: 2 }).default("0"),
+  taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
   totalPrice: numeric("total_price", { precision: 12, scale: 2 }).notNull(),
 });
 
@@ -318,6 +334,11 @@ export const pipelineStages = pgTable("pipeline_stage", {
   order: integer("order").notNull(),
   color: text("color"),
   defaultProbability: integer("default_probability").default(0),
+  // Terminal stages. Without these, dragging a card into the "Won" column changed
+  // the stage and left `deal.status` at "open" forever, so the deal kept weighing
+  // on the forecast (audit rilievo C-06).
+  isWon: boolean("is_won").default(false).notNull(),
+  isLost: boolean("is_lost").default(false).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -337,6 +358,12 @@ export const deals = pgTable("deal", {
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
   status: text("status").default("open").notNull(), // open, won, lost
+  // "Won this month" was computed from updatedAt, so re-saving an old deal moved
+  // it into the current month's revenue (audit rilievo C-07).
+  closedAt: timestamp("closed_at", { mode: "date" }),
+  // Without a reason there is no win/loss analysis at all — the product knew how
+  // much was lost and never why.
+  lostReason: text("lost_reason"),
   healthScore: integer("health_score").default(0),
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
@@ -791,7 +818,14 @@ export const quotes = pgTable("quote", {
   taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
   taxPercent: numeric("tax_percent", { precision: 5, scale: 2 }).default("0"),
   totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
+  // The currency the document is written in — what the customer reads. Amounts
+  // above are stored in it. Previously every quote was rewritten into EUR and this
+  // column hardcoded to "EUR", so an offer made in dollars reached the customer as
+  // a euro figure at the day's rate (audit rilievo C-02).
   currency: text("currency").default("EUR").notNull(),
+  // The rate used to express this document in EUR for reporting, captured at issue
+  // time so a later rate change cannot rewrite history.
+  eurRate: numeric("eur_rate", { precision: 18, scale: 8 }).default("1"),
   issuedAt: timestamp("issued_at", { mode: "date" }).defaultNow().notNull(),
   expiresAt: timestamp("expires_at", { mode: "date" }),
   sentAt: timestamp("sent_at", { mode: "date" }),
@@ -858,6 +892,10 @@ export const tickets = pgTable("ticket", {
   groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
   parentTicketId: text("parent_ticket_id"),
   slaDeadlineAt: timestamp("sla_deadline_at", { mode: "date" }),
+  // An SLA defines two promises and the ticket only ever tracked one of them, so
+  // first-response compliance was unmeasurable (audit rilievo D-01).
+  firstResponseDueAt: timestamp("first_response_due_at", { mode: "date" }),
+  firstResponseBreachedAt: timestamp("first_response_breached_at", { mode: "date" }),
   slaPausedAt: timestamp("sla_paused_at", { mode: "date" }),
   slaPauseMinutes: integer("sla_pause_minutes").default(0).notNull(),
   slaBreachedAt: timestamp("sla_breached_at", { mode: "date" }),

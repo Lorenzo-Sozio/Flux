@@ -56,6 +56,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { actionErrorMessage, isPlanLimit } from "@/lib/action-error";
 
 import { MergeLeadsModal } from "./merge-leads-modal";
 
@@ -253,18 +254,48 @@ export function LeadModal({
   const saveLead = async (payload: Record<string, unknown>) => {
     try {
       if (isEditing) {
-        await updateLead(lead.id, payload);
+        const result = await updateLead(lead.id, payload);
+        if (!result.ok) {
+          // The guards write these messages for the person reading them; the old
+          // catch-all threw them away (audit rilievo U-01).
+          toast.error(result.message, {
+            action: isPlanLimit(result)
+              ? {
+                  label: "Upgrade",
+                  onClick: () => {
+                    window.location.href = "/dashboard/settings/billing";
+                  },
+                }
+              : undefined,
+          });
+          return;
+        }
         toast.success(t("updateSuccess"));
       } else {
-        await createLead(payload);
+        const result = await createLead(payload);
+        if (!result.ok) {
+          // The guards write these messages for the person reading them; the old
+          // catch-all threw them away (audit rilievo U-01).
+          toast.error(result.message, {
+            action: isPlanLimit(result)
+              ? {
+                  label: "Upgrade",
+                  onClick: () => {
+                    window.location.href = "/dashboard/settings/billing";
+                  },
+                }
+              : undefined,
+          });
+          return;
+        }
         toast.success(t("createSuccess"));
       }
       setOpen(false);
       setDuplicates([]);
       setPendingPayload(null);
       form.reset();
-    } catch {
-      toast.error(t("form.saveFailed"));
+    } catch (err) {
+      toast.error(actionErrorMessage(err, t("form.saveFailed")));
     }
   };
 

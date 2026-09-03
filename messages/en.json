@@ -953,7 +953,10 @@
       "sent": "Sent",
       "accepted": "Accepted",
       "declined": "Declined",
-      "expired": "Expired"
+      "expired": "Expired",
+      "approved": "Approved",
+      "viewed": "Viewed",
+      "converted": "Converted"
     },
     "columns": {
       "number": "Number",
@@ -1777,7 +1780,12 @@
       "viewer": "Viewer"
     },
     "rolePerms": {
-      "owner": ["All admin permissions", "Transfer workspace ownership", "Delete workspace", "Manage billing"],
+      "owner": [
+        "All admin permissions",
+        "Transfer workspace ownership",
+        "Delete workspace",
+        "Manage billing"
+      ],
       "admin": [
         "All user permissions",
         "Invite and manage users",

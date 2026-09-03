@@ -1,12 +1,7 @@
-import { NextResponse } from "next/server";
-
 import { autoCloseResolvedTickets } from "@/actions/support";
-import { verifyCronRequest } from "@/lib/cron-auth";
+import { runCronJob } from "@/lib/cron-runner";
 
+/** Closes resolved tickets that have gone quiet, in every workspace. Daily. */
 export async function GET(req: Request) {
-  const authError = verifyCronRequest(req);
-  if (authError) return authError;
-
-  const count = await autoCloseResolvedTickets();
-  return NextResponse.json({ closed: count });
+  return runCronJob("ticket-autoclose", req, async () => ({ closed: await autoCloseResolvedTickets() }));
 }

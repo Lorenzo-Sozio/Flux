@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { ilike, or } from "drizzle-orm";
+import { ilike, or, sql } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 
 import { auth } from "@/auth";
 import { companies, contacts, deals, leads, orders, quotes, tickets } from "@/db/schema";
@@ -16,12 +17,35 @@ export async function GET(req: NextRequest) {
 
   const like = `%${q}%`;
 
+  // "Mario Rossi" used to return nothing: the term was compared separately with
+  // the first name and the last name, and matched neither in full. Searching the
+  // concatenation is what people actually type (audit rilievo U-04).
+  const fullName = (first: AnyPgColumn, last: AnyPgColumn) =>
+    sql`lower(coalesce(${first}, '') || ' ' || coalesce(${last}, '')) LIKE lower(${like})`;
+
+  // A phone number arriving on screen is the second most common thing to look up,
+  // and neither phone column was searched at all. Digits are compared with the
+  // formatting stripped, so "+39 02 1234567" is found by "021234567".
+  const digits = q.replace(/\D/g, "");
+  const phoneLike = digits.length >= 4 ? `%${digits}%` : null;
+  const phoneMatch = (col: AnyPgColumn) =>
+    phoneLike ? sql`regexp_replace(coalesce(${col}, ''), '[^0-9]', '', 'g') LIKE ${phoneLike}` : undefined;
+
   const [foundContacts, foundLeads, foundCompanies, foundDeals, foundTickets, foundQuotes, foundOrders] =
     await Promise.all([
       db
         .select({ id: contacts.id, firstName: contacts.firstName, lastName: contacts.lastName, email: contacts.email })
         .from(contacts)
-        .where(or(ilike(contacts.firstName, like), ilike(contacts.lastName, like), ilike(contacts.email, like)))
+        .where(
+          or(
+            ilike(contacts.firstName, like),
+            ilike(contacts.lastName, like),
+            fullName(contacts.firstName, contacts.lastName),
+            ilike(contacts.email, like),
+            phoneMatch(contacts.phone),
+            phoneMatch(contacts.mobile),
+          ),
+        )
         .limit(5),
 
       db
@@ -37,8 +61,11 @@ export async function GET(req: NextRequest) {
           or(
             ilike(leads.firstName, like),
             ilike(leads.lastName, like),
+            fullName(leads.firstName, leads.lastName),
             ilike(leads.email, like),
             ilike(leads.companyName, like),
+            phoneMatch(leads.phone),
+            phoneMatch(leads.mobile),
           ),
         )
         .limit(5),
@@ -46,7 +73,15 @@ export async function GET(req: NextRequest) {
       db
         .select({ id: companies.id, name: companies.name, industry: companies.industry })
         .from(companies)
-        .where(or(ilike(companies.name, like), ilike(companies.industry, like)))
+        .where(
+          or(
+            ilike(companies.name, like),
+            ilike(companies.industry, like),
+            ilike(companies.vatNumber, like),
+            phoneMatch(companies.mainPhone),
+            ilike(companies.mainEmail, like),
+          ),
+        )
         .limit(5),
 
       db

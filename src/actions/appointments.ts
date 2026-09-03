@@ -6,11 +6,13 @@ import { and, eq, gte, inArray, isNotNull, lte, ne, or } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { appointmentAttendees, appointments, companies, contacts, deals, leads, users } from "@/db/schema";
+import { getAppUrl } from "@/lib/app-url";
 import { requireWriteAccess } from "@/lib/auth-guard";
 import { type AppointmentEmailData, sendAppointmentInviteEmail } from "@/lib/email";
 import { getEmailConfig } from "@/lib/email-provider";
 import { generateICS, type ICSAttendee } from "@/lib/ical";
 import { getDb } from "@/lib/tenant-context";
+import { resolveTenantByProbe } from "@/lib/tenant-resolve";
 
 export type InviteResult = {
   sent: number;
@@ -18,7 +20,12 @@ export type InviteResult = {
   noProvider: boolean;
 };
 
-const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+// Resolved per call, not at import: `getAppUrl()` refuses to guess in production,
+// and a module-scope call would make that refusal a build failure rather than a
+// clear error on the request that was about to send a wrong link (rilievo B-04).
+function appBase(): string {
+  return getAppUrl();
+}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -120,9 +127,9 @@ async function dispatchInvites(appointmentId: string, method: "REQUEST" | "CANCE
       const rsvpLinks =
         method === "REQUEST" && attendee.responseToken
           ? {
-              accept: `${APP_URL}/api/appointments/rsvp?token=${attendee.responseToken}&r=accept`,
-              decline: `${APP_URL}/api/appointments/rsvp?token=${attendee.responseToken}&r=decline`,
-              tentative: `${APP_URL}/api/appointments/rsvp?token=${attendee.responseToken}&r=tentative`,
+              accept: `${appBase()}/api/appointments/rsvp?token=${attendee.responseToken}&r=accept`,
+              decline: `${appBase()}/api/appointments/rsvp?token=${attendee.responseToken}&r=decline`,
+              tentative: `${appBase()}/api/appointments/rsvp?token=${attendee.responseToken}&r=tentative`,
             }
           : undefined;
 
@@ -366,8 +373,26 @@ export async function deleteAppointment(id: string) {
 
 // ─── RSVP ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Records an invitee's answer from the emailed RSVP link.
+ *
+ * The person clicking is external: no account, no session, no workspace header.
+ * `getDb()` therefore threw before reading anything, so every RSVP link in every
+ * invitation was dead (audit rilievo B-01). The workspace is derived from the
+ * attendee token, which is what identifies the invitation in the first place.
+ */
 export async function updateAttendeeRsvp(token: string, response: "accept" | "decline" | "tentative") {
-  const db = await getDb();
+  const resolved = await resolveTenantByProbe(`rsvp:${token}`, async (tenantDb) => {
+    const row = await tenantDb.query.appointmentAttendees.findFirst({
+      where: eq(appointmentAttendees.responseToken, token),
+      columns: { id: true },
+    });
+    return Boolean(row);
+  }).catch(() => null);
+
+  if (!resolved) return { success: false, error: "Invalid or expired invitation link." };
+
+  const db = resolved.db;
   const statusMap = {
     accept: "accepted",
     decline: "declined",
@@ -379,7 +404,7 @@ export async function updateAttendeeRsvp(token: string, response: "accept" | "de
     .from(appointmentAttendees)
     .where(eq(appointmentAttendees.responseToken, token));
 
-  if (!attendee) return { success: false, error: "Token non valido" };
+  if (!attendee) return { success: false, error: "Invalid or expired invitation link." };
 
   await db
     .update(appointmentAttendees)
