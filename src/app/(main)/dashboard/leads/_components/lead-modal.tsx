@@ -37,6 +37,7 @@ import {
 } from "@/actions/crm";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
 import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combobox";
+import { DuplicateHint } from "@/components/crm/duplicate-hint";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
 import { Button } from "@/components/ui/button";
 import {
@@ -56,6 +57,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useDuplicateWatch } from "@/hooks/use-duplicate-watch";
 import { actionErrorMessage, isPlanLimit } from "@/lib/action-error";
 
 import { MergeLeadsModal } from "./merge-leads-modal";
@@ -199,6 +201,24 @@ export function LeadModal({
     watch,
     formState: { errors, isSubmitting },
   } = form;
+  // See the note in the companies modal: the check is worth running before the
+  // form has been filled in, not after (rilievo U-13).
+  const typedEmail = form.watch("email");
+  const typedFirstName = form.watch("firstName");
+  const typedLastName = form.watch("lastName");
+  const dupWatch = useDuplicateWatch(
+    () =>
+      checkLeadDuplicates({
+        email: typedEmail,
+        firstName: typedFirstName,
+        lastName: typedLastName,
+        excludeId: lead?.id,
+      }),
+    [typedEmail, typedFirstName, typedLastName],
+    // Nothing to warn about while the dialog is shut, and the form keeps its
+    // values after it closes.
+    { enabled: open },
+  );
 
   useEffect(() => {
     if (open && lead) {
@@ -360,6 +380,17 @@ export function LeadModal({
 
           <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 overflow-y-auto px-6 py-4">
+              <DuplicateHint
+                title="This person may already be a lead"
+                matches={dupWatch.matches.map((d) => ({
+                  id: d.id,
+                  label: [d.firstName, d.lastName].filter(Boolean).join(" ") || d.email || d.id,
+                  detail: d.email ?? d.phone,
+                  href: `/dashboard/leads/${d.id}`,
+                }))}
+                onDismiss={dupWatch.dismiss}
+              />
+
               <Tabs defaultValue="info">
                 <TabsList className="mb-5 w-full">
                   <TabsTrigger value="info" className="relative flex-1 gap-1.5">

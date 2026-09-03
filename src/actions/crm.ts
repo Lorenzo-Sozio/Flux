@@ -37,8 +37,8 @@ import {
   users,
 } from "@/db/schema";
 import { guarded } from "@/lib/action-error";
-import { requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
-import { normalizeCompanyName } from "@/lib/company-name";
+import { requireCapability, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
+import { isSameCompanyName, normalizeCompanyName } from "@/lib/company-name";
 import {
   buildWhereClause,
   COMPANY_FIELDS,
@@ -682,6 +682,12 @@ export async function getLeadsForSelect() {
 }
 
 // ── Duplicate detection ───────────────────────────────────────────────────────
+//
+// These ran only at save time, after every tab of the form had been filled in
+// (audit rilievo U-13). They are cheap and bounded, so they now also run while
+// the identifying field is being typed — see `useDuplicateWatch`. That makes them
+// a probe anyone with a session could aim at the workspace, so they are guarded
+// like any other read.
 
 export async function checkLeadDuplicates(params: {
   email?: string | null;
@@ -690,6 +696,7 @@ export async function checkLeadDuplicates(params: {
   lastName?: string | null;
   excludeId?: string;
 }) {
+  await requireCapability("record:read");
   const db = await getDb();
   const { email, phone, firstName, lastName, excludeId } = params;
   const conditions = [];
@@ -724,6 +731,7 @@ export async function checkContactDuplicates(params: {
   lastName?: string | null;
   excludeId?: string;
 }) {
+  await requireCapability("record:read");
   const db = await getDb();
   const { email, phone, firstName, lastName, excludeId } = params;
   const conditions = [];
@@ -757,11 +765,21 @@ export async function checkCompanyDuplicates(params: {
   mainEmail?: string | null;
   excludeId?: string;
 }) {
+  await requireCapability("record:read");
   const db = await getDb();
   const { name, website, mainEmail, excludeId } = params;
   const conditions = [];
-  if (name?.trim()) conditions.push(ilike(companies.name, name.trim()));
-  if (website?.trim()) conditions.push(ilike(companies.website, website.trim()));
+
+  // The exact match this used to do never fired on the case that matters: nobody
+  // types the same legal form twice. "Acme S.r.l." and "Acme Srl" are one company,
+  // and the check has to say so or it is decoration (rilievo U-13).
+  //
+  // The narrowing happens in SQL on the longest word of the name, so the scan stays
+  // bounded; the decision happens in `isSameCompanyName`, which knows about legal
+  // forms, punctuation and accents.
+  const anchor = longestWord(name);
+  if (anchor) conditions.push(ilike(companies.name, `%${anchor}%`));
+  if (website?.trim()) conditions.push(ilike(companies.website, `%${hostOf(website)}%`));
   if (mainEmail?.trim()) conditions.push(ilike(companies.mainEmail, mainEmail.trim()));
   if (!conditions.length) return [];
 
@@ -769,7 +787,7 @@ export async function checkCompanyDuplicates(params: {
   const base = or(...conditions)!;
   const where = excludeId ? and(base, ne(companies.id, excludeId)) : base;
 
-  return db
+  const candidates = await db
     .select({
       id: companies.id,
       name: companies.name,
@@ -778,7 +796,44 @@ export async function checkCompanyDuplicates(params: {
     })
     .from(companies)
     .where(where)
-    .limit(5);
+    .limit(40);
+
+  const typedName = name?.trim() ?? "";
+  const typedHost = hostOf(website);
+  const typedEmail = mainEmail?.trim().toLowerCase() ?? "";
+
+  return candidates
+    .filter(
+      (c) =>
+        (typedName !== "" && isSameCompanyName(c.name, typedName)) ||
+        (typedHost !== "" && hostOf(c.website) === typedHost) ||
+        (typedEmail !== "" && (c.mainEmail ?? "").toLowerCase() === typedEmail),
+    )
+    .slice(0, 5);
+}
+
+/**
+ * The longest word of a name, minus the legal form.
+ *
+ * Used only to narrow the scan: the word most likely to survive however the
+ * company is written down, and long enough that `%word%` is not the whole table.
+ */
+function longestWord(name?: string | null): string {
+  const words = normalizeCompanyName(name ?? "")
+    .split(" ")
+    .filter((w) => w.length >= 3);
+  return words.reduce((longest, w) => (w.length > longest.length ? w : longest), "");
+}
+
+/** The host of a URL, however loosely it was typed. Empty when there isn't one. */
+function hostOf(website?: string | null): string {
+  const raw = website?.trim().toLowerCase();
+  if (!raw) return "";
+  const host = raw
+    .replace(/^[a-z]+:\/\//, "")
+    .replace(/^www\./, "")
+    .split(/[/?#]/)[0];
+  return host.includes(".") ? host : "";
 }
 
 // ── Merge helpers ─────────────────────────────────────────────────────────────

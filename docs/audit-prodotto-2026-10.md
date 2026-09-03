@@ -714,12 +714,27 @@ fare: sono decisioni di prodotto, non di codice.
 **Rimedio.** Fasi, SLA e categorie predefiniti alla creazione del workspace. Una lista di
 avvio in cinque passi con avanzamento visibile. Stati vuoti che propongono l'azione.
 
-### U-13 — Il controllo duplicati arriva dopo che il modulo è stato compilato
+### U-13 — Il controllo duplicati arriva dopo che il modulo è stato compilato ✅
 
 Il rilevamento scatta al salvataggio, dopo che l'utente ha riempito tutte le schede.
 
 **Rimedio.** Verifica alla digitazione dell'email o del nome azienda, con proposta inline
 di aprire la scheda esistente.
+
+**✅ Risolto.** `useDuplicateWatch` esegue la stessa interrogazione mentre il campo
+identificante si sta ancora scrivendo: aspetta che la digitazione si fermi, e scarta una
+risposta arrivata dopo che i tasti sono andati avanti, così l'avviso descrive sempre ciò
+che è a schermo. `DuplicateHint` lo mostra come striscia sopra il modulo, non come
+finestra: a quel punto non è stato scritto nulla da difendere, e le uniche risposte utili
+sono «apri quella» o «no, è un'altra persona».
+
+Due difetti che il controllo si portava dietro. Nessuna delle tre azioni era protetta —
+erano una sonda puntabile sul workspace da chiunque avesse una sessione — e ora
+richiedono `record:read` come ogni altra lettura. E il confronto sul nome azienda era una
+uguaglianza esatta, che non scatta mai sul caso che conta: nessuno scrive due volte la
+stessa forma giuridica. Ora la SQL restringe sulla parola più lunga del nome e la
+decisione la prende `isSameCompanyName`, che conosce forme giuridiche, punteggiatura e
+accenti — «Acme S.r.l.» e «Acme Srl» sono la stessa azienda.
 
 ---
 

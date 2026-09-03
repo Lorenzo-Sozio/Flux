@@ -33,6 +33,7 @@ import {
 } from "@/actions/crm";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
 import { CreatableLookupCombobox } from "@/components/crm/creatable-lookup-combobox";
+import { DuplicateHint } from "@/components/crm/duplicate-hint";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -41,6 +42,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useDuplicateWatch } from "@/hooks/use-duplicate-watch";
 import { actionErrorMessage, isPlanLimit } from "@/lib/action-error";
 
 import { MergeCompaniesModal } from "./merge-companies-modal";
@@ -185,6 +187,25 @@ export function CompanyModal({
     watch,
     formState: { errors, isSubmitting },
   } = form;
+  // The same check the form runs on save, run while the name is still being typed
+  // (rilievo U-13). Told at the end, the user has already filled in three tabs for
+  // a company that was here all along.
+  const typedName = form.watch("name");
+  const typedWebsite = form.watch("website");
+  const typedMainEmail = form.watch("mainEmail");
+  const dupWatch = useDuplicateWatch(
+    () =>
+      checkCompanyDuplicates({
+        name: typedName,
+        website: typedWebsite,
+        mainEmail: typedMainEmail,
+        excludeId: company?.id,
+      }),
+    [typedName, typedWebsite, typedMainEmail],
+    // Nothing to warn about while the dialog is shut, and the form keeps its
+    // values after it closes.
+    { enabled: open },
+  );
 
   useEffect(() => {
     if (open && company) {
@@ -353,6 +374,17 @@ export function CompanyModal({
 
           <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 overflow-y-auto px-6 py-4">
+              <DuplicateHint
+                title="A company with this name may already be here"
+                matches={dupWatch.matches.map((d) => ({
+                  id: d.id,
+                  label: d.name,
+                  detail: d.mainEmail ?? d.website,
+                  href: `/dashboard/companies/${d.id}`,
+                }))}
+                onDismiss={dupWatch.dismiss}
+              />
+
               <Tabs defaultValue="info">
                 <TabsList className="mb-5 w-full">
                   <TabsTrigger value="info" className="relative flex-1 gap-1.5">
