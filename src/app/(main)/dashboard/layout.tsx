@@ -18,9 +18,13 @@ import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/s
 import { CurrencyProvider } from "@/contexts/currency-context";
 import { platformDb } from "@/db";
 import { tenantMembers, tenants, users } from "@/db/schema";
+import { getTenantEntitlements } from "@/lib/auth-guard";
+import { normalizeTenantRole } from "@/lib/permissions";
 import { SIDEBAR_COLLAPSIBLE_VALUES, SIDEBAR_VARIANT_VALUES } from "@/lib/preferences/layout";
 import { getDb } from "@/lib/tenant-context";
 import { cn } from "@/lib/utils";
+import { filterNav } from "@/navigation/sidebar/filter-nav";
+import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { getPreference } from "@/server/server-actions";
 
 import { LayoutControls } from "./_components/sidebar/layout-controls";
@@ -73,6 +77,18 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
     .onConflictDoUpdate({ target: users.id, set: { name: uname, role: urole } });
   // ─────────────────────────────────────────────────────────────────────────────
 
+  // The sidebar is built from the membership role read above — the authoritative
+  // one — rather than the platform staff field the pages used to consult.
+  const entitlements = await getTenantEntitlements().catch(() => null);
+  const navGroups = filterNav(sidebarItems, {
+    actor: {
+      userId: uid,
+      tenantRole: normalizeTenantRole(member.role),
+      isPlatformStaff: false,
+    },
+    enabledModules: entitlements?.enabledModules,
+  });
+
   const cookieStore = await cookies();
   const userNotifications = session?.user?.id ? await getNotificationsAction(session.user.id) : [];
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
@@ -84,7 +100,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
   return (
     <CurrencyProvider>
       <SidebarProvider defaultOpen={defaultOpen}>
-        <AppSidebar user={user} variant={variant} collapsible={collapsible} />
+        <AppSidebar user={user} navGroups={navGroups} variant={variant} collapsible={collapsible} />
         <SidebarInset
           className={cn(
             "overflow-hidden",

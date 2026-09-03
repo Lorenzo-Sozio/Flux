@@ -1,64 +1,86 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-import { CreditCard, Mail, Settings2, Webhook } from "lucide-react";
+import { CreditCard, GitMerge, Mail, MessageSquareQuote, Settings2, Webhook } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
-import { auth } from "@/auth";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { requirePageCapability } from "@/lib/page-guard";
+import { type Capability, can } from "@/lib/permissions";
 
 export default async function SettingsPage() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
-
-  const role = (session.user as any).role;
-  if (!["admin", "owner"].includes(role)) redirect("/dashboard/crm");
+  const actor = await requirePageCapability("settings:read", "/dashboard/settings");
 
   const t = await getTranslations("settings");
+  const tMacros = await getTranslations("support.macros");
+
+  // Pipeline stages and macros used to live only at their URL: absent from the
+  // sidebar AND from this index, so configuring the pipeline — the first thing
+  // anyone does when adopting a CRM — meant typing the path by hand.
+  const cards: { href: string; icon: typeof CreditCard; title: string; description: string; need: Capability }[] = [
+    {
+      href: "/dashboard/settings/billing",
+      icon: CreditCard,
+      title: t("billing.title"),
+      description: t("billing.description"),
+      need: "billing:read",
+    },
+    {
+      href: "/dashboard/settings/pipeline",
+      icon: GitMerge,
+      title: t("pipeline.title"),
+      description: t("pipeline.description"),
+      need: "pipeline:manage",
+    },
+    {
+      href: "/dashboard/settings/custom-fields",
+      icon: Settings2,
+      title: t("customFields.title"),
+      description: t("customFields.description"),
+      need: "customField:manage",
+    },
+    {
+      href: "/dashboard/settings/email",
+      icon: Mail,
+      title: t("email.title"),
+      description: t("email.description"),
+      need: "emailSettings:manage",
+    },
+    {
+      href: "/dashboard/settings/macros",
+      icon: MessageSquareQuote,
+      title: tMacros("title"),
+      description: tMacros("subtitle"),
+      need: "macro:manage",
+    },
+    {
+      href: "/dashboard/settings/webhooks",
+      icon: Webhook,
+      title: t("webhooks.title"),
+      description: t("webhooks.description"),
+      need: "webhook:manage",
+    },
+  ];
+
+  const visible = cards.filter((c) => can(actor, c.need));
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+        <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
         <p className="text-muted-foreground">{t("general.title")}</p>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link href="/dashboard/settings/billing">
-          <Card className="cursor-pointer transition-shadow hover:shadow-md">
-            <CardHeader>
-              <CreditCard className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>{t("billing.title")}</CardTitle>
-              <CardDescription>{t("billing.description")}</CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
-        <Link href="/dashboard/settings/custom-fields">
-          <Card className="cursor-pointer transition-shadow hover:shadow-md">
-            <CardHeader>
-              <Settings2 className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>{t("customFields.title")}</CardTitle>
-              <CardDescription>{t("customFields.description")}</CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
-        <Link href="/dashboard/settings/webhooks">
-          <Card className="cursor-pointer transition-shadow hover:shadow-md">
-            <CardHeader>
-              <Webhook className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>{t("webhooks.title")}</CardTitle>
-              <CardDescription>{t("webhooks.description")}</CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
-        <Link href="/dashboard/settings/email">
-          <Card className="cursor-pointer transition-shadow hover:shadow-md">
-            <CardHeader>
-              <Mail className="mb-2 h-8 w-8 text-primary" />
-              <CardTitle>{t("email.title")}</CardTitle>
-              <CardDescription>{t("email.description")}</CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
+        {visible.map(({ href, icon: Icon, title, description }) => (
+          <Link key={href} href={href}>
+            <Card className="h-full cursor-pointer transition-shadow hover:shadow-md">
+              <CardHeader>
+                <Icon className="mb-2 h-8 w-8 text-primary" />
+                <CardTitle>{title}</CardTitle>
+                <CardDescription>{description}</CardDescription>
+              </CardHeader>
+            </Card>
+          </Link>
+        ))}
       </div>
     </div>
   );

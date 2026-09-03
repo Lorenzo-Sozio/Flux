@@ -1,12 +1,14 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { and, count, desc, eq, getTableColumns, ilike, isNull, ne, or } from "drizzle-orm";
 import { getTranslations } from "next-intl/server";
 
 import { createNotificationAction } from "@/actions/auth";
 import { dispatchWebhook } from "@/actions/webhooks";
+import { runAutomations } from "@/components/crm/automation/rule-engine";
 import {
   activities,
   appointments,
@@ -24,6 +26,7 @@ import {
   tickets,
   users,
 } from "@/db/schema";
+import { guarded } from "@/lib/action-error";
 import { requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
 import {
   buildWhereClause,
@@ -129,73 +132,104 @@ export async function getContacts(encodedFilter?: string | null) {
 
 // biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
 export async function createLead(data: any) {
-  await requireWriteAccess();
-  const db = await getDb();
-  await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
-  const payload = {
-    ...data,
-    marketingConsent: data.marketingConsent ?? false,
-    consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
-    tags: Array.isArray(data.tags)
-      ? data.tags
-      : typeof data.tags === "string"
+  return guarded(async () => {
+    await requireWriteAccess();
+    const db = await getDb();
+    await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
+    const payload = {
+      ...data,
+      marketingConsent: data.marketingConsent ?? false,
+      consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
+      tags: Array.isArray(data.tags)
         ? data.tags
-            .split(",")
-            .map((t: string) => t.trim())
-            .filter(Boolean)
-        : null,
-    leadScore: computeLeadScore(data),
-  };
-  const [newLead] = await db.insert(leads).values(payload).returning();
-  revalidatePath("/dashboard/leads");
-  dispatchWebhook("lead.created", {
-    id: newLead.id,
-    email: newLead.email,
-    firstName: newLead.firstName,
-    lastName: newLead.lastName,
-    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
-  }).catch(() => {});
-  return newLead;
+        : typeof data.tags === "string"
+          ? data.tags
+              .split(",")
+              .map((t: string) => t.trim())
+              .filter(Boolean)
+          : null,
+      leadScore: computeLeadScore(data),
+    };
+    const [newLead] = await db.insert(leads).values(payload).returning();
+    revalidatePath("/dashboard/leads");
+    dispatchWebhook("lead.created", {
+      id: newLead.id,
+      email: newLead.email,
+      firstName: newLead.firstName,
+      lastName: newLead.lastName,
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+    }).catch(() => {});
+
+    // The rule builder has always offered this entity; nothing ever called the
+    // engine for it (audit rilievo D-02). `after()` keeps it off the response path.
+    after(() =>
+      runAutomations({
+        entityType: "lead",
+        entityId: newLead.id,
+        event: "onCreate",
+        oldData: {},
+        newData: newLead as Record<string, unknown>,
+      }),
+    );
+    return { lead: newLead };
+  });
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
 export async function updateLead(id: string, data: any) {
-  await requireWriteAccess();
-  const db = await getDb();
-  // Notify new assignee if ownerId changed
-  if (data.ownerId) {
-    const [cur] = await db
-      .select({ ownerId: leads.ownerId, firstName: leads.firstName, lastName: leads.lastName })
-      .from(leads)
-      .where(eq(leads.id, id));
-    if (cur && cur.ownerId !== data.ownerId) {
-      createNotificationAction({
-        userId: data.ownerId,
-        type: "lead_assigned",
-        title: "Lead assigned to you",
-        message: `${cur.firstName} ${cur.lastName} has been assigned to you.`,
-        link: `/dashboard/leads/${id}`,
-        // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
-      }).catch(() => {});
+  return guarded(async () => {
+    await requireWriteAccess();
+    const db = await getDb();
+    // Read before the write: the automation engine compares old and new to
+    // decide whether a field `changed`, and cannot do that after the fact.
+    const [previous] = await db.select().from(leads).where(eq(leads.id, id));
+    // Notify new assignee if ownerId changed
+    if (data.ownerId) {
+      const [cur] = await db
+        .select({ ownerId: leads.ownerId, firstName: leads.firstName, lastName: leads.lastName })
+        .from(leads)
+        .where(eq(leads.id, id));
+      if (cur && cur.ownerId !== data.ownerId) {
+        createNotificationAction({
+          userId: data.ownerId,
+          type: "lead_assigned",
+          title: "Lead assigned to you",
+          message: `${cur.firstName} ${cur.lastName} has been assigned to you.`,
+          link: `/dashboard/leads/${id}`,
+          // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+        }).catch(() => {});
+      }
     }
-  }
-  const payload = {
-    ...data,
-    marketingConsent: data.marketingConsent ?? false,
-    consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
-    tags: Array.isArray(data.tags)
-      ? data.tags
-      : typeof data.tags === "string"
+    const payload = {
+      ...data,
+      marketingConsent: data.marketingConsent ?? false,
+      consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
+      tags: Array.isArray(data.tags)
         ? data.tags
-            .split(",")
-            .map((t: string) => t.trim())
-            .filter(Boolean)
-        : null,
-    leadScore: computeLeadScore(data),
-  };
-  const [updatedLead] = await db.update(leads).set(payload).where(eq(leads.id, id)).returning();
-  revalidatePath("/dashboard/leads");
-  return updatedLead;
+        : typeof data.tags === "string"
+          ? data.tags
+              .split(",")
+              .map((t: string) => t.trim())
+              .filter(Boolean)
+          : null,
+      leadScore: computeLeadScore(data),
+    };
+    const [updatedLead] = await db.update(leads).set(payload).where(eq(leads.id, id)).returning();
+    revalidatePath("/dashboard/leads");
+
+    after(() =>
+      runAutomations({
+        entityType: "lead",
+        entityId: updatedLead.id,
+        event: "onUpdate",
+        // The engine's `changed`, `changed_to` and `changed_from` operators are
+        // meaningless without the previous row, so it is read before the write.
+        oldData: (previous ?? {}) as Record<string, unknown>,
+        newData: updatedLead as Record<string, unknown>,
+      }),
+    );
+    return { lead: updatedLead };
+  });
 }
 
 export async function deleteLead(id: string) {
@@ -356,80 +390,111 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
 
 // biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
 export async function createContact(data: any) {
-  await requireWriteAccess();
-  const db = await getDb();
-  await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
-  const payload = {
-    ...data,
-    marketingConsent: data.marketingConsent ?? false,
-    consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
-    tags: Array.isArray(data.tags)
-      ? data.tags
-      : typeof data.tags === "string"
+  return guarded(async () => {
+    await requireWriteAccess();
+    const db = await getDb();
+    await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
+    const payload = {
+      ...data,
+      marketingConsent: data.marketingConsent ?? false,
+      consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
+      tags: Array.isArray(data.tags)
         ? data.tags
-            .split(",")
-            .map((t: string) => t.trim())
-            .filter(Boolean)
-        : null,
-    leadScore: computeLeadScore(data),
-  };
-  const [newContact] = await db.insert(contacts).values(payload).returning();
-  revalidatePath("/dashboard/contacts");
-  dispatchWebhook("contact.created", {
-    id: newContact.id,
-    email: newContact.email,
-    firstName: newContact.firstName,
-    lastName: newContact.lastName,
-    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
-  }).catch(() => {});
-  return newContact;
+        : typeof data.tags === "string"
+          ? data.tags
+              .split(",")
+              .map((t: string) => t.trim())
+              .filter(Boolean)
+          : null,
+      leadScore: computeLeadScore(data),
+    };
+    const [newContact] = await db.insert(contacts).values(payload).returning();
+    revalidatePath("/dashboard/contacts");
+    dispatchWebhook("contact.created", {
+      id: newContact.id,
+      email: newContact.email,
+      firstName: newContact.firstName,
+      lastName: newContact.lastName,
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+    }).catch(() => {});
+
+    // The rule builder has always offered this entity; nothing ever called the
+    // engine for it (audit rilievo D-02). `after()` keeps it off the response path.
+    after(() =>
+      runAutomations({
+        entityType: "contact",
+        entityId: newContact.id,
+        event: "onCreate",
+        oldData: {},
+        newData: newContact as Record<string, unknown>,
+      }),
+    );
+    return { contact: newContact };
+  });
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
 export async function updateContact(id: string, data: any) {
-  await requireWriteAccess();
-  const db = await getDb();
-  // Notify new assignee if ownerId changed
-  if (data.ownerId) {
-    const [cur] = await db
-      .select({ ownerId: contacts.ownerId, firstName: contacts.firstName, lastName: contacts.lastName })
-      .from(contacts)
-      .where(eq(contacts.id, id));
-    if (cur && cur.ownerId !== data.ownerId) {
-      createNotificationAction({
-        userId: data.ownerId,
-        type: "lead_assigned",
-        title: "Contact assigned to you",
-        message: `${cur.firstName} ${cur.lastName} has been assigned to you.`,
-        link: `/dashboard/contacts/${id}`,
-        // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
-      }).catch(() => {});
+  return guarded(async () => {
+    await requireWriteAccess();
+    const db = await getDb();
+    // Read before the write: the automation engine compares old and new to
+    // decide whether a field `changed`, and cannot do that after the fact.
+    const [previous] = await db.select().from(contacts).where(eq(contacts.id, id));
+    // Notify new assignee if ownerId changed
+    if (data.ownerId) {
+      const [cur] = await db
+        .select({ ownerId: contacts.ownerId, firstName: contacts.firstName, lastName: contacts.lastName })
+        .from(contacts)
+        .where(eq(contacts.id, id));
+      if (cur && cur.ownerId !== data.ownerId) {
+        createNotificationAction({
+          userId: data.ownerId,
+          type: "lead_assigned",
+          title: "Contact assigned to you",
+          message: `${cur.firstName} ${cur.lastName} has been assigned to you.`,
+          link: `/dashboard/contacts/${id}`,
+          // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+        }).catch(() => {});
+      }
     }
-  }
-  const payload = {
-    ...data,
-    marketingConsent: data.marketingConsent ?? false,
-    consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
-    tags: Array.isArray(data.tags)
-      ? data.tags
-      : typeof data.tags === "string"
+    const payload = {
+      ...data,
+      marketingConsent: data.marketingConsent ?? false,
+      consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
+      tags: Array.isArray(data.tags)
         ? data.tags
-            .split(",")
-            .map((t: string) => t.trim())
-            .filter(Boolean)
-        : null,
-    leadScore: computeLeadScore(data),
-  };
-  const [updatedContact] = await db.update(contacts).set(payload).where(eq(contacts.id, id)).returning();
-  revalidatePath("/dashboard/contacts");
-  dispatchWebhook("contact.updated", {
-    id: updatedContact.id,
-    email: updatedContact.email,
-    firstName: updatedContact.firstName,
-    lastName: updatedContact.lastName,
-    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
-  }).catch(() => {});
-  return updatedContact;
+        : typeof data.tags === "string"
+          ? data.tags
+              .split(",")
+              .map((t: string) => t.trim())
+              .filter(Boolean)
+          : null,
+      leadScore: computeLeadScore(data),
+    };
+    const [updatedContact] = await db.update(contacts).set(payload).where(eq(contacts.id, id)).returning();
+    revalidatePath("/dashboard/contacts");
+    dispatchWebhook("contact.updated", {
+      id: updatedContact.id,
+      email: updatedContact.email,
+      firstName: updatedContact.firstName,
+      lastName: updatedContact.lastName,
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+    }).catch(() => {});
+
+    after(() =>
+      runAutomations({
+        entityType: "contact",
+        entityId: updatedContact.id,
+        event: "onUpdate",
+        // The engine's `changed`, `changed_to` and `changed_from` operators are
+        // meaningless without the previous row, so it is read before the write.
+        oldData: (previous ?? {}) as Record<string, unknown>,
+        newData: updatedContact as Record<string, unknown>,
+      }),
+    );
+    return { contact: updatedContact };
+  });
 }
 
 export async function deleteContact(id: string) {
@@ -461,64 +526,95 @@ export async function getCompanies(encodedFilter?: string | null) {
 
 // biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
 export async function createCompany(data: any) {
-  await requireWriteAccess();
-  const db = await getDb();
-  await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
-  const payload = {
-    ...data,
-    vatNumber: data.vatNumber,
-    sdiCode: data.sdiCode,
-    tags: Array.isArray(data.tags)
-      ? data.tags
-      : typeof data.tags === "string"
+  return guarded(async () => {
+    await requireWriteAccess();
+    const db = await getDb();
+    await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
+    const payload = {
+      ...data,
+      vatNumber: data.vatNumber,
+      sdiCode: data.sdiCode,
+      tags: Array.isArray(data.tags)
         ? data.tags
-            .split(",")
-            .map((t: string) => t.trim())
-            .filter(Boolean)
-        : null,
-  };
-  const [newCompany] = await db.insert(companies).values(payload).returning();
-  revalidatePath("/dashboard/companies");
-  return newCompany;
+        : typeof data.tags === "string"
+          ? data.tags
+              .split(",")
+              .map((t: string) => t.trim())
+              .filter(Boolean)
+          : null,
+    };
+    const [newCompany] = await db.insert(companies).values(payload).returning();
+    revalidatePath("/dashboard/companies");
+
+    // The rule builder has always offered this entity; nothing ever called the
+    // engine for it (audit rilievo D-02). `after()` keeps it off the response path.
+    after(() =>
+      runAutomations({
+        entityType: "company",
+        entityId: newCompany.id,
+        event: "onCreate",
+        oldData: {},
+        newData: newCompany as Record<string, unknown>,
+      }),
+    );
+    return { company: newCompany };
+  });
 }
 
 // biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
 export async function updateCompany(id: string, data: any) {
-  await requireWriteAccess();
-  const db = await getDb();
-  // Notify new assignee if ownerId changed
-  if (data.ownerId) {
-    const [cur] = await db
-      .select({ ownerId: companies.ownerId, name: companies.name })
-      .from(companies)
-      .where(eq(companies.id, id));
-    if (cur && cur.ownerId !== data.ownerId) {
-      createNotificationAction({
-        userId: data.ownerId,
-        type: "lead_assigned",
-        title: "Company assigned to you",
-        message: `${cur.name} has been assigned to you.`,
-        link: `/dashboard/companies/${id}`,
-        // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
-      }).catch(() => {});
+  return guarded(async () => {
+    await requireWriteAccess();
+    const db = await getDb();
+    // Read before the write: the automation engine compares old and new to
+    // decide whether a field `changed`, and cannot do that after the fact.
+    const [previous] = await db.select().from(companies).where(eq(companies.id, id));
+    // Notify new assignee if ownerId changed
+    if (data.ownerId) {
+      const [cur] = await db
+        .select({ ownerId: companies.ownerId, name: companies.name })
+        .from(companies)
+        .where(eq(companies.id, id));
+      if (cur && cur.ownerId !== data.ownerId) {
+        createNotificationAction({
+          userId: data.ownerId,
+          type: "lead_assigned",
+          title: "Company assigned to you",
+          message: `${cur.name} has been assigned to you.`,
+          link: `/dashboard/companies/${id}`,
+          // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+        }).catch(() => {});
+      }
     }
-  }
-  const payload = {
-    ...data,
-    vatNumber: data.vatNumber,
-    sdiCode: data.sdiCode,
-    tags: Array.isArray(data.tags)
-      ? data.tags
-      : typeof data.tags === "string"
+    const payload = {
+      ...data,
+      vatNumber: data.vatNumber,
+      sdiCode: data.sdiCode,
+      tags: Array.isArray(data.tags)
         ? data.tags
-            .split(",")
-            .map((t: string) => t.trim())
-            .filter(Boolean)
-        : null,
-  };
-  const [updatedCompany] = await db.update(companies).set(payload).where(eq(companies.id, id)).returning();
-  revalidatePath("/dashboard/companies");
-  return updatedCompany;
+        : typeof data.tags === "string"
+          ? data.tags
+              .split(",")
+              .map((t: string) => t.trim())
+              .filter(Boolean)
+          : null,
+    };
+    const [updatedCompany] = await db.update(companies).set(payload).where(eq(companies.id, id)).returning();
+    revalidatePath("/dashboard/companies");
+
+    after(() =>
+      runAutomations({
+        entityType: "company",
+        entityId: updatedCompany.id,
+        event: "onUpdate",
+        // The engine's `changed`, `changed_to` and `changed_from` operators are
+        // meaningless without the previous row, so it is read before the write.
+        oldData: (previous ?? {}) as Record<string, unknown>,
+        newData: updatedCompany as Record<string, unknown>,
+      }),
+    );
+    return { company: updatedCompany };
+  });
 }
 
 export async function deleteCompany(id: string) {

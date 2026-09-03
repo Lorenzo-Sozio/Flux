@@ -9,29 +9,35 @@
  * Retry: up to 3 attempts with exponential backoff (5 min, 30 min).
  */
 
-import { type NextRequest, NextResponse } from "next/server";
-
 import { and, eq, lte, sql } from "drizzle-orm";
 
 import { getActivitiesWithPendingReminder } from "@/actions/activities";
 import { createNotificationAction } from "@/actions/auth";
 import { campaignLogs, emailJobs, marketingCampaigns, users } from "@/db/schema";
-import { verifyCronRequest } from "@/lib/cron-auth";
+import { runCronJob } from "@/lib/cron-runner";
 import { sendActivityReminderEmail } from "@/lib/email";
 import { getEmailConfig, sendEmail } from "@/lib/email-provider";
-import { getDb } from "@/lib/tenant-context";
+import type { TenantDb } from "@/lib/tenant-resolve";
 
-const BATCH_SIZE = parseInt(process.env.EMAILS_PER_WORKER_RUN ?? "30");
+const BATCH_SIZE = Number.parseInt(process.env.EMAILS_PER_WORKER_RUN ?? "30", 10);
 
 // Retry delays in milliseconds (5 min, 30 min)
 const RETRY_DELAYS_MS = [5 * 60 * 1000, 30 * 60 * 1000];
 
-export async function GET(req: NextRequest) {
-  const authError = verifyCronRequest(req);
-  if (authError) return authError;
+/**
+ * Drains the email queue for every workspace.
+ *
+ * Until now this opened a single database with getDb(), which reads a request
+ * header that a scheduled request never carries: the job threw immediately, so
+ * queued campaign email was never sent at all and simply accumulated (audit
+ * rilievo B-02). The batch size is per workspace, so one busy tenant cannot
+ * starve the others.
+ */
+export async function GET(req: Request) {
+  return runCronJob("email-worker", req, runForTenant);
+}
 
-  const db = await getDb();
-
+async function runForTenant(db: TenantDb) {
   const now = new Date();
   const config = await getEmailConfig();
 
@@ -44,7 +50,9 @@ export async function GET(req: NextRequest) {
     .for("update", { skipLocked: true }); // prevent duplicate processing
 
   if (jobs.length === 0) {
-    return NextResponse.json({ processed: 0, message: "No pending jobs." });
+    // Reminders still have to run even when the queue is empty.
+    const reminders = await dispatchActivityReminders(db);
+    return { processed: 0, sent: 0, failed: 0, remindersDispatched: reminders };
   }
 
   // Mark all fetched jobs as "processing" atomically
@@ -84,11 +92,11 @@ export async function GET(req: NextRequest) {
 
         sent++;
       } else {
-        await handleJobFailure(job, result.error ?? "Send failed", now);
+        await handleJobFailure(db, job, result.error ?? "Send failed", now);
         failed++;
       }
     } catch (err: any) {
-      await handleJobFailure(job, err?.message ?? "Unexpected error", now);
+      await handleJobFailure(db, job, err?.message ?? "Unexpected error", now);
       failed++;
     }
 
@@ -111,7 +119,13 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── Activity reminder notifications ──────────────────────────────────────
+  const remindersDispatched = await dispatchActivityReminders(db);
+
+  return { processed: jobs.length, sent, failed, remindersDispatched };
+}
+
+// ── Activity reminder notifications ──────────────────────────────────────────
+async function dispatchActivityReminders(db: TenantDb): Promise<number> {
   const pendingReminders = await getActivitiesWithPendingReminder(2);
   let remindersDispatched = 0;
 
@@ -137,22 +151,24 @@ export async function GET(req: NextRequest) {
       userId: activity.ownerId,
       type: "task_due",
       title: `Upcoming ${typeLabel}: "${description}"`,
-      message: `Scheduled for ${activity.date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}`,
+      message: `Scheduled for ${activity.date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`,
       link,
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
     }).catch(() => {});
 
     if (user.email) {
+      // One recipient whose mail bounces must not stop the sweep for everyone else.
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: best-effort delivery
       await sendActivityReminderEmail(user.email, activity.type, description, activity.date, link).catch(() => {});
     }
 
     remindersDispatched++;
   }
 
-  return NextResponse.json({ processed: jobs.length, sent, failed, remindersDispatched });
+  return remindersDispatched;
 }
 
-async function handleJobFailure(job: typeof emailJobs.$inferSelect, error: string, now: Date) {
-  const db = await getDb();
+async function handleJobFailure(db: TenantDb, job: typeof emailJobs.$inferSelect, error: string, now: Date) {
   const newAttempts = job.attempts + 1;
 
   if (newAttempts >= job.maxAttempts) {

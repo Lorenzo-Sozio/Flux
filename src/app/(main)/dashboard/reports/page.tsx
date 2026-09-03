@@ -1,5 +1,3 @@
-import { redirect } from "next/navigation";
-
 import { subDays } from "date-fns";
 import { BarChart3 } from "lucide-react";
 
@@ -14,16 +12,12 @@ import {
   getSalesReport,
   getTaskPerformanceByUser,
 } from "@/actions/reports";
-import { auth } from "@/auth";
+import { requirePageCapability } from "@/lib/page-guard";
 
 import { ReportsClient } from "./_components/reports-client";
 
 export default async function ReportsPage() {
-  const session = await auth();
-  if (!session?.user) redirect("/login");
-
-  const role = (session.user as { role?: string }).role;
-  if (!["admin", "owner"].includes(role ?? "")) redirect("/dashboard");
+  await requirePageCapability("report:read", "/dashboard/reports");
 
   const defaultFrom = subDays(new Date(), 29).toISOString().split("T")[0];
   const defaultTo = new Date().toISOString().split("T")[0];
@@ -43,13 +37,13 @@ export default async function ReportsPage() {
     ]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <BarChart3 className="w-6 h-6 text-primary" />
+        <h1 className="flex items-center gap-2 font-bold text-2xl tracking-tight">
+          <BarChart3 className="h-6 w-6 text-primary" />
           Reports & Analytics
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="mt-1 text-muted-foreground text-sm">
           Monitor user activity, performance metrics, and campaign results. Admin only.
         </p>
       </div>

@@ -96,17 +96,17 @@ export function PipelineBoard({
   if (!isMounted) return null;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-120px)] w-full overflow-hidden">
-      <div className="flex items-center justify-between mb-6 shrink-0 px-1">
+    <div className="flex h-[calc(100vh-120px)] w-full flex-col overflow-hidden">
+      <div className="mb-6 flex shrink-0 items-center justify-between px-1">
         <div>
-          <h2 className="text-xl font-bold">{t("title")}</h2>
-          <p className="text-sm text-muted-foreground">{t("boardSubtitle")}</p>
+          <h2 className="font-bold text-xl">{t("title")}</h2>
+          <p className="text-muted-foreground text-sm">{t("boardSubtitle")}</p>
         </div>
 
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link href="/dashboard/pipeline/forecast">
-              <TrendingUp className="mr-2 h-4 w-4" /> Forecast
+              <TrendingUp className="mr-2 h-4 w-4" /> {t("forecast.title")}
             </Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
@@ -124,14 +124,18 @@ export function PipelineBoard({
           {canEdit && (
             <DealModal stages={initialStages} companies={companies} contacts={contacts}>
               <Button size="sm" className="gap-2">
-                <PlusIcon className="w-4 h-4" /> {t("newDeal")}
+                <PlusIcon className="h-4 w-4" /> {t("newDeal")}
               </Button>
             </DealModal>
           )}
         </div>
       </div>
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="flex-1 flex gap-4 w-full pb-4">
+        {/* Columns shared the available width with no minimum, so a pipeline with
+            seven stages rendered as unreadable strips and adding a stage made the
+            board worse instead of richer (audit rilievo U-05). They now keep a
+            legible width and the board scrolls sideways instead. */}
+        <div className="flex w-full flex-1 gap-4 overflow-x-auto pb-4">
           {initialStages.map((stage) => {
             const stageDeals = deals.filter((d) => d.stageId === stage.id);
             const totalAmount = stageDeals.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
@@ -139,23 +143,30 @@ export function PipelineBoard({
             return (
               <div
                 key={stage.id}
-                className="flex-1 min-w-0 flex flex-col bg-muted/30 rounded-xl border h-full overflow-hidden shadow-sm"
+                className="flex h-full min-w-[280px] flex-1 shrink-0 flex-col overflow-hidden rounded-xl border bg-muted/30 shadow-sm"
               >
-                <div className="p-4 border-b bg-background/50 backdrop-blur-sm flex flex-col gap-1 shrink-0">
+                <div className="flex shrink-0 flex-col gap-1 border-b bg-background/50 p-4 backdrop-blur-sm">
                   <div className="flex items-center justify-between">
                     <h3
-                      className="font-bold text-sm tracking-tight truncate uppercase"
+                      className="truncate font-bold text-sm uppercase tracking-tight"
                       style={{ color: stage.color || "inherit" }}
                     >
                       {stage.name}
                     </h3>
-                    <Badge variant="secondary" className="rounded-full h-5 text-[10px]">
+                    <Badge variant="secondary" className="h-5 rounded-full text-[10px]">
                       {stageDeals.length}
                     </Badge>
                   </div>
-                  <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
-                    <CoinsIcon className="w-3 h-3" />
-                    {totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  <p className="flex items-center gap-1 font-semibold text-muted-foreground text-xs">
+                    <CoinsIcon className="h-3 w-3" />
+                    {/* A bare number with no currency symbol: money that does not say
+                        what it is. Amounts are stored in EUR. */}
+                    {totalAmount.toLocaleString(undefined, {
+                      style: "currency",
+                      currency: "EUR",
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </p>
                 </div>
 
@@ -164,7 +175,7 @@ export function PipelineBoard({
                     <div
                       {...provided.droppableProps}
                       ref={provided.innerRef}
-                      className={`flex-1 overflow-y-auto p-3 flex flex-col gap-3 transition-colors ${
+                      className={`flex flex-1 flex-col gap-3 overflow-y-auto p-3 transition-colors ${
                         snapshot.isDraggingOver ? "bg-primary/5" : "bg-transparent"
                       }`}
                     >
@@ -179,30 +190,30 @@ export function PipelineBoard({
                               className="group"
                             >
                               <Card
-                                className={`relative transition-all border-l-4 ${
+                                className={`relative border-l-4 transition-all ${
                                   snapshot.isDragging
-                                    ? "shadow-xl ring-2 ring-primary/20 rotate-1 scale-[1.02]"
+                                    ? "rotate-1 scale-[1.02] shadow-xl ring-2 ring-primary/20"
                                     : "hover:shadow-md"
                                 }`}
                                 style={{ borderLeftColor: stage.color || "#3b82f6" }}
                               >
                                 <CardHeader className="p-3 pb-1">
-                                  <div className="flex justify-between items-start gap-2">
-                                    <CardTitle className="text-sm font-bold leading-tight">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <CardTitle className="font-bold text-sm leading-tight">
                                       <Link
                                         href={`/dashboard/pipeline/${deal.id}`}
-                                        className="hover:text-primary transition-colors"
+                                        className="transition-colors hover:text-primary"
                                         onClick={(e) => e.stopPropagation()}
                                       >
                                         {deal.name}
                                       </Link>
                                     </CardTitle>
-                                    <div className="flex items-center gap-1 shrink-0">
+                                    <div className="flex shrink-0 items-center gap-1">
                                       {/* Health score dot */}
                                       {deal.status === "open" && (
                                         <span
                                           title={`Health: ${deal.healthScore ?? 0}/100`}
-                                          className={`h-2 w-2 rounded-full shrink-0 ${
+                                          className={`h-2 w-2 shrink-0 rounded-full ${
                                             (deal.healthScore ?? 0) >= 70
                                               ? "bg-green-500"
                                               : (deal.healthScore ?? 0) >= 40
@@ -221,7 +232,7 @@ export function PipelineBoard({
                                           <Button
                                             variant="ghost"
                                             size="icon"
-                                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
                                             title={t("editDealTitle")}
                                           >
                                             <PencilIcon className="h-3 w-3" />
@@ -231,13 +242,13 @@ export function PipelineBoard({
                                     </div>
                                   </div>
                                 </CardHeader>
-                                <CardContent className="p-3 pt-0 flex flex-col gap-1.5">
-                                  <div className="flex items-center justify-between mt-1">
-                                    <p className="text-[11px] font-bold text-foreground/80">
+                                <CardContent className="flex flex-col gap-1.5 p-3 pt-0">
+                                  <div className="mt-1 flex items-center justify-between">
+                                    <p className="font-bold text-[11px] text-foreground/80">
                                       {deal.currency} {Number(deal.amount || 0).toLocaleString()}
                                     </p>
                                     {(deal.probability ?? 0) > 0 && (
-                                      <span className="text-[9px] font-medium text-muted-foreground">
+                                      <span className="font-medium text-[9px] text-muted-foreground">
                                         {deal.probability}%
                                       </span>
                                     )}
@@ -248,7 +259,7 @@ export function PipelineBoard({
                                       <span
                                         className={
                                           new Date(deal.expectedCloseDate) < new Date()
-                                            ? "text-red-500 font-medium"
+                                            ? "font-medium text-red-500"
                                             : ""
                                         }
                                       >

@@ -11,11 +11,10 @@ import type { NextRequest } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { campaignLogs, contacts, emailSuppressions, leads } from "@/db/schema";
-import { getDb } from "@/lib/tenant-context";
+import { resolveTenantByProbe } from "@/lib/tenant-resolve";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe-token";
 
 export async function GET(req: NextRequest) {
-  const db = await getDb();
   const token = req.nextUrl.searchParams.get("token");
 
   if (!token) {
@@ -29,6 +28,25 @@ export async function GET(req: NextRequest) {
   }
 
   const { email, logId } = payload;
+
+  // The recipient of a marketing email has no session and no workspace header, so
+  // the tenant is derived from the campaign log the token is signed against.
+  // Calling getDb() here returned 500 on every unsubscribe — a link that is both
+  // legally required and the one people click when they are already annoyed
+  // (audit rilievo B-01).
+  const resolved = await resolveTenantByProbe(`campaignLog:${logId}`, async (tenantDb) => {
+    const row = await tenantDb.query.campaignLogs.findFirst({
+      where: eq(campaignLogs.id, logId),
+      columns: { id: true },
+    });
+    return Boolean(row);
+  }).catch(() => null);
+
+  if (!resolved) {
+    return htmlResponse("Invalid link", "This unsubscribe link is invalid or has expired.", false);
+  }
+
+  const db = resolved.db;
 
   try {
     // Add to suppression list (ignore if already present)

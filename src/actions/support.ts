@@ -17,7 +17,6 @@ import {
   UpdateSLASchema,
   UpdateTicketSchema,
 } from "@/actions/support-validation";
-import { auth } from "@/auth";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import {
   chatChannels,
@@ -30,6 +29,7 @@ import {
   tickets,
   users,
 } from "@/db/schema";
+import { requireCapability } from "@/lib/auth-guard";
 import { sendEmail } from "@/lib/email-provider";
 import { getDb } from "@/lib/tenant-context";
 import { logTicketChange } from "@/lib/ticket-audit";
@@ -45,29 +45,45 @@ function generateTicketNumber(): string {
   return `TKT-${year}${month}-${random}`;
 }
 
-async function calculateSLADeadline(slaId: string | null | undefined): Promise<Date | null> {
+/**
+ * Picks the SLA policy that applies to a ticket, and works out both deadlines.
+ *
+ * Ticket creation called `calculateSLADeadline(null)` — the argument was hardcoded
+ * — so `slaDeadlineAt` was always empty and no ticket ever carried an SLA at all.
+ * The policy page, the compliance gauge, the "SLA due" badge and the breach job
+ * were therefore all reading a column nothing wrote (audit rilievo D-01).
+ *
+ * The policy is matched on priority, which is what the `sla.priority` column is
+ * for. A ticket whose priority has no policy simply has no deadline, rather than
+ * silently inheriting someone else's.
+ */
+async function resolveSla(priority: string, from: Date = new Date()) {
   const db = await getDb();
-  if (!slaId) return null;
 
   const sla = await db.query.slas.findFirst({
-    where: eq(slas.id, slaId),
+    where: and(eq(slas.priority, priority), eq(slas.isActive, true)),
   });
 
-  if (!sla) return null;
+  if (!sla) return { slaId: null, firstResponseDueAt: null, slaDeadlineAt: null };
 
-  return new Date(Date.now() + sla.resolutionTimeMinutes * 60000);
+  return {
+    slaId: sla.id,
+    // Two promises, tracked separately. The ticket only ever had one field, so
+    // first-response compliance could not be measured even in principle.
+    firstResponseDueAt: new Date(from.getTime() + sla.firstResponseTimeMinutes * 60_000),
+    slaDeadlineAt: new Date(from.getTime() + sla.resolutionTimeMinutes * 60_000),
+  };
 }
 
 // --- MAIN ACTIONS ---
 
 export async function createTicketAction(data: z.infer<typeof CreateTicketSchema>) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const actor = await requireCapability("ticket:write");
 
   const validated = CreateTicketSchema.parse(data);
   const ticketNumber = generateTicketNumber();
-  const slaDeadlineAt = await calculateSLADeadline(null);
+  const sla = await resolveSla(validated.priority);
 
   const [ticket] = await db
     .insert(tickets)
@@ -86,16 +102,18 @@ export async function createTicketAction(data: z.infer<typeof CreateTicketSchema
       companyId: validated.companyId,
       leadId: validated.leadId,
       assigneeId: validated.assigneeId,
-      ownerId: session.user.id,
+      ownerId: actor.userId,
       tags: validated.tags,
-      slaDeadlineAt,
+      slaId: sla.slaId,
+      firstResponseDueAt: sla.firstResponseDueAt,
+      slaDeadlineAt: sla.slaDeadlineAt,
     })
     .returning();
 
   await logTicketChange({
     ticketId: ticket.id,
-    actorId: session.user.id,
-    actorName: session.user.name ?? session.user.email ?? undefined,
+    actorId: actor.userId,
+    actorName: actor.name ?? actor.email ?? undefined,
     action: "created",
     newValue: ticketNumber,
   });
@@ -110,7 +128,7 @@ export async function createTicketAction(data: z.infer<typeof CreateTicketSchema
       event: "onCreate",
       oldData: {},
       newData: ticket as Record<string, unknown>,
-      currentUserId: session.user.id,
+      currentUserId: actor.userId,
     }),
   );
 
@@ -119,8 +137,7 @@ export async function createTicketAction(data: z.infer<typeof CreateTicketSchema
 
 export async function getTicketById(ticketId: string) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireCapability("ticket:read");
 
   const ticket = await db.query.tickets.findFirst({
     where: eq(tickets.id, ticketId),
@@ -153,8 +170,7 @@ export async function getTicketById(ticketId: string) {
 
 export async function getTickets(options?: { limit?: number; status?: string }) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireCapability("ticket:read");
 
   const ticketList = await db.query.tickets.findMany({
     orderBy: desc(tickets.createdAt),
@@ -175,8 +191,7 @@ export async function getTickets(options?: { limit?: number; status?: string }) 
 
 export async function getTicketsByStatus(status: string) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireCapability("ticket:read");
 
   const ticketList = await db.query.tickets.findMany({
     where: eq(tickets.status, status),
@@ -197,8 +212,7 @@ export async function getTicketsByStatus(status: string) {
 
 export async function updateTicketAction(ticketId: string, data: z.infer<typeof UpdateTicketSchema>) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const actor = await requireCapability("ticket:write");
 
   const validated = UpdateTicketSchema.parse(data);
   const ticket = await db.query.tickets.findFirst({
@@ -207,11 +221,16 @@ export async function updateTicketAction(ticketId: string, data: z.infer<typeof 
 
   if (!ticket) throw new Error("Ticket not found");
 
-  if (session.user.id !== ticket.ownerId && session.user.id !== ticket.assigneeId && session.user.role !== "admin") {
+  if (
+    actor.userId !== ticket.ownerId &&
+    actor.userId !== ticket.assigneeId &&
+    actor.tenantRole !== "admin" &&
+    actor.tenantRole !== "owner"
+  ) {
     throw new Error("Unauthorized");
   }
 
-  const actorName = session.user.name ?? session.user.email ?? undefined;
+  const actorName = actor.name ?? actor.email ?? undefined;
   const now = new Date();
   const updateData: Record<string, unknown> = { updatedAt: now };
 
@@ -239,13 +258,25 @@ export async function updateTicketAction(ticketId: string, data: z.infer<typeof 
     }
   }
 
-  if (validated.priority) updateData.priority = validated.priority;
+  if (validated.priority && validated.priority !== ticket.priority) {
+    updateData.priority = validated.priority;
+    // Raising a ticket to urgent has to shorten its deadlines, or the policy is
+    // whatever it happened to be when the ticket was opened.
+    const sla = await resolveSla(validated.priority, ticket.createdAt);
+    updateData.slaId = sla.slaId;
+    updateData.firstResponseDueAt = sla.firstResponseDueAt;
+    updateData.slaDeadlineAt = sla.slaDeadlineAt;
+    // A new clock starts un-breached; the breach job re-evaluates it.
+    updateData.slaBreachedAt = null;
+  } else if (validated.priority) {
+    updateData.priority = validated.priority;
+  }
   if (validated.severity) updateData.severity = validated.severity;
   if (validated.assigneeId !== undefined) {
     updateData.assigneeId = validated.assigneeId;
-    if (validated.assigneeId && !ticket.firstResponseAt) {
-      updateData.firstResponseAt = now;
-    }
+    // Assigning a ticket is NOT a response to the customer. Counting it as one
+    // reported a first-response time of nearly zero for every triaged ticket,
+    // which made the metric flattering and useless (audit rilievo D-01).
   }
   if (validated.tags) updateData.tags = validated.tags;
 
@@ -257,7 +288,7 @@ export async function updateTicketAction(ticketId: string, data: z.infer<typeof 
     auditPromises.push(
       logTicketChange({
         ticketId,
-        actorId: session.user.id,
+        actorId: actor.userId,
         actorName,
         action: "status_changed",
         field: "status",
@@ -270,7 +301,7 @@ export async function updateTicketAction(ticketId: string, data: z.infer<typeof 
     auditPromises.push(
       logTicketChange({
         ticketId,
-        actorId: session.user.id,
+        actorId: actor.userId,
         actorName,
         action: "priority_changed",
         field: "priority",
@@ -283,7 +314,7 @@ export async function updateTicketAction(ticketId: string, data: z.infer<typeof 
     auditPromises.push(
       logTicketChange({
         ticketId,
-        actorId: session.user.id,
+        actorId: actor.userId,
         actorName,
         action: "assigned",
         field: "assigneeId",
@@ -304,7 +335,7 @@ export async function updateTicketAction(ticketId: string, data: z.infer<typeof 
       event: "onUpdate",
       oldData: ticket as Record<string, unknown>,
       newData: updated as Record<string, unknown>,
-      currentUserId: session.user.id,
+      currentUserId: actor.userId,
     }),
   );
 
@@ -313,8 +344,7 @@ export async function updateTicketAction(ticketId: string, data: z.infer<typeof 
 
 export async function addTicketMessageAction(ticketId: string, data: z.infer<typeof AddMessageSchema>) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const actor = await requireCapability("ticket:write");
 
   const validated = AddMessageSchema.parse(data);
   const ticket = await db.query.tickets.findFirst({
@@ -323,7 +353,12 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
 
   if (!ticket) throw new Error("Ticket not found");
 
-  if (session.user.id !== ticket.ownerId && session.user.id !== ticket.assigneeId && session.user.role !== "admin") {
+  if (
+    actor.userId !== ticket.ownerId &&
+    actor.userId !== ticket.assigneeId &&
+    actor.tenantRole !== "admin" &&
+    actor.tenantRole !== "owner"
+  ) {
     throw new Error("Unauthorized");
   }
 
@@ -344,15 +379,15 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
         contactId: ticket.contactId,
         companyId: ticket.companyId,
         assigneeId: ticket.assigneeId,
-        ownerId: session.user.id,
+        ownerId: actor.userId,
         parentTicketId: ticket.id,
       })
       .returning();
 
     await logTicketChange({
       ticketId: newTicket.id,
-      actorId: session.user.id,
-      actorName: session.user.name ?? session.user.email ?? undefined,
+      actorId: actor.userId,
+      actorName: actor.name ?? actor.email ?? undefined,
       action: "created",
       newValue: `linked from ${ticket.ticketNumber}`,
     });
@@ -382,7 +417,7 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
     .insert(ticketMessages)
     .values({
       ticketId,
-      senderId: session.user.id,
+      senderId: actor.userId,
       content: validated.content,
       channel: validated.channel,
       isPublic: validated.isPublic,
@@ -393,7 +428,12 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
     .returning();
 
   const ticketUpdates: Record<string, unknown> = { updatedAt: new Date() };
-  if (!ticket.firstResponseAt) ticketUpdates.firstResponseAt = new Date();
+  // Only a message the customer can actually see counts as the first response.
+  // Internal notes used to stop the clock too, so the SLA was met by talking to
+  // colleagues (audit rilievo D-01).
+  if (!ticket.firstResponseAt && validated.isPublic !== false) {
+    ticketUpdates.firstResponseAt = new Date();
+  }
   // Auto-move from 'new' to 'open' on first agent reply
   if (ticket.status === "new") ticketUpdates.status = "open";
 
@@ -401,8 +441,8 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
 
   await logTicketChange({
     ticketId,
-    actorId: session.user.id,
-    actorName: session.user.name ?? session.user.email ?? undefined,
+    actorId: actor.userId,
+    actorName: actor.name ?? actor.email ?? undefined,
     action: "message_added",
     newValue: validated.isPublic ? "public" : "internal_note",
   });
@@ -456,8 +496,7 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
 
 export async function getTicketAuditLog(ticketId: string) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireCapability("ticket:read");
 
   return db.query.ticketAuditLogs.findMany({
     where: eq(ticketAuditLogs.ticketId, ticketId),
@@ -470,8 +509,7 @@ export async function getTicketAuditLog(ticketId: string) {
 
 export async function getSLAs() {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireCapability("ticket:read");
 
   return db.query.slas.findMany({
     where: eq(slas.isActive, true),
@@ -481,8 +519,7 @@ export async function getSLAs() {
 
 export async function createSLAAction(data: z.infer<typeof CreateSLASchema>) {
   const db = await getDb();
-  const session = await auth();
-  if (session?.user?.role !== "admin") throw new Error("Only admins can create SLAs");
+  await requireCapability("sla:manage");
 
   const validated = CreateSLASchema.parse(data);
   const [sla] = await db.insert(slas).values(validated).returning();
@@ -492,8 +529,7 @@ export async function createSLAAction(data: z.infer<typeof CreateSLASchema>) {
 
 export async function updateSLAAction(slaId: string, data: z.infer<typeof UpdateSLASchema>) {
   const db = await getDb();
-  const session = await auth();
-  if (session?.user?.role !== "admin") throw new Error("Only admins can update SLAs");
+  await requireCapability("sla:manage");
 
   const validated = UpdateSLASchema.parse(data);
   const [updated] = await db.update(slas).set(validated).where(eq(slas.id, slaId)).returning();
@@ -503,8 +539,7 @@ export async function updateSLAAction(slaId: string, data: z.infer<typeof Update
 
 export async function deleteSLAAction(slaId: string) {
   const db = await getDb();
-  const session = await auth();
-  if (session?.user?.role !== "admin") throw new Error("Only admins can delete SLAs");
+  await requireCapability("sla:manage");
 
   await db.delete(slas).where(eq(slas.id, slaId));
 
@@ -522,8 +557,7 @@ export async function getChatChannels() {
 
 export async function createChatChannelAction(name: string, type: string, config?: Record<string, unknown>) {
   const db = await getDb();
-  const session = await auth();
-  if (session?.user?.role !== "admin") throw new Error("Only admins can create chat channels");
+  await requireCapability("chatChannel:manage");
 
   const [channel] = await db
     .insert(chatChannels)
@@ -547,8 +581,7 @@ export async function startChatSessionAction(channelId: string, visitorEmail?: s
 
 export async function assignChatSessionAction(sessionId: string, agentId: string, ticketId?: string) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireCapability("ticket:write");
 
   const [updated] = await db
     .update(chatSessions)
@@ -574,8 +607,7 @@ export async function endChatSessionAction(sessionId: string) {
 
 export async function getAgents() {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireCapability("ticket:read");
 
   return db.select({ id: users.id, name: users.name, email: users.email }).from(users);
 }
@@ -584,15 +616,10 @@ export async function getAgents() {
 
 export async function deleteTicketAction(ticketId: string) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireCapability("ticket:delete");
 
   const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
   if (!ticket) throw new Error("Ticket not found");
-
-  if (session.user.id !== ticket.ownerId && session.user.role !== "admin") {
-    throw new Error("Unauthorized");
-  }
 
   await db.delete(tickets).where(eq(tickets.id, ticketId));
   revalidatePath("/dashboard/support/tickets");
@@ -601,13 +628,17 @@ export async function deleteTicketAction(ticketId: string) {
 
 export async function reassignTicketAction(ticketId: string, assigneeId: string | null) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const actor = await requireCapability("ticket:write");
 
   const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
   if (!ticket) throw new Error("Ticket not found");
 
-  if (session.user.id !== ticket.ownerId && session.user.id !== ticket.assigneeId && session.user.role !== "admin") {
+  if (
+    actor.userId !== ticket.ownerId &&
+    actor.userId !== ticket.assigneeId &&
+    actor.tenantRole !== "admin" &&
+    actor.tenantRole !== "owner"
+  ) {
     throw new Error("Unauthorized");
   }
 
@@ -619,8 +650,8 @@ export async function reassignTicketAction(ticketId: string, assigneeId: string 
 
   await logTicketChange({
     ticketId,
-    actorId: session.user.id,
-    actorName: session.user.name ?? session.user.email ?? undefined,
+    actorId: actor.userId,
+    actorName: actor.name ?? actor.email ?? undefined,
     action: "assigned",
     field: "assigneeId",
     oldValue: ticket.assigneeId ?? undefined,
@@ -640,13 +671,17 @@ const PRIORITY_ESCALATION: Record<string, string> = {
 
 export async function escalateTicketAction(ticketId: string) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const actor = await requireCapability("ticket:write");
 
   const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
   if (!ticket) throw new Error("Ticket not found");
 
-  if (session.user.id !== ticket.ownerId && session.user.id !== ticket.assigneeId && session.user.role !== "admin") {
+  if (
+    actor.userId !== ticket.ownerId &&
+    actor.userId !== ticket.assigneeId &&
+    actor.tenantRole !== "admin" &&
+    actor.tenantRole !== "owner"
+  ) {
     throw new Error("Unauthorized");
   }
 
@@ -665,8 +700,8 @@ export async function escalateTicketAction(ticketId: string) {
 
   await logTicketChange({
     ticketId,
-    actorId: session.user.id,
-    actorName: session.user.name ?? session.user.email ?? undefined,
+    actorId: actor.userId,
+    actorName: actor.name ?? actor.email ?? undefined,
     action: "priority_changed",
     field: "priority",
     oldValue: currentPriority,
@@ -679,8 +714,7 @@ export async function escalateTicketAction(ticketId: string) {
 
 export async function updateTicketStatusAction(ticketId: string, status: string) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const actor = await requireCapability("ticket:write");
 
   const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
   if (!ticket) throw new Error("Ticket not found");
@@ -708,8 +742,8 @@ export async function updateTicketStatusAction(ticketId: string, status: string)
 
   await logTicketChange({
     ticketId,
-    actorId: session.user.id,
-    actorName: session.user.name ?? session.user.email ?? undefined,
+    actorId: actor.userId,
+    actorName: actor.name ?? actor.email ?? undefined,
     action: "status_changed",
     field: "status",
     oldValue: ticket.status,
@@ -725,8 +759,7 @@ export async function updateTicketStatusAction(ticketId: string, status: string)
 
 export async function getMacros() {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireCapability("ticket:read");
 
   return db.query.ticketMacros.findMany({
     orderBy: ticketMacros.name,
@@ -736,13 +769,12 @@ export async function getMacros() {
 
 export async function createMacroAction(data: z.infer<typeof CreateMacroSchema>) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  const actor = await requireCapability("macro:manage");
 
   const validated = CreateMacroSchema.parse(data);
   const [macro] = await db
     .insert(ticketMacros)
-    .values({ ...validated, createdBy: session.user.id })
+    .values({ ...validated, createdBy: actor.userId })
     .returning();
 
   revalidatePath("/dashboard/settings/macros");
@@ -751,8 +783,7 @@ export async function createMacroAction(data: z.infer<typeof CreateMacroSchema>)
 
 export async function updateMacroAction(macroId: string, data: z.infer<typeof UpdateMacroSchema>) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireCapability("macro:manage");
 
   const validated = UpdateMacroSchema.parse(data);
   const [updated] = await db
@@ -767,8 +798,7 @@ export async function updateMacroAction(macroId: string, data: z.infer<typeof Up
 
 export async function deleteMacroAction(macroId: string) {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireCapability("macro:manage");
 
   await db.delete(ticketMacros).where(eq(ticketMacros.id, macroId));
 

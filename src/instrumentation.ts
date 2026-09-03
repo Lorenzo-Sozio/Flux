@@ -24,6 +24,12 @@ function isCloudflareWorkers(): boolean {
 export async function register() {
   // Only run in the Node.js runtime, not in Edge or during the build.
   if (process.env.NEXT_RUNTIME === "nodejs" && !isCloudflareWorkers()) {
+    // Report every missing environment variable at once, before the first
+    // request. Discovering them one failure at a time costs a deploy each, and
+    // several of them fail in ways that name a symptom rather than a cause.
+    const { reportEnv } = await import("@/lib/env-check");
+    reportEnv();
+
     const { initializeScheduler } = await import("@/components/crm/automation/scheduler");
     await initializeScheduler();
   }

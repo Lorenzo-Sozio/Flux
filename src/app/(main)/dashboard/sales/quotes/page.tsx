@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 
 import Link from "next/link";
 
@@ -47,7 +47,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { QUOTE_STATUS_CONFIG } from "@/lib/quote-status";
+import { quoteStatusConfig } from "@/lib/quote-status";
 
 type Quote = Awaited<ReturnType<typeof getAllQuotes>>[number];
 
@@ -117,12 +117,12 @@ export default function QuotesPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6 p-6">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t("quoteNumber")}</p>
+          <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
+          <p className="mt-1 text-muted-foreground text-sm">{t("quoteNumber")}</p>
         </div>
         <Link href="/dashboard/sales/quotes/new">
           <Button>
@@ -133,17 +133,17 @@ export default function QuotesPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                   {tc("total")} {t("title")}
                 </p>
-                <p className="text-2xl font-bold mt-1">{stats.total}</p>
+                <p className="mt-1 font-bold text-2xl">{stats.total}</p>
               </div>
-              <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100">
                 <FileText className="h-5 w-5 text-slate-600" />
               </div>
             </div>
@@ -154,12 +154,12 @@ export default function QuotesPage() {
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                   {t("statuses.sent")}
                 </p>
-                <p className="text-2xl font-bold mt-1 text-blue-600">{stats.sent}</p>
+                <p className="mt-1 font-bold text-2xl text-blue-600">{stats.sent}</p>
               </div>
-              <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50">
                 <Clock className="h-5 w-5 text-blue-600" />
               </div>
             </div>
@@ -170,12 +170,12 @@ export default function QuotesPage() {
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                   {t("statuses.accepted")}
                 </p>
-                <p className="text-2xl font-bold mt-1 text-green-600">{stats.accepted}</p>
+                <p className="mt-1 font-bold text-2xl text-green-600">{stats.accepted}</p>
               </div>
-              <div className="h-10 w-10 rounded-full bg-green-50 flex items-center justify-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50">
                 <CheckCircle2 className="h-5 w-5 text-green-600" />
               </div>
             </div>
@@ -186,14 +186,14 @@ export default function QuotesPage() {
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                   {tc("value")} {tc("total")}
                 </p>
-                <p className="text-2xl font-bold mt-1">
+                <p className="mt-1 font-bold text-2xl">
                   ${stats.totalValue.toLocaleString("en-US", { maximumFractionDigits: 0 })}
                 </p>
               </div>
-              <div className="h-10 w-10 rounded-full bg-violet-50 flex items-center justify-center">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-50">
                 <TrendingUp className="h-5 w-5 text-violet-600" />
               </div>
             </div>
@@ -210,21 +210,21 @@ export default function QuotesPage() {
                 {isLoading ? t("title") : `${filteredQuotes.length} ${t("title")}`}
               </CardTitle>
               {searchTerm && (
-                <CardDescription className="text-xs mt-0.5">Searching for &ldquo;{searchTerm}&rdquo;</CardDescription>
+                <CardDescription className="mt-0.5 text-xs">Searching for &ldquo;{searchTerm}&rdquo;</CardDescription>
               )}
             </div>
-            <div className="flex gap-2 flex-1 sm:flex-none sm:min-w-[420px]">
+            <div className="flex flex-1 gap-2 sm:min-w-[420px] sm:flex-none">
               <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Search className="-translate-y-1/2 absolute top-1/2 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
                 <Input
                   placeholder={`${tc("search")}…`}
-                  className="pl-8 h-8 text-sm"
+                  className="h-8 pl-8 text-sm"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[150px] h-8 text-sm">
+                <SelectTrigger className="h-8 w-[150px] text-sm">
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -250,10 +250,10 @@ export default function QuotesPage() {
               ))}
             </div>
           ) : filteredQuotes.length === 0 ? (
-            <div className="text-center py-16">
-              <FileText className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
+            <div className="py-16 text-center">
+              <FileText className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
               <p className="font-medium text-muted-foreground">{t("noQuotes")}</p>
-              <p className="text-sm text-muted-foreground/70 mt-1 mb-5">
+              <p className="mt-1 mb-5 text-muted-foreground/70 text-sm">
                 {searchTerm || statusFilter !== "all" ? tc("clearFilters") : t("newQuote")}
               </p>
               {!searchTerm && statusFilter === "all" && (
@@ -266,23 +266,23 @@ export default function QuotesPage() {
               )}
             </div>
           ) : (
-            <div className="rounded-md border overflow-hidden">
+            <div className="overflow-hidden rounded-md border">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="text-xs font-semibold">{t("columns.number")}</TableHead>
-                    <TableHead className="text-xs font-semibold">{t("columns.customer")}</TableHead>
-                    <TableHead className="text-xs font-semibold">{t("columns.deal")}</TableHead>
-                    <TableHead className="text-xs font-semibold">{t("columns.status")}</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">{tc("amount")}</TableHead>
-                    <TableHead className="text-xs font-semibold">{t("columns.issued")}</TableHead>
-                    <TableHead className="text-xs font-semibold">{t("columns.expires")}</TableHead>
+                    <TableHead className="font-semibold text-xs">{t("columns.number")}</TableHead>
+                    <TableHead className="font-semibold text-xs">{t("columns.customer")}</TableHead>
+                    <TableHead className="font-semibold text-xs">{t("columns.deal")}</TableHead>
+                    <TableHead className="font-semibold text-xs">{t("columns.status")}</TableHead>
+                    <TableHead className="text-right font-semibold text-xs">{tc("amount")}</TableHead>
+                    <TableHead className="font-semibold text-xs">{t("columns.issued")}</TableHead>
+                    <TableHead className="font-semibold text-xs">{t("columns.expires")}</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredQuotes.map((quote) => {
-                    const statusCfg = QUOTE_STATUS_CONFIG[quote.status] ?? QUOTE_STATUS_CONFIG.draft;
+                    const statusCfg = quoteStatusConfig(quote.status);
                     const contactName = quote.contact
                       ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim()
                       : null;
@@ -290,35 +290,36 @@ export default function QuotesPage() {
                       quote.expiresAt && quote.status !== "accepted" && new Date(quote.expiresAt) < new Date();
 
                     return (
-                      <TableRow key={quote.id} className="group hover:bg-muted/30 transition-colors">
-                        <TableCell className="font-mono text-sm font-medium">
+                      <TableRow key={quote.id} className="group transition-colors hover:bg-muted/30">
+                        <TableCell className="font-medium font-mono text-sm">
                           <Link href={`/dashboard/sales/quotes/${quote.id}`} className="text-primary hover:underline">
                             {quote.quoteNumber}
                           </Link>
                         </TableCell>
                         <TableCell>
                           <div className="font-medium text-sm leading-tight">{quote.company?.name ?? "—"}</div>
-                          {contactName && <div className="text-xs text-muted-foreground mt-0.5">{contactName}</div>}
+                          {contactName && <div className="mt-0.5 text-muted-foreground text-xs">{contactName}</div>}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{quote.deal?.name ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{quote.deal?.name ?? "—"}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={`text-xs font-medium ${statusCfg.className}`}>
-                            {statusCfg.label}
+                          <Badge variant="outline" className={`font-medium text-xs ${statusCfg.className}`}>
+                            {t(`statuses.${statusCfg.labelKey}`)}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right font-semibold text-sm tabular-nums">
-                          {quote.currency}{" "}
-                          {parseFloat(quote.totalAmount ?? "0").toLocaleString("en-US", {
+                          {parseFloat(quote.totalAmount ?? "0").toLocaleString(undefined, {
+                            style: "currency",
+                            currency: quote.currency || "EUR",
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
                           })}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell className="text-muted-foreground text-sm">
                           {format(new Date(quote.issuedAt), "MMM d, yyyy")}
                         </TableCell>
                         <TableCell className="text-sm">
                           {quote.expiresAt ? (
-                            <span className={isExpired ? "text-destructive font-medium" : "text-muted-foreground"}>
+                            <span className={isExpired ? "font-medium text-destructive" : "text-muted-foreground"}>
                               {format(new Date(quote.expiresAt), "MMM d, yyyy")}
                             </span>
                           ) : (
@@ -331,7 +332,7 @@ export default function QuotesPage() {
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="h-7 w-7 p-0 opacity-0 transition-opacity group-hover:opacity-100"
                               >
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>

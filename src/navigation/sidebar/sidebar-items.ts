@@ -9,9 +9,7 @@ import {
   Contact,
   CreditCard,
   FileText,
-  Fingerprint,
   GanttChartSquare,
-  Gauge,
   GitMerge,
   HelpCircle,
   Kanban,
@@ -23,7 +21,6 @@ import {
   Package,
   Settings,
   Settings2,
-  Shield,
   ShoppingCart,
   Target,
   TrendingUp,
@@ -34,6 +31,11 @@ import {
   Zap,
 } from "lucide-react";
 
+import type { Capability } from "@/lib/permissions";
+
+/** Plan modules a nav entry can belong to. */
+export type NavModule = "crm" | "sales" | "marketing" | "support" | "automation" | "reporting" | "helpdesk";
+
 export interface NavSubItem {
   titleKey: string;
   url: string;
@@ -41,6 +43,18 @@ export interface NavSubItem {
   comingSoon?: boolean;
   newTab?: boolean;
   isNew?: boolean;
+  /**
+   * The capability needed to open this. The sidebar used to show every module to
+   * everybody: a viewer saw Users and Settings and was bounced without a word on
+   * clicking, and a workspace whose plan excluded a module saw it and was
+   * redirected straight back to where it started (audit rilievi D-08, U-02).
+   */
+  need?: Capability;
+  /** Plan module this belongs to. Absent means always available. */
+  module?: NavModule;
+  /** Set by `filterNav` when the plan excludes this entry. Shown, not hidden. */
+  locked?: boolean;
+  lockedModule?: NavModule;
 }
 
 export interface NavMainItem {
@@ -51,6 +65,10 @@ export interface NavMainItem {
   comingSoon?: boolean;
   newTab?: boolean;
   isNew?: boolean;
+  need?: Capability;
+  module?: NavModule;
+  locked?: boolean;
+  lockedModule?: NavModule;
 }
 
 export interface NavGroup {
@@ -75,7 +93,7 @@ export const sidebarItems: NavGroup[] = [
           { titleKey: "workload", url: "/dashboard/tasks/workload", icon: Users2 },
         ],
       },
-      { titleKey: "chat", url: "/dashboard/chat", icon: MessageCircle, isNew: true },
+      { titleKey: "chat", url: "/dashboard/chat", icon: MessageCircle },
       { titleKey: "leads", url: "/dashboard/leads", icon: Users },
       { titleKey: "contacts", url: "/dashboard/contacts", icon: Contact },
       { titleKey: "companies", url: "/dashboard/companies", icon: Building2 },
@@ -85,57 +103,75 @@ export const sidebarItems: NavGroup[] = [
     id: 2,
     labelKey: "sales",
     items: [
-      { titleKey: "finance", url: "/dashboard/sales/finance", icon: Banknote },
-      { titleKey: "quotes", url: "/dashboard/sales/quotes", icon: FileText, isNew: true },
-      { titleKey: "products", url: "/dashboard/sales/products", icon: Package, isNew: true },
-      { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, isNew: true },
-      { titleKey: "pipeline", url: "/dashboard/pipeline", icon: Kanban },
-      { titleKey: "salesTargets", url: "/dashboard/pipeline/targets", icon: TrendingUp, isNew: true },
-      { titleKey: "salesFunnel", url: "/dashboard/pipeline/funnel", icon: GitMerge, isNew: true },
+      { titleKey: "finance", url: "/dashboard/sales/finance", icon: Banknote, module: "sales" },
+      { titleKey: "quotes", url: "/dashboard/sales/quotes", icon: FileText, module: "sales" },
+      { titleKey: "products", url: "/dashboard/sales/products", icon: Package, module: "sales" },
+      { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, module: "sales" },
+      { titleKey: "pipeline", url: "/dashboard/pipeline", icon: Kanban, module: "sales" },
+      { titleKey: "salesTargets", url: "/dashboard/pipeline/targets", icon: TrendingUp, module: "sales" },
+      { titleKey: "salesFunnel", url: "/dashboard/pipeline/funnel", icon: GitMerge, module: "sales" },
     ],
-  },
-  {
-    id: 2.5,
-    labelKey: "automation",
-    items: [{ titleKey: "rules", url: "/dashboard/automation", icon: Zap, isNew: true }],
   },
   {
     id: 3,
-    labelKey: "support",
-    items: [
-      { titleKey: "tickets", url: "/dashboard/support/tickets", icon: MessageSquare, isNew: true },
-      { titleKey: "slaManagement", url: "/dashboard/support/sla", icon: Clock, isNew: true },
-    ],
+    labelKey: "automation",
+    items: [{ titleKey: "rules", url: "/dashboard/automation", icon: Zap, module: "automation" }],
   },
   {
     id: 4,
-    labelKey: "marketing",
+    labelKey: "support",
     items: [
-      { titleKey: "templates", url: "/dashboard/marketing/templates", icon: Mail },
-      { titleKey: "campaigns", url: "/dashboard/marketing/campaigns", icon: Target },
+      { titleKey: "tickets", url: "/dashboard/support/tickets", icon: MessageSquare, module: "support" },
+      {
+        titleKey: "slaManagement",
+        url: "/dashboard/support/sla",
+        icon: Clock,
+        module: "support",
+        need: "sla:manage",
+      },
     ],
   },
   {
     id: 5,
+    labelKey: "marketing",
+    items: [
+      { titleKey: "templates", url: "/dashboard/marketing/templates", icon: Mail, module: "marketing" },
+      { titleKey: "campaigns", url: "/dashboard/marketing/campaigns", icon: Target, module: "marketing" },
+    ],
+  },
+  {
+    id: 6,
     labelKey: "administration",
     items: [
-      { titleKey: "users", url: "/dashboard/users", icon: Users, isNew: true },
+      { titleKey: "users", url: "/dashboard/users", icon: Users, need: "user:read" },
       {
         titleKey: "reports",
         url: "/dashboard/reports",
         icon: BarChart3,
-        isNew: true,
-        subItems: [{ titleKey: "reportBuilder", url: "/dashboard/reports/builder", icon: Wand2 }],
+        module: "reporting",
+        need: "report:read",
+        subItems: [{ titleKey: "reportBuilder", url: "/dashboard/reports/builder", icon: Wand2, need: "report:read" }],
       },
       {
         titleKey: "settings",
         url: "/dashboard/settings",
         icon: Settings,
+        need: "settings:read",
         subItems: [
-          { titleKey: "billing", url: "/dashboard/settings/billing", icon: CreditCard },
-          { titleKey: "customFields", url: "/dashboard/settings/custom-fields", icon: Settings2 },
-          { titleKey: "email", url: "/dashboard/settings/email", icon: MailOpen },
-          { titleKey: "webhooks", url: "/dashboard/settings/webhooks", icon: Webhook },
+          { titleKey: "billing", url: "/dashboard/settings/billing", icon: CreditCard, need: "billing:read" },
+          // Pipeline stages and macros existed only at their URL: absent from the
+          // sidebar AND from the settings index, so configuring the pipeline — the
+          // first thing anyone does — meant typing the path (audit rilievo D-04).
+          { titleKey: "pipelineStages", url: "/dashboard/settings/pipeline", icon: GitMerge, need: "pipeline:manage" },
+          {
+            titleKey: "customFields",
+            url: "/dashboard/settings/custom-fields",
+            icon: Settings2,
+            need: "customField:manage",
+          },
+          { titleKey: "email", url: "/dashboard/settings/email", icon: MailOpen, need: "emailSettings:manage" },
+          { titleKey: "macros", url: "/dashboard/settings/macros", icon: MessageSquare, need: "macro:manage" },
+          { titleKey: "webhooks", url: "/dashboard/settings/webhooks", icon: Webhook, need: "webhook:manage" },
         ],
       },
       { titleKey: "help", url: "/dashboard/help", icon: HelpCircle },

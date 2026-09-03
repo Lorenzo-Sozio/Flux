@@ -34,6 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { actionErrorMessage, isPlanLimit } from "@/lib/action-error";
 
 import { MergeContactsModal } from "./merge-contacts-modal";
 
@@ -215,18 +216,48 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
   const saveContact = async (payload: Record<string, unknown>) => {
     try {
       if (isEditing) {
-        await updateContact(contact.id, payload);
+        const result = await updateContact(contact.id, payload);
+        if (!result.ok) {
+          // The guards write these messages for the person reading them; the old
+          // catch-all threw them away (audit rilievo U-01).
+          toast.error(result.message, {
+            action: isPlanLimit(result)
+              ? {
+                  label: "Upgrade",
+                  onClick: () => {
+                    window.location.href = "/dashboard/settings/billing";
+                  },
+                }
+              : undefined,
+          });
+          return;
+        }
         toast.success(t("updateSuccess"));
       } else {
-        await createContact(payload);
+        const result = await createContact(payload);
+        if (!result.ok) {
+          // The guards write these messages for the person reading them; the old
+          // catch-all threw them away (audit rilievo U-01).
+          toast.error(result.message, {
+            action: isPlanLimit(result)
+              ? {
+                  label: "Upgrade",
+                  onClick: () => {
+                    window.location.href = "/dashboard/settings/billing";
+                  },
+                }
+              : undefined,
+          });
+          return;
+        }
         toast.success(t("createSuccess"));
       }
       setOpen(false);
       setDuplicates([]);
       setPendingPayload(null);
       form.reset();
-    } catch {
-      toast.error(t("form.saveFailed"));
+    } catch (err) {
+      toast.error(actionErrorMessage(err, t("form.saveFailed")));
     }
   };
 

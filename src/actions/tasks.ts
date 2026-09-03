@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, desc, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { createNotificationAction } from "@/actions/auth";
@@ -460,25 +460,55 @@ export async function getTaskActualHours(taskId: string): Promise<string | null>
 
 // ─── Time Tracking ─────────────────────────────────────────────────────────────
 
-export async function startTimer(taskId: string, userId: string) {
-  await requireWriteAccess();
+/**
+ * Starts the caller's timer on a task.
+ *
+ * The identity used to arrive as a parameter, so time could be logged against any
+ * colleague, and nothing stopped a second timer running alongside the first — a
+ * timesheet nobody could defend (audit rilievo C-10). The `userId` argument is
+ * kept for call-site compatibility and deliberately ignored.
+ */
+export async function startTimer(taskId: string, _userId?: string) {
+  const session = await requireWriteAccess();
   const db = await getDb();
+  const userId = session.user.id;
+
+  // One running timer per person. Starting a second one silently accrued both.
+  const [running] = await db
+    .select({ id: taskTimeLogs.id })
+    .from(taskTimeLogs)
+    .where(and(eq(taskTimeLogs.userId, userId), isNull(taskTimeLogs.stoppedAt)))
+    .limit(1);
+
+  if (running) {
+    throw new Error("You already have a timer running. Stop it before starting another.");
+  }
+
   const [log] = await db.insert(taskTimeLogs).values({ taskId, userId, startedAt: new Date() }).returning();
   return log;
 }
 
+/** Maximum a single un-stopped timer may bill. A timer left running overnight
+ *  used to record sixteen hours against a task with no warning. */
+const MAX_TIMER_HOURS = 12;
+
 export async function stopTimer(logId: string) {
-  await requireWriteAccess();
+  const session = await requireWriteAccess();
   const db = await getDb();
   const stoppedAt = new Date();
   const [log] = await db
-    .select({ startedAt: taskTimeLogs.startedAt, taskId: taskTimeLogs.taskId })
+    .select({ startedAt: taskTimeLogs.startedAt, taskId: taskTimeLogs.taskId, userId: taskTimeLogs.userId })
     .from(taskTimeLogs)
     .where(eq(taskTimeLogs.id, logId))
     .limit(1);
   if (!log) throw new Error("Timer log not found");
+  // Stopping somebody else's timer is not something the UI offers and was not
+  // something the action prevented.
+  if (log.userId !== session.user.id && session.user.role !== "admin" && session.user.role !== "owner") {
+    throw new Error("You can only stop your own timer.");
+  }
   const hours = (stoppedAt.getTime() - new Date(log.startedAt).getTime()) / 3_600_000;
-  const roundedHours = Math.round(hours * 100) / 100;
+  const roundedHours = Math.min(Math.round(hours * 100) / 100, MAX_TIMER_HOURS);
   await db
     .update(taskTimeLogs)
     .set({ stoppedAt, hours: String(roundedHours) })
@@ -497,9 +527,12 @@ export async function stopTimer(logId: string) {
   return { logId, hours: roundedHours };
 }
 
-export async function logHoursManual(taskId: string, userId: string, hours: number, note?: string) {
-  await requireWriteAccess();
+/** Records hours for the caller. `userId` is ignored — see startTimer. */
+export async function logHoursManual(taskId: string, _userId: string | undefined, hours: number, note?: string) {
+  const session = await requireWriteAccess();
   const db = await getDb();
+  const userId = session.user.id;
+  if (!(hours > 0) || hours > 24) throw new Error("Enter between 0 and 24 hours.");
   const now = new Date();
   await db.insert(taskTimeLogs).values({
     taskId,

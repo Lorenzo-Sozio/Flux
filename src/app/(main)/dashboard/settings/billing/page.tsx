@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 
 import { getInvoices, getPublicPlans, getSubscriptionDetails } from "@/actions/billing";
-import { auth } from "@/auth";
+import { requirePageCapability } from "@/lib/page-guard";
 
 import { BillingClient } from "./_components/billing-client";
 
@@ -13,11 +13,7 @@ export const metadata: Metadata = {
 };
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ upgrade?: string }> }) {
-  const session = await auth();
-  if (!session?.user) redirect("/auth/v1/login");
-
-  const role = (session.user as { role?: string }).role;
-  if (!role || !["admin", "owner"].includes(role)) redirect("/dashboard/crm");
+  await requirePageCapability("billing:read", "/dashboard/settings/billing");
 
   const t = await getTranslations("settings.billing");
   const { upgrade } = await searchParams;
@@ -33,7 +29,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   const addons = details?.addons ?? [];
   const usage = details?.usage ?? {};
 
-  if (!entitlements) redirect("/dashboard/crm");
+  if (!entitlements) redirect("/unauthorized?need=billing%3Aread");
 
   const moduleKeys: Record<string, string> = {
     marketing: t("plans.modules.marketing"),
@@ -48,12 +44,12 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+        <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
         <p className="text-muted-foreground">{t("description")}</p>
       </div>
 
       {upgradeModuleName && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 text-sm dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
           <strong>{upgradeModuleName}</strong> {t("upgradeNoticeSuffix")}
         </div>
       )}

@@ -8,7 +8,7 @@
   {
     "file": "src/lib/quote-events.ts",
     "description": "⚠️⚠️ senza indirizzo di base si inventa un localhost: al cliente arriva il link a una macchina che non e' la sua, e la consegna riesce verso il posto sbagliato",
-    "find": "  const base = process.env.NEXTAUTH_URL;",
+    "find": "  const base = getAppUrlOrNull();",
     "replace": "  const base = process.env.NEXTAUTH_URL ?? \"http://localhost:3000\";"
   },
   {
@@ -20,7 +20,7 @@
   {
     "file": "src/lib/quote-events.ts",
     "description": "il recapito non viaggia: chi riceve l'evento non ha modo di sapere di quale persona si tratti, perche' il nostro id da lui non significa niente",
-    "find": "      ...(await reachOf(quote)),\n      url,",
+    "find": "      ...(await reachOf(quote, explicitDb)),\n      url,",
     "replace": "      url,"
   },
   {

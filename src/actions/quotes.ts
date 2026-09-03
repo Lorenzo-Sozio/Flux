@@ -9,28 +9,46 @@ import type { z } from "zod";
 
 import { createNotificationAction, createNotificationsBatch } from "@/actions/auth";
 import { CreateQuoteSchema, UpdateQuoteSchema } from "@/actions/quotes-validation";
-import { auth } from "@/auth";
 import { companies, deals, products, quoteActivities, quoteItems, quotes, users } from "@/db/schema";
-import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
+import { appUrl } from "@/lib/app-url";
+import { ForbiddenError, requireCapability } from "@/lib/auth-guard";
+import { computeDocument } from "@/lib/document-totals";
 import { sendEmail } from "@/lib/email-provider";
 import { getExchangeRates } from "@/lib/exchange-rates";
+import { getTenantById } from "@/lib/get-tenant";
+import { can } from "@/lib/permissions";
 import { announceQuoteDecision, announceQuoteSent, hasAlreadyLeft } from "@/lib/quote-events";
-import { getDb } from "@/lib/tenant-context";
+import { approvalPolicyFrom, approvalRequiredReason, canTransition, transitionError } from "@/lib/quote-status";
+import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 
 // --- HELPERS ---
 
-function calculateLineTotal(quantity: number, unitPrice: number, discountPercent: number, taxPercent: number) {
-  const subtotal = quantity * unitPrice;
-  const discountAmount = (subtotal * discountPercent) / 100;
-  const subtotalAfterDiscount = subtotal - discountAmount;
-  const taxAmount = (subtotalAfterDiscount * taxPercent) / 100;
-  const totalPrice = subtotalAfterDiscount + taxAmount;
-
-  return {
-    discountAmount,
-    taxAmount,
-    totalPrice,
-  };
+/**
+ * Builds the rows and the document totals for a quote.
+ *
+ * The old code returned a tax-INCLUSIVE line total, summed those into a field
+ * called `subtotal`, then applied the header discount and the header tax on top —
+ * charging tax on tax and printing a "subtotal" that was nothing of the sort
+ * (audit rilievo C-01). The arithmetic now lives in one tested module shared with
+ * orders, so creation and update cannot drift apart either (rilievo C-03).
+ */
+function buildQuoteTotals(
+  items: { quantity: number; unitPrice: number; discountPercent?: number; taxPercent?: number }[],
+  discountPercent: number,
+  headerTaxPercent: number | undefined,
+) {
+  return computeDocument({
+    lines: items.map((i) => ({
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+      discountPercent: i.discountPercent ?? 0,
+      // A header rate, when given, overrides the per-line rates; otherwise each
+      // line keeps its own, which is what a mixed-rate document needs.
+      taxPercent: i.taxPercent ?? 0,
+    })),
+    discountPercent,
+    taxPercent: headerTaxPercent && headerTaxPercent > 0 ? headerTaxPercent : undefined,
+  });
 }
 
 function generateQuoteNumber(): string {
@@ -65,11 +83,7 @@ async function logQuoteActivity(
 export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>) {
   const db = await getDb();
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new Error("Unauthorized");
-    }
-
+    const actor = await requireCapability("quote:write");
     const validated = CreateQuoteSchema.parse(data);
 
     // Verify deal exists
@@ -81,36 +95,23 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
       throw new Error("Deal not found");
     }
 
-    // Resolve EUR conversion rate for the input currency
-    const inputCurrency = (validated.currency || "EUR").toUpperCase();
-    let eurRate = 1; // multiplier: amount_in_eur = input_amount * eurRate
-    if (inputCurrency !== "EUR") {
+    // The document keeps the currency it was written in.
+    //
+    // Everything used to be converted to EUR and the currency column hardcoded to
+    // "EUR", so an offer made in dollars reached the customer as a euro figure at
+    // the day's rate, with the original amount unrecoverable (audit rilievo C-02).
+    // The rate is stored alongside, for reporting, and captured now so a later rate
+    // change cannot rewrite a document that has already been sent.
+    const currency = (validated.currency || "EUR").toUpperCase();
+    let eurRate = 1; // amount_in_eur = amount * eurRate
+    if (currency !== "EUR") {
       const { rates } = await getExchangeRates();
-      const rate = rates[inputCurrency.toLowerCase()];
+      const rate = rates[currency.toLowerCase()];
       if (rate) eurRate = 1 / rate;
     }
-    const toEur = (n: number) => n * eurRate;
 
-    // Calculate totals (in input currency first, then convert)
-    let subtotal = 0;
-    const itemsData = validated.items.map((item) => {
-      const { discountAmount, taxAmount, totalPrice } = calculateLineTotal(
-        item.quantity,
-        item.unitPrice,
-        item.discountPercent || 0,
-        item.taxPercent || 0,
-      );
-      subtotal += totalPrice;
-      return { ...item, discountAmount, taxAmount, totalPrice };
-    });
+    const totals = buildQuoteTotals(validated.items, validated.discountPercent || 0, validated.taxPercent);
 
-    // Calculate quote-level totals
-    const quoteDiscountAmount = (subtotal * (validated.discountPercent || 0)) / 100;
-    const subtotalAfterDiscount = subtotal - quoteDiscountAmount;
-    const quoteTaxAmount = (subtotalAfterDiscount * (validated.taxPercent || 0)) / 100;
-    const totalAmount = subtotalAfterDiscount + quoteTaxAmount;
-
-    // Create quote — all monetary values stored in EUR
     const quoteNumber = generateQuoteNumber();
     const [quote] = await db
       .insert(quotes)
@@ -119,38 +120,44 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
         dealId: validated.dealId,
         companyId: validated.companyId,
         contactId: validated.contactId || null,
-        ownerId: session.user.id,
+        ownerId: actor.userId,
         status: "draft",
-        currency: "EUR",
-        subtotal: toEur(subtotal).toString(),
-        discountAmount: toEur(quoteDiscountAmount).toString(),
-        discountPercent: (validated.discountPercent || 0).toString(),
-        taxAmount: toEur(quoteTaxAmount).toString(),
+        currency,
+        eurRate: eurRate.toString(),
+        subtotal: totals.subtotal.toString(),
+        discountAmount: totals.discountAmount.toString(),
+        discountPercent: totals.discountPercent.toString(),
+        taxAmount: totals.taxAmount.toString(),
         taxPercent: (validated.taxPercent || 0).toString(),
-        totalAmount: toEur(totalAmount).toString(),
+        totalAmount: totals.total.toString(),
         expiresAt: validated.expiresAt ? new Date(validated.expiresAt) : null,
         notes: validated.notes,
       })
       .returning();
 
-    // Create quote items — all unit prices stored in EUR
-    for (const item of itemsData) {
-      await db.insert(quoteItems).values({
-        quoteId: quote.id,
-        productId: item.productId || null,
-        description: item.description,
-        quantity: item.quantity,
-        unitPrice: toEur(item.unitPrice).toString(),
-        discountPercent: item.discountPercent.toString(),
-        discountAmount: toEur(item.discountAmount).toString(),
-        taxPercent: item.taxPercent.toString(),
-        taxAmount: toEur(item.taxAmount).toString(),
-        totalPrice: toEur(item.totalPrice).toString(),
-      });
-    }
+    // One insert for all lines rather than a loop: a failure halfway through left
+    // a quote with some of its items and totals that did not match them, and there
+    // is no transaction here to undo it (audit rilievo M-04).
+    await db.insert(quoteItems).values(
+      validated.items.map((item, i) => {
+        const line = totals.lines[i];
+        return {
+          quoteId: quote.id,
+          productId: item.productId || null,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice.toString(),
+          discountPercent: (item.discountPercent ?? 0).toString(),
+          discountAmount: line.discountAmount.toString(),
+          taxPercent: line.taxPercent.toString(),
+          taxAmount: line.taxAmount.toString(),
+          totalPrice: line.total.toString(),
+        };
+      }),
+    );
 
     // Log activity
-    await logQuoteActivity(quote.id, "created", session.user.id);
+    await logQuoteActivity(quote.id, "created", actor.userId);
 
     revalidatePath("/dashboard/sales/quotes");
     return { success: true, quoteId: quote.id, quoteNumber };
@@ -163,11 +170,7 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
 export async function getQuoteById(quoteId: string) {
   const db = await getDb();
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new Error("Unauthorized");
-    }
-
+    const actor = await requireCapability("record:read");
     const quote = await db.query.quotes.findFirst({
       where: eq(quotes.id, quoteId),
       with: {
@@ -195,7 +198,7 @@ export async function getQuoteById(quoteId: string) {
 
     // Check permission: owner, deal owner, or admin
     const isAuthorized =
-      session.user.id === quote.ownerId || session.user.id === quote.deal.ownerId || session.user.role === "admin";
+      actor.userId === quote.ownerId || actor.userId === quote.deal.ownerId || actor.tenantRole === "admin";
 
     if (!isAuthorized) {
       throw new Error("Unauthorized");
@@ -211,11 +214,7 @@ export async function getQuoteById(quoteId: string) {
 export async function getQuotesByDeal(dealId: string) {
   const db = await getDb();
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new Error("Unauthorized");
-    }
-
+    await requireCapability("record:read");
     const quoteList = await db.query.quotes.findMany({
       where: eq(quotes.dealId, dealId),
       orderBy: desc(quotes.createdAt),
@@ -237,11 +236,7 @@ export async function getQuotesByDeal(dealId: string) {
 export async function updateQuoteAction(quoteId: string, data: z.infer<typeof UpdateQuoteSchema>) {
   const db = await getDb();
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new Error("Unauthorized");
-    }
-
+    const actor = await requireCapability("quote:write");
     const validated = UpdateQuoteSchema.parse(data);
     const quote = await db.query.quotes.findFirst({
       where: eq(quotes.id, quoteId),
@@ -251,9 +246,31 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
       throw new Error("Quote not found");
     }
 
-    // Check permission
-    if (session.user.id !== quote.ownerId && session.user.role !== "admin") {
-      throw new Error("Unauthorized");
+    // The owner, or anyone who can approve quotes. The old check compared against
+    // the platform role, so a workspace admin could not touch a colleague's quote.
+    const mayEditOthers = can(actor, "quote:approve");
+    if (actor.userId !== quote.ownerId && !mayEditOthers) {
+      throw new ForbiddenError("Only the quote's owner or a workspace admin can change it.");
+    }
+
+    // A status could previously be set to anything from anything: `sent` straight
+    // from a draft that needed approval, or `accepted` rolled back to `draft`,
+    // rewriting acceptedAt on the way (audit rilievo D-03).
+    if (validated.status && validated.status !== quote.status) {
+      if (!canTransition(quote.status, validated.status)) {
+        throw new Error(transitionError(quote.status, validated.status));
+      }
+
+      // Approval that only applies when someone remembers to ask for it is not a
+      // control. Above the workspace threshold, the quote has to be approved first.
+      if (validated.status === "sent" && quote.status !== "approved") {
+        const tenantId = await getCurrentTenantId();
+        const tenant = tenantId ? await getTenantById(tenantId) : null;
+        const reason = approvalRequiredReason(quote, approvalPolicyFrom(tenant?.settings));
+        if (reason) {
+          throw new Error(`${reason} Submit it for approval before sending.`);
+        }
+      }
     }
 
     const updateData: Record<string, unknown> = {
@@ -269,53 +286,38 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
       updateData.expiresAt = validated.expiresAt ? new Date(validated.expiresAt) : null;
     }
 
-    // If items are being updated, recalculate totals
+    // Recalculate through the same function creation uses. These were two separate
+    // implementations, and only one of them converted currency, so opening and
+    // saving a non-EUR quote silently changed its value (audit rilievo C-03).
     if (validated.items && validated.items.length > 0) {
-      // Delete old items
       await db.delete(quoteItems).where(eq(quoteItems.quoteId, quoteId));
 
-      let subtotal = 0;
-      const itemsData = validated.items.map((item) => {
-        const { discountAmount, taxAmount, totalPrice } = calculateLineTotal(
-          item.quantity,
-          item.unitPrice,
-          item.discountPercent || 0,
-          item.taxPercent || 0,
-        );
-        subtotal += totalPrice;
-        return { ...item, discountAmount, taxAmount, totalPrice };
-      });
+      const totals = buildQuoteTotals(validated.items, validated.discountPercent || 0, validated.taxPercent);
 
-      // Create new items
-      for (const item of itemsData) {
-        await db.insert(quoteItems).values({
-          quoteId,
-          productId: item.productId || null,
-          description: item.description,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice.toString(),
-          discountPercent: item.discountPercent.toString(),
-          discountAmount: item.discountAmount.toString(),
-          taxPercent: item.taxPercent.toString(),
-          taxAmount: item.taxAmount.toString(),
-          totalPrice: item.totalPrice.toString(),
-        });
-      }
+      await db.insert(quoteItems).values(
+        validated.items.map((item, i) => {
+          const line = totals.lines[i];
+          return {
+            quoteId,
+            productId: item.productId || null,
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice.toString(),
+            discountPercent: (item.discountPercent ?? 0).toString(),
+            discountAmount: line.discountAmount.toString(),
+            taxPercent: line.taxPercent.toString(),
+            taxAmount: line.taxAmount.toString(),
+            totalPrice: line.total.toString(),
+          };
+        }),
+      );
 
-      // Recalculate quote totals
-      const quoteDiscountPercent = validated.discountPercent || 0;
-      const quoteTaxPercent = validated.taxPercent || 0;
-      const quoteDiscountAmount = (subtotal * quoteDiscountPercent) / 100;
-      const subtotalAfterDiscount = subtotal - quoteDiscountAmount;
-      const quoteTaxAmount = (subtotalAfterDiscount * quoteTaxPercent) / 100;
-      const totalAmount = subtotalAfterDiscount + quoteTaxAmount;
-
-      updateData.subtotal = subtotal.toString();
-      updateData.discountAmount = quoteDiscountAmount.toString();
-      updateData.discountPercent = quoteDiscountPercent.toString();
-      updateData.taxAmount = quoteTaxAmount.toString();
-      updateData.taxPercent = quoteTaxPercent.toString();
-      updateData.totalAmount = totalAmount.toString();
+      updateData.subtotal = totals.subtotal.toString();
+      updateData.discountAmount = totals.discountAmount.toString();
+      updateData.discountPercent = totals.discountPercent.toString();
+      updateData.taxAmount = totals.taxAmount.toString();
+      updateData.taxPercent = (validated.taxPercent || 0).toString();
+      updateData.totalAmount = totals.total.toString();
     }
 
     // Update status timestamps
@@ -331,7 +333,7 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
 
     // Log activity
     if (validated.status) {
-      await logQuoteActivity(quoteId, validated.status, session.user.id);
+      await logQuoteActivity(quoteId, validated.status, actor.userId);
     }
 
     // ⚠️⚠️ The moment the owner says the quote is ready to leave, and the only one an
@@ -348,13 +350,13 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
       // this event's redelivery is derived from would never be written: the event would be
       // lost with nothing to retry from. Everywhere else that costs a log line; here it
       // costs a customer never receiving their quote.
-      await announceQuoteSent(updated, session.user.id);
+      await announceQuoteSent(updated, actor.userId);
     }
     // The same answer can arrive from the customer's own page or be recorded here by whoever
     // heard it on the phone. Both are the answer, and an integration must not have to guess
     // which door it came through.
     if ((validated.status === "accepted" || validated.status === "declined") && quote.status !== validated.status) {
-      await announceQuoteDecision(updated, validated.status, session.user.id);
+      await announceQuoteDecision(updated, validated.status, actor.userId);
     }
 
     revalidatePath("/dashboard/sales/quotes");
@@ -369,11 +371,7 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
 export async function deleteQuoteAction(quoteId: string) {
   const db = await getDb();
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new Error("Unauthorized");
-    }
-
+    const actor = await requireCapability("quote:write");
     const quote = await db.query.quotes.findFirst({
       where: eq(quotes.id, quoteId),
     });
@@ -388,7 +386,7 @@ export async function deleteQuoteAction(quoteId: string) {
     }
 
     // Check permission
-    if (session.user.id !== quote.ownerId && session.user.role !== "admin") {
+    if (actor.userId !== quote.ownerId && actor.tenantRole !== "admin") {
       throw new Error("Unauthorized");
     }
 
@@ -404,10 +402,7 @@ export async function deleteQuoteAction(quoteId: string) {
 
 export async function sendQuoteEmailAction(quoteId: string, toEmail: string, subject: string, message: string) {
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new Error("Unauthorized");
-    }
+    const actor = await requireCapability("quote:write");
     const db = await getDb();
 
     const quote = await db.query.quotes.findFirst({
@@ -423,14 +418,17 @@ export async function sendQuoteEmailAction(quoteId: string, toEmail: string, sub
     }
 
     // Check permission
-    if (session.user.id !== quote.ownerId && session.user.role !== "admin") {
+    if (actor.userId !== quote.ownerId && actor.tenantRole !== "admin") {
       throw new Error("Unauthorized");
     }
 
     // Generate public view token for quote (simplified: use quoteId + timestamp)
     const viewToken = crypto.createHash("sha256").update(`${quoteId}:${Date.now()}`).digest("hex");
 
-    const quoteViewUrl = `${process.env.NEXTAUTH_URL}/quotes/${quoteId}?token=${viewToken}`;
+    // Was `${process.env.NEXTAUTH_URL}/...`, which renders the literal string
+    // "undefined/quotes/..." when the variable is unset — a link the customer
+    // cannot open, delivered without any error (audit rilievo B-04).
+    const quoteViewUrl = appUrl(`/q/${viewToken}`);
 
     // Build HTML email
     const html = `
@@ -449,7 +447,7 @@ export async function sendQuoteEmailAction(quoteId: string, toEmail: string, sub
 
     // Update status and log activity
     await updateQuoteAction(quoteId, { status: "sent" });
-    await logQuoteActivity(quoteId, "sent", session.user.id, toEmail);
+    await logQuoteActivity(quoteId, "sent", actor.userId, toEmail);
 
     return { success: true };
   } catch (error) {
@@ -485,11 +483,7 @@ export async function markQuoteAsViewedAction(quoteId: string, email?: string, i
 export async function getAllQuotes(filters?: { status?: string; searchTerm?: string }) {
   const db = await getDb();
   try {
-    const session = await auth();
-    if (!session?.user?.id) {
-      throw new Error("Unauthorized");
-    }
-
+    await requireCapability("record:read");
     const statusFilter = filters?.status && filters.status !== "all" ? eq(quotes.status, filters.status) : undefined;
 
     const allQuotes = await db.query.quotes.findMany({
@@ -520,12 +514,12 @@ export async function getAllQuotes(filters?: { status?: string; searchTerm?: str
 
 export async function requestApprovalAction(quoteId: string) {
   const db = await getDb();
-  const session = await requireWriteAccess();
+  const actor = await requireCapability("quote:write");
 
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
   if (!quote) throw new Error("Quote not found");
   if (quote.status !== "draft") throw new Error("Only draft quotes can be submitted for approval");
-  if (session.user.id !== quote.ownerId && session.user.role !== "admin" && session.user.role !== "owner") {
+  if (actor.userId !== quote.ownerId && actor.tenantRole !== "admin" && actor.tenantRole !== "owner") {
     throw new Error("Unauthorized");
   }
 
@@ -536,15 +530,15 @@ export async function requestApprovalAction(quoteId: string) {
 
   await Promise.all([
     db.update(quotes).set({ status: "pending_approval", updatedAt: new Date() }).where(eq(quotes.id, quoteId)),
-    logQuoteActivity(quoteId, "approval_requested", session.user.id),
+    logQuoteActivity(quoteId, "approval_requested", actor.userId),
     createNotificationsBatch(
       admins
-        .filter((u) => u.id !== session.user.id)
+        .filter((u) => u.id !== actor.userId)
         .map((u) => ({
           userId: u.id,
           type: "quote_approval_requested",
-          title: "Approvazione preventivo richiesta",
-          message: `Il preventivo ${quote.quoteNumber} richiede la tua approvazione.`,
+          title: "Quote awaiting your approval",
+          message: `Quote ${quote.quoteNumber} needs your approval before it can be sent.`,
           link: `/dashboard/sales/quotes/${quoteId}`,
         })),
     ),
@@ -556,7 +550,7 @@ export async function requestApprovalAction(quoteId: string) {
 
 export async function approveQuoteAction(quoteId: string) {
   const db = await getDb();
-  const session = await requireAdminAccess();
+  const actor = await requireCapability("quote:approve");
 
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
   if (!quote) throw new Error("Quote not found");
@@ -566,22 +560,25 @@ export async function approveQuoteAction(quoteId: string) {
     db
       .update(quotes)
       .set({
-        status: "draft",
-        approvedById: session.user.id,
+        // "approved", not back to "draft". Approve and reject both returned the
+        // quote to draft, so an approved quote and a rejected one were the same
+        // record and nothing stopped the owner sending either (audit rilievo D-03).
+        status: "approved",
+        approvedById: actor.userId,
         approvedAt: new Date(),
         approvalNote: null,
         updatedAt: new Date(),
       })
       .where(eq(quotes.id, quoteId)),
-    logQuoteActivity(quoteId, "approved", session.user.id),
+    logQuoteActivity(quoteId, "approved", actor.userId),
   ]);
 
-  if (quote.ownerId && quote.ownerId !== session.user.id) {
+  if (quote.ownerId && quote.ownerId !== actor.userId) {
     await createNotificationAction({
       userId: quote.ownerId,
       type: "quote_approved",
-      title: "Preventivo approvato",
-      message: `Il preventivo ${quote.quoteNumber} è stato approvato. Puoi ora inviarlo al cliente.`,
+      title: "Quote approved",
+      message: `Quote ${quote.quoteNumber} is approved. You can send it to the customer.`,
       link: `/dashboard/sales/quotes/${quoteId}`,
     });
   }
@@ -592,7 +589,7 @@ export async function approveQuoteAction(quoteId: string) {
 
 export async function rejectQuoteAction(quoteId: string, note: string) {
   const db = await getDb();
-  const session = await requireAdminAccess();
+  const actor = await requireCapability("quote:approve");
 
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
   if (!quote) throw new Error("Quote not found");
@@ -601,17 +598,19 @@ export async function rejectQuoteAction(quoteId: string, note: string) {
   await Promise.all([
     db
       .update(quotes)
-      .set({ status: "draft", approvalNote: note || null, updatedAt: new Date() })
+      // Back to draft with the reason attached: the owner has to change something
+      // before asking again, which is the point of a rejection.
+      .set({ status: "draft", approvalNote: note || null, approvedAt: null, updatedAt: new Date() })
       .where(eq(quotes.id, quoteId)),
-    logQuoteActivity(quoteId, "rejected", session.user.id),
+    logQuoteActivity(quoteId, "rejected", actor.userId),
   ]);
 
-  if (quote.ownerId && quote.ownerId !== session.user.id) {
+  if (quote.ownerId && quote.ownerId !== actor.userId) {
     await createNotificationAction({
       userId: quote.ownerId,
       type: "quote_rejected",
-      title: "Preventivo rifiutato",
-      message: `Il preventivo ${quote.quoteNumber} è stato rifiutato.${note ? ` Nota: ${note}` : ""}`,
+      title: "Quote sent back",
+      message: `Quote ${quote.quoteNumber} was not approved.${note ? ` Reason: ${note}` : ""}`,
       link: `/dashboard/sales/quotes/${quoteId}`,
     });
   }
@@ -623,8 +622,7 @@ export async function rejectQuoteAction(quoteId: string, note: string) {
 /** Lightweight list of deals + companies + products for the quote creation form. */
 export async function getQuoteFormData() {
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.id) throw new Error("Unauthorized");
+  await requireCapability("record:read");
 
   const [dealList, companyList, productList] = await Promise.all([
     db

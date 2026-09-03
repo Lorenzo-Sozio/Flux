@@ -13,6 +13,16 @@
   // l'handler `scheduled`, senza il quale i Cron Triggers non hanno dove atterrare.
   "main": "custom-worker.ts",
 
+  // ⚠️ `wrangler deploy` NON basta da solo. Vedendo open-next.config.ts, wrangler
+  // riconosce il progetto come OpenNext e ridirige a `opennextjs-cloudflare deploy`,
+  // che pretende `.open-next/.build/open-next.config.edge.mjs`. Se prima non è girato
+  // `opennextjs-cloudflare build` il deploy muore con un messaggio che sembra arrivare
+  // dal nulla:
+  //   ERROR Could not find compiled Open Next config, did you run the build command?
+  // Su Cloudflare Workers Builds il build command deve essere
+  // `npx opennextjs-cloudflare build`, non `npm run build`.
+  // In locale: `npm run cf:deploy`, che fa entrambe le cose.
+
   "compatibility_date": "2026-06-01",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
 
@@ -36,6 +46,24 @@
 
   "observability": {
     "enabled": true
+  },
+
+  // ⚠️ `wrangler deploy` SOSTITUISCE le vars remote con queste: quello che è stato
+  // aggiunto dalla dashboard e non è ripetuto qui viene CANCELLATO al deploy
+  // successivo, senza chiedere niente in modalità non interattiva.
+  // Quindi: ogni variabile non segreta va dichiarata qui, non nella dashboard.
+  //
+  // I segreti invece NON vanno qui (questo file è in git): si impostano con
+  // `npx wrangler secret put NOME` e sopravvivono ai deploy, perché wrangler non
+  // li gestisce dalla configurazione. Servono:
+  //   DATABASE_URL  AUTH_SECRET  ADMIN_SESSION_SECRET
+  //   PLATFORM_ENCRYPTION_KEY  IMPORT_API_KEY  CRON_SECRET
+  "vars": {
+    // Serve due volte: a build time (Next la inlinea nel bundle client) e a
+    // runtime (custom-worker.ts la usa come base URL dei cron). Senza slash finale.
+    "NEXT_PUBLIC_APP_URL": "https://flux.schedulatore.workers.dev",
+    // Dominio nudo, senza schema né slash.
+    "NEXT_PUBLIC_ROOT_DOMAIN": "flux.schedulatore.workers.dev"
   },
 
   // Sostituiscono i crons di vercel.json: su Cloudflare i job non sono richieste

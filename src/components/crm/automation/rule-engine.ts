@@ -217,6 +217,11 @@ async function executeRule(
   let actionsExecuted = 0;
   let totalRetries = 0;
   let errorMessage: string | undefined;
+  // A rule whose conditions simply did not match has not failed, and writing a
+  // row for it turned the log into one line per rule per record change — growing
+  // without bound and burying the failures somebody is actually looking for
+  // (audit rilievo D-09).
+  let didNotApply = false;
   const db = await getDb();
 
   try {
@@ -260,7 +265,10 @@ async function executeRule(
       context.oldData,
       context.newData,
     );
-    if (!conditionsMet) return; // silent skip — this is the happy-path fast exit
+    if (!conditionsMet) {
+      didNotApply = true;
+      return; // the happy-path fast exit: nothing happened, so nothing is recorded
+    }
 
     // 4. Parse + validate actions from stored JSON
     //    Zod discriminated union rejects any unknown action type here.
@@ -286,31 +294,34 @@ async function executeRule(
     errorMessage = err instanceof Error ? err.message : String(err);
     console.error(`[RuleEngine] Rule "${rule.name}" failed:`, err);
   } finally {
-    // Always write a log entry — invaluable for debugging + audit trail
-    await db
-      .insert(automationLogs)
-      .values({
-        ruleId: rule.id,
-        entityType: context.entityType,
-        entityId: context.entityId,
-        event: context.event,
-        success,
-        actionsExecuted,
-        errorMessage: errorMessage ?? null,
-        retryCount: totalRetries,
-        retryInfo:
-          totalRetries > 0
-            ? JSON.stringify({
-                attempts: totalRetries,
-                maxAttempts: actionsExecuted * 3,
-                exponentialBackoff: true,
-                lastError: errorMessage ?? null,
-              })
-            : null,
-      })
-      .catch((logErr) => {
-        // Never let a logging failure propagate — the action already ran
-        console.error("[RuleEngine] Failed to write automation log:", logErr);
-      });
+    // A log entry for everything that ran. "Did not apply" is the overwhelming
+    // majority of evaluations and is not worth a row.
+    if (!didNotApply) {
+      await db
+        .insert(automationLogs)
+        .values({
+          ruleId: rule.id,
+          entityType: context.entityType,
+          entityId: context.entityId,
+          event: context.event,
+          success,
+          actionsExecuted,
+          errorMessage: errorMessage ?? null,
+          retryCount: totalRetries,
+          retryInfo:
+            totalRetries > 0
+              ? JSON.stringify({
+                  attempts: totalRetries,
+                  maxAttempts: actionsExecuted * 3,
+                  exponentialBackoff: true,
+                  lastError: errorMessage ?? null,
+                })
+              : null,
+        })
+        .catch((logErr) => {
+          // Never let a logging failure propagate — the action already ran
+          console.error("[RuleEngine] Failed to write automation log:", logErr);
+        });
+    }
   }
 }

@@ -1,21 +1,15 @@
-// Campaign scheduler — dispatches campaigns whose scheduledAt has passed.
-// Run every 5 minutes: cron schedule "0,5,10,... * * * *" (every 5 min)
+// Campaign scheduler - dispatches campaigns whose scheduledAt has passed, in every
+// workspace. Run every 5 minutes.
 // External: curl -H "Authorization: Bearer $CRON_SECRET" https://your-domain/api/cron/campaign-scheduler
 
-import { type NextRequest, NextResponse } from "next/server";
-
 import { dispatchDueCampaigns } from "@/lib/campaign-send";
-import { verifyCronRequest } from "@/lib/cron-auth";
+import { runCronJob } from "@/lib/cron-runner";
 
-export async function GET(req: NextRequest) {
-  const authError = verifyCronRequest(req);
-  if (authError) return authError;
-
-  try {
+export async function GET(req: Request) {
+  // `dispatchDueCampaigns` calls getDb() internally; runCronJob sets the active
+  // workspace around each call so it resolves per tenant (audit rilievo B-02).
+  return runCronJob("campaign-scheduler", req, async () => {
     const results = await dispatchDueCampaigns();
-    return NextResponse.json({ dispatched: results.length, campaigns: results });
-  } catch (err) {
-    console.error("[campaign-scheduler]", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
-  }
+    return { dispatched: results.length, campaigns: results };
+  });
 }

@@ -6,7 +6,12 @@ import crypto from "node:crypto";
 
 import { eq } from "drizzle-orm";
 
+import type { createTenantDb } from "@/db";
 import { webhookLogs, webhooks } from "@/db/schema";
+
+/** A tenant database handle, for callers that resolve the workspace themselves. */
+export type WebhookDispatchDb = ReturnType<typeof createTenantDb>;
+
 import { ForbiddenError, requireAdminAccess } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 // ⚠️ La busta vive in una libreria **senza dipendenze**: chi la usa per
@@ -102,8 +107,15 @@ export async function dispatchWebhook(
   event: string,
   payload: Record<string, unknown>,
   origin: Origin = { via: "user" },
+  /**
+   * The workspace to dispatch for. Server actions omit it and the active tenant
+   * is resolved from the request. Callers with no request context — the public
+   * quote page, inbound email, the retry job — must pass one, because `getDb()`
+   * has nothing to read the tenant from there (audit rilievo B-01).
+   */
+  explicitDb?: WebhookDispatchDb,
 ) {
-  const db = await getDb();
+  const db = explicitDb ?? (await getDb());
   const activeWebhooks = await db.select().from(webhooks).where(eq(webhooks.isActive, true));
 
   const eligible = activeWebhooks.filter((wh) => wh.events.includes(event) || wh.events.includes("*"));

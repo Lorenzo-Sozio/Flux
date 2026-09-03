@@ -14,8 +14,8 @@
   {
     "file": "src/lib/quote-events.ts",
     "description": "⚠️ l'origine della risposta diventa «macchina»: l'integrazione che filtra le proprie scritture scarta la risposta che sta aspettando",
-    "find": "    { via: \"user\", actor },\n  ).catch((e) => console.error(`[quotes] quote.${decision} not dispatched`, e));",
-    "replace": "    { via: \"api\", actor },\n  ).catch((e) => console.error(`[quotes] quote.${decision} not dispatched`, e));"
+    "find": "    { via: \"user\", actor },\n    explicitDb,\n  ).catch((e) => console.error(`[quotes] quote.${decision} not dispatched`, e));",
+    "replace": "    { via: \"api\", actor },\n    explicitDb,\n  ).catch((e) => console.error(`[quotes] quote.${decision} not dispatched`, e));"
   },
   {
     "file": "src/lib/quote-events.ts",

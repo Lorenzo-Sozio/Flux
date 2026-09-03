@@ -98,18 +98,42 @@ export async function updateDealStage(dealId: string, newStageId: string) {
   // Capture old state BEFORE the update (needed for "changed" operators)
   const [oldDeal] = await db.select().from(deals).where(eq(deals.id, dealId));
 
-  // Auto-set probability based on the destination stage's default
   const [stage] = await db
-    .select({ defaultProbability: pipelineStages.defaultProbability })
+    .select({
+      defaultProbability: pipelineStages.defaultProbability,
+      isWon: pipelineStages.isWon,
+      isLost: pipelineStages.isLost,
+    })
     .from(pipelineStages)
     .where(eq(pipelineStages.id, newStageId));
+
+  const [oldStage] = oldDeal?.stageId
+    ? await db
+        .select({ defaultProbability: pipelineStages.defaultProbability })
+        .from(pipelineStages)
+        .where(eq(pipelineStages.id, oldDeal.stageId))
+    : [undefined];
+
+  // The stage default used to be written unconditionally, so a rep who had set
+  // 65% by hand lost it every time the card moved. It is now applied only when the
+  // current value is still whatever the previous stage suggested (audit rilievo C-06).
+  const currentProbability = oldDeal?.probability ?? null;
+  const probabilityWasManual =
+    currentProbability !== null && currentProbability !== (oldStage?.defaultProbability ?? 0);
+
+  // Dragging a card into the "Won" column changed the stage and left status at
+  // "open", so the deal kept weighing on the forecast for ever. Terminal stages
+  // now close the deal, and record when.
+  const closing = stage?.isWon ? "won" : stage?.isLost ? "lost" : null;
+  const now = new Date();
 
   const [updatedDeal] = await db
     .update(deals)
     .set({
       stageId: newStageId,
-      probability: stage?.defaultProbability ?? 0,
-      updatedAt: new Date(),
+      probability: probabilityWasManual ? currentProbability : (stage?.defaultProbability ?? 0),
+      ...(closing ? { status: closing, closedAt: now } : {}),
+      updatedAt: now,
     })
     .where(eq(deals.id, dealId))
     .returning();
@@ -121,6 +145,18 @@ export async function updateDealStage(dealId: string, newStageId: string) {
     probability: updatedDeal.probability,
     // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
   }).catch(() => {});
+
+  // A deal closed by a drag is closed for the same reasons as one closed from the
+  // form, and integrations must hear about it either way.
+  if (closing && oldDeal?.status !== closing) {
+    dispatchWebhook(closing === "won" ? "deal.won" : "deal.lost", {
+      id: updatedDeal.id,
+      name: updatedDeal.name,
+      amount: updatedDeal.amount,
+      currency: updatedDeal.currency,
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+    }).catch(() => {});
+  }
 
   revalidatePath("/dashboard/pipeline");
 
@@ -157,9 +193,17 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
     }
   }
 
+  // Record WHEN a deal closed. "Won this month" was derived from updatedAt, so
+  // re-saving an old deal moved it into the current month's revenue, and the
+  // number people are measured on drifted (audit rilievo C-07).
+  const isClosing = (data.status === "won" || data.status === "lost") && oldDeal?.status !== data.status;
+  const isReopening = data.status === "open" && oldDeal?.status !== "open";
+
   const payload = {
     ...data,
     amount: amountStr,
+    ...(isClosing ? { closedAt: new Date() } : {}),
+    ...(isReopening ? { closedAt: null, lostReason: null } : {}),
   };
 
   const [updatedDeal] = await db
@@ -169,8 +213,10 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
     .returning();
   revalidatePath("/dashboard/pipeline");
 
-  // Fire webhook + notification on deal won/lost
-  if (data.status === "won") {
+  // Only on the transition. Passing status: "won" on any later edit re-fired the
+  // event and re-notified the owner, so an integration saw the same deal won
+  // several times.
+  if (data.status === "won" && isClosing) {
     dispatchWebhook("deal.won", { id: updatedDeal.id, name: updatedDeal.name, amount: updatedDeal.amount }).catch(
       // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
       () => {},
@@ -185,9 +231,16 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
         // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
       }).catch(() => {});
     }
-  } else if (data.status === "lost") {
-    // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
-    dispatchWebhook("deal.lost", { id: updatedDeal.id, name: updatedDeal.name }).catch(() => {});
+  } else if (data.status === "lost" && isClosing) {
+    dispatchWebhook("deal.lost", {
+      id: updatedDeal.id,
+      name: updatedDeal.name,
+      amount: updatedDeal.amount,
+      // Why it was lost travels with the event: without it there is no win/loss
+      // analysis anywhere, here or downstream.
+      reason: updatedDeal.lostReason,
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+    }).catch(() => {});
   }
 
   after(async () => {
@@ -435,7 +488,7 @@ export async function getForecastData() {
     const period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     periodKeys.push(period);
     months.push({
-      label: d.toLocaleDateString("en-US", { month: "short", year: "numeric" }),
+      label: d.toLocaleDateString(undefined, { month: "short", year: "numeric" }),
       year: d.getFullYear(),
       month: d.getMonth(),
       period,
@@ -457,6 +510,17 @@ export async function getForecastData() {
     if (bucket) bucket.target += parseFloat(tr.targetAmount ?? "0");
   }
 
+  // Deals that do not belong to any of the six months.
+  //
+  // Both of these used to be dumped into the LAST bucket, so a future month
+  // appeared inflated with dead pipeline and deals whose close date had already
+  // passed were presented as revenue six months out (audit rilievo C-08). They are
+  // now reported separately, because each is a list of work rather than a forecast:
+  // one needs a date, the other needs a decision.
+  const unscheduled = { count: 0, weighted: 0, total: 0 };
+  const overdue = { count: 0, weighted: 0, total: 0 };
+  const startOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
   // Single pass: bucket by month and build owner map simultaneously
   const ownerMap = new Map<string, { name: string; weighted: number; dealCount: number }>();
   for (const deal of openDeals) {
@@ -464,15 +528,36 @@ export async function getForecastData() {
     const prob = deal.probability ?? 0;
     const weighted = (amt * prob) / 100;
 
-    let bucket = months[months.length - 1];
-    if (deal.expectedCloseDate) {
+    let bucket: (typeof months)[number] | null = null;
+    if (!deal.expectedCloseDate) {
+      unscheduled.count += 1;
+      unscheduled.weighted += weighted;
+      unscheduled.total += amt;
+    } else {
       const cd = new Date(deal.expectedCloseDate);
       const found = months.find((m) => m.year === cd.getFullYear() && m.month === cd.getMonth());
-      if (found) bucket = found;
+      if (found) {
+        bucket = found;
+      } else if (cd < startOfCurrentMonth) {
+        overdue.count += 1;
+        overdue.weighted += weighted;
+        overdue.total += amt;
+      } else {
+        // Genuinely beyond the horizon: counted, but not folded into month six.
+        unscheduled.count += 1;
+        unscheduled.weighted += weighted;
+        unscheduled.total += amt;
+      }
     }
-    bucket.pipeline += weighted;
-    if (prob >= 50) bucket.bestCase += weighted;
-    if (prob >= 80) bucket.committed += weighted;
+
+    if (bucket) {
+      bucket.pipeline += weighted;
+      // "Best case" and "committed" are the full value of the deals that qualify,
+      // not the probability-weighted value. Weighting them as well discounted the
+      // two lines management reads twice over.
+      if (prob >= 50) bucket.bestCase += amt;
+      if (prob >= 80) bucket.committed += amt;
+    }
 
     if (deal.ownerId) {
       const existing = ownerMap.get(deal.ownerId);
@@ -485,12 +570,17 @@ export async function getForecastData() {
     }
   }
 
-  const currency = openDeals[0]?.currency ?? "EUR";
+  // Amounts are stored in EUR, so the figures are EUR. Labelling them with the
+  // currency of whichever deal happened to be first in the list presented euro
+  // totals as dollars (audit rilievo C-08).
+  const currency = "EUR";
   // months[0] is always the current month (loop starts at i=0)
   const currentMonthTarget = months[0]?.target ?? 0;
 
   return {
     months,
+    unscheduled,
+    overdue,
     byOwner: [...ownerMap.values()].sort((a, b) => b.weighted - a.weighted),
     currency,
     totalWeighted: months.reduce((s, m) => s + m.pipeline, 0),

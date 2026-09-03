@@ -33,6 +33,7 @@ declare module "@auth/core/jwt" {
     role?: string;
     activeTenantId?: string | null;
     tenantRole?: string | null;
+    tenantRoleCheckedAt?: number;
   }
 }
 
@@ -95,6 +96,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           token.activeTenantId = null;
           token.tenantRole = null;
         }
+        token.tenantRoleCheckedAt = Date.now();
       }
 
       // Tenant switch triggered from client via session.update({ activeTenantId })
@@ -105,6 +107,42 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (membership) {
           token.activeTenantId = membership.tenantId;
           token.tenantRole = membership.role;
+          token.tenantRoleCheckedAt = Date.now();
+        }
+      }
+
+      // Re-read the membership periodically.
+      //
+      // The role was previously captured once at sign-in and never revisited, so
+      // a demotion — or removal from the workspace entirely — stayed invisible
+      // until the user happened to sign out. Every authorisation decision in the
+      // product reads this value, so the staleness window is the window in which
+      // revoked access still works. Five minutes bounds it without adding a
+      // query to every request.
+      const checkedAt = (token.tenantRoleCheckedAt as number | undefined) ?? 0;
+      const STALE_AFTER_MS = 5 * 60 * 1000;
+
+      if (token.activeTenantId && token.id && Date.now() - checkedAt > STALE_AFTER_MS) {
+        try {
+          const membership = await platformDb.query.tenantMembers.findFirst({
+            where: and(
+              eq(tenantMembers.userId, token.id as string),
+              eq(tenantMembers.tenantId, token.activeTenantId as string),
+            ),
+          });
+
+          if (membership) {
+            token.tenantRole = membership.role;
+          } else {
+            // Membership revoked: drop the workspace so the next request is sent
+            // back to workspace selection rather than acting with a stale role.
+            token.activeTenantId = null;
+            token.tenantRole = null;
+          }
+          token.tenantRoleCheckedAt = Date.now();
+        } catch {
+          // A transient database problem must not sign the user out; the value
+          // simply stays as it was and is retried on the next request.
         }
       }
 

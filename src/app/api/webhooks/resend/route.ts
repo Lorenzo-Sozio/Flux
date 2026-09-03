@@ -14,10 +14,9 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { eq } from "drizzle-orm";
 
 import { campaignLogs, emailSuppressions } from "@/db/schema";
-import { getDb } from "@/lib/tenant-context";
+import { resolveTenantByProbe } from "@/lib/tenant-resolve";
 
 export async function POST(req: NextRequest) {
-  const db = await getDb();
   const body = await req.text();
 
   // Verify Svix signature — mandatory; reject if secret is not configured
@@ -39,12 +38,32 @@ export async function POST(req: NextRequest) {
 
   const type = typeof event.type === "string" ? event.type : "";
   const data = event.data ?? {};
-  const messageId =
-    typeof data.email_id === "string"
-      ? data.email_id
-      : typeof data.id === "string"
-        ? data.id
-        : "";
+  const messageId = typeof data.email_id === "string" ? data.email_id : typeof data.id === "string" ? data.id : "";
+
+  // Resend does not know about workspaces: the delivery event names a message id,
+  // and the workspace is whichever one recorded that message. Calling getDb() here
+  // threw on every callback, so bounces and complaints never reached the
+  // suppression list and the same dead address was mailed again next campaign
+  // (audit rilievo B-01).
+  if (!messageId) {
+    return NextResponse.json({ received: true, ignored: "no message id" });
+  }
+
+  const resolved = await resolveTenantByProbe(`messageId:${messageId}`, async (tenantDb) => {
+    const row = await tenantDb.query.campaignLogs.findFirst({
+      where: eq(campaignLogs.messageId, messageId),
+      columns: { id: true },
+    });
+    return Boolean(row);
+  }).catch(() => null);
+
+  if (!resolved) {
+    // Transactional mail that is not part of a campaign has no log row. Nothing to
+    // record, and Resend must still get a 2xx or it will keep redelivering.
+    return NextResponse.json({ received: true, ignored: "unknown message" });
+  }
+
+  const db = resolved.db;
 
   try {
     switch (type) {

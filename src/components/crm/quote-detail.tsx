@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
@@ -26,6 +26,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import {
@@ -44,7 +45,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
-import { QUOTE_STATUS_CONFIG } from "@/lib/quote-status";
+import { quoteStatusConfig } from "@/lib/quote-status";
 
 import { SendQuoteEmailDialog } from "./send-quote-email-dialog";
 
@@ -102,7 +103,8 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
     }
   }, [autoOpenSend, quote.status]);
 
-  const statusCfg = QUOTE_STATUS_CONFIG[quote.status] ?? QUOTE_STATUS_CONFIG.draft;
+  const tq = useTranslations("quotes");
+  const statusCfg = quoteStatusConfig(quote.status);
   const contactName = quote.contact ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim() : null;
 
   async function handleStatusChange(newStatus: string) {
@@ -133,19 +135,19 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
   }
 
   return (
-    <div className="flex flex-col md:flex-row gap-6">
+    <div className="flex flex-col gap-6 md:flex-row">
       {/* Left column: Quote info + actions */}
-      <div className="w-full md:w-1/3 flex flex-col gap-6">
+      <div className="flex w-full flex-col gap-6 md:w-1/3">
         {/* Quote Details card */}
         <Card>
           <CardHeader className="flex flex-row items-start justify-between pb-3">
             <div className="space-y-1">
               <CardTitle className="font-mono tracking-tight">{quote.quoteNumber}</CardTitle>
-              <Badge variant="outline" className={`text-xs font-medium ${statusCfg.className}`}>
-                {statusCfg.label}
+              <Badge variant="outline" className={`font-medium text-xs ${statusCfg.className}`}>
+                {tq(`statuses.${statusCfg.labelKey}`)}
               </Badge>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex shrink-0 items-center gap-1">
               {quote.status === "draft" && (
                 <Button
                   variant="ghost"
@@ -161,8 +163,8 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
 
           <CardContent className="space-y-4">
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Issued</p>
-              <p className="text-sm font-medium flex items-center gap-1.5">
+              <p className="mb-1 text-muted-foreground text-xs">Issued</p>
+              <p className="flex items-center gap-1.5 font-medium text-sm">
                 <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                 {format(new Date(quote.issuedAt), "MMM d, yyyy")}
               </p>
@@ -170,8 +172,8 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
 
             {quote.expiresAt && (
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Expires</p>
-                <p className="text-sm font-medium flex items-center gap-1.5">
+                <p className="mb-1 text-muted-foreground text-xs">Expires</p>
+                <p className="flex items-center gap-1.5 font-medium text-sm">
                   <Clock className="h-3.5 w-3.5 text-muted-foreground" />
                   {format(new Date(quote.expiresAt), "MMM d, yyyy")}
                 </p>
@@ -180,8 +182,8 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
 
             {quote.deal && (
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Deal</p>
-                <p className="text-sm font-medium flex items-center gap-1.5">
+                <p className="mb-1 text-muted-foreground text-xs">Deal</p>
+                <p className="flex items-center gap-1.5 font-medium text-sm">
                   <Hash className="h-3.5 w-3.5 text-muted-foreground" />
                   {quote.deal.name}
                 </p>
@@ -190,8 +192,8 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
 
             {quote.company && (
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Company</p>
-                <p className="text-sm font-medium flex items-center gap-1.5">
+                <p className="mb-1 text-muted-foreground text-xs">Company</p>
+                <p className="flex items-center gap-1.5 font-medium text-sm">
                   <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                   {quote.company.name}
                 </p>
@@ -200,8 +202,8 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
 
             {contactName && (
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Contact</p>
-                <p className="text-sm font-medium flex items-center gap-1.5">
+                <p className="mb-1 text-muted-foreground text-xs">Contact</p>
+                <p className="flex items-center gap-1.5 font-medium text-sm">
                   <User className="h-3.5 w-3.5 text-muted-foreground" />
                   {contactName}
                 </p>
@@ -210,8 +212,8 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
 
             {quote.owner && (
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Owner</p>
-                <p className="text-sm font-medium flex items-center gap-1.5">
+                <p className="mb-1 text-muted-foreground text-xs">Owner</p>
+                <p className="flex items-center gap-1.5 font-medium text-sm">
                   <User className="h-3.5 w-3.5 text-muted-foreground" />
                   {quote.owner.name}
                 </p>
@@ -221,8 +223,8 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
             <Separator />
 
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Total Amount</p>
-              <p className="text-xl font-bold tabular-nums flex items-center gap-1.5">
+              <p className="mb-1 text-muted-foreground text-xs">Total Amount</p>
+              <p className="flex items-center gap-1.5 font-bold text-xl tabular-nums">
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
                 {fmt(quote.totalAmount)}
               </p>
@@ -233,7 +235,7 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
         {/* Actions card */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
               Actions
             </CardTitle>
           </CardHeader>
@@ -273,8 +275,8 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
             )}
 
             {quote.status === "pending_approval" && !isPrivileged && (
-              <div className="rounded-md bg-orange-50 border border-orange-200 px-3 py-2.5 text-xs text-orange-700 flex items-start gap-2">
-                <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+              <div className="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-2.5 text-orange-700 text-xs">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>In attesa di approvazione da un amministratore.</span>
               </div>
             )}
@@ -346,10 +348,10 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
         {quote.status === "draft" && quote.approvalNote && (
           <Card className="border-orange-200 bg-orange-50">
             <CardContent className="flex items-start gap-2 p-4">
-              <AlertTriangle className="h-4 w-4 text-orange-600 shrink-0 mt-0.5" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
               <div>
-                <p className="text-sm font-medium text-orange-800">Preventivo rifiutato</p>
-                <p className="text-xs text-orange-700 mt-0.5">{quote.approvalNote}</p>
+                <p className="font-medium text-orange-800 text-sm">Preventivo rifiutato</p>
+                <p className="mt-0.5 text-orange-700 text-xs">{quote.approvalNote}</p>
               </div>
             </CardContent>
           </Card>
@@ -359,17 +361,17 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
         {(quote.sentAt || quote.viewedAt || quote.acceptedAt || quote.declinedAt) && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
                 Timeline
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {quote.sentAt && (
-                <div className="flex items-center gap-2 text-sm text-blue-600">
+                <div className="flex items-center gap-2 text-blue-600 text-sm">
                   <Mail className="h-3.5 w-3.5 shrink-0" />
                   <div>
                     <p className="font-medium leading-none">Sent</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="mt-0.5 text-muted-foreground text-xs">
                       {format(new Date(quote.sentAt), "MMM d, yyyy HH:mm")}
                     </p>
                   </div>
@@ -380,29 +382,29 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
                   <Eye className="h-3.5 w-3.5 shrink-0" />
                   <div>
                     <p className="font-medium leading-none">Viewed</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="mt-0.5 text-muted-foreground text-xs">
                       {format(new Date(quote.viewedAt), "MMM d, yyyy HH:mm")}
                     </p>
                   </div>
                 </div>
               )}
               {quote.acceptedAt && (
-                <div className="flex items-center gap-2 text-sm text-green-600">
+                <div className="flex items-center gap-2 text-green-600 text-sm">
                   <Check className="h-3.5 w-3.5 shrink-0" />
                   <div>
                     <p className="font-medium leading-none">Accepted</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="mt-0.5 text-muted-foreground text-xs">
                       {format(new Date(quote.acceptedAt), "MMM d, yyyy HH:mm")}
                     </p>
                   </div>
                 </div>
               )}
               {quote.declinedAt && (
-                <div className="flex items-center gap-2 text-sm text-red-600">
+                <div className="flex items-center gap-2 text-red-600 text-sm">
                   <X className="h-3.5 w-3.5 shrink-0" />
                   <div>
                     <p className="font-medium leading-none">Declined</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="mt-0.5 text-muted-foreground text-xs">
                       {format(new Date(quote.declinedAt), "MMM d, yyyy HH:mm")}
                     </p>
                   </div>
@@ -414,7 +416,7 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
       </div>
 
       {/* Right column: Items, Summary, Activity */}
-      <div className="w-full md:w-2/3 flex flex-col gap-6">
+      <div className="flex w-full flex-col gap-6 md:w-2/3">
         <Tabs defaultValue="items">
           <TabsList>
             <TabsTrigger value="items">
@@ -431,12 +433,12 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="text-xs font-semibold">Description</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Qty</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Unit Price</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Discount</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Tax</TableHead>
-                    <TableHead className="text-xs font-semibold text-right">Total</TableHead>
+                    <TableHead className="font-semibold text-xs">Description</TableHead>
+                    <TableHead className="text-right font-semibold text-xs">Qty</TableHead>
+                    <TableHead className="text-right font-semibold text-xs">Unit Price</TableHead>
+                    <TableHead className="text-right font-semibold text-xs">Discount</TableHead>
+                    <TableHead className="text-right font-semibold text-xs">Tax</TableHead>
+                    <TableHead className="text-right font-semibold text-xs">Total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -445,20 +447,20 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
                       <TableCell>
                         <div className="font-medium text-sm">{item.description}</div>
                         {item.product && (
-                          <div className="text-xs text-muted-foreground mt-0.5">{item.product.name}</div>
+                          <div className="mt-0.5 text-muted-foreground text-xs">{item.product.name}</div>
                         )}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{item.quantity}</TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{fmt(item.unitPrice)}</TableCell>
-                      <TableCell className="text-right text-sm tabular-nums text-amber-600">
+                      <TableCell className="text-right text-amber-600 text-sm tabular-nums">
                         {parseFloat(item.discountPercent ?? "0") > 0
                           ? `${item.discountPercent}% (−${fmt(item.discountAmount)})`
                           : "—"}
                       </TableCell>
-                      <TableCell className="text-right text-sm tabular-nums text-slate-600">
+                      <TableCell className="text-right text-slate-600 text-sm tabular-nums">
                         {parseFloat(item.taxPercent ?? "0") > 0 ? `${item.taxPercent}% (+${fmt(item.taxAmount)})` : "—"}
                       </TableCell>
-                      <TableCell className="text-right text-sm font-semibold tabular-nums">
+                      <TableCell className="text-right font-semibold text-sm tabular-nums">
                         {fmt(item.totalPrice)}
                       </TableCell>
                     </TableRow>
@@ -471,20 +473,20 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
           {/* Summary tab */}
           <TabsContent value="summary" className="mt-4">
             <Card>
-              <CardContent className="pt-6 space-y-6">
-                <div className="max-w-sm ml-auto space-y-2">
+              <CardContent className="space-y-6 pt-6">
+                <div className="ml-auto max-w-sm space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
                     <span className="font-medium tabular-nums">{fmt(quote.subtotal)}</span>
                   </div>
                   {parseFloat(quote.discountAmount ?? "0") > 0 && (
-                    <div className="flex justify-between text-sm text-amber-600">
+                    <div className="flex justify-between text-amber-600 text-sm">
                       <span>Discount ({quote.discountPercent}%)</span>
                       <span className="font-medium tabular-nums">−{fmt(quote.discountAmount)}</span>
                     </div>
                   )}
                   {parseFloat(quote.taxAmount ?? "0") > 0 && (
-                    <div className="flex justify-between text-sm text-slate-600">
+                    <div className="flex justify-between text-slate-600 text-sm">
                       <span>Tax ({quote.taxPercent}%)</span>
                       <span className="font-medium tabular-nums">+{fmt(quote.taxAmount)}</span>
                     </div>
@@ -492,14 +494,14 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
                   <Separator />
                   <div className="flex justify-between">
                     <span className="font-semibold">Total</span>
-                    <span className="text-lg font-bold tabular-nums">{fmt(quote.totalAmount)}</span>
+                    <span className="font-bold text-lg tabular-nums">{fmt(quote.totalAmount)}</span>
                   </div>
                 </div>
 
                 {quote.notes && (
-                  <div className="pt-4 border-t">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Notes</p>
-                    <p className="text-sm whitespace-pre-wrap">{quote.notes}</p>
+                  <div className="border-t pt-4">
+                    <p className="mb-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Notes</p>
+                    <p className="whitespace-pre-wrap text-sm">{quote.notes}</p>
                   </div>
                 )}
               </CardContent>
@@ -511,29 +513,29 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
             <Card>
               <CardContent className="pt-6">
                 {quote.activities.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">No activity yet</p>
+                  <p className="py-8 text-center text-muted-foreground text-sm">No activity yet</p>
                 ) : (
                   <div className="space-y-0">
                     {quote.activities.map((activity, idx) => (
                       <div key={activity.id} className="relative flex gap-4 pb-4">
                         {idx < quote.activities.length - 1 && (
-                          <div className="absolute left-[11px] top-7 bottom-0 w-px bg-border" />
+                          <div className="absolute top-7 bottom-0 left-[11px] w-px bg-border" />
                         )}
-                        <div className="mt-1.5 h-5 w-5 rounded-full border-2 border-border bg-background shrink-0 z-10" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium leading-tight">
+                        <div className="z-10 mt-1.5 h-5 w-5 shrink-0 rounded-full border-2 border-border bg-background" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm leading-tight">
                             {ACTIVITY_LABELS[activity.type] ?? activity.type}
                           </p>
-                          <div className="flex items-center gap-2 mt-0.5">
+                          <div className="mt-0.5 flex items-center gap-2">
                             {activity.user?.name && (
-                              <span className="text-xs text-muted-foreground">{activity.user.name}</span>
+                              <span className="text-muted-foreground text-xs">{activity.user.name}</span>
                             )}
                             {activity.email && (
-                              <span className="text-xs text-muted-foreground">({activity.email})</span>
+                              <span className="text-muted-foreground text-xs">({activity.email})</span>
                             )}
                           </div>
                         </div>
-                        <span className="text-xs text-muted-foreground shrink-0 mt-0.5">
+                        <span className="mt-0.5 shrink-0 text-muted-foreground text-xs">
                           {format(new Date(activity.createdAt), "MMM d, HH:mm")}
                         </span>
                       </div>
@@ -565,7 +567,7 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
             <DialogTitle>Rifiuta preventivo</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Il preventivo tornerà in stato bozza. Aggiungi una nota per il venditore (opzionale).
             </p>
             <Textarea

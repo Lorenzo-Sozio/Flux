@@ -1,8 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 import { updateAttendeeRsvp } from "@/actions/appointments";
+import { getAppUrl } from "@/lib/app-url";
 
-const APP_URL = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+// Resolved per call, not at import: `getAppUrl()` refuses to guess in production,
+// and a module-scope call would make that refusal a build failure rather than a
+// clear error on the request that was about to send a wrong link (rilievo B-04).
+function appBase(): string {
+  return getAppUrl();
+}
 
 const RESPONSE_LABELS: Record<string, string> = {
   accept: "Partecipazione confermata",
@@ -82,7 +88,7 @@ export async function GET(req: NextRequest) {
     <div class="icon">${icon}</div>
     <h1>${label}</h1>
     <p>La tua risposta è stata registrata correttamente.</p>
-    <a href="${APP_URL}/dashboard/calendar">Vai al calendario</a>
+    <a href="${appBase()}/dashboard/calendar">Vai al calendario</a>
   </div>
 </body>
 </html>`;

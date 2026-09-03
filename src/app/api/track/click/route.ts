@@ -11,14 +11,13 @@ import { type NextRequest, NextResponse } from "next/server";
 import { and, eq, isNull, notInArray, sql } from "drizzle-orm";
 
 import { campaignLogs } from "@/db/schema";
-import { getDb } from "@/lib/tenant-context";
+import { resolveTenantByProbe } from "@/lib/tenant-resolve";
 import { verifyTrackingUrl } from "@/lib/tracking-token";
 
 // Statuses that must never be downgraded by a click event
 const PROTECTED_STATUSES = ["unsubscribed", "bounced", "complained"];
 
 export async function GET(req: NextRequest) {
-  const db = await getDb();
   const logId = req.nextUrl.searchParams.get("log");
   const url = req.nextUrl.searchParams.get("url");
   const sig = req.nextUrl.searchParams.get("sig");
@@ -34,11 +33,27 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Invalid tracking link" }, { status: 400 });
   }
 
+  // The workspace comes from the log row, not from a header: this request arrives
+  // from a mail client with no session at all. Calling getDb() here threw on every
+  // click, and because this endpoint is a redirect that meant every link in every
+  // campaign already delivered was dead (audit rilievo B-01).
+  //
+  // Resolution failure must not strand the reader on an error page — the click is
+  // recorded on a best-effort basis and the redirect happens regardless.
+  const resolved = await resolveTenantByProbe(`campaignLog:${logId}`, async (db) => {
+    const row = await db.query.campaignLogs.findFirst({
+      where: eq(campaignLogs.id, logId),
+      columns: { id: true },
+    });
+    return Boolean(row);
+  }).catch(() => null);
+
   const now = new Date();
   // Set status → "clicked" and record timestamps.
   // Guard: only on first click (clickedAt IS NULL) AND never overwrite negative statuses.
   // openedAt: COALESCE preserves the original open timestamp if pixel already fired.
-  db.update(campaignLogs)
+  resolved?.db
+    .update(campaignLogs)
     .set({
       status: "clicked",
       clickedAt: now,
@@ -51,7 +66,7 @@ export async function GET(req: NextRequest) {
         notInArray(campaignLogs.status, PROTECTED_STATUSES),
       ),
     )
-    .catch((err) => console.error("[track/click] DB update failed", { logId, err }));
+    .catch((err: unknown) => console.error("[track/click] DB update failed", { logId, err }));
 
   // The HMAC signature verified above guarantees url was produced by this server
   // and therefore points to a destination that was embedded at campaign-send time.

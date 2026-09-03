@@ -3,12 +3,12 @@
  * Called when the tracking pixel in a campaign email is loaded.
  * URL: /api/track/open?log=<campaignLogId>
  */
-import { type NextRequest, NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 import { and, eq, isNull, notInArray } from "drizzle-orm";
 
 import { campaignLogs } from "@/db/schema";
-import { getDb } from "@/lib/tenant-context";
+import { resolveTenantByProbe } from "@/lib/tenant-resolve";
 
 // 1x1 transparent GIF
 const PIXEL = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
@@ -17,10 +17,24 @@ const PIXEL = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBR
 const PROTECTED_STATUSES = ["opened", "clicked", "unsubscribed", "bounced", "complained"];
 
 export async function GET(req: NextRequest) {
-  const db = await getDb();
   const logId = req.nextUrl.searchParams.get("log");
 
-  if (logId) {
+  // No session and no tenant header — a mail client fetched this. The workspace
+  // is derived from the log row instead (audit rilievo B-01). A failure here only
+  // costs an unrecorded open; the pixel is always returned.
+  const resolved = logId
+    ? await resolveTenantByProbe(`campaignLog:${logId}`, async (db) => {
+        const row = await db.query.campaignLogs.findFirst({
+          where: eq(campaignLogs.id, logId),
+          columns: { id: true },
+        });
+        return Boolean(row);
+      }).catch(() => null)
+    : null;
+
+  const db = resolved?.db;
+
+  if (logId && db) {
     const now = new Date();
 
     // 1. Advance status to "opened" only when not already at a higher state

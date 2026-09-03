@@ -13,13 +13,59 @@ import { cache } from "react";
 
 import { headers } from "next/headers";
 
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { createTenantDb, platformDb } from "@/db";
 
 import { getTenantById } from "./get-tenant";
 import { decryptDbUrl } from "./tenant-db";
 
-export const getDb = cache(async () => {
-  let tenantId: string | null = null;
+/**
+ * An explicit tenant for work that has no request to read one from.
+ *
+ * Background jobs process every workspace in turn inside a single HTTP request,
+ * so a header — or React's per-request `cache()` — cannot express "this tenant,
+ * for the duration of this callback". Without it every cron route resolved to no
+ * tenant at all and threw before doing any work (audit rilievo B-02).
+ *
+ * Scoped rather than global on purpose: two workspaces processed concurrently
+ * must not be able to observe each other's context.
+ */
+const tenantOverride = new AsyncLocalStorage<string>();
+
+/**
+ * Runs `fn` with `tenantId` as the active workspace.
+ *
+ * Everything called inside — including server actions written for the dashboard
+ * — resolves `getDb()` to that workspace, which is what lets a job reuse the
+ * same code paths the UI uses instead of duplicating them.
+ */
+export function runWithTenant<T>(tenantId: string, fn: () => Promise<T>): Promise<T> {
+  return tenantOverride.run(tenantId, fn);
+}
+
+/** The workspace set by `runWithTenant`, if any. */
+export function getOverriddenTenantId(): string | null {
+  return tenantOverride.getStore() ?? null;
+}
+
+/**
+ * NOT wrapped in `cache()`: an override changes within a single request as a job
+ * moves from one workspace to the next, and a memoised handle would hand the
+ * second workspace the first one's database.
+ */
+async function resolveDb() {
+  let tenantId: string | null = getOverriddenTenantId();
+
+  if (tenantId) {
+    const tenant = await getTenantById(tenantId);
+    if (!tenant) {
+      const err = new Error(`Tenant not found: ${tenantId}`);
+      (err as NodeJS.ErrnoException).code = "TENANT_NOT_FOUND";
+      throw err;
+    }
+    return createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
+  }
 
   try {
     const h = await headers();
@@ -51,17 +97,33 @@ export const getDb = cache(async () => {
   }
 
   return createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
-});
+}
+
+/**
+ * The tenant database for the current request.
+ *
+ * Memoised per request when the tenant comes from the header, so a page with a
+ * dozen queries opens one handle. When a job has set an explicit tenant the
+ * memoisation is bypassed, because the answer changes as the job advances.
+ */
+const getDbCached = cache(resolveDb);
+
+export async function getDb() {
+  return getOverriddenTenantId() ? resolveDb() : getDbCached();
+}
 
 /**
  * Returns the active tenantId from the x-tenant-id header injected by middleware.
  * Returns null when called outside a tenant request (e.g., admin panel, cron jobs).
  */
-export const getCurrentTenantId = cache(async (): Promise<string | null> => {
+export async function getCurrentTenantId(): Promise<string | null> {
+  const overridden = getOverriddenTenantId();
+  if (overridden) return overridden;
+
   try {
     const h = await headers();
     return h.get("x-tenant-id") ?? null;
   } catch {
     return null;
   }
-});
+}

@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/lib/permissions.ts",
+    "description": "⚠️⚠️ un ruolo sconosciuto diventa proprietario invece che sola lettura: un valore rimasto da una vecchia migrazione apre tutto",
+    "find": "  return (TENANT_ROLES as readonly string[]).includes(raw ?? \"\") ? (raw as TenantRole) : \"viewer\";",
+    "replace": "  return (TENANT_ROLES as readonly string[]).includes(raw ?? \"\") ? (raw as TenantRole) : \"owner\";"
+  },
+  {
+    "file": "src/lib/permissions.ts",
+    "description": "⚠️⚠️ il confronto fra ruoli passa a >=: chi puo' scrivere puo' anche amministrare, e il viewer smette di essere sola lettura",
+    "find": "    return RANK[actor.tenantRole] >= required;\n  }\n\n  return RANK[normalizeTenantRole(actor)] >= required;",
+    "replace": "    return RANK[actor.tenantRole] >= 0;\n  }\n\n  return RANK[normalizeTenantRole(actor)] >= required;"
+  },
+  {
+    "file": "src/lib/permissions.ts",
+    "description": "il viewer sale a editor: chi doveva solo leggere puo' scrivere ovunque",
+    "find": "  viewer: 0,\n  editor: 1,",
+    "replace": "  viewer: 1,\n  editor: 1,"
+  },
+  {
+    "file": "src/lib/permissions.ts",
+    "description": "⚠️ scrivere un record non richiede piu' nulla: il viewer crea e modifica",
+    "find": "  \"record:write\": \"editor\",",
+    "replace": "  \"record:write\": \"viewer\","
+  },
+  {
+    "file": "src/lib/permissions.ts",
+    "description": "⚠️⚠️ chiunque puo' concedere qualunque ruolo: un editor si promuove a proprietario",
+    "find": "  const ceiling = actor && typeof actor === \"object\" && actor.isPlatformStaff ? RANK.owner : rank;",
+    "replace": "  const ceiling = RANK.owner;"
+  },
+  {
+    "file": "src/lib/permissions.ts",
+    "description": "⚠️ un ruolo di workspace vale come personale di piattaforma: l'admin di un cliente entra nel pannello che governa tutti gli altri",
+    "find": "export function isPlatformStaffRole(raw: string | null | undefined): boolean {\n  return raw === \"admin\" || raw === \"owner\";\n}",
+    "replace": "export function isPlatformStaffRole(raw: string | null | undefined): boolean {\n  return raw !== \"viewer\";\n}"
+  },
+  {
+    "file": "src/lib/permissions.ts",
+    "description": "outranks diventa >=: un admin puo' declassare un altro admin, e un proprietario perde la protezione",
+    "find": "  return RANK[normalizeTenantRole(a)] > RANK[normalizeTenantRole(b)];",
+    "replace": "  return RANK[normalizeTenantRole(a)] >= RANK[normalizeTenantRole(b)];"
+  },
+  {
+    "file": "src/lib/permissions.ts",
+    "description": "impostazioni e utenti scendono al livello editor: chiunque possa scrivere un contatto puo' anche cambiare i permessi di tutti",
+    "find": "  \"user:manage\": \"admin\",",
+    "replace": "  \"user:manage\": \"editor\","
+  }
+]
