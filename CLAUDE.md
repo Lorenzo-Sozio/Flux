@@ -168,8 +168,9 @@ process:
 
 - `src/instrumentation.ts` skips the node-cron scheduler there (it detects
   `navigator.userAgent === "Cloudflare-Workers"`); scheduled automation rules do not run.
-- `src/actions/tenants.ts` and `src/app/api/admin/migrate-all/route.ts` read tenant
-  migration SQL from `process.cwd()`.
+- ~~`src/actions/tenants.ts` and `src/app/api/admin/migrate-all/route.ts` read tenant
+  migration SQL from `process.cwd()`.~~ Fixed: migrations are embedded in the build,
+  see below.
 - `src/app/api/documents/[id]/route.ts` reads uploads from disk.
 
 ⚠️ Document uploads are broken on **Vercel** too, not only on Workers, and the failure
@@ -205,6 +206,41 @@ npx drizzle-kit studio
 ```
 
 Migrations live in [src/db/migrations/](src/db/migrations/). Schema is defined in [src/db/schema.ts](src/db/schema.ts).
+
+### Tenant migrations are embedded, not read from disk
+
+⚠️ Drizzle's migrator reads `meta/_journal.json` and the `.sql` files **at the moment it
+runs**. That works from a developer's machine and nowhere else: a deployed Next.js
+server does not carry files the bundler never saw imported, and a Worker has no
+filesystem. Pressing *Migrate DB* in the admin panel in production failed on every
+tenant with
+
+```
+Can't find meta/_journal.json file
+```
+
+So the migrations travel with the code, in
+[src/db/migrations-tenant.generated.ts](src/db/migrations-tenant.generated.ts), applied by
+[applyTenantMigrations()](src/db/migrate-tenant.ts). Same bookkeeping table
+(`drizzle.__drizzle_migrations`), same rule — apply everything whose journal timestamp is
+newer than the newest recorded — so databases migrated by the old code carry on from where
+they were.
+
+```bash
+npm run generate:tenant-migrations   # drizzle-kit generate + embed, in one step
+npm run generate:migrations          # re-embed only
+npm run migrate:tenants              # apply to every tenant, from here
+npm run migrate:tenants:dry          # list the tenants, change nothing
+```
+
+⚠️ **Every tenant migration must be additive.** The Neon HTTP driver has no session to
+hold a transaction across statements, so a migration that fails halfway leaves the
+statements before it applied and records nothing — and re-running repeats them. `ADD
+COLUMN`, `CREATE TABLE IF NOT EXISTS` and guarded `UPDATE`s are safe; a destructive or
+order-dependent statement is not.
+
+`npm test` fails when the generated file and the folder disagree, because shipping code
+whose columns were never created is exactly the failure that looks like a working deploy.
 
 ## Architecture
 

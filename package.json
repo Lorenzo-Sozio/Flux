@@ -24,10 +24,13 @@
     "migrate:tenants": "npx tsx scripts/migrate-all-tenants.ts",
     "migrate:tenants:dry": "npx tsx scripts/migrate-all-tenants.ts --dry-run",
     "generate:postman": "npx tsx scripts/generate-postman-collection.ts",
-    "generate:tenant-migrations": "drizzle-kit generate --config=drizzle.tenant.config.ts"
+    "generate:tenant-migrations": "drizzle-kit generate --config=drizzle.tenant.config.ts && node scripts/generate-embedded-migrations.mjs",
+    "generate:migrations": "node scripts/generate-embedded-migrations.mjs"
   },
   "lint-staged": {
-    "*.{js,ts,jsx,tsx}": ["biome check --write --no-errors-on-unmatched"]
+    "*.{js,ts,jsx,tsx}": [
+      "biome check --write --no-errors-on-unmatched"
+    ]
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",

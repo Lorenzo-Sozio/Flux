@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/db/migrate-tenant.ts",
+    "description": "⚠️⚠️ si riapplica tutto da capo a ogni esecuzione: su un tenant gia' migrato la 0000 ricrea tabelle che esistono, e la migrazione fallisce a meta'",
+    "find": "    if (lastApplied !== null && lastApplied >= migration.folderMillis) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/db/migrate-tenant.ts",
+    "description": "⚠️⚠️ il confronto diventa stretto: la migrazione appena registrata viene riapplicata alla prossima esecuzione",
+    "find": "    if (lastApplied !== null && lastApplied >= migration.folderMillis) {",
+    "replace": "    if (lastApplied !== null && lastApplied > migration.folderMillis) {"
+  },
+  {
+    "file": "src/db/migrate-tenant.ts",
+    "description": "⚠️⚠️ non si registra piu' nulla: ogni esecuzione successiva ricomincia dalla prima migrazione",
+    "find": "    await db.execute(\n      sql`insert into ${sql.identifier(MIGRATIONS_SCHEMA)}.${sql.identifier(MIGRATIONS_TABLE)} (\"hash\", \"created_at\") values(${migration.hash}, ${migration.folderMillis})`,\n    );",
+    "replace": ""
+  },
+  {
+    "file": "src/db/migrate-tenant.ts",
+    "description": "⚠️ si registra il timestamp sbagliato: il confronto con la prossima migrazione non significa piu' niente",
+    "find": "values(${migration.hash}, ${migration.folderMillis})`,",
+    "replace": "values(${migration.hash}, ${Date.now()})`,"
+  },
+  {
+    "file": "src/db/migrate-tenant.ts",
+    "description": "l'ordine di applicazione diventa quello dell'array invece che quello del journal: una migrazione puo' arrivare prima di quella che crea la tabella che modifica",
+    "find": "  for (const migration of [...migrations].sort((a, b) => a.folderMillis - b.folderMillis)) {",
+    "replace": "  for (const migration of migrations) {"
+  },
+  {
+    "file": "src/db/migrate-tenant.ts",
+    "description": "la tabella di controllo cambia nome: drizzle non riconosce piu' quello che era gia' stato applicato e riparte da zero",
+    "find": "const MIGRATIONS_TABLE = \"__drizzle_migrations\";",
+    "replace": "const MIGRATIONS_TABLE = \"__flux_migrations\";"
+  },
+  {
+    "file": "src/db/migrate-tenant.ts",
+    "description": "un frammento di soli commenti viene mandato al driver, che risponde con un errore di sintassi su una migrazione valida",
+    "find": "      if (!hasExecutableSql(statement)) continue;",
+    "replace": ""
+  },
+  {
+    "file": "src/db/migrate-tenant.ts",
+    "description": "una riga di commento conta come istruzione eseguibile",
+    "find": "  return statement.split(\"\\n\").some((line) => line.trim() !== \"\" && !line.trimStart().startsWith(\"--\"));",
+    "replace": "  return statement.split(\"\\n\").some((line) => line.trim() !== \"\");"
+  }
+]

@@ -14,24 +14,23 @@
  */
 import "dotenv/config";
 
-import path from "node:path";
-
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
-import { migrate } from "drizzle-orm/neon-http/migrator";
 
+import { applyTenantMigrations } from "../src/db/migrate-tenant";
 import { tenants } from "../src/db/schema";
 import { decryptDbUrl } from "../src/lib/tenant-db";
 
 const isDryRun = process.argv.includes("--dry-run");
 const filterSubdomains = process.argv.slice(2).filter((a) => !a.startsWith("-"));
 
-const MIGRATIONS_FOLDER = path.join(process.cwd(), "src/db/migrations-tenant");
-
-async function migrateTenant(dbUrl: string): Promise<void> {
+// The same embedded migrations the deployed app applies, so running this script
+// and pressing the button in the admin panel can never do different things.
+async function migrateTenant(dbUrl: string): Promise<string[]> {
   const sql = neon(dbUrl);
   const db = drizzle(sql);
-  await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+  const { applied } = await applyTenantMigrations(db);
+  return applied;
 }
 
 async function main() {
@@ -78,11 +77,15 @@ async function main() {
   for (const tenant of targets) {
     process.stdout.write(`  ${tenant.subdomain} ... `);
     try {
-      if (!isDryRun) {
+      if (isDryRun) {
+        console.log("ok (dry run)");
+      } else {
         const decrypted = decryptDbUrl(tenant.dbUrl);
-        await migrateTenant(decrypted);
+        const applied = await migrateTenant(decrypted);
+        // "already up to date" and "applied three migrations" both used to print
+        // a bare tick, which is the one thing you want to know when you run this.
+        console.log(applied.length === 0 ? "✓ already up to date" : `✓ applied ${applied.join(", ")}`);
       }
-      console.log(isDryRun ? "ok (dry run)" : "✓ done");
       passed++;
     } catch (err) {
       console.log(`✗ FAILED: ${err instanceof Error ? err.message : String(err)}`);

@@ -29,6 +29,9 @@ const specPaths = process.argv[2]
       .map((f) => join(DEFAULT_DIR, f));
 
 const spec = specPaths.flatMap((p) => JSON.parse(readFileSync(p, "utf8")));
+
+const CRLF = String.fromCharCode(13, 10);
+const LF = String.fromCharCode(10);
 const originals = new Map();
 
 function restore() {
@@ -59,8 +62,18 @@ try {
   }
 
   for (const m of spec) {
-    const before = readFileSync(m.file, "utf8");
-    if (!originals.has(m.file)) originals.set(m.file, before);
+    const onDisk = readFileSync(m.file, "utf8");
+    if (!originals.has(m.file)) originals.set(m.file, onDisk);
+
+    // Match against LF regardless of what git checked out.
+    //
+    // A spec writes its pattern with escaped newlines, while the working copy may
+    // hold CRLF -- and does, on Windows, for anything git has normalised. Every
+    // multi-line pattern then matched zero times and the run reported BROKEN, which
+    // reads exactly like "this guard is gone" and is nothing of the sort.
+    //
+    // The file is written back with LF; the formatter and git settle the endings.
+    const before = onDisk.split(CRLF).join(LF);
 
     const occurrences = before.split(m.find).length - 1;
     if (occurrences !== 1) {

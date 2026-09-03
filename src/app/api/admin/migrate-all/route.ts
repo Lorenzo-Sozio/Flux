@@ -1,16 +1,12 @@
-import path from "node:path";
-
 import { neon } from "@neondatabase/serverless";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
-import { migrate } from "drizzle-orm/neon-http/migrator";
 
 import { platformDb } from "@/db";
+import { applyTenantMigrations } from "@/db/migrate-tenant";
 import { tenants } from "@/db/schema";
 import { requireAdminPanelAccess } from "@/lib/auth-guard";
 import { decryptDbUrl } from "@/lib/tenant-db";
-
-const MIGRATIONS_FOLDER = path.join(process.cwd(), "src/db/migrations-tenant");
 
 function sseEvent(data: object): string {
   return `data: ${JSON.stringify(data)}\n\n`;
@@ -39,12 +35,28 @@ export async function GET() {
           const dbUrl = decryptDbUrl(tenant.dbUrl);
           const sql = neon(dbUrl);
           const db = drizzle(sql);
-          await migrate(db, { migrationsFolder: MIGRATIONS_FOLDER });
+
+          // Migrations are embedded in the build rather than read from disk. The
+          // drizzle migrator wanted `meta/_journal.json` at runtime, which a
+          // deployed server does not carry and a Worker cannot have, so this
+          // failed for every tenant with "Can't find meta/_journal.json file".
+          const { applied, skipped } = await applyTenantMigrations(db);
 
           await platformDb.update(tenants).set({ lastMigratedAt: new Date() }).where(eq(tenants.id, tenant.id));
 
           passed++;
-          controller.enqueue(enc.encode(sseEvent({ subdomain: tenant.subdomain, success: true })));
+          controller.enqueue(
+            enc.encode(
+              sseEvent({
+                subdomain: tenant.subdomain,
+                success: true,
+                // Say what actually happened: "nothing to do" and "applied three
+                // migrations" both used to render as a bare tick.
+                applied,
+                alreadyApplied: skipped.length,
+              }),
+            ),
+          );
         } catch (err) {
           failed++;
           controller.enqueue(

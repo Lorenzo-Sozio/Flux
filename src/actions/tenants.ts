@@ -2,15 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 
-import path from "node:path";
-
 import { neon } from "@neondatabase/serverless";
 import { and, eq, gt, isNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/neon-http";
-import { migrate } from "drizzle-orm/neon-http/migrator";
 
 import { auth } from "@/auth";
 import { createTenantDb, invalidateTenantDbCache, platformDb } from "@/db";
+import { applyTenantMigrations } from "@/db/migrate-tenant";
 import { billingPlans, billingSubscriptions, tenantMembers, tenants, userInvitations, users } from "@/db/schema";
 import { requireAdminPanelAccess } from "@/lib/auth-guard";
 import { sendInvitationEmail } from "@/lib/email";
@@ -295,13 +293,18 @@ export async function deleteTenant(subdomain: string) {
   return { success: true };
 }
 
-const TENANT_MIGRATIONS_FOLDER = path.join(process.cwd(), "src/db/migrations-tenant");
-
-/** Core migration logic — runs migrations and stamps lastMigratedAt. */
+/**
+ * Core migration logic — runs migrations and stamps lastMigratedAt.
+ *
+ * Uses the migrations embedded in the build. Reading them from disk worked only
+ * on a developer's machine: a deployed server carries no folder the bundler never
+ * saw imported, and a Worker has no filesystem, so provisioning a tenant in
+ * production failed at this step.
+ */
 async function runMigrations(tenantId: string, dbUrl: string) {
   const sql = neon(dbUrl);
   const db = drizzle(sql);
-  await migrate(db, { migrationsFolder: TENANT_MIGRATIONS_FOLDER });
+  await applyTenantMigrations(db);
   await platformDb.update(tenants).set({ lastMigratedAt: new Date() }).where(eq(tenants.id, tenantId));
 }
 
