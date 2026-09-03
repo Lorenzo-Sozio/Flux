@@ -58,6 +58,29 @@
   // li gestisce dalla configurazione. Servono:
   //   DATABASE_URL  AUTH_SECRET  ADMIN_SESSION_SECRET
   //   PLATFORM_ENCRYPTION_KEY  IMPORT_API_KEY  CRON_SECRET
+  /**
+   * ⚠️⚠️ Senza questo, ogni deploy CANCELLA i segreti del Worker.
+   *
+   * Per wrangler questo file e la sola fonte di verita sulle variabili: al deploy
+   * sostituisce l'elenco dei binding con quello che trova qui e rimuove tutto il
+   * resto. I segreti impostati con `wrangler secret put` o dal pannello non
+   * compaiono in nessun file di configurazione — e per come sono fatti non
+   * possono — quindi sono esattamente cio che viene rimosso: DATABASE_URL,
+   * AUTH_SECRET, PLATFORM_ENCRYPTION_KEY, CRON_SECRET, RESEND_API_KEY.
+   *
+   * Nel sorgente di wrangler la riga e `keepSecrets: keepVars || !!secretsFile`:
+   * i segreti sopravvivono solo se sopravvivono le variabili.
+   *
+   * Il deploy riesce. E la richiesta successiva a fallire, e senza
+   * PLATFORM_ENCRYPTION_KEY nessun database tenant puo essere decifrato, quindi
+   * ogni pagina risponde con un errore mentre il deploy sembra andato a buon fine.
+   *
+   * Sta qui e non solo come flag `--keep-vars` sugli script perche vale per
+   * QUALUNQUE deploy, compreso `npx wrangler deploy` digitato nella casella di
+   * Workers Builds, dove nessuno script npm passa mai.
+   */
+  "keep_vars": true,
+
   "vars": {
     // Serve due volte: a build time (Next la inlinea nel bundle client) e a
     // runtime (custom-worker.ts la usa come base URL dei cron). Senza slash finale.
