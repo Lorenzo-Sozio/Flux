@@ -16,7 +16,11 @@
  * `opennextjs-cloudflare build` non l'ha generato, quindi `next build` non deve
  * provare a type-checkarlo. Lo bundla wrangler con esbuild.
  */
-// @ts-expect-error - generato da `opennextjs-cloudflare build`
+// `.open-next/worker.js` esiste solo dopo `opennextjs-cloudflare build`, quindi il
+// modulo va ignorato e non "atteso": con @ts-expect-error il type-check fallirebbe
+// *dopo* il build ("Unused directive"), cioè esattamente quando il file c'è.
+// biome-ignore lint/suspicious/noTsIgnore: deve valere in entrambi gli stati
+// @ts-ignore
 import { default as handler } from "./.open-next/worker.js";
 
 /**
@@ -35,6 +39,19 @@ const CRON_JOBS: Record<string, readonly string[]> = {
   "0 6 * * *": ["/api/cron/task-overdue-check"],
   "0 3 * * *": ["/api/cron/ticket-autoclose"],
 };
+
+/**
+ * Tipi minimi del runtime Workers, dichiarati qui invece di importare i tipi globali
+ * di workerd: quelli ridefiniscono `Response.json()` come `Promise<unknown>` per
+ * l'intero progetto, e il type-check dei componenti client (che girano nel browser,
+ * dove `json()` è `any`) va in pezzi in una ventina di punti.
+ */
+interface ExecutionContext {
+  waitUntil(promise: Promise<unknown>): void;
+}
+interface ScheduledController {
+  readonly cron: string;
+}
 
 async function runCronJob(path: string, base: string, secret: string, env: unknown, ctx: ExecutionContext) {
   const request = new Request(new URL(path, base), {
