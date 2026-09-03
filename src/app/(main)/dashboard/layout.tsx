@@ -23,7 +23,7 @@ import { normalizeTenantRole } from "@/lib/permissions";
 import { SIDEBAR_COLLAPSIBLE_VALUES, SIDEBAR_VARIANT_VALUES } from "@/lib/preferences/layout";
 import { getDb } from "@/lib/tenant-context";
 import { cn } from "@/lib/utils";
-import { filterNav } from "@/navigation/sidebar/filter-nav";
+import { computeNavAccess } from "@/navigation/sidebar/filter-nav";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { getPreference } from "@/server/server-actions";
 
@@ -80,7 +80,10 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
   // The sidebar is built from the membership role read above — the authoritative
   // one — rather than the platform staff field the pages used to consult.
   const entitlements = await getTenantEntitlements().catch(() => null);
-  const navGroups = filterNav(sidebarItems, {
+  // Strings only. Sending the filtered menu itself carried each entry's `icon`,
+  // a React component, which cannot cross into a Client Component — and took every
+  // dashboard page down with it.
+  const navAccess = computeNavAccess(sidebarItems, {
     actor: {
       userId: uid,
       tenantRole: normalizeTenantRole(member.role),
@@ -100,7 +103,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
   return (
     <CurrencyProvider>
       <SidebarProvider defaultOpen={defaultOpen}>
-        <AppSidebar user={user} navGroups={navGroups} variant={variant} collapsible={collapsible} />
+        <AppSidebar user={user} navAccess={navAccess} variant={variant} collapsible={collapsible} />
         <SidebarInset
           className={cn(
             "overflow-hidden",

@@ -1,5 +1,7 @@
 "use client";
 
+import { useMemo } from "react";
+
 import Link from "next/link";
 
 import { Command } from "lucide-react";
@@ -15,7 +17,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
-import type { NavGroup } from "@/navigation/sidebar/sidebar-items";
+import { applyNavAccess, type NavAccess } from "@/navigation/sidebar/filter-nav";
+import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
 import { NavMain } from "./nav-main";
@@ -23,9 +26,13 @@ import { NavUser } from "./nav-user";
 
 export function AppSidebar({
   user,
-  navGroups,
+  navAccess,
   ...props
-}: React.ComponentProps<typeof Sidebar> & { user: any; navGroups: NavGroup[] }) {
+}: React.ComponentProps<typeof Sidebar> & { user: any; navAccess: NavAccess }) {
+  // The menu — icons included — is imported here, on the client, and never
+  // travels. Only the server's verdict about it does.
+  const navGroups = useMemo(() => applyNavAccess(sidebarItems, navAccess), [navAccess]);
+
   const { sidebarVariant, sidebarCollapsible, isSynced } = usePreferencesStore(
     useShallow((s) => ({
       sidebarVariant: s.sidebarVariant,
