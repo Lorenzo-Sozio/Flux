@@ -24,9 +24,10 @@ import {
 } from "drizzle-orm";
 
 import { activities, companies, contacts, deals, leads, quotes, savedReports, tasks } from "@/db/schema";
-import { requireAdminAccess } from "@/lib/auth-guard";
+import { requireCapability } from "@/lib/auth-guard";
 import {
   type AggregationFn,
+  type DateBucket,
   ENTITY_CONFIGS,
   type FieldDef,
   type FilterCondition,
@@ -198,10 +199,38 @@ function buildFilterConditions(colMap: ColMap, fieldDefs: FieldDef[], filters: F
   });
 }
 
+// ── Grouping helpers ───────────────────────────────────────────────────────────
+
+/**
+ * The expression a group-by uses for a column.
+ *
+ * A date is truncated to the requested bucket. Grouping by the raw value gives
+ * one group per distinct timestamp — which for `createdAt` means one group per
+ * record, and a report that answers nothing (audit rilievo C-09).
+ */
+function groupExpression(col: unknown, fieldDef: FieldDef | undefined, bucket: DateBucket) {
+  if (fieldDef?.type !== "date") return col as never;
+  return sql`date_trunc(${bucket}, ${col})` as never;
+}
+
+/** Reads better than "Created At" alone once the values are buckets. */
+function groupLabel(fieldLabel: string, fieldDef: FieldDef | undefined, bucket: DateBucket): string {
+  if (fieldDef?.type !== "date") return fieldLabel;
+  return `${fieldLabel} (${bucket})`;
+}
+
 // ── Query execution ────────────────────────────────────────────────────────────
 
+/**
+ * Runs a report.
+ *
+ * Reading needs no more authority than reading the rows behind it. Every action
+ * in this file required admin, so a sales manager could not open a report that
+ * had been saved for them (audit rilievo U-10). Saving and deleting a shared
+ * report stays privileged.
+ */
 export async function runReport(config: ReportConfig): Promise<ReportResult> {
-  await requireAdminAccess();
+  await requireCapability("report:read");
   const db = await getDb();
 
   const entityConfig = ENTITY_CONFIGS[config.entity];
@@ -215,10 +244,31 @@ export async function runReport(config: ReportConfig): Promise<ReportResult> {
   const conditions = buildFilterConditions(colMap, fieldDefs, config.filters ?? []);
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
+  /**
+   * How many rows match — asked separately, because the row query is capped.
+   *
+   * In group mode this counts the groups, which is what the reader is looking at.
+   */
+  const countMatching = async (groupCol?: unknown): Promise<number> => {
+    if (groupCol) {
+      const [row] = await (db as any)
+        .select({ n: sql<number>`count(distinct ${groupCol})::int` })
+        .from(table)
+        .where(whereClause);
+      return Number(row?.n ?? 0);
+    }
+    const [row] = await (db as any).select({ n: count() }).from(table).where(whereClause);
+    return Number(row?.n ?? 0);
+  };
+
   // ── Aggregate (group-by) mode ──────────────────────────────────────────────
   if (config.groupBy) {
-    const groupCol = colMap[config.groupBy];
-    if (!groupCol) throw new Error("Invalid groupBy field");
+    const rawGroupCol = colMap[config.groupBy];
+    if (!rawGroupCol) throw new Error("Invalid groupBy field");
+
+    const groupFieldDefEarly = fieldDefs.find((f) => f.key === config.groupBy);
+    const bucket: DateBucket = config.groupByBucket ?? "month";
+    const groupCol = groupExpression(rawGroupCol, groupFieldDefEarly, bucket);
 
     const selectObj: Record<string, unknown> = {
       _group: groupCol,
@@ -244,14 +294,18 @@ export async function runReport(config: ReportConfig): Promise<ReportResult> {
       .orderBy(desc(count()))
       .limit(limitClamped);
 
-    const groupFieldDef = fieldDefs.find((f) => f.key === config.groupBy);
+    const groupFieldDef = groupFieldDefEarly;
     const columns = [
-      { key: "_group", label: groupFieldDef?.label ?? config.groupBy ?? "Group" },
+      {
+        key: "_group",
+        label: groupLabel(groupFieldDef?.label ?? config.groupBy ?? "Group", groupFieldDef, bucket),
+      },
       { key: "_count", label: "Count" },
       ...(selectObj._agg ? [{ key: "_agg", label: `${aggFn.toUpperCase()} ${aggFieldDef?.label ?? ""}`.trim() }] : []),
     ];
 
-    return { rows, columns, total: rows.length };
+    const total = await countMatching(groupCol);
+    return { rows, columns, total, truncated: total > rows.length };
   }
 
   // ── List mode ──────────────────────────────────────────────────────────────
@@ -276,31 +330,32 @@ export async function runReport(config: ReportConfig): Promise<ReportResult> {
     label: fieldDefs.find((d) => d.key === f)?.label ?? f,
   }));
 
-  return { rows, columns, total: rows.length };
+  const total = await countMatching();
+  return { rows, columns, total, truncated: total > rows.length };
 }
 
 // ── Saved reports CRUD ─────────────────────────────────────────────────────────
 
 export async function listSavedReports(): Promise<SavedReport[]> {
-  await requireAdminAccess();
+  await requireCapability("report:read");
   const db = await getDb();
   const rows = await db.select().from(savedReports).orderBy(desc(savedReports.updatedAt));
   return rows.map((r) => ({ ...r, config: JSON.parse(r.config) as ReportConfig }));
 }
 
 export async function saveReport(name: string, config: ReportConfig): Promise<SavedReport> {
-  const session = await requireAdminAccess();
+  const session = await requireCapability("report:manage");
   const db = await getDb();
   const [row] = await db
     .insert(savedReports)
-    .values({ name, config: JSON.stringify(config), ownerId: session.user.id })
+    .values({ name, config: JSON.stringify(config), ownerId: session.userId })
     .returning();
   revalidatePath("/dashboard/reports/builder");
   return { ...row, config };
 }
 
 export async function updateSavedReport(id: string, name: string, config: ReportConfig): Promise<void> {
-  await requireAdminAccess();
+  await requireCapability("report:manage");
   const db = await getDb();
   await db
     .update(savedReports)
@@ -310,7 +365,7 @@ export async function updateSavedReport(id: string, name: string, config: Report
 }
 
 export async function deleteSavedReport(id: string): Promise<void> {
-  await requireAdminAccess();
+  await requireCapability("report:manage");
   const db = await getDb();
   await db.delete(savedReports).where(eq(savedReports.id, id));
   revalidatePath("/dashboard/reports/builder");

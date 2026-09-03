@@ -6,19 +6,21 @@ import { desc, eq, isNull } from "drizzle-orm";
 
 import { type AutomationRuleFormData, AutomationRuleFormSchema } from "@/components/crm/automation/types";
 import { automationLogs, automationRules, campaignLogs, contacts, leads } from "@/db/schema";
-import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
+import { requireAdminAccess, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 export async function getAutomationRules() {
   await requireWriteAccess();
+  await requirePlanModule("automation");
   const db = await getDb();
   return db.select().from(automationRules).orderBy(desc(automationRules.createdAt));
 }
 
 export async function getAutomationRuleById(id: string) {
   await requireWriteAccess();
+  await requirePlanModule("automation");
   const db = await getDb();
   const [rule] = await db.select().from(automationRules).where(eq(automationRules.id, id));
   return rule ?? null;
@@ -26,6 +28,7 @@ export async function getAutomationRuleById(id: string) {
 
 export async function getAutomationLogs(ruleId: string, limit = 50) {
   await requireWriteAccess();
+  await requirePlanModule("automation");
   const db = await getDb();
   return db
     .select()
@@ -40,6 +43,7 @@ export async function getAutomationLogs(ruleId: string, limit = 50) {
  */
 export async function getRecentAutomationLogs(limit = 50) {
   await requireWriteAccess();
+  await requirePlanModule("automation");
   const db = await getDb();
   return db.select().from(automationLogs).orderBy(desc(automationLogs.createdAt)).limit(limit);
 }
@@ -49,6 +53,7 @@ export async function getRecentAutomationLogs(limit = 50) {
  */
 export async function getAutomationEmailLogs(limit = 100) {
   await requireWriteAccess();
+  await requirePlanModule("automation");
   const db = await getDb();
   const rows = await db
     .select({
@@ -84,6 +89,7 @@ export async function getAutomationEmailLogs(limit = 100) {
 
 export async function createAutomationRule(data: AutomationRuleFormData) {
   const session = await requireWriteAccess();
+  await requirePlanModule("automation");
   const db = await getDb();
 
   // Server-side Zod validation (also validates nested JSON structures)
@@ -114,6 +120,7 @@ export async function createAutomationRule(data: AutomationRuleFormData) {
 
 export async function updateAutomationRule(id: string, data: AutomationRuleFormData) {
   await requireWriteAccess();
+  await requirePlanModule("automation");
   const db = await getDb();
 
   const parsed = AutomationRuleFormSchema.safeParse(data);
@@ -146,6 +153,7 @@ export async function updateAutomationRule(id: string, data: AutomationRuleFormD
 
 export async function toggleAutomationRuleActive(id: string, isActive: boolean) {
   await requireWriteAccess();
+  await requirePlanModule("automation");
   const db = await getDb();
   await db.update(automationRules).set({ isActive, updatedAt: new Date() }).where(eq(automationRules.id, id));
   revalidatePath("/dashboard/automation");
@@ -156,6 +164,7 @@ export async function toggleAutomationRuleActive(id: string, isActive: boolean) 
 
 export async function deleteAutomationRule(id: string) {
   await requireAdminAccess();
+  await requirePlanModule("automation");
   const db = await getDb();
   await db.delete(automationRules).where(eq(automationRules.id, id));
   revalidatePath("/dashboard/automation");

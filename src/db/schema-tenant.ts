@@ -66,7 +66,6 @@ export {
   // Notifications
   notifications,
   notificationsRelations,
-  opportunities,
   orderItems,
   orders,
   passwordResetTokens,

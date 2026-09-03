@@ -236,4 +236,14 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\r\n-- Orders predating the money columns: the old total was tax-free, so it is also\r\n-- the net. Recording it as such keeps existing documents internally consistent.\r\nUPDATE "order" SET "subtotal" = "total_amount" WHERE "subtotal" = 0;\r\n',
     ],
   },
+  {
+    tag: "0003_open_jackpot",
+    folderMillis: 1788471494436,
+    hash: "b75a62be7d3f817c9ba6328c16c24c70fbbfcaddbf0778f3924d5972aeb494ec",
+    sql: [
+      '-- Rimuove la tabella `opportunity` (audit rilievo D-06).\n--\n-- Nessuna query, nessuna azione e nessuna interfaccia l\'ha mai letta: era rimasta\n-- da un modello precedente, sostituita dalle trattative. Verificato vuota su ogni\n-- tenant prima di generare questa migrazione, e nessun ordine la referenziava.\n--\n-- ⚠️ È l\'unica migrazione distruttiva del progetto. Ogni istruzione è scritta per\n-- poter essere rieseguita senza fallire, perché il driver Neon HTTP non tiene una\n-- transazione fra istruzioni: un errore a metà lascia applicato ciò che precede.\n--\n-- L\'ordine conta. `DROP TABLE ... CASCADE` rimuove già il vincolo dalla tabella\n-- `order`, quindi il DROP CONSTRAINT generato automaticamente veniva dopo e\n-- falliva su un vincolo ormai inesistente.\nALTER TABLE "order" DROP CONSTRAINT IF EXISTS "order_opportunity_id_opportunity_id_fk";',
+      '\nALTER TABLE "order" DROP COLUMN IF EXISTS "opportunity_id";',
+      '\nDROP TABLE IF EXISTS "opportunity" CASCADE;\n',
+    ],
+  },
 ];

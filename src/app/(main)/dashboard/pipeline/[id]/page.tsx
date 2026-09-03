@@ -18,6 +18,7 @@ import { getTranslations } from "next-intl/server";
 
 import { createActivity, getActivitiesByDeal } from "@/actions/activities";
 import { getCompanies, getContacts } from "@/actions/crm";
+import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { getDealComments } from "@/actions/deal-comments";
 import { getDealById, getPipelineData, updateDeal } from "@/actions/pipeline";
 import { getQuotesByDeal } from "@/actions/quotes";
@@ -26,6 +27,7 @@ import { auth } from "@/auth";
 import { ActivityModal } from "@/components/crm/activity-modal";
 import { ActivityTimeline } from "@/components/crm/activity-timeline";
 import { CreateQuoteButton } from "@/components/crm/create-quote-button";
+import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { DealEditButton } from "@/components/crm/deal-edit-button";
 import { DocumentPanel } from "@/components/crm/document-panel";
 import { FormattedDate } from "@/components/crm/formatted-date";
@@ -59,6 +61,8 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     companiesList,
     contactsList,
     commentsList,
+    customFieldDefs,
+    customFieldVals,
     t,
     tD,
   ] = await Promise.all([
@@ -72,6 +76,10 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     getCompanies(),
     getContacts(),
     getDealComments(dealId),
+    // Custom fields have always been definable for a deal — the entity type is in
+    // the picker — and there was nowhere to fill them in (audit rilievo U-09).
+    getCustomFieldDefinitions("deal"),
+    getCustomFieldValues("deal", dealId),
     getTranslations("pipeline"),
     getTranslations("entityDetail"),
   ]);
@@ -247,6 +255,8 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             </CardContent>
           </Card>
         </div>
+
+        <CustomFieldsPanel entityType="deal" entityId={dealId} definitions={customFieldDefs} values={customFieldVals} />
 
         {/* Documents */}
         <DocumentPanel entityType="deal" entityId={dealId} />

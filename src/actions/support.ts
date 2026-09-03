@@ -29,7 +29,7 @@ import {
   tickets,
   users,
 } from "@/db/schema";
-import { requireCapability } from "@/lib/auth-guard";
+import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { sendEmail } from "@/lib/email-provider";
 import { getDb } from "@/lib/tenant-context";
 import { logTicketChange } from "@/lib/ticket-audit";
@@ -80,6 +80,7 @@ async function resolveSla(priority: string, from: Date = new Date()) {
 export async function createTicketAction(data: z.infer<typeof CreateTicketSchema>) {
   const db = await getDb();
   const actor = await requireCapability("ticket:write");
+  await requirePlanModule("support");
 
   const validated = CreateTicketSchema.parse(data);
   const ticketNumber = generateTicketNumber();
@@ -138,6 +139,7 @@ export async function createTicketAction(data: z.infer<typeof CreateTicketSchema
 export async function getTicketById(ticketId: string) {
   const db = await getDb();
   await requireCapability("ticket:read");
+  await requirePlanModule("support");
 
   const ticket = await db.query.tickets.findFirst({
     where: eq(tickets.id, ticketId),
@@ -171,6 +173,7 @@ export async function getTicketById(ticketId: string) {
 export async function getTickets(options?: { limit?: number; status?: string }) {
   const db = await getDb();
   await requireCapability("ticket:read");
+  await requirePlanModule("support");
 
   const ticketList = await db.query.tickets.findMany({
     orderBy: desc(tickets.createdAt),
@@ -192,6 +195,7 @@ export async function getTickets(options?: { limit?: number; status?: string }) 
 export async function getTicketsByStatus(status: string) {
   const db = await getDb();
   await requireCapability("ticket:read");
+  await requirePlanModule("support");
 
   const ticketList = await db.query.tickets.findMany({
     where: eq(tickets.status, status),
@@ -213,6 +217,7 @@ export async function getTicketsByStatus(status: string) {
 export async function updateTicketAction(ticketId: string, data: z.infer<typeof UpdateTicketSchema>) {
   const db = await getDb();
   const actor = await requireCapability("ticket:write");
+  await requirePlanModule("support");
 
   const validated = UpdateTicketSchema.parse(data);
   const ticket = await db.query.tickets.findFirst({
@@ -345,6 +350,7 @@ export async function updateTicketAction(ticketId: string, data: z.infer<typeof 
 export async function addTicketMessageAction(ticketId: string, data: z.infer<typeof AddMessageSchema>) {
   const db = await getDb();
   const actor = await requireCapability("ticket:write");
+  await requirePlanModule("support");
 
   const validated = AddMessageSchema.parse(data);
   const ticket = await db.query.tickets.findFirst({
@@ -497,6 +503,7 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
 export async function getTicketAuditLog(ticketId: string) {
   const db = await getDb();
   await requireCapability("ticket:read");
+  await requirePlanModule("support");
 
   return db.query.ticketAuditLogs.findMany({
     where: eq(ticketAuditLogs.ticketId, ticketId),
@@ -510,6 +517,7 @@ export async function getTicketAuditLog(ticketId: string) {
 export async function getSLAs() {
   const db = await getDb();
   await requireCapability("ticket:read");
+  await requirePlanModule("support");
 
   return db.query.slas.findMany({
     where: eq(slas.isActive, true),
@@ -520,6 +528,7 @@ export async function getSLAs() {
 export async function createSLAAction(data: z.infer<typeof CreateSLASchema>) {
   const db = await getDb();
   await requireCapability("sla:manage");
+  await requirePlanModule("support");
 
   const validated = CreateSLASchema.parse(data);
   const [sla] = await db.insert(slas).values(validated).returning();
@@ -530,6 +539,7 @@ export async function createSLAAction(data: z.infer<typeof CreateSLASchema>) {
 export async function updateSLAAction(slaId: string, data: z.infer<typeof UpdateSLASchema>) {
   const db = await getDb();
   await requireCapability("sla:manage");
+  await requirePlanModule("support");
 
   const validated = UpdateSLASchema.parse(data);
   const [updated] = await db.update(slas).set(validated).where(eq(slas.id, slaId)).returning();
@@ -540,6 +550,7 @@ export async function updateSLAAction(slaId: string, data: z.infer<typeof Update
 export async function deleteSLAAction(slaId: string) {
   const db = await getDb();
   await requireCapability("sla:manage");
+  await requirePlanModule("support");
 
   await db.delete(slas).where(eq(slas.id, slaId));
 
@@ -558,6 +569,7 @@ export async function getChatChannels() {
 export async function createChatChannelAction(name: string, type: string, config?: Record<string, unknown>) {
   const db = await getDb();
   await requireCapability("chatChannel:manage");
+  await requirePlanModule("support");
 
   const [channel] = await db
     .insert(chatChannels)
@@ -582,6 +594,7 @@ export async function startChatSessionAction(channelId: string, visitorEmail?: s
 export async function assignChatSessionAction(sessionId: string, agentId: string, ticketId?: string) {
   const db = await getDb();
   await requireCapability("ticket:write");
+  await requirePlanModule("support");
 
   const [updated] = await db
     .update(chatSessions)
@@ -608,6 +621,7 @@ export async function endChatSessionAction(sessionId: string) {
 export async function getAgents() {
   const db = await getDb();
   await requireCapability("ticket:read");
+  await requirePlanModule("support");
 
   return db.select({ id: users.id, name: users.name, email: users.email }).from(users);
 }
@@ -617,6 +631,7 @@ export async function getAgents() {
 export async function deleteTicketAction(ticketId: string) {
   const db = await getDb();
   await requireCapability("ticket:delete");
+  await requirePlanModule("support");
 
   const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
   if (!ticket) throw new Error("Ticket not found");
@@ -629,6 +644,7 @@ export async function deleteTicketAction(ticketId: string) {
 export async function reassignTicketAction(ticketId: string, assigneeId: string | null) {
   const db = await getDb();
   const actor = await requireCapability("ticket:write");
+  await requirePlanModule("support");
 
   const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
   if (!ticket) throw new Error("Ticket not found");
@@ -672,6 +688,7 @@ const PRIORITY_ESCALATION: Record<string, string> = {
 export async function escalateTicketAction(ticketId: string) {
   const db = await getDb();
   const actor = await requireCapability("ticket:write");
+  await requirePlanModule("support");
 
   const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
   if (!ticket) throw new Error("Ticket not found");
@@ -715,6 +732,7 @@ export async function escalateTicketAction(ticketId: string) {
 export async function updateTicketStatusAction(ticketId: string, status: string) {
   const db = await getDb();
   const actor = await requireCapability("ticket:write");
+  await requirePlanModule("support");
 
   const ticket = await db.query.tickets.findFirst({ where: eq(tickets.id, ticketId) });
   if (!ticket) throw new Error("Ticket not found");
@@ -760,6 +778,7 @@ export async function updateTicketStatusAction(ticketId: string, status: string)
 export async function getMacros() {
   const db = await getDb();
   await requireCapability("ticket:read");
+  await requirePlanModule("support");
 
   return db.query.ticketMacros.findMany({
     orderBy: ticketMacros.name,
@@ -770,6 +789,7 @@ export async function getMacros() {
 export async function createMacroAction(data: z.infer<typeof CreateMacroSchema>) {
   const db = await getDb();
   const actor = await requireCapability("macro:manage");
+  await requirePlanModule("support");
 
   const validated = CreateMacroSchema.parse(data);
   const [macro] = await db
@@ -784,6 +804,7 @@ export async function createMacroAction(data: z.infer<typeof CreateMacroSchema>)
 export async function updateMacroAction(macroId: string, data: z.infer<typeof UpdateMacroSchema>) {
   const db = await getDb();
   await requireCapability("macro:manage");
+  await requirePlanModule("support");
 
   const validated = UpdateMacroSchema.parse(data);
   const [updated] = await db
@@ -799,6 +820,7 @@ export async function updateMacroAction(macroId: string, data: z.infer<typeof Up
 export async function deleteMacroAction(macroId: string) {
   const db = await getDb();
   await requireCapability("macro:manage");
+  await requirePlanModule("support");
 
   await db.delete(ticketMacros).where(eq(ticketMacros.id, macroId));
 

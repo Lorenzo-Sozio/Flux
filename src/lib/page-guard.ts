@@ -12,6 +12,15 @@ import { redirect } from "next/navigation";
 import { getActor } from "@/lib/auth-guard";
 import { type Actor, type Capability, can } from "@/lib/permissions";
 
+/**
+ * The single sign-in route.
+ *
+ * There were two parallel auth interfaces (`/auth/v1/*` and `/auth/v2/*`) and
+ * three ways in, with the code redirecting to `/login` in thirteen places and to
+ * the full path in three. The v2 screens were unreachable from the product and
+ * had drifted (audit rilievo M-07). `/login` still redirects here so nothing that
+ * links to it breaks.
+ */
 export const LOGIN_PATH = "/auth/v1/login";
 
 /**

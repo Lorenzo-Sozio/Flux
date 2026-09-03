@@ -2,12 +2,13 @@ import { redirect } from "next/navigation";
 
 import { getWorkloadMatrix } from "@/actions/workload";
 import { auth } from "@/auth";
+import { LOGIN_PATH } from "@/lib/page-guard";
 
 import { WorkloadClient } from "./_components/workload-client";
 
 export default async function WorkloadPage() {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  if (!session?.user?.id) redirect(LOGIN_PATH);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);

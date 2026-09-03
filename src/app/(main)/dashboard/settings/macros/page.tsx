@@ -4,12 +4,13 @@ import { getTranslations } from "next-intl/server";
 
 import { getMacros } from "@/actions/support";
 import { auth } from "@/auth";
+import { LOGIN_PATH } from "@/lib/page-guard";
 
 import { MacrosClient } from "./_components/macros-client";
 
 export default async function MacrosPage() {
   const session = await auth();
-  if (!session?.user) redirect("/login");
+  if (!session?.user) redirect(LOGIN_PATH);
 
   const [macros, t] = await Promise.all([getMacros(), getTranslations("support.macros")]);
 

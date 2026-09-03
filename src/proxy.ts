@@ -129,15 +129,14 @@ export const proxy = auth((req) => {
     return passThrough();
   }
 
-  const isOnLogin =
-    pathname.startsWith("/auth/v1/login") || pathname.startsWith("/auth/v2/login") || pathname.startsWith("/login");
+  // `/login` still redirects here, so old links and bookmarks keep working.
+  const isOnLogin = pathname.startsWith("/auth/v1/login") || pathname.startsWith("/login");
 
   const isOnPublicAuth =
     pathname.startsWith("/auth/v1/forgot-password") ||
     pathname.startsWith("/auth/v1/reset-password") ||
     pathname.startsWith("/auth/v1/accept-invitation") ||
-    pathname.startsWith("/auth/v1/register") ||
-    pathname.startsWith("/auth/v2/register");
+    pathname.startsWith("/auth/v1/register");
 
   if (isOnPublicAuth) return passThrough();
 

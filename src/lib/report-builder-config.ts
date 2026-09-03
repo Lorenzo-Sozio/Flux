@@ -165,11 +165,24 @@ export type AggregationFn = "count" | "sum" | "avg" | "min" | "max";
 export type ChartType = "table" | "bar" | "line" | "area" | "pie";
 export type SortDir = "asc" | "desc";
 
+/**
+ * How a date is bucketed when grouping by it.
+ *
+ * Grouping by a raw timestamp produces one row per record, which is not a
+ * grouping at all — and `createdAt` was marked groupable on almost every
+ * entity, so the most obvious thing to ask for was the thing that did not work
+ * (audit rilievo C-09).
+ */
+export const DATE_BUCKETS = ["day", "week", "month", "quarter", "year"] as const;
+export type DateBucket = (typeof DATE_BUCKETS)[number];
+
 export interface ReportConfig {
   entity: string;
   fields: string[];
   filters: FilterCondition[];
   groupBy?: string;
+  /** Only meaningful when `groupBy` names a date field. Defaults to month. */
+  groupByBucket?: DateBucket;
   aggregation?: AggregationFn;
   aggregationField?: string;
   chartType: ChartType;
@@ -185,7 +198,16 @@ export interface ReportColumn {
 export interface ReportResult {
   rows: Record<string, unknown>[];
   columns: ReportColumn[];
+  /**
+   * How many rows match, not how many were returned.
+   *
+   * This used to be `rows.length` against a query capped at 1000, so a report
+   * over five thousand records announced one thousand — a number that looks
+   * like an answer and is a limit (audit rilievo C-09).
+   */
   total: number;
+  /** True when `total` exceeds what was returned, so the UI can say so. */
+  truncated: boolean;
 }
 
 export interface SavedReport {

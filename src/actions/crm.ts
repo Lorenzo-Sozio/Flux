@@ -7,6 +7,15 @@ import { and, count, desc, eq, getTableColumns, ilike, isNull, ne, or } from "dr
 import { getTranslations } from "next-intl/server";
 
 import { createNotificationAction } from "@/actions/auth";
+import {
+  CompanySchema,
+  CompanyUpdateSchema,
+  ContactSchema,
+  ContactUpdateSchema,
+  definedOnly,
+  LeadSchema,
+  LeadUpdateSchema,
+} from "@/actions/crm-validation";
 import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import {
@@ -28,6 +37,7 @@ import {
 } from "@/db/schema";
 import { guarded } from "@/lib/action-error";
 import { requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
+import { normalizeCompanyName } from "@/lib/company-name";
 import {
   buildWhereClause,
   COMPANY_FIELDS,
@@ -130,25 +140,17 @@ export async function getContacts(encodedFilter?: string | null) {
   return base.where(where).orderBy(desc(contacts.createdAt));
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
-export async function createLead(data: any) {
+export async function createLead(data: unknown) {
   return guarded(async () => {
     await requireWriteAccess();
     const db = await getDb();
+    // Validated with the same schema the form uses, so a bad value is a message
+    // on the field rather than a Postgres error naming a column (rilievo M-08).
+    const validated = LeadSchema.parse(data);
     await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
     const payload = {
-      ...data,
-      marketingConsent: data.marketingConsent ?? false,
-      consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
-      tags: Array.isArray(data.tags)
-        ? data.tags
-        : typeof data.tags === "string"
-          ? data.tags
-              .split(",")
-              .map((t: string) => t.trim())
-              .filter(Boolean)
-          : null,
-      leadScore: computeLeadScore(data),
+      ...validated,
+      leadScore: computeLeadScore(validated),
     };
     const [newLead] = await db.insert(leads).values(payload).returning();
     revalidatePath("/dashboard/leads");
@@ -175,23 +177,25 @@ export async function createLead(data: any) {
   });
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
-export async function updateLead(id: string, data: any) {
+export async function updateLead(id: string, data: unknown) {
   return guarded(async () => {
     await requireWriteAccess();
     const db = await getDb();
+    // Validated with the same schema the form uses, so a bad value is a message
+    // on the field rather than a Postgres error naming a column (rilievo M-08).
+    const validated = definedOnly(LeadUpdateSchema.parse(data));
     // Read before the write: the automation engine compares old and new to
     // decide whether a field `changed`, and cannot do that after the fact.
     const [previous] = await db.select().from(leads).where(eq(leads.id, id));
     // Notify new assignee if ownerId changed
-    if (data.ownerId) {
+    if (validated.ownerId) {
       const [cur] = await db
         .select({ ownerId: leads.ownerId, firstName: leads.firstName, lastName: leads.lastName })
         .from(leads)
         .where(eq(leads.id, id));
-      if (cur && cur.ownerId !== data.ownerId) {
+      if (cur && cur.ownerId !== validated.ownerId) {
         createNotificationAction({
-          userId: data.ownerId,
+          userId: validated.ownerId,
           type: "lead_assigned",
           title: "Lead assigned to you",
           message: `${cur.firstName} ${cur.lastName} has been assigned to you.`,
@@ -201,18 +205,8 @@ export async function updateLead(id: string, data: any) {
       }
     }
     const payload = {
-      ...data,
-      marketingConsent: data.marketingConsent ?? false,
-      consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
-      tags: Array.isArray(data.tags)
-        ? data.tags
-        : typeof data.tags === "string"
-          ? data.tags
-              .split(",")
-              .map((t: string) => t.trim())
-              .filter(Boolean)
-          : null,
-      leadScore: computeLeadScore(data),
+      ...validated,
+      leadScore: computeLeadScore(validated),
     };
     const [updatedLead] = await db.update(leads).set(payload).where(eq(leads.id, id)).returning();
     revalidatePath("/dashboard/leads");
@@ -248,28 +242,46 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   if (!lead) throw new Error("Lead not found");
   if (lead.isConverted) throw new Error("Lead is already converted");
 
-  // Fetch translation before transaction (next-intl doesn't belong inside a tx)
   const tLeads = await getTranslations("leads");
   const dealName = tLeads("dealForName", { firstName: lead.firstName, lastName: lead.lastName });
 
-  // 1. Create or find Company — copy all relevant lead fields to a new company
+  // Everything this function writes is collected first and committed together.
+  //
+  // It used to write eight rows one at a time, under a comment promising a
+  // transaction that was never opened. A failure partway through left an orphan
+  // company and contact, activities already moved off a lead still marked
+  // unconverted, and no way to tell from the data which half had happened
+  // (audit rilievi M-03, M-04).
+  //
+  // `db.transaction()` throws on the Neon HTTP driver. `db.batch()` maps to Neon's
+  // transaction endpoint, at the cost that no statement may read another's output —
+  // hence the ids below are chosen here rather than by the database default.
+  const writes: unknown[] = [];
+
+  // 1. Create or find Company.
+  //
+  // Matching on the exact name is why "ACME Srl" and "Acme S.r.l." became two
+  // companies. A normalised comparison catches the ordinary variations; the VAT
+  // number catches the rest, and is the only truly reliable key.
   let companyId: string | null = null;
   if (lead.companyName) {
-    const [existing] = await db
-      .select({ id: companies.id, sourceLeadId: companies.sourceLeadId })
-      .from(companies)
-      .where(eq(companies.name, lead.companyName));
+    const normalized = normalizeCompanyName(lead.companyName);
+    const candidates = await db
+      .select({ id: companies.id, name: companies.name, sourceLeadId: companies.sourceLeadId })
+      .from(companies);
+    const existing = candidates.find((c) => normalizeCompanyName(c.name) === normalized);
 
     if (existing) {
       companyId = existing.id;
       // Link back to source lead only when not already traced
       if (!existing.sourceLeadId) {
-        await db.update(companies).set({ sourceLeadId: lead.id }).where(eq(companies.id, existing.id));
+        writes.push(db.update(companies).set({ sourceLeadId: lead.id }).where(eq(companies.id, existing.id)));
       }
     } else {
-      const [newCompany] = await db
-        .insert(companies)
-        .values({
+      companyId = crypto.randomUUID();
+      writes.push(
+        db.insert(companies).values({
+          id: companyId,
           name: lead.companyName,
           industry: lead.industry ?? undefined,
           website: lead.website ?? undefined,
@@ -283,53 +295,63 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
           sourceLeadId: lead.id,
           companyTypeId: lead.leadTypeId ?? undefined,
           companyCategoryId: lead.leadCategoryId ?? undefined,
-        })
-        .returning({ id: companies.id });
-      companyId = newCompany.id;
+        }),
+      );
     }
   }
 
-  // 2. Create Contact from full lead profile
-  const [newContact] = await db
-    .insert(contacts)
-    .values({
-      firstName: lead.firstName,
-      lastName: lead.lastName,
-      email: lead.email ?? undefined,
-      phone: lead.phone ?? undefined,
-      mobile: lead.mobile ?? undefined,
-      jobTitle: lead.jobTitle ?? undefined,
-      street: lead.street ?? undefined,
-      city: lead.city ?? undefined,
-      state: lead.state ?? undefined,
-      zipCode: lead.zipCode ?? undefined,
-      country: lead.country ?? undefined,
-      source: lead.source ?? undefined,
-      notes: lead.notes ?? undefined,
-      ownerId: lead.ownerId,
-      companyId: companyId ?? undefined,
-      marketingConsent: lead.marketingConsent,
-      consentDate: lead.consentDate ?? undefined,
-      tags: lead.tags,
-      sourceLeadId: lead.id,
-    })
-    .returning({ id: contacts.id });
+  // 2. Create Contact from full lead profile.
+  //
+  // Converting the same person twice used to produce two contacts: the duplicate
+  // check existed in this very file and was never called from here.
+  const duplicate = lead.email
+    ? (await db.select({ id: contacts.id }).from(contacts).where(eq(contacts.email, lead.email)).limit(1))[0]
+    : undefined;
 
-  const contactId = newContact.id;
+  const contactId = duplicate?.id ?? crypto.randomUUID();
+
+  if (!duplicate) {
+    writes.push(
+      db.insert(contacts).values({
+        id: contactId,
+        firstName: lead.firstName,
+        lastName: lead.lastName,
+        email: lead.email ?? undefined,
+        phone: lead.phone ?? undefined,
+        mobile: lead.mobile ?? undefined,
+        jobTitle: lead.jobTitle ?? undefined,
+        street: lead.street ?? undefined,
+        city: lead.city ?? undefined,
+        state: lead.state ?? undefined,
+        zipCode: lead.zipCode ?? undefined,
+        country: lead.country ?? undefined,
+        source: lead.source ?? undefined,
+        notes: lead.notes ?? undefined,
+        ownerId: lead.ownerId,
+        companyId: companyId ?? undefined,
+        marketingConsent: lead.marketingConsent,
+        consentDate: lead.consentDate ?? undefined,
+        tags: lead.tags,
+        sourceLeadId: lead.id,
+      }),
+    );
+  }
 
   // 3. Migrate activities — relink from lead to new contact + company
-  await db.update(activities).set({ leadId: null, contactId, companyId }).where(eq(activities.leadId, leadId));
+  writes.push(db.update(activities).set({ leadId: null, contactId, companyId }).where(eq(activities.leadId, leadId)));
 
   // 4. Migrate tasks — relink from lead to new contact + company
-  await db.update(tasks).set({ leadId: null, contactId, companyId }).where(eq(tasks.leadId, leadId));
+  writes.push(db.update(tasks).set({ leadId: null, contactId, companyId }).where(eq(tasks.leadId, leadId)));
 
   // 5. Migrate tickets — preserve existing contactId if already assigned
-  await db
-    .update(tickets)
-    .set({ leadId: null, contactId, companyId })
-    .where(and(eq(tickets.leadId, leadId), isNull(tickets.contactId)));
+  writes.push(
+    db
+      .update(tickets)
+      .set({ leadId: null, contactId, companyId })
+      .where(and(eq(tickets.leadId, leadId), isNull(tickets.contactId))),
+  );
   // Tickets that already had a contactId: just clear the leadId
-  await db.update(tickets).set({ leadId: null }).where(eq(tickets.leadId, leadId));
+  writes.push(db.update(tickets).set({ leadId: null }).where(eq(tickets.leadId, leadId)));
 
   // 6. Optionally create Deal
   let dealId: string | null = null;
@@ -341,9 +363,10 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
       .limit(1);
     if (!firstStage) throw new Error("No pipeline stages found. Please create one first.");
 
-    const [newDeal] = await db
-      .insert(deals)
-      .values({
+    dealId = crypto.randomUUID();
+    writes.push(
+      db.insert(deals).values({
+        id: dealId,
         name: dealName,
         amount: "0",
         currency: "EUR",
@@ -352,23 +375,28 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
         contactId,
         ownerId: lead.ownerId,
         status: "open",
-      })
-      .returning({ id: deals.id });
-    dealId = newDeal.id;
+      }),
+    );
   }
 
   // 7. Mark lead as converted with full traceability
-  await db
-    .update(leads)
-    .set({
-      status: "converted",
-      isConverted: true,
-      convertedAt: new Date(),
-      convertedToContactId: contactId,
-      convertedToCompanyId: companyId,
-      convertedToDealId: dealId,
-    })
-    .where(eq(leads.id, leadId));
+  writes.push(
+    db
+      .update(leads)
+      .set({
+        status: "converted",
+        isConverted: true,
+        convertedAt: new Date(),
+        convertedToContactId: contactId,
+        convertedToCompanyId: companyId,
+        convertedToDealId: dealId,
+      })
+      .where(eq(leads.id, leadId)),
+  );
+
+  // One commit. Either the lead is converted and everything moved with it, or
+  // nothing happened and it can be retried.
+  await db.batch(writes as unknown as Parameters<typeof db.batch>[0]);
 
   const result = { contactId, companyId, dealId };
 
@@ -388,25 +416,17 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
   return result;
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
-export async function createContact(data: any) {
+export async function createContact(data: unknown) {
   return guarded(async () => {
     await requireWriteAccess();
     const db = await getDb();
+    // Validated with the same schema the form uses, so a bad value is a message
+    // on the field rather than a Postgres error naming a column (rilievo M-08).
+    const validated = ContactSchema.parse(data);
     await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
     const payload = {
-      ...data,
-      marketingConsent: data.marketingConsent ?? false,
-      consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
-      tags: Array.isArray(data.tags)
-        ? data.tags
-        : typeof data.tags === "string"
-          ? data.tags
-              .split(",")
-              .map((t: string) => t.trim())
-              .filter(Boolean)
-          : null,
-      leadScore: computeLeadScore(data),
+      ...validated,
+      leadScore: computeLeadScore(validated),
     };
     const [newContact] = await db.insert(contacts).values(payload).returning();
     revalidatePath("/dashboard/contacts");
@@ -433,23 +453,25 @@ export async function createContact(data: any) {
   });
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
-export async function updateContact(id: string, data: any) {
+export async function updateContact(id: string, data: unknown) {
   return guarded(async () => {
     await requireWriteAccess();
     const db = await getDb();
+    // Validated with the same schema the form uses, so a bad value is a message
+    // on the field rather than a Postgres error naming a column (rilievo M-08).
+    const validated = definedOnly(ContactUpdateSchema.parse(data));
     // Read before the write: the automation engine compares old and new to
     // decide whether a field `changed`, and cannot do that after the fact.
     const [previous] = await db.select().from(contacts).where(eq(contacts.id, id));
     // Notify new assignee if ownerId changed
-    if (data.ownerId) {
+    if (validated.ownerId) {
       const [cur] = await db
         .select({ ownerId: contacts.ownerId, firstName: contacts.firstName, lastName: contacts.lastName })
         .from(contacts)
         .where(eq(contacts.id, id));
-      if (cur && cur.ownerId !== data.ownerId) {
+      if (cur && cur.ownerId !== validated.ownerId) {
         createNotificationAction({
-          userId: data.ownerId,
+          userId: validated.ownerId,
           type: "lead_assigned",
           title: "Contact assigned to you",
           message: `${cur.firstName} ${cur.lastName} has been assigned to you.`,
@@ -459,18 +481,8 @@ export async function updateContact(id: string, data: any) {
       }
     }
     const payload = {
-      ...data,
-      marketingConsent: data.marketingConsent ?? false,
-      consentDate: data.marketingConsent && !data.consentDate ? new Date() : data.consentDate,
-      tags: Array.isArray(data.tags)
-        ? data.tags
-        : typeof data.tags === "string"
-          ? data.tags
-              .split(",")
-              .map((t: string) => t.trim())
-              .filter(Boolean)
-          : null,
-      leadScore: computeLeadScore(data),
+      ...validated,
+      leadScore: computeLeadScore(validated),
     };
     const [updatedContact] = await db.update(contacts).set(payload).where(eq(contacts.id, id)).returning();
     revalidatePath("/dashboard/contacts");
@@ -524,25 +536,15 @@ export async function getCompanies(encodedFilter?: string | null) {
   return base.where(where).orderBy(desc(companies.createdAt));
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
-export async function createCompany(data: any) {
+export async function createCompany(data: unknown) {
   return guarded(async () => {
     await requireWriteAccess();
     const db = await getDb();
+    // Validated with the same schema the form uses, so a bad value is a message
+    // on the field rather than a Postgres error naming a column (rilievo M-08).
+    const validated = CompanySchema.parse(data);
     await requirePlanLimit("maxRecords", await getTotalRecordCount(db));
-    const payload = {
-      ...data,
-      vatNumber: data.vatNumber,
-      sdiCode: data.sdiCode,
-      tags: Array.isArray(data.tags)
-        ? data.tags
-        : typeof data.tags === "string"
-          ? data.tags
-              .split(",")
-              .map((t: string) => t.trim())
-              .filter(Boolean)
-          : null,
-    };
+    const payload = { ...validated };
     const [newCompany] = await db.insert(companies).values(payload).returning();
     revalidatePath("/dashboard/companies");
 
@@ -561,23 +563,25 @@ export async function createCompany(data: any) {
   });
 }
 
-// biome-ignore lint/suspicious/noExplicitAny: server action form data is inherently untyped
-export async function updateCompany(id: string, data: any) {
+export async function updateCompany(id: string, data: unknown) {
   return guarded(async () => {
     await requireWriteAccess();
     const db = await getDb();
+    // Validated with the same schema the form uses, so a bad value is a message
+    // on the field rather than a Postgres error naming a column (rilievo M-08).
+    const validated = definedOnly(CompanyUpdateSchema.parse(data));
     // Read before the write: the automation engine compares old and new to
     // decide whether a field `changed`, and cannot do that after the fact.
     const [previous] = await db.select().from(companies).where(eq(companies.id, id));
     // Notify new assignee if ownerId changed
-    if (data.ownerId) {
+    if (validated.ownerId) {
       const [cur] = await db
         .select({ ownerId: companies.ownerId, name: companies.name })
         .from(companies)
         .where(eq(companies.id, id));
-      if (cur && cur.ownerId !== data.ownerId) {
+      if (cur && cur.ownerId !== validated.ownerId) {
         createNotificationAction({
-          userId: data.ownerId,
+          userId: validated.ownerId,
           type: "lead_assigned",
           title: "Company assigned to you",
           message: `${cur.name} has been assigned to you.`,
@@ -586,19 +590,7 @@ export async function updateCompany(id: string, data: any) {
         }).catch(() => {});
       }
     }
-    const payload = {
-      ...data,
-      vatNumber: data.vatNumber,
-      sdiCode: data.sdiCode,
-      tags: Array.isArray(data.tags)
-        ? data.tags
-        : typeof data.tags === "string"
-          ? data.tags
-              .split(",")
-              .map((t: string) => t.trim())
-              .filter(Boolean)
-          : null,
-    };
+    const payload = { ...validated };
     const [updatedCompany] = await db.update(companies).set(payload).where(eq(companies.id, id)).returning();
     revalidatePath("/dashboard/companies");
 

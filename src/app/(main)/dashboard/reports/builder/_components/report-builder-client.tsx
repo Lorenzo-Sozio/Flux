@@ -49,6 +49,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { DATE_BUCKETS } from "@/lib/report-builder-config";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -548,6 +549,26 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
               </SelectContent>
             </Select>
 
+            {/* Grouping by a raw timestamp gives one group per record, so a date
+                needs a bucket to be a grouping at all (audit rilievo C-09). */}
+            {config.groupBy && groupableFields.find((f) => f.key === config.groupBy)?.type === "date" && (
+              <Select
+                value={config.groupByBucket ?? "month"}
+                onValueChange={(v) => setConfig((c) => ({ ...c, groupByBucket: v as ReportConfig["groupByBucket"] }))}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DATE_BUCKETS.map((b) => (
+                    <SelectItem key={b} value={b}>
+                      {t(`buckets.${b}` as never)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             {config.groupBy && aggrFields.length > 0 && (
               <div className="flex gap-1.5">
                 <Select
@@ -684,6 +705,12 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
               {/* Toolbar */}
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="secondary">{t("rowCount", { count: result.total })}</Badge>
+                {result.truncated && (
+                  // "1000" used to be printed as the answer when it was the cap.
+                  <Badge variant="outline" className="text-xs font-normal">
+                    {t("showingFirst", { count: result.rows.length })}
+                  </Badge>
+                )}
                 <div className="flex-1" />
                 <div className="flex items-center gap-1.5">
                   <Input

@@ -34,10 +34,7 @@ export const authConfig = {
       // NextAuth must not intercept or redirect these paths.
       if (nextUrl.pathname.startsWith("/admin")) return true;
 
-      const isOnLogin =
-        nextUrl.pathname.startsWith("/auth/v1/login") ||
-        nextUrl.pathname.startsWith("/auth/v2/login") ||
-        nextUrl.pathname.startsWith("/login");
+      const isOnLogin = nextUrl.pathname.startsWith("/auth/v1/login") || nextUrl.pathname.startsWith("/login");
 
       if (isOnLogin) {
         if (isLoggedIn) return Response.redirect(new URL("/select-tenant", nextUrl));

@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { campaignLogs, contacts, emailSuppressions, emailTemplates, leads, marketingCampaigns } from "@/db/schema";
-import { requireWriteAccess } from "@/lib/auth-guard";
+import { requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
 import { executeCampaignSend } from "@/lib/campaign-send";
 import { getDb } from "@/lib/tenant-context";
 
@@ -60,6 +60,7 @@ export async function getEmailTemplates() {
 
 export async function createEmailTemplate(data: unknown) {
   await requireWriteAccess();
+  await requirePlanModule("marketing");
   const validated = EmailTemplateCreateSchema.parse(data);
   const db = await getDb();
   const [t] = await db.insert(emailTemplates).values(validated).returning();
@@ -69,6 +70,7 @@ export async function createEmailTemplate(data: unknown) {
 
 export async function updateEmailTemplate(id: string, data: unknown) {
   await requireWriteAccess();
+  await requirePlanModule("marketing");
   const validated = EmailTemplateUpdateSchema.parse(data);
   const db = await getDb();
   const [t] = await db
@@ -82,6 +84,7 @@ export async function updateEmailTemplate(id: string, data: unknown) {
 
 export async function deleteEmailTemplate(id: string) {
   await requireWriteAccess();
+  await requirePlanModule("marketing");
   const db = await getDb();
   await db.delete(emailTemplates).where(eq(emailTemplates.id, id));
   revalidatePath("/dashboard/marketing/templates");
@@ -96,6 +99,7 @@ export async function getMarketingCampaigns() {
 
 export async function createMarketingCampaign(data: unknown) {
   await requireWriteAccess();
+  await requirePlanModule("marketing");
   const validated = MarketingCampaignCreateSchema.parse(data);
   const db = await getDb();
   const [c] = await db.insert(marketingCampaigns).values(validated).returning();
@@ -105,6 +109,7 @@ export async function createMarketingCampaign(data: unknown) {
 
 export async function updateMarketingCampaign(id: string, data: unknown) {
   await requireWriteAccess();
+  await requirePlanModule("marketing");
   const validated = MarketingCampaignUpdateSchema.parse(data);
   const db = await getDb();
   const [c] = await db
@@ -118,6 +123,7 @@ export async function updateMarketingCampaign(id: string, data: unknown) {
 
 export async function deleteMarketingCampaign(id: string) {
   await requireWriteAccess();
+  await requirePlanModule("marketing");
   const db = await getDb();
   await db.delete(marketingCampaigns).where(eq(marketingCampaigns.id, id));
   revalidatePath("/dashboard/marketing/campaigns");
@@ -131,6 +137,7 @@ export async function sendCampaignAction(data: {
   recipientIds?: string[];
 }) {
   await requireWriteAccess();
+  await requirePlanModule("marketing");
   const db = await getDb();
   return executeCampaignSend(data);
 }
@@ -270,6 +277,7 @@ export async function scheduleCampaignAction(data: {
   scheduledAt: Date;
 }) {
   await requireWriteAccess();
+  await requirePlanModule("marketing");
   const db = await getDb();
   const { campaignId, recipientType, scheduledAt } = data;
   if (scheduledAt <= new Date()) throw new Error("Scheduled time must be in the future");
@@ -282,6 +290,7 @@ export async function scheduleCampaignAction(data: {
 
 export async function cancelScheduledCampaignAction(campaignId: string) {
   await requireWriteAccess();
+  await requirePlanModule("marketing");
   const db = await getDb();
   await db
     .update(marketingCampaigns)
@@ -294,6 +303,7 @@ export async function cancelScheduledCampaignAction(campaignId: string) {
 
 export async function duplicateCampaignAction(id: string) {
   await requireWriteAccess();
+  await requirePlanModule("marketing");
   const db = await getDb();
   const [original] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, id));
   if (!original) throw new Error("Campaign not found");

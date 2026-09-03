@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/lib/company-name.ts",
+    "description": "⚠️⚠️ il confine di parola sparisce: «sa» viene tolto da Sanofi e «inc» da Incotex, e due aziende che non c'entrano nulla diventano la stessa",
+    "find": "const LEGAL_FORM_PATTERN = new RegExp(`\\\\b(?:${LEGAL_FORMS.join(\"|\")})\\\\b`, \"g\");",
+    "replace": "const LEGAL_FORM_PATTERN = new RegExp(`(?:${LEGAL_FORMS.join(\"|\")})`, \"g\");"
+  },
+  {
+    "file": "src/lib/company-name.ts",
+    "description": "⚠️ un nome fatto di sola forma giuridica si riduce a stringa vuota, e combacia con ogni altro che si riduce a niente",
+    "find": "  if (cleaned) return cleaned;\n  return base.replace(/[^a-z0-9]+/g, \" \").trim();",
+    "replace": "  return cleaned;"
+  },
+  {
+    "file": "src/lib/company-name.ts",
+    "description": "la punteggiatura interna non viene piu' tolta: «S.r.l.» non combacia con «Srl» e il duplicato torna",
+    "find": "    .replace(/[.'`’]/g, \"\");",
+    "replace": "    .replace(/[]/g, \"\");"
+  },
+  {
+    "file": "src/lib/company-name.ts",
+    "description": "gli accenti restano: «Società» e «Societa» diventano due aziende",
+    "find": "    .replace(/[̀-ͯ]/g, \"\")",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/company-name.ts",
+    "description": "il confronto diventa case-sensitive: «ACME» e «Acme» sono due aziende",
+    "find": "    .toLowerCase()\n    .normalize(\"NFKD\")",
+    "replace": "    .normalize(\"NFKD\")"
+  }
+]

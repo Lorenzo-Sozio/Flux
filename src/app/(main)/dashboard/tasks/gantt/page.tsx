@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getAllTasksForGantt, getAllUsers } from "@/actions/tasks";
 import { auth } from "@/auth";
 import { taskDependencies } from "@/db/schema";
+import { LOGIN_PATH } from "@/lib/page-guard";
 import { getDb } from "@/lib/tenant-context";
 
 import { TaskGantt } from "./_components/task-gantt";
@@ -10,7 +11,7 @@ import { TaskGantt } from "./_components/task-gantt";
 export default async function GanttPage() {
   const db = await getDb();
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  if (!session?.user?.id) redirect(LOGIN_PATH);
 
   const [tasks, deps, users] = await Promise.all([
     getAllTasksForGantt(),

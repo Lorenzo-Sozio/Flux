@@ -245,22 +245,6 @@ export const contacts = pgTable("contact", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-export const opportunities = pgTable("opportunity", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(),
-  amount: numeric("amount", { precision: 12, scale: 2 }),
-  stage: text("stage").default("prospecting").notNull(), // prospecting, qualification, proposal, negotiation, closed_won, closed_lost
-  probability: integer("probability"), // 0-100
-  expectedCloseDate: timestamp("expected_close_date", { mode: "date" }),
-  companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
-  contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
-  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
-});
-
 export const products = pgTable("product", {
   id: text("id")
     .primaryKey()
@@ -284,7 +268,6 @@ export const orders = pgTable("order", {
   orderNumber: text("order_number").notNull().unique(),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
-  opportunityId: text("opportunity_id").references(() => opportunities.id, { onDelete: "set null" }),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   // An order used to carry a single tax-free number and no currency at all, so the
   // same content quoted and ordered showed two different totals (rilievo C-04).
@@ -294,9 +277,9 @@ export const orders = pgTable("order", {
   taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0"),
   totalAmount: numeric("total_amount", { precision: 12, scale: 2 }).notNull(),
   currency: text("currency").default("EUR").notNull(),
-  // Where the order came from. `opportunityId` pointed at a table nothing reads,
-  // so an order could not be traced to the quote or deal that produced it
-  // (rilievi D-06, S-03).
+  // Where the order came from. This used to be `opportunityId`, pointing at a table
+  // nothing in the product ever read, so an order could not be traced to the quote
+  // or the deal that produced it (audit rilievo D-06).
   quoteId: text("quote_id"), // FK set via migration → quote.id (set null)
   dealId: text("deal_id"), // FK set via migration → deal.id (set null)
   status: text("status").default("draft").notNull(), // draft, processing, completed, cancelled

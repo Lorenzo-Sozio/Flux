@@ -11,7 +11,7 @@ import { createNotificationAction, createNotificationsBatch } from "@/actions/au
 import { CreateQuoteSchema, UpdateQuoteSchema } from "@/actions/quotes-validation";
 import { companies, deals, products, quoteActivities, quoteItems, quotes, users } from "@/db/schema";
 import { appUrl } from "@/lib/app-url";
-import { ForbiddenError, requireCapability } from "@/lib/auth-guard";
+import { ForbiddenError, requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { computeDocument } from "@/lib/document-totals";
 import { sendEmail } from "@/lib/email-provider";
 import { getExchangeRates } from "@/lib/exchange-rates";
@@ -84,6 +84,7 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
   const db = await getDb();
   try {
     const actor = await requireCapability("quote:write");
+    await requirePlanModule("sales");
     const validated = CreateQuoteSchema.parse(data);
 
     // Verify deal exists
@@ -113,48 +114,59 @@ export async function createQuoteAction(data: z.infer<typeof CreateQuoteSchema>)
     const totals = buildQuoteTotals(validated.items, validated.discountPercent || 0, validated.taxPercent);
 
     const quoteNumber = generateQuoteNumber();
-    const [quote] = await db
-      .insert(quotes)
-      .values({
-        quoteNumber,
-        dealId: validated.dealId,
-        companyId: validated.companyId,
-        contactId: validated.contactId || null,
-        ownerId: actor.userId,
-        status: "draft",
-        currency,
-        eurRate: eurRate.toString(),
-        subtotal: totals.subtotal.toString(),
-        discountAmount: totals.discountAmount.toString(),
-        discountPercent: totals.discountPercent.toString(),
-        taxAmount: totals.taxAmount.toString(),
-        taxPercent: (validated.taxPercent || 0).toString(),
-        totalAmount: totals.total.toString(),
-        expiresAt: validated.expiresAt ? new Date(validated.expiresAt) : null,
-        notes: validated.notes,
-      })
-      .returning();
+    // Chosen here rather than by the database default, so the lines can be written
+    // in the same transaction as the header instead of waiting to learn the id.
+    const quoteId = crypto.randomUUID();
 
-    // One insert for all lines rather than a loop: a failure halfway through left
-    // a quote with some of its items and totals that did not match them, and there
-    // is no transaction here to undo it (audit rilievo M-04).
-    await db.insert(quoteItems).values(
-      validated.items.map((item, i) => {
-        const line = totals.lines[i];
-        return {
-          quoteId: quote.id,
-          productId: item.productId || null,
-          description: item.description,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice.toString(),
-          discountPercent: (item.discountPercent ?? 0).toString(),
-          discountAmount: line.discountAmount.toString(),
-          taxPercent: line.taxPercent.toString(),
-          taxAmount: line.taxAmount.toString(),
-          totalPrice: line.total.toString(),
-        };
-      }),
-    );
+    const itemRows = validated.items.map((item, i) => {
+      const line = totals.lines[i];
+      return {
+        quoteId,
+        productId: item.productId || null,
+        description: item.description,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice.toString(),
+        discountPercent: (item.discountPercent ?? 0).toString(),
+        discountAmount: line.discountAmount.toString(),
+        taxPercent: line.taxPercent.toString(),
+        taxAmount: line.taxAmount.toString(),
+        totalPrice: line.total.toString(),
+      };
+    });
+
+    // Header and lines commit together. Separately, a failure between them left a
+    // quote whose totals described lines that were never written (rilievo M-04).
+    // `db.transaction()` is not an option: the Neon HTTP driver throws on it.
+    // `db.batch()` maps to Neon's transaction endpoint, which is a real
+    // BEGIN/COMMIT — at the cost that no statement may read another's output,
+    // which is why the id is chosen above.
+    const [insertedQuotes] = await db.batch([
+      db
+        .insert(quotes)
+        .values({
+          id: quoteId,
+          quoteNumber,
+          dealId: validated.dealId,
+          companyId: validated.companyId,
+          contactId: validated.contactId || null,
+          ownerId: actor.userId,
+          status: "draft",
+          currency,
+          eurRate: eurRate.toString(),
+          subtotal: totals.subtotal.toString(),
+          discountAmount: totals.discountAmount.toString(),
+          discountPercent: totals.discountPercent.toString(),
+          taxAmount: totals.taxAmount.toString(),
+          taxPercent: (validated.taxPercent || 0).toString(),
+          totalAmount: totals.total.toString(),
+          expiresAt: validated.expiresAt ? new Date(validated.expiresAt) : null,
+          notes: validated.notes,
+        })
+        .returning(),
+      db.insert(quoteItems).values(itemRows),
+    ]);
+
+    const quote = insertedQuotes[0];
 
     // Log activity
     await logQuoteActivity(quote.id, "created", actor.userId);
@@ -171,6 +183,7 @@ export async function getQuoteById(quoteId: string) {
   const db = await getDb();
   try {
     const actor = await requireCapability("record:read");
+    await requirePlanModule("sales");
     const quote = await db.query.quotes.findFirst({
       where: eq(quotes.id, quoteId),
       with: {
@@ -215,6 +228,7 @@ export async function getQuotesByDeal(dealId: string) {
   const db = await getDb();
   try {
     await requireCapability("record:read");
+    await requirePlanModule("sales");
     const quoteList = await db.query.quotes.findMany({
       where: eq(quotes.dealId, dealId),
       orderBy: desc(quotes.createdAt),
@@ -237,6 +251,7 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
   const db = await getDb();
   try {
     const actor = await requireCapability("quote:write");
+    await requirePlanModule("sales");
     const validated = UpdateQuoteSchema.parse(data);
     const quote = await db.query.quotes.findFirst({
       where: eq(quotes.id, quoteId),
@@ -289,28 +304,33 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
     // Recalculate through the same function creation uses. These were two separate
     // implementations, and only one of them converted currency, so opening and
     // saving a non-EUR quote silently changed its value (audit rilievo C-03).
-    if (validated.items && validated.items.length > 0) {
-      await db.delete(quoteItems).where(eq(quoteItems.quoteId, quoteId));
+    let rewriteItems: (() => Promise<unknown>) | null = null;
 
+    if (validated.items && validated.items.length > 0) {
       const totals = buildQuoteTotals(validated.items, validated.discountPercent || 0, validated.taxPercent);
 
-      await db.insert(quoteItems).values(
-        validated.items.map((item, i) => {
-          const line = totals.lines[i];
-          return {
-            quoteId,
-            productId: item.productId || null,
-            description: item.description,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice.toString(),
-            discountPercent: (item.discountPercent ?? 0).toString(),
-            discountAmount: line.discountAmount.toString(),
-            taxPercent: line.taxPercent.toString(),
-            taxAmount: line.taxAmount.toString(),
-            totalPrice: line.total.toString(),
-          };
-        }),
-      );
+      const rows = validated.items.map((item, i) => {
+        const line = totals.lines[i];
+        return {
+          quoteId,
+          productId: item.productId || null,
+          description: item.description,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice.toString(),
+          discountPercent: (item.discountPercent ?? 0).toString(),
+          discountAmount: line.discountAmount.toString(),
+          taxPercent: line.taxPercent.toString(),
+          taxAmount: line.taxAmount.toString(),
+          totalPrice: line.total.toString(),
+        };
+      });
+
+      // Deferred so the delete, the re-insert and the header update commit
+      // together. Run separately, a failure between the delete and the insert
+      // left a quote with no lines and a total that described lines that no
+      // longer existed (audit rilievo M-04).
+      rewriteItems = () =>
+        db.batch([db.delete(quoteItems).where(eq(quoteItems.quoteId, quoteId)), db.insert(quoteItems).values(rows)]);
 
       updateData.subtotal = totals.subtotal.toString();
       updateData.discountAmount = totals.discountAmount.toString();
@@ -329,6 +349,7 @@ export async function updateQuoteAction(quoteId: string, data: z.infer<typeof Up
       updateData.declinedAt = new Date();
     }
 
+    if (rewriteItems) await rewriteItems();
     const [updated] = await db.update(quotes).set(updateData).where(eq(quotes.id, quoteId)).returning();
 
     // Log activity
@@ -372,6 +393,7 @@ export async function deleteQuoteAction(quoteId: string) {
   const db = await getDb();
   try {
     const actor = await requireCapability("quote:write");
+    await requirePlanModule("sales");
     const quote = await db.query.quotes.findFirst({
       where: eq(quotes.id, quoteId),
     });
@@ -403,6 +425,7 @@ export async function deleteQuoteAction(quoteId: string) {
 export async function sendQuoteEmailAction(quoteId: string, toEmail: string, subject: string, message: string) {
   try {
     const actor = await requireCapability("quote:write");
+    await requirePlanModule("sales");
     const db = await getDb();
 
     const quote = await db.query.quotes.findFirst({
@@ -484,6 +507,7 @@ export async function getAllQuotes(filters?: { status?: string; searchTerm?: str
   const db = await getDb();
   try {
     await requireCapability("record:read");
+    await requirePlanModule("sales");
     const statusFilter = filters?.status && filters.status !== "all" ? eq(quotes.status, filters.status) : undefined;
 
     const allQuotes = await db.query.quotes.findMany({
@@ -515,6 +539,7 @@ export async function getAllQuotes(filters?: { status?: string; searchTerm?: str
 export async function requestApprovalAction(quoteId: string) {
   const db = await getDb();
   const actor = await requireCapability("quote:write");
+  await requirePlanModule("sales");
 
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
   if (!quote) throw new Error("Quote not found");
@@ -551,6 +576,7 @@ export async function requestApprovalAction(quoteId: string) {
 export async function approveQuoteAction(quoteId: string) {
   const db = await getDb();
   const actor = await requireCapability("quote:approve");
+  await requirePlanModule("sales");
 
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
   if (!quote) throw new Error("Quote not found");
@@ -590,6 +616,7 @@ export async function approveQuoteAction(quoteId: string) {
 export async function rejectQuoteAction(quoteId: string, note: string) {
   const db = await getDb();
   const actor = await requireCapability("quote:approve");
+  await requirePlanModule("sales");
 
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.id, quoteId) });
   if (!quote) throw new Error("Quote not found");
@@ -623,6 +650,7 @@ export async function rejectQuoteAction(quoteId: string, note: string) {
 export async function getQuoteFormData() {
   const db = await getDb();
   await requireCapability("record:read");
+  await requirePlanModule("sales");
 
   const [dealList, companyList, productList] = await Promise.all([
     db

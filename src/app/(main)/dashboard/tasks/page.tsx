@@ -5,12 +5,13 @@ import { getDealsForSelect } from "@/actions/pipeline";
 import { getTicketsForSelect } from "@/actions/support";
 import { getAllTasks, getAllUsers } from "@/actions/tasks";
 import { auth } from "@/auth";
+import { LOGIN_PATH } from "@/lib/page-guard";
 
 import { TasksClient } from "./_components/tasks-client";
 
 export default async function TasksPage({ searchParams }: { searchParams: Promise<{ task?: string }> }) {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
+  if (!session?.user?.id) redirect(LOGIN_PATH);
 
   const { task: openTaskId } = await searchParams;
 

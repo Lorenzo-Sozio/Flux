@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { dispatchWebhook } from "@/actions/webhooks";
 import { companies, contacts, orderItems, orders, products, users } from "@/db/schema";
-import { requireCapability } from "@/lib/auth-guard";
+import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { computeDocument } from "@/lib/document-totals";
 import { getDb } from "@/lib/tenant-context";
 
@@ -118,7 +118,8 @@ export async function getOrderById(id: string) {
       updatedAt: orders.updatedAt,
       companyId: orders.companyId,
       contactId: orders.contactId,
-      opportunityId: orders.opportunityId,
+      quoteId: orders.quoteId,
+      dealId: orders.dealId,
       ownerId: orders.ownerId,
       companyName: companies.name,
       contactFirstName: contacts.firstName,
@@ -194,6 +195,7 @@ const createSchema = z.object({
 
 export async function createOrder(data: z.input<typeof createSchema>) {
   const actor = await requireCapability("order:write");
+  await requirePlanModule("sales");
   const db = await getDb();
   const validated = createSchema.parse(data);
 
@@ -260,6 +262,7 @@ export async function createOrder(data: z.input<typeof createSchema>) {
 
 export async function updateOrderStatus(id: string, status: OrderStatus) {
   await requireCapability("order:write");
+  await requirePlanModule("sales");
   const db = await getDb();
   const [updated] = await db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, id)).returning();
 
@@ -282,6 +285,7 @@ export async function addOrderItem(
   item: { productId: string; quantity: number; unitPrice: number; discountPercent?: number },
 ) {
   await requireCapability("order:write");
+  await requirePlanModule("sales");
   const db = await getDb();
 
   await db.insert(orderItems).values({
@@ -299,6 +303,7 @@ export async function addOrderItem(
 
 export async function removeOrderItem(itemId: string, orderId: string) {
   await requireCapability("order:write");
+  await requirePlanModule("sales");
   const db = await getDb();
   await db.delete(orderItems).where(eq(orderItems.id, itemId));
   await recalcOrder(db, orderId);
@@ -331,22 +336,24 @@ async function recalcOrder(db: Awaited<ReturnType<typeof getDb>>, orderId: strin
     Number(order?.discountPercent ?? 0),
   );
 
-  await Promise.all(
-    rows.map((r, i) => {
-      const line = totals.lines[i];
-      return db
-        .update(orderItems)
-        .set({
-          discountAmount: String(line.discountAmount),
-          taxPercent: String(line.taxPercent),
-          taxAmount: String(line.taxAmount),
-          totalPrice: String(line.total),
-        })
-        .where(eq(orderItems.id, r.id));
-    }),
-  );
+  // Lines and header commit together. Run separately, a failure partway through
+  // left an order whose total no longer matched the lines under it — and the total
+  // is the number the customer signed (audit rilievo M-04). `db.transaction()`
+  // throws on the Neon HTTP driver; `db.batch()` maps to its transaction endpoint.
+  const writes = rows.map((r, i) => {
+    const line = totals.lines[i];
+    return db
+      .update(orderItems)
+      .set({
+        discountAmount: String(line.discountAmount),
+        taxPercent: String(line.taxPercent),
+        taxAmount: String(line.taxAmount),
+        totalPrice: String(line.total),
+      })
+      .where(eq(orderItems.id, r.id));
+  });
 
-  await db
+  const updateHeader = db
     .update(orders)
     .set({
       subtotal: String(totals.subtotal),
@@ -356,12 +363,18 @@ async function recalcOrder(db: Awaited<ReturnType<typeof getDb>>, orderId: strin
       updatedAt: new Date(),
     })
     .where(eq(orders.id, orderId));
+
+  // The two statement kinds have different generic types; drizzle's batch signature
+  // wants one tuple element type, so the array is widened at the call.
+  const batch = [...writes, updateHeader] as unknown as Parameters<typeof db.batch>[0];
+  await db.batch(batch);
 }
 
 export async function deleteOrder(id: string) {
   // Deleting a commercial document is an admin act, and only while it is still a
   // draft. A completed order is a record of something that happened.
   await requireCapability("order:delete");
+  await requirePlanModule("sales");
   const db = await getDb();
 
   const [order] = await db.select({ status: orders.status }).from(orders).where(eq(orders.id, id));

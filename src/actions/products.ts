@@ -6,7 +6,7 @@ import { desc, eq, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { products } from "@/db/schema";
-import { requireWriteAccess } from "@/lib/auth-guard";
+import { requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -38,6 +38,7 @@ export async function getProducts(search?: string) {
 
 export async function createProduct(data: z.infer<typeof productSchema>) {
   await requireWriteAccess();
+  await requirePlanModule("sales");
   const db = await getDb();
   const validated = productSchema.parse(data);
   const [product] = await db
@@ -59,6 +60,7 @@ export async function createProduct(data: z.infer<typeof productSchema>) {
 
 export async function updateProduct(id: string, data: Partial<z.infer<typeof productSchema>>) {
   await requireWriteAccess();
+  await requirePlanModule("sales");
   const db = await getDb();
   const [product] = await db
     .update(products)
@@ -76,6 +78,7 @@ export async function updateProduct(id: string, data: Partial<z.infer<typeof pro
 
 export async function toggleProductActive(id: string, isActive: boolean) {
   await requireWriteAccess();
+  await requirePlanModule("sales");
   const db = await getDb();
   await db.update(products).set({ isActive, updatedAt: new Date() }).where(eq(products.id, id));
   revalidatePath("/dashboard/sales/products");
@@ -83,6 +86,7 @@ export async function toggleProductActive(id: string, isActive: boolean) {
 
 export async function deleteProduct(id: string) {
   await requireWriteAccess();
+  await requirePlanModule("sales");
   const db = await getDb();
   await db.delete(products).where(eq(products.id, id));
   revalidatePath("/dashboard/sales/products");
