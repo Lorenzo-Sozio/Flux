@@ -138,7 +138,7 @@ export function WorkloadPanel({ viewDate, onClose }: Props) {
   const week2Start = visibleDays[7];
   const periodEnd = visibleDays[visibleDays.length - 1];
 
-  const fmtShort = (d: Date) => d.toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
+  const fmtShort = (d: Date) => d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
 
   return (
     <div className="flex w-80 shrink-0 flex-col border-l bg-background">
@@ -199,7 +199,7 @@ export function WorkloadPanel({ viewDate, onClose }: Props) {
                     isToday ? "font-bold text-primary" : "text-muted-foreground/60",
                   )}
                 >
-                  {d.toLocaleDateString("it-IT", { weekday: "narrow" })}
+                  {d.toLocaleDateString(undefined, { weekday: "narrow" })}
                 </div>
               );
             })}
@@ -240,7 +240,7 @@ export function WorkloadPanel({ viewDate, onClose }: Props) {
                       )}
                       title={
                         hours > 0
-                          ? `${user.name} · ${d.toLocaleDateString("it-IT", { weekday: "short", day: "2-digit", month: "short" })} · ${hours.toFixed(1)}h`
+                          ? `${user.name} · ${d.toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short" })} · ${hours.toFixed(1)}h`
                           : undefined
                       }
                     />

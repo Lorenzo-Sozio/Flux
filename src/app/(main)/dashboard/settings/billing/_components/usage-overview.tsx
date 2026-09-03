@@ -29,7 +29,7 @@ const METRIC_ORDER = [
 
 function formatValue(metric: string, value: number): string {
   if (metric === "storageGb") return `${value} GB`;
-  return new Intl.NumberFormat("it-IT").format(value);
+  return new Intl.NumberFormat(undefined).format(value);
 }
 
 function progressColor(percent: number | null): string {

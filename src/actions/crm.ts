@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { and, count, desc, eq, getTableColumns, ilike, isNull, ne, or } from "drizzle-orm";
+import { and, asc, count, desc, eq, getTableColumns, ilike, isNull, ne, or, type SQL, sql } from "drizzle-orm";
+import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import { getTranslations } from "next-intl/server";
 
 import { createNotificationAction } from "@/actions/auth";
@@ -47,6 +48,7 @@ import {
 } from "@/lib/filter-engine";
 import { decodeFilter } from "@/lib/filter-types";
 import { computeLeadScore } from "@/lib/lead-score";
+import { type ListParams, offsetOf, type Page, toPage } from "@/lib/pagination";
 import { getDb } from "@/lib/tenant-context";
 
 // ── Company lookup tables ──────────────────────────────────────────────────────
@@ -120,6 +122,32 @@ export async function getLeads(encodedFilter?: string | null) {
   const registry = { ...LEAD_FIELDS, ...customFieldsToRegistry(customDefs) };
   const where = buildWhereClause(tree, registry, leads.id);
   return base.where(where).orderBy(desc(leads.createdAt));
+}
+
+/**
+ * The most recently created leads, for the dashboard.
+ *
+ * The dashboard used to call `getLeads()` — every lead, every column — sort them
+ * in JavaScript and keep five (audit rilievo B-08).
+ */
+export async function getRecentLeads(limit = 5) {
+  const db = await getDb();
+  return db
+    .select({
+      id: leads.id,
+      firstName: leads.firstName,
+      lastName: leads.lastName,
+      email: leads.email,
+      companyName: leads.companyName,
+      status: leads.status,
+      rating: leads.rating,
+      leadScore: leads.leadScore,
+      createdAt: leads.createdAt,
+    })
+    .from(leads)
+    .where(eq(leads.isConverted, false))
+    .orderBy(desc(leads.createdAt))
+    .limit(limit);
 }
 
 // CONTACTS
@@ -886,3 +914,231 @@ export async function mergeCompanies(keepId: string, mergeId: string, fields: Co
   await db.delete(companies).where(eq(companies.id, mergeId));
   revalidatePath("/dashboard/companies");
 }
+
+// ─── Paged list queries ───────────────────────────────────────────────────────
+//
+// The three list screens used to select every column of every row and hand the
+// result to a client component: no limit, no paging, no server-side sort, and no
+// plain search box (audit rilievi B-08, U-04). At a few thousand records that is
+// megabytes of JSON per visit; at a few tens of thousands the page does not open.
+//
+// Only the columns the table renders are selected, the count comes from the
+// database, and the state lives in the URL so a filtered list stays shareable.
+
+/** Concatenated-name match, because "Mario Rossi" is what people type. */
+function fullNameMatch(first: AnyPgColumn, last: AnyPgColumn, term: string) {
+  return sql`lower(coalesce(${first}, '') || ' ' || coalesce(${last}, '')) LIKE lower(${`%${term}%`})`;
+}
+
+/** Digits-only comparison, so "+39 02 1234567" is found by "021234567". */
+function phoneMatch(col: AnyPgColumn, term: string) {
+  const digits = term.replace(/\D/g, "");
+  if (digits.length < 4) return undefined;
+  return sql`regexp_replace(coalesce(${col}, ''), '[^0-9]', '', 'g') LIKE ${`%${digits}%`}`;
+}
+
+/** Combines the saved filter tree with the free-text search box. */
+async function listWhere(
+  db: Awaited<ReturnType<typeof getDb>>,
+  params: ListParams,
+  entityType: "lead" | "contact" | "company",
+  idCol: AnyPgColumn,
+  baseFields: Record<string, unknown>,
+  searchClause: SQL | undefined,
+): Promise<SQL | undefined> {
+  const tree = params.filter ? decodeFilter(params.filter) : null;
+
+  let filterClause: SQL | undefined;
+  if (tree) {
+    const customDefs = await db
+      .select()
+      .from(customFieldDefinitions)
+      .where(eq(customFieldDefinitions.entityType, entityType));
+    const registry = { ...baseFields, ...customFieldsToRegistry(customDefs) } as never;
+    filterClause = buildWhereClause(tree, registry, idCol);
+  }
+
+  if (filterClause && searchClause) return and(filterClause, searchClause);
+  return filterClause ?? searchClause;
+}
+
+const LEAD_SORTS: Record<string, AnyPgColumn> = {
+  firstName: leads.firstName,
+  lastName: leads.lastName,
+  email: leads.email,
+  companyName: leads.companyName,
+  status: leads.status,
+  leadScore: leads.leadScore,
+  createdAt: leads.createdAt,
+};
+
+const CONTACT_SORTS: Record<string, AnyPgColumn> = {
+  firstName: contacts.firstName,
+  lastName: contacts.lastName,
+  email: contacts.email,
+  jobTitle: contacts.jobTitle,
+  city: contacts.city,
+  status: contacts.status,
+  leadScore: contacts.leadScore,
+  createdAt: contacts.createdAt,
+};
+
+const COMPANY_SORTS: Record<string, AnyPgColumn> = {
+  name: companies.name,
+  industry: companies.industry,
+  city: companies.city,
+  status: companies.status,
+  createdAt: companies.createdAt,
+};
+
+function orderFor(sorts: Record<string, AnyPgColumn>, params: ListParams, fallback: AnyPgColumn) {
+  const col = params.sort ? sorts[params.sort] : undefined;
+  if (!col) return desc(fallback);
+  return params.dir === "asc" ? asc(col) : desc(col);
+}
+
+/** One page of leads, with the total that matches the query. */
+export async function listLeads(params: ListParams) {
+  const db = await getDb();
+  const term = params.search;
+
+  const search = term
+    ? or(
+        ilike(leads.firstName, `%${term}%`),
+        ilike(leads.lastName, `%${term}%`),
+        fullNameMatch(leads.firstName, leads.lastName, term),
+        ilike(leads.email, `%${term}%`),
+        ilike(leads.companyName, `%${term}%`),
+        phoneMatch(leads.phone, term),
+        phoneMatch(leads.mobile, term),
+      )
+    : undefined;
+
+  const where = await listWhere(db, params, "lead", leads.id, LEAD_FIELDS, search);
+
+  const [rows, [counted]] = await Promise.all([
+    db
+      .select({
+        id: leads.id,
+        firstName: leads.firstName,
+        lastName: leads.lastName,
+        email: leads.email,
+        phone: leads.phone,
+        companyName: leads.companyName,
+        city: leads.city,
+        status: leads.status,
+        rating: leads.rating,
+        leadScore: leads.leadScore,
+        isConverted: leads.isConverted,
+        createdAt: leads.createdAt,
+        ownerId: leads.ownerId,
+        ownerName: users.name,
+      })
+      .from(leads)
+      .leftJoin(users, eq(leads.ownerId, users.id))
+      .where(where)
+      .orderBy(orderFor(LEAD_SORTS, params, leads.createdAt))
+      .limit(params.pageSize)
+      .offset(offsetOf(params)),
+    db.select({ n: count() }).from(leads).where(where),
+  ]);
+
+  return toPage(rows, Number(counted?.n ?? 0), params);
+}
+
+/** One page of contacts. */
+export async function listContacts(params: ListParams) {
+  const db = await getDb();
+  const term = params.search;
+
+  const search = term
+    ? or(
+        ilike(contacts.firstName, `%${term}%`),
+        ilike(contacts.lastName, `%${term}%`),
+        fullNameMatch(contacts.firstName, contacts.lastName, term),
+        ilike(contacts.email, `%${term}%`),
+        phoneMatch(contacts.phone, term),
+        phoneMatch(contacts.mobile, term),
+      )
+    : undefined;
+
+  const where = await listWhere(db, params, "contact", contacts.id, CONTACT_FIELDS, search);
+
+  const [rows, [counted]] = await Promise.all([
+    db
+      .select({
+        id: contacts.id,
+        firstName: contacts.firstName,
+        lastName: contacts.lastName,
+        email: contacts.email,
+        phone: contacts.phone,
+        jobTitle: contacts.jobTitle,
+        city: contacts.city,
+        status: contacts.status,
+        leadScore: contacts.leadScore,
+        createdAt: contacts.createdAt,
+        ownerId: contacts.ownerId,
+        ownerName: users.name,
+      })
+      .from(contacts)
+      .leftJoin(users, eq(contacts.ownerId, users.id))
+      .where(where)
+      .orderBy(orderFor(CONTACT_SORTS, params, contacts.createdAt))
+      .limit(params.pageSize)
+      .offset(offsetOf(params)),
+    db.select({ n: count() }).from(contacts).where(where),
+  ]);
+
+  return toPage(rows, Number(counted?.n ?? 0), params);
+}
+
+/** One page of companies. */
+export async function listCompanies(params: ListParams) {
+  const db = await getDb();
+  const term = params.search;
+
+  const search = term
+    ? or(
+        ilike(companies.name, `%${term}%`),
+        ilike(companies.industry, `%${term}%`),
+        ilike(companies.vatNumber, `%${term}%`),
+        ilike(companies.mainEmail, `%${term}%`),
+        phoneMatch(companies.mainPhone, term),
+      )
+    : undefined;
+
+  const where = await listWhere(db, params, "company", companies.id, COMPANY_FIELDS, search);
+
+  const [rows, [counted]] = await Promise.all([
+    db
+      .select({
+        id: companies.id,
+        name: companies.name,
+        industry: companies.industry,
+        city: companies.city,
+        country: companies.country,
+        website: companies.website,
+        employeeCount: companies.employeeCount,
+        mainPhone: companies.mainPhone,
+        mainEmail: companies.mainEmail,
+        status: companies.status,
+        type: companies.type,
+        createdAt: companies.createdAt,
+        ownerId: companies.ownerId,
+        ownerName: users.name,
+      })
+      .from(companies)
+      .leftJoin(users, eq(companies.ownerId, users.id))
+      .where(where)
+      .orderBy(orderFor(COMPANY_SORTS, params, companies.createdAt))
+      .limit(params.pageSize)
+      .offset(offsetOf(params)),
+    db.select({ n: count() }).from(companies).where(where),
+  ]);
+
+  return toPage(rows, Number(counted?.n ?? 0), params);
+}
+
+export type LeadRow = Awaited<ReturnType<typeof listLeads>>["rows"][number];
+export type ContactRow = Awaited<ReturnType<typeof listContacts>>["rows"][number];
+export type CompanyRow = Awaited<ReturnType<typeof listCompanies>>["rows"][number];

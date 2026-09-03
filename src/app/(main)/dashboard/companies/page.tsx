@@ -2,29 +2,36 @@ import Link from "next/link";
 
 import { getTranslations } from "next-intl/server";
 
-import { getAllUsers, getCompanies, getCompanyCategories, getCompanyTypes } from "@/actions/crm";
+import { getAllUsers, getCompanyCategories, getCompanyTypes, listCompanies } from "@/actions/crm";
 import { getCustomFieldDefinitions } from "@/actions/custom-fields";
 import { getCustomFilters } from "@/actions/filters";
-import { auth } from "@/auth";
 import { FilterBuilder } from "@/components/crm/filter-builder";
 import { ImportExportButtons } from "@/components/crm/import-export-buttons";
+import { ListToolbar } from "@/components/crm/list-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { hasCapability } from "@/lib/auth-guard";
 import { COMPANY_FIELDS, customFieldsToMetaMap, toFieldMetaMap } from "@/lib/filter-engine";
 import { countActive, decodeFilter } from "@/lib/filter-types";
+import { parseListParams } from "@/lib/pagination";
 
 import { CompaniesTable } from "./_components/companies-table";
 import { CompanyModal } from "./_components/company-modal";
 
 export default async function CompaniesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const params = await searchParams;
-  const encoded = params.filter ?? null;
+  // The whole list state lives in the URL, so a filtered and sorted page stays
+  // shareable and the back button works (audit rilievo B-08).
+  const listParams = parseListParams(params);
+  const encoded = listParams.filter;
 
-  const session = await auth();
-  const canEdit = session?.user?.role !== "viewer";
+  // The workspace role, not the platform staff field: the latter is "user" for
+  // every customer, so this was always true and a viewer saw buttons that could
+  // only fail (audit rilievo U-02).
+  const canEdit = await hasCapability("record:write");
 
-  const [allCompanies, savedFilters, customDefs, users, categories, companyTypes] = await Promise.all([
-    getCompanies(encoded),
+  const [pageResult, savedFilters, customDefs, users, categories, companyTypes] = await Promise.all([
+    listCompanies(listParams),
     getCustomFilters("companies").catch(() => []),
     getCustomFieldDefinitions("company").catch(() => []),
     getAllUsers(),
@@ -56,7 +63,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
       <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <h1 className="font-bold text-2xl">{t("title")}</h1>
-          <Badge variant="secondary">{allCompanies.length}</Badge>
+          <Badge variant="secondary">{pageResult.total}</Badge>
           {activeCount > 0 && (
             <Badge variant="outline" className="text-xs gap-1">
               {tc("filtersActive", { count: activeCount })}
@@ -86,8 +93,18 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
         </div>
       </div>
 
+      <div className="mb-4">
+        <ListToolbar
+          total={pageResult.total}
+          page={pageResult.page}
+          pageCount={pageResult.pageCount}
+          pageSize={pageResult.pageSize}
+          shown={pageResult.rows.length}
+        />
+      </div>
+
       <CompaniesTable
-        companies={allCompanies}
+        companies={pageResult.rows}
         users={users}
         canEdit={canEdit}
         activeCount={activeCount}

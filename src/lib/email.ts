@@ -169,7 +169,7 @@ export async function sendCallInviteEmail(to: string, contactName: string, descr
     return;
   }
 
-  const dateStr = scheduledAt.toLocaleString("en-GB", {
+  const dateStr = scheduledAt.toLocaleString(undefined, {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -215,7 +215,7 @@ export async function sendActivityReminderEmail(
     return;
   }
 
-  const dateStr = scheduledAt.toLocaleString("en-GB", {
+  const dateStr = scheduledAt.toLocaleString(undefined, {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -272,7 +272,7 @@ export async function sendAppointmentInviteEmail(
 ): Promise<{ success: boolean; error?: string }> {
   const safe = (s: string) => sanitizeHeader(s);
 
-  const startStr = data.startAt.toLocaleString("it-IT", {
+  const startStr = data.startAt.toLocaleString(undefined, {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -280,7 +280,7 @@ export async function sendAppointmentInviteEmail(
     hour: "2-digit",
     minute: "2-digit",
   });
-  const endStr = data.endAt.toLocaleString("it-IT", {
+  const endStr = data.endAt.toLocaleString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
   });

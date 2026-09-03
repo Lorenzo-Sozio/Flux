@@ -211,7 +211,11 @@
       "advertisement": "Pubblicità",
       "email_campaign": "Campagna Email",
       "other": "Altro"
-    }
+    },
+    "clear": "Cancella",
+    "listRange": "{from}–{to} di {total}",
+    "pageOf": "{page} / {pageCount}",
+    "there": "a te"
   },
   "contacts": {
     "title": "Contatti",
@@ -2473,7 +2477,10 @@
     "dealsByStageDesc": "Numero di opportunità attive per fase della pipeline",
     "leadsBySource": "Lead per fonte",
     "leadsBySourceDesc": "Efficacia dei canali di acquisizione",
-    "noLeadSourceData": "Nessun dato sulle fonti disponibile"
+    "noLeadSourceData": "Nessun dato sulle fonti disponibile",
+    "greetingMorning": "Buongiorno, {name}",
+    "greetingAfternoon": "Buon pomeriggio, {name}",
+    "greetingEvening": "Buonasera, {name}"
   },
   "auth": {
     "login": {

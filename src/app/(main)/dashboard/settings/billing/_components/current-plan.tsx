@@ -56,7 +56,7 @@ export function CurrentPlan({ entitlements, periodEnd, billingCycle, onManageCli
               <>
                 {" "}
                 · {t("currentPlan.renews")}{" "}
-                {new Date(periodEnd).toLocaleDateString("it-IT", {
+                {new Date(periodEnd).toLocaleDateString(undefined, {
                   day: "numeric",
                   month: "short",
                   year: "numeric",
@@ -134,5 +134,5 @@ function capitalize(s: string) {
 }
 
 function formatNumber(n: number) {
-  return new Intl.NumberFormat("it-IT").format(n);
+  return new Intl.NumberFormat(undefined).format(n);
 }

@@ -494,7 +494,11 @@ export default function NewQuotePage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Subtotal</span>
                     <span className="tabular-nums font-medium">
-                      ${totals.subtotal.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      $
+                      {totals.subtotal.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </span>
                   </div>
                   {totals.discountAmount > 0 && (
@@ -502,7 +506,7 @@ export default function NewQuotePage() {
                       <span>Discount ({discountPct}%)</span>
                       <span className="tabular-nums">
                         −$
-                        {totals.discountAmount.toLocaleString("en-US", {
+                        {totals.discountAmount.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
@@ -514,7 +518,7 @@ export default function NewQuotePage() {
                       <span>Tax ({taxPct}%)</span>
                       <span className="tabular-nums">
                         +$
-                        {totals.taxAmount.toLocaleString("en-US", {
+                        {totals.taxAmount.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
@@ -525,7 +529,7 @@ export default function NewQuotePage() {
                   <div className="flex justify-between">
                     <span className="font-semibold">Total</span>
                     <span className="text-lg font-bold tabular-nums">
-                      ${totals.total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      ${totals.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
                 </CardContent>

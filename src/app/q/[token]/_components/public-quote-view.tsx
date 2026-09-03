@@ -62,7 +62,7 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
 };
 
 function fmt(amount: string | null, currency: string) {
-  return `${currency} ${parseFloat(amount ?? "0").toLocaleString("en-US", {
+  return `${currency} ${parseFloat(amount ?? "0").toLocaleString(undefined, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;

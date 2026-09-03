@@ -116,7 +116,7 @@ export function SubtaskList({ parentId, parentDepth, subtasks: initial, onChange
               </span>
               {sub.dueDate && (
                 <span className="text-[10px] text-muted-foreground shrink-0">
-                  {new Date(sub.dueDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
+                  {new Date(sub.dueDate).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
                 </span>
               )}
               <button

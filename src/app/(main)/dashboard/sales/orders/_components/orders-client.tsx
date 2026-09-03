@@ -96,7 +96,7 @@ const newOrderSchema = z.object({
 type NewOrderValues = z.infer<typeof newOrderSchema>;
 
 function formatDate(date: Date | string) {
-  return new Date(date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(date).toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 // ── New Order Dialog ──────────────────────────────────────────────────────────

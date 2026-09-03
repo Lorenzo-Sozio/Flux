@@ -96,7 +96,7 @@ export function GanttToolbar({
               <PopoverTrigger asChild>
                 <Button variant="outline" className="h-8 gap-1.5 px-3 font-normal text-sm">
                   <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                  {viewDate.toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+                  {viewDate.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">

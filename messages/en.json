@@ -211,7 +211,11 @@
       "advertisement": "Advertisement",
       "email_campaign": "Email Campaign",
       "other": "Other"
-    }
+    },
+    "clear": "Clear",
+    "listRange": "{from}–{to} of {total}",
+    "pageOf": "{page} / {pageCount}",
+    "there": "there"
   },
   "contacts": {
     "title": "Contacts",
@@ -2473,7 +2477,10 @@
     "dealsByStageDesc": "Number of active opportunities per pipeline stage",
     "leadsBySource": "Leads by Source",
     "leadsBySourceDesc": "Acquisition channel effectiveness",
-    "noLeadSourceData": "No lead source data available"
+    "noLeadSourceData": "No lead source data available",
+    "greetingMorning": "Good morning, {name}",
+    "greetingAfternoon": "Good afternoon, {name}",
+    "greetingEvening": "Good evening, {name}"
   },
   "auth": {
     "login": {

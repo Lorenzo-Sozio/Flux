@@ -34,7 +34,7 @@ const STATUS_VARIANT: Record<string, "default" | "secondary" | "destructive" | "
 };
 
 function formatAmount(cents: number, currency: string) {
-  return new Intl.NumberFormat("it-IT", {
+  return new Intl.NumberFormat(undefined, {
     style: "currency",
     currency: currency.toUpperCase(),
     minimumFractionDigits: 2,
@@ -76,7 +76,7 @@ export function InvoiceList({ invoices }: InvoiceListProps) {
               ? t(`invoices.status.${statusKey}` as Parameters<typeof t>[0])
               : (inv.status ?? "—");
 
-            const date = new Date(inv.created * 1000).toLocaleDateString("it-IT", {
+            const date = new Date(inv.created * 1000).toLocaleDateString(undefined, {
               day: "numeric",
               month: "short",
               year: "numeric",

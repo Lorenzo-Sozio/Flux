@@ -270,7 +270,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             </Badge>
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Calendar className="h-3 w-3" />
-              {new Date(order.orderDate).toLocaleDateString("en-GB", {
+              {new Date(order.orderDate).toLocaleDateString(undefined, {
                 day: "2-digit",
                 month: "short",
                 year: "numeric",
@@ -433,7 +433,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     Order date
                   </span>
                   <span>
-                    {new Date(order.orderDate).toLocaleDateString("en-GB", {
+                    {new Date(order.orderDate).toLocaleDateString(undefined, {
                       day: "2-digit",
                       month: "short",
                       year: "numeric",
@@ -446,7 +446,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     Created
                   </span>
                   <span>
-                    {new Date(order.createdAt).toLocaleDateString("en-GB", {
+                    {new Date(order.createdAt).toLocaleDateString(undefined, {
                       day: "2-digit",
                       month: "short",
                       year: "numeric",

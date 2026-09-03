@@ -144,7 +144,7 @@ function suggestMinDueDate(task: WorkloadTaskEntry): Date {
 }
 
 function formatDate(d: Date): string {
-  return d.toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
+  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
 }
 
 function toLocalStr(d: Date): string {
@@ -492,9 +492,9 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                     <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
                   <span>
-                    {periodStart.toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}
+                    {periodStart.toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
                     {" – "}
-                    {periodEnd.toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" })}
+                    {periodEnd.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}
                   </span>
                 </Button>
               </PopoverTrigger>
@@ -597,7 +597,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                     >
                       {t("weekLabel", { week: wi + 1 })}
                       <span className="ml-1.5 font-normal opacity-60">
-                        {week[0].toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit" })}
+                        {week[0].toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}
                       </span>
                     </th>
                   ))}
@@ -620,10 +620,10 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                       >
                         <div className="flex flex-col items-center gap-0.5">
                           <span className="text-[9px] uppercase opacity-60">
-                            {d.toLocaleDateString("it-IT", { weekday: "short" })}
+                            {d.toLocaleDateString(undefined, { weekday: "short" })}
                           </span>
                           <span className="font-medium text-[11px]">
-                            {d.toLocaleDateString("it-IT", { day: "2-digit" })}
+                            {d.toLocaleDateString(undefined, { day: "2-digit" })}
                           </span>
                           {isToday && <span className="h-1 w-1 rounded-full bg-indigo-500" />}
                         </div>
@@ -747,7 +747,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                           <span className="font-medium text-[11px]">{conflict.userName}</span>
                           <span className="text-muted-foreground text-[11px]">·</span>
                           <span className="text-[11px] text-muted-foreground capitalize">
-                            {new Date(`${conflict.date}T00:00:00`).toLocaleDateString("it-IT", {
+                            {new Date(`${conflict.date}T00:00:00`).toLocaleDateString(undefined, {
                               weekday: "short",
                               day: "2-digit",
                               month: "short",
@@ -789,7 +789,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                       <p className="font-semibold text-sm">{selected.userName}</p>
                     </div>
                     <p className="text-muted-foreground text-xs capitalize">
-                      {new Date(`${selected.date}T00:00:00`).toLocaleDateString("it-IT", {
+                      {new Date(`${selected.date}T00:00:00`).toLocaleDateString(undefined, {
                         weekday: "long",
                         day: "2-digit",
                         month: "long",

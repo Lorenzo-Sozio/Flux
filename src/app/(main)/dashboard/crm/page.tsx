@@ -17,12 +17,11 @@ import {
   TrendingUpIcon,
   UsersIcon,
 } from "lucide-react";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { getAppointmentCalendarEvents } from "@/actions/appointments";
-import { getLeads } from "@/actions/crm";
+import { getRecentLeads } from "@/actions/crm";
 import { getDashboardStats, getRecentActivities, getTopDeals } from "@/actions/dashboard";
-import { auth } from "@/auth";
 import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
 import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
 import CRMCharts from "@/components/dashboard/CRMCharts.client";
@@ -31,6 +30,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { activities, companies, contacts, deals, leads, salesTargets, tasks, tickets } from "@/db/schema";
+import { getActor } from "@/lib/auth-guard";
+import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
 
 import { type AgendaItem, AgendaWidget } from "./_components/agenda-widget";
@@ -45,28 +46,31 @@ const ACTIVITY_ICON: Record<string, React.ReactNode> = {
   note: <ClipboardIcon className="h-3.5 w-3.5 text-amber-500" />,
 };
 
-function timeAgo(date: Date | null): string {
+/**
+ * Dates and times follow the reader's language.
+ *
+ * This screen formatted with `it-IT` hardcoded in three places, the forecast with
+ * `en-US` and the email worker with `en-GB`, in a product that ships in two
+ * languages (audit rilievo U-06). `Intl.RelativeTimeFormat` also removes three
+ * hand-written Italian suffixes that no translation file knew about.
+ */
+function timeAgo(date: Date | null, locale: string): string {
   if (!date) return "";
-  const diff = Date.now() - new Date(date).getTime();
-  const mins = Math.floor(diff / 60_000);
-  if (mins < 60) return `${mins}m fa`;
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto", style: "narrow" });
+  const mins = Math.floor((Date.now() - new Date(date).getTime()) / 60_000);
+  if (mins < 60) return rtf.format(-mins, "minute");
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h fa`;
-  return `${Math.floor(hrs / 24)}g fa`;
+  if (hrs < 24) return rtf.format(-hrs, "hour");
+  return rtf.format(-Math.floor(hrs / 24), "day");
 }
 
-function greeting(hour: number, name: string) {
-  const g = hour < 12 ? "Buongiorno" : hour < 18 ? "Buon pomeriggio" : "Buonasera";
-  return `${g}, ${name}`;
-}
-
-function formatDueTime(d: Date | null) {
+function formatDueTime(d: Date | null, locale: string) {
   if (!d) return null;
-  return new Date(d).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+  return new Date(d).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
-function formatToday(d: Date) {
-  return d.toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" });
+function formatToday(d: Date, locale: string) {
+  return d.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -76,11 +80,14 @@ export default async function CRMPage() {
   const t = await getTranslations("crm");
   const tc = await getTranslations("common");
 
-  const session = await auth();
-  const userId = session?.user?.id;
-  const userName = session?.user?.name?.split(" ")[0] ?? "Utente";
-  const role = session?.user?.role ?? "user";
-  const isPrivileged = role === "admin" || role === "owner";
+  const locale = await getLocale();
+  const actor = await getActor();
+  const userId = actor?.userId;
+  const userName = actor?.name?.split(" ")[0] ?? tc("there");
+  // The workspace role. This read the platform staff field, which is "user" for
+  // every customer, so a workspace owner saw only their own tickets and activities
+  // on their own dashboard (audit rilievo P-01).
+  const isPrivileged = can(actor, "user:read");
 
   const now = new Date();
   const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
@@ -112,7 +119,7 @@ export default async function CRMPage() {
     wonThisMonth,
   ] = await Promise.all([
     getDashboardStats(),
-    getLeads(),
+    getRecentLeads(5),
     getTopDeals(5),
     getRecentActivities(10),
 
@@ -342,22 +349,28 @@ export default async function CRMPage() {
     ),
   ];
 
-  const recentLeads = (rawLeads || [])
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5);
+  // Already the five most recent, ordered by the database. This used to load every
+  // lead in the workspace, sort them in JavaScript and throw all but five away
+  // (audit rilievo B-08).
+  const recentLeads = rawLeads;
 
   return (
     <div className="space-y-8 p-6">
       {/* ── Greeting + date ─────────────────────────────────────────── */}
       <div>
-        <h1 className="font-bold text-3xl tracking-tight">{greeting(now.getHours(), userName)} 👋</h1>
-        <p className="mt-0.5 text-muted-foreground capitalize">{formatToday(now)}</p>
+        <h1 className="font-bold text-3xl tracking-tight">
+          {t(now.getHours() < 12 ? "greetingMorning" : now.getHours() < 18 ? "greetingAfternoon" : "greetingEvening", {
+            name: userName,
+          })}{" "}
+          👋
+        </h1>
+        <p className="mt-0.5 text-muted-foreground capitalize">{formatToday(now, locale)}</p>
       </div>
 
       {/* ── Agenda + Tickets ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
         <div className="xl:col-span-2">
-          <AgendaWidget items={agendaItems} dateLabel={formatToday(now)} />
+          <AgendaWidget items={agendaItems} dateLabel={formatToday(now, locale)} />
         </div>
 
         {/* Tickets */}
@@ -409,10 +422,10 @@ export default async function CRMPage() {
                       </div>
                       <p className="truncate font-medium text-sm group-hover:text-primary">{ticket.subject}</p>
                       <p className="mt-0.5 text-muted-foreground text-xs">
-                        aggiornato {timeAgo(ticket.updatedAt)}
+                        aggiornato {timeAgo(ticket.updatedAt, locale)}
                         {slaUrgent && ticket.slaDeadlineAt && (
                           <span className="ml-2 font-medium text-red-500">
-                            · SLA scade {formatDueTime(ticket.slaDeadlineAt)}
+                            · SLA scade {formatDueTime(ticket.slaDeadlineAt, locale)}
                           </span>
                         )}
                       </p>
@@ -531,7 +544,7 @@ export default async function CRMPage() {
         <MonthTargetCard
           myTarget={myTarget}
           wonThisMonth={wonThisMonth}
-          monthLabel={now.toLocaleDateString("it-IT", { month: "long", year: "numeric" })}
+          monthLabel={now.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
         />
       )}
 
@@ -627,7 +640,7 @@ export default async function CRMPage() {
                         )}
                         <div className="mt-1 flex items-center gap-2">
                           {act.ownerName && <span className="text-[10px] text-muted-foreground">{act.ownerName}</span>}
-                          <span className="text-[10px] text-muted-foreground">{timeAgo(act.createdAt)}</span>
+                          <span className="text-[10px] text-muted-foreground">{timeAgo(act.createdAt, locale)}</span>
                         </div>
                       </div>
                     </div>

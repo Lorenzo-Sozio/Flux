@@ -59,6 +59,7 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
   useEffect(() => {
     getTimeLogs(taskId)
       .then(setLogs)
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
       .catch(() => {});
     const stored = localStorage.getItem(STORAGE_KEY(taskId));
     if (stored) {
@@ -238,7 +239,7 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
               <span className="truncate flex-1">{log.userName ?? log.userId}</span>
               {log.note && <span className="truncate max-w-[100px] italic">{log.note}</span>}
               <span className="shrink-0">
-                {new Date(log.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
+                {new Date(log.createdAt).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
               </span>
               <button
                 type="button"

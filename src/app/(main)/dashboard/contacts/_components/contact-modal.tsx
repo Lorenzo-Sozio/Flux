@@ -23,7 +23,13 @@ import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
-import { checkContactDuplicates, createContact, deleteContact, getCompanies, updateContact } from "@/actions/crm";
+import {
+  checkContactDuplicates,
+  createContact,
+  deleteContact,
+  getCompaniesForSelect,
+  updateContact,
+} from "@/actions/crm";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
 import { GeoAddressFields } from "@/components/crm/geo-address-fields";
 import { Button } from "@/components/ui/button";
@@ -113,7 +119,8 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
 
   useEffect(() => {
     if (open) {
-      getCompanies().then((rows) => setCompanies(rows.map((c) => ({ id: c.id, name: c.name }))));
+      // A dropdown needs id and name, not every column of every company.
+      getCompaniesForSelect().then(setCompanies);
     }
   }, [open]);
 

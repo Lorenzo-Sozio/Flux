@@ -177,8 +177,8 @@ function formatStamp(date: Date) {
   const diff = now - date.getTime();
   if (diff < 60_000) return "Adesso";
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m fa`;
-  if (diff < 86_400_000) return date.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
-  return date.toLocaleDateString("it-IT", {
+  if (diff < 86_400_000) return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleDateString(undefined, {
     day: "numeric",
     month: "short",
     hour: "2-digit",
@@ -226,13 +226,13 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
 
   return (
     <Card>
-      <CardHeader className="pb-2 pt-3 px-3">
-        <CardTitle className="flex items-center justify-between text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+      <CardHeader className="px-3 pt-3 pb-2">
+        <CardTitle className="flex items-center justify-between font-semibold text-muted-foreground text-xs uppercase tracking-wide">
           <span className="flex items-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5" />
             Attività
             {tasks.length > 0 && (
-              <span className="rounded-full bg-muted px-1.5 py-0.5 font-normal normal-case tracking-normal text-[10px]">
+              <span className="rounded-full bg-muted px-1.5 py-0.5 font-normal text-[10px] normal-case tracking-normal">
                 {tasks.length}
               </span>
             )}
@@ -240,13 +240,13 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
           <button
             type="button"
             onClick={() => setAdding((v) => !v)}
-            className="flex items-center gap-0.5 font-medium normal-case tracking-normal text-xs hover:text-foreground transition-colors"
+            className="flex items-center gap-0.5 font-medium text-xs normal-case tracking-normal transition-colors hover:text-foreground"
           >
             <Plus className="h-3.5 w-3.5" /> Nuova
           </button>
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-3 pb-3 space-y-1">
+      <CardContent className="space-y-1 px-3 pb-3">
         {adding && (
           <form onSubmit={handleSubmit(onSubmit)} className="mb-2 space-y-2 rounded-lg border bg-muted/30 p-2.5">
             <Input {...register("title")} placeholder="Titolo attività…" className="h-8 text-sm" autoFocus />
@@ -274,14 +274,14 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
                   setAdding(false);
                   reset();
                 }}
-                className="rounded px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
+                className="rounded px-2 py-1 text-muted-foreground text-xs hover:text-foreground"
               >
                 Annulla
               </button>
               <button
                 type="submit"
                 disabled={saving}
-                className="rounded bg-primary px-3 py-1 font-semibold text-xs text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                className="rounded bg-primary px-3 py-1 font-semibold text-primary-foreground text-xs hover:bg-primary/90 disabled:opacity-50"
               >
                 {saving ? "…" : "Crea"}
               </button>
@@ -312,12 +312,12 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
                     className={`h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOT[task.priority] ?? PRIORITY_DOT.normal}`}
                   />
                   {task.dueDate && (
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {new Date(task.dueDate).toLocaleDateString("it-IT", { day: "2-digit", month: "short" })}
+                    <span className="text-muted-foreground text-xs tabular-nums">
+                      {new Date(task.dueDate).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
                     </span>
                   )}
                   {task.assigneeName && (
-                    <span className="truncate text-xs text-muted-foreground">{task.assigneeName}</span>
+                    <span className="truncate text-muted-foreground text-xs">{task.assigneeName}</span>
                   )}
                 </div>
               </div>
@@ -380,8 +380,8 @@ function AuditEvent({ entry }: { entry: any }) {
   const label = AUDIT_LABELS[entry.action] ?? entry.action;
   return (
     <div className="flex items-center gap-3 py-1">
-      <div className="flex-1 h-px bg-border" />
-      <div className="flex items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap">
+      <div className="h-px flex-1 bg-border" />
+      <div className="flex items-center gap-1.5 whitespace-nowrap text-muted-foreground text-xs">
         <Activity className="h-2.5 w-2.5 shrink-0" />
         <span className="font-medium">{actor}</span>
         <span>·</span>
@@ -396,7 +396,7 @@ function AuditEvent({ entry }: { entry: any }) {
         <span>·</span>
         <span>{formatStamp(new Date(entry.createdAt))}</span>
       </div>
-      <div className="flex-1 h-px bg-border" />
+      <div className="h-px flex-1 bg-border" />
     </div>
   );
 }
@@ -436,26 +436,39 @@ function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent
       <div className="rounded-xl border border-amber-200/60 bg-amber-50/70 px-4 py-3 dark:border-amber-800/30 dark:bg-amber-950/20">
         <div className="mb-1.5 flex items-center gap-2">
           <div
-            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-[10px] font-bold ${avatarColor(senderName)}`}
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-bold text-[10px] text-white ${avatarColor(senderName)}`}
           >
             {initials(senderName)}
           </div>
-          <span className="font-semibold text-sm text-amber-800 dark:text-amber-300">{senderName}</span>
+          <span className="font-semibold text-amber-800 text-sm dark:text-amber-300">{senderName}</span>
           <Badge
             variant="secondary"
             className="h-4 gap-0.5 bg-amber-100 px-1.5 text-[10px] text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
           >
             <Lock className="h-2.5 w-2.5" /> Nota interna
           </Badge>
-          <span className="ml-auto text-xs text-amber-600/70 dark:text-amber-500/60">{stamp}</span>
+          <span className="ml-auto text-amber-600/70 text-xs dark:text-amber-500/60">{stamp}</span>
         </div>
         {msg.content?.startsWith("<") ? (
           <div
-            className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed prose-p:text-amber-900 dark:prose-p:text-amber-100"
+            className="prose prose-sm dark:prose-invert max-w-none prose-p:text-amber-900 text-sm leading-relaxed dark:prose-p:text-amber-100"
+            // WARN Message bodies arrive from inbound customer email and are rendered without
+            // sanitisation. What stops that being stored XSS today is the Content-Security-Policy
+            // in src/proxy.ts, and only that: no `unsafe-inline` in script-src blocks <script>,
+            // inline handlers and javascript: URLs; `frame-src 'none'` blocks iframes;
+            // `form-action 'self'` blocks credential-harvesting forms; `img-src 'self' data: blob:`
+            // blocks tracking pixels. What remains possible is visual defacement through inline
+            // CSS, which style-src does allow.
+            //
+            // WARN Weakening that CSP turns this into code execution in an authenticated agent's
+            // browser. Sanitising properly needs an HTML parser that runs on Workers — jsdom does
+            // not, and the bundle is already near the 10 MB limit — so this is a known open item,
+            // not an oversight.
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML, contained by the CSP
             dangerouslySetInnerHTML={{ __html: msg.content }}
           />
         ) : (
-          <p className="whitespace-pre-wrap text-sm leading-relaxed text-amber-900 dark:text-amber-100">
+          <p className="whitespace-pre-wrap text-amber-900 text-sm leading-relaxed dark:text-amber-100">
             {msg.content}
           </p>
         )}
@@ -466,17 +479,18 @@ function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent
 
   if (isAgent) {
     return (
-      <div className="flex gap-3 justify-end">
-        <div className="max-w-[85%] min-w-0">
+      <div className="flex justify-end gap-3">
+        <div className="min-w-0 max-w-[85%]">
           <div className="mb-1 flex items-center justify-end gap-2">
             {msg.channel && <span className="text-muted-foreground/60">{CHANNEL_ICONS[msg.channel]}</span>}
-            <span className="text-xs text-muted-foreground/70">{stamp}</span>
+            <span className="text-muted-foreground/70 text-xs">{stamp}</span>
             <span className="font-semibold text-sm">{senderName}</span>
           </div>
-          <div className="rounded-2xl rounded-tr-sm bg-primary/8 dark:bg-primary/12 border border-primary/12 px-4 py-3">
+          <div className="rounded-2xl rounded-tr-sm border border-primary/12 bg-primary/8 px-4 py-3 dark:bg-primary/12">
             {msg.content?.startsWith("<") ? (
               <div
                 className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML, contained by the CSP; see the first occurrence
                 dangerouslySetInnerHTML={{ __html: msg.content }}
               />
             ) : (
@@ -486,7 +500,7 @@ function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent
           </div>
         </div>
         <div
-          className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-[10px] font-bold self-start ${avatarColor(senderName)}`}
+          className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center self-start rounded-full bg-gradient-to-br font-bold text-[10px] text-white ${avatarColor(senderName)}`}
         >
           {initials(senderName)}
         </div>
@@ -498,21 +512,22 @@ function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent
   return (
     <div className="flex gap-3">
       <div
-        className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-[10px] font-bold self-start ${avatarColor(senderName)}`}
+        className={`mt-1 flex h-7 w-7 shrink-0 items-center justify-center self-start rounded-full bg-gradient-to-br font-bold text-[10px] text-white ${avatarColor(senderName)}`}
       >
         {initials(senderName)}
       </div>
-      <div className="max-w-[85%] min-w-0">
+      <div className="min-w-0 max-w-[85%]">
         <div className="mb-1 flex items-center gap-2">
           <span className="font-semibold text-sm">{senderName}</span>
-          {msg.senderEmail && <span className="text-xs text-muted-foreground/70">&lt;{msg.senderEmail}&gt;</span>}
+          {msg.senderEmail && <span className="text-muted-foreground/70 text-xs">&lt;{msg.senderEmail}&gt;</span>}
           {msg.channel && <span className="text-muted-foreground/60">{CHANNEL_ICONS[msg.channel]}</span>}
-          <span className="text-xs text-muted-foreground/70">{stamp}</span>
+          <span className="text-muted-foreground/70 text-xs">{stamp}</span>
         </div>
-        <div className="rounded-2xl rounded-tl-sm bg-muted/60 border border-border/60 px-4 py-3">
+        <div className="rounded-2xl rounded-tl-sm border border-border/60 bg-muted/60 px-4 py-3">
           {msg.content?.startsWith("<") ? (
             <div
               className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML, contained by the CSP; see the first occurrence
               dangerouslySetInnerHTML={{ __html: msg.content }}
             />
           ) : (
@@ -541,31 +556,31 @@ function ContactCard({ ticket }: { ticket: any }) {
   const name = contact.name ?? (`${contact.firstName ?? ""} ${contact.lastName ?? ""}`.trim() || "—");
   return (
     <Card>
-      <CardHeader className="pb-2 pt-3 px-3">
-        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+      <CardHeader className="px-3 pt-3 pb-2">
+        <CardTitle className="flex items-center gap-1.5 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
           <User className="h-3.5 w-3.5" /> Cliente
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-3 pb-3 space-y-2.5">
+      <CardContent className="space-y-2.5 px-3 pb-3">
         <div className="flex items-center gap-2.5">
           <div
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br text-white text-xs font-bold ${avatarColor(name)}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br font-bold text-white text-xs ${avatarColor(name)}`}
           >
             {initials(name)}
           </div>
           <div className="min-w-0">
-            <p className="font-semibold text-sm truncate">{name}</p>
-            {contact.email && <p className="text-sm text-muted-foreground truncate">{contact.email}</p>}
+            <p className="truncate font-semibold text-sm">{name}</p>
+            {contact.email && <p className="truncate text-muted-foreground text-sm">{contact.email}</p>}
           </div>
         </div>
         {contact.phone && (
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <div className="flex items-center gap-1.5 text-muted-foreground text-sm">
             <Phone className="h-3.5 w-3.5 shrink-0" />
             {contact.phone}
           </div>
         )}
         {ticket.company && (
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground border-t pt-2">
+          <div className="flex items-center gap-1.5 border-t pt-2 text-muted-foreground text-sm">
             <Building2 className="h-3.5 w-3.5 shrink-0" />
             <span className="font-medium text-foreground">{ticket.company.name}</span>
           </div>
@@ -588,22 +603,22 @@ function PropertiesCard({
 }) {
   return (
     <Card>
-      <CardHeader className="pb-2 pt-3 px-3">
-        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Proprietà</CardTitle>
+      <CardHeader className="px-3 pt-3 pb-2">
+        <CardTitle className="font-semibold text-muted-foreground text-xs uppercase tracking-wide">Proprietà</CardTitle>
       </CardHeader>
-      <CardContent className="px-3 pb-3 space-y-3">
+      <CardContent className="space-y-3 px-3 pb-3">
         {/* Status pills */}
         <div>
-          <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Stato</p>
+          <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">Stato</p>
           <div className="flex flex-wrap gap-1">
             {STATUS_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => onStatusChange(opt.value)}
-                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition-all ${
+                className={`rounded-full px-2.5 py-0.5 font-semibold text-xs transition-all ${
                   ticket.status === opt.value
-                    ? `${opt.color} ring-1 ring-inset ring-current/30`
+                    ? `${opt.color} ring-1 ring-current/30 ring-inset`
                     : "bg-muted/50 text-muted-foreground hover:bg-muted"
                 }`}
               >
@@ -615,16 +630,16 @@ function PropertiesCard({
 
         {/* Priority */}
         <div>
-          <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Priorità</p>
+          <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">Priorità</p>
           <div className="flex gap-1">
             {PRIORITY_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 type="button"
                 onClick={() => onPriorityChange(opt.value)}
-                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold transition-all ${
+                className={`rounded-full px-2.5 py-0.5 font-semibold text-xs transition-all ${
                   (ticket.priority ?? "normal") === opt.value
-                    ? `bg-muted ${opt.color} ring-1 ring-inset ring-current/20`
+                    ? `bg-muted ${opt.color} ring-1 ring-current/20 ring-inset`
                     : "bg-muted/50 text-muted-foreground hover:bg-muted"
                 }`}
               >
@@ -636,16 +651,16 @@ function PropertiesCard({
 
         {/* Assignee */}
         <div>
-          <p className="mb-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wide">Assegnato a</p>
+          <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">Assegnato a</p>
           <button
             type="button"
             onClick={onReassign}
-            className="group flex w-full items-center gap-2 rounded-lg border border-dashed border-border/60 px-2.5 py-1.5 transition-colors hover:border-primary/40 hover:bg-primary/5"
+            className="group flex w-full items-center gap-2 rounded-lg border border-border/60 border-dashed px-2.5 py-1.5 transition-colors hover:border-primary/40 hover:bg-primary/5"
           >
             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted">
               <User className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
-            <span className="truncate text-sm font-medium">{ticket.assignee?.name ?? "Non assegnato"}</span>
+            <span className="truncate font-medium text-sm">{ticket.assignee?.name ?? "Non assegnato"}</span>
             <MoreHorizontal className="ml-auto h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </button>
         </div>
@@ -682,27 +697,27 @@ function SLACard({
   if (!ticket.sla && !ticket.firstResponseAt && !ticket.resolvedAt) return null;
   return (
     <Card>
-      <CardHeader className="pb-2 pt-3 px-3">
-        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+      <CardHeader className="px-3 pt-3 pb-2">
+        <CardTitle className="flex items-center gap-1.5 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
           <Clock className="h-3.5 w-3.5" /> SLA
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-3 pb-3 space-y-2">
+      <CardContent className="space-y-2 px-3 pb-3">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Prima risposta</span>
+          <span className="text-muted-foreground text-sm">Prima risposta</span>
           {ticket.firstResponseAt ? (
-            <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-              ✓ {new Date(ticket.firstResponseAt).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}
+            <span className="font-semibold text-emerald-600 text-sm dark:text-emerald-400">
+              ✓ {new Date(ticket.firstResponseAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
             </span>
           ) : (
             <SLATimer targetDate={slaFirstTarget} />
           )}
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Risoluzione</span>
+          <span className="text-muted-foreground text-sm">Risoluzione</span>
           {ticket.resolvedAt ? (
-            <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-              ✓ {new Date(ticket.resolvedAt).toLocaleDateString("it-IT", { day: "numeric", month: "short" })}
+            <span className="font-semibold text-emerald-600 text-sm dark:text-emerald-400">
+              ✓ {new Date(ticket.resolvedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
             </span>
           ) : (
             <SLATimer targetDate={slaResTarget} />
@@ -710,9 +725,9 @@ function SLACard({
         </div>
         {ticket.closedAt && (
           <div className="flex items-center justify-between border-t pt-2">
-            <span className="text-sm text-muted-foreground">Chiuso</span>
+            <span className="text-muted-foreground text-sm">Chiuso</span>
             <span className="font-mono text-sm">
-              {new Date(ticket.closedAt).toLocaleDateString("it-IT", {
+              {new Date(ticket.closedAt).toLocaleDateString(undefined, {
                 day: "numeric",
                 month: "short",
                 hour: "2-digit",
@@ -729,20 +744,20 @@ function SLACard({
 function AttachmentsCard({ docs }: { docs: any[] }) {
   return (
     <Card>
-      <CardHeader className="pb-2 pt-3 px-3">
-        <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+      <CardHeader className="px-3 pt-3 pb-2">
+        <CardTitle className="flex items-center gap-1.5 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
           <Paperclip className="h-3.5 w-3.5" />
           Allegati
           {docs.length > 0 && (
-            <span className="rounded-full bg-muted px-1.5 py-0.5 font-normal normal-case tracking-normal text-[10px] text-muted-foreground">
+            <span className="rounded-full bg-muted px-1.5 py-0.5 font-normal text-[10px] text-muted-foreground normal-case tracking-normal">
               {docs.length}
             </span>
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent className="px-3 pb-3 space-y-1">
+      <CardContent className="space-y-1 px-3 pb-3">
         {docs.length === 0 ? (
-          <p className="py-0.5 text-sm text-muted-foreground italic">Nessun allegato</p>
+          <p className="py-0.5 text-muted-foreground text-sm italic">Nessun allegato</p>
         ) : (
           docs.map((doc) => {
             const isPdf = doc.mimeType === "application/pdf";
@@ -757,10 +772,10 @@ function AttachmentsCard({ docs }: { docs: any[] }) {
               >
                 <FileText className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium leading-snug group-hover:text-primary">{doc.name}</p>
-                  {doc.size != null && <p className="text-xs text-muted-foreground">{formatBytes(doc.size)}</p>}
+                  <p className="truncate font-medium text-sm leading-snug group-hover:text-primary">{doc.name}</p>
+                  {doc.size != null && <p className="text-muted-foreground text-xs">{formatBytes(doc.size)}</p>}
                 </div>
-                <ExternalLink className="h-3 w-3 text-muted-foreground/40 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <ExternalLink className="h-3 w-3 text-muted-foreground/40 opacity-0 transition-opacity group-hover:opacity-100" />
               </a>
             );
           })
@@ -832,7 +847,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   useEffect(() => {
     loadTicket();
     getMacros().then(setMacros).catch(console.error);
-  }, [id, loadTicket]);
+  }, [loadTicket]);
   useEffect(() => {
     if (!loading) scrollToBottom();
   }, [loading, scrollToBottom]);
@@ -969,12 +984,12 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex flex-col gap-0 animate-pulse p-6">
-        <div className="h-4 w-28 rounded bg-muted mb-6" />
-        <div className="h-7 w-96 rounded bg-muted mb-3" />
-        <div className="h-4 w-64 rounded bg-muted mb-6" />
+      <div className="flex animate-pulse flex-col gap-0 p-6">
+        <div className="mb-6 h-4 w-28 rounded bg-muted" />
+        <div className="mb-3 h-7 w-96 rounded bg-muted" />
+        <div className="mb-6 h-4 w-64 rounded bg-muted" />
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-3">
+          <div className="space-y-3 lg:col-span-2">
             <div className="h-80 rounded-xl bg-muted" />
             <div className="h-40 rounded-xl bg-muted" />
           </div>
@@ -1007,17 +1022,17 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       {/* Cancel parent vertical padding only, fill viewport below the 3rem app header */}
       <div className="-my-4 md:-my-6 flex flex-col overflow-hidden" style={{ height: "calc(100vh - 3rem)" }}>
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div className="shrink-0 border-b bg-background px-6 pb-4 pt-5">
+        <div className="shrink-0 border-b bg-background px-6 pt-5 pb-4">
           {/* Breadcrumb + actions */}
           <div className="mb-3 flex items-center justify-between gap-4">
             <Link
               href="/dashboard/support/tickets"
-              className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="inline-flex items-center gap-1.5 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground"
             >
               <ArrowLeft className="h-3.5 w-3.5" /> Tutti i ticket
             </Link>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-semibold text-muted-foreground">{ticket.ticketNumber}</span>
+              <span className="font-mono font-semibold text-muted-foreground text-xs">{ticket.ticketNumber}</span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8 gap-1">
@@ -1044,7 +1059,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
           </div>
 
           {/* Title */}
-          <h1 className="font-bold text-2xl leading-tight tracking-tight mb-2">{ticket.subject}</h1>
+          <h1 className="mb-2 font-bold text-2xl leading-tight tracking-tight">{ticket.subject}</h1>
 
           {/* Meta row */}
           <div className="flex flex-wrap items-center gap-2">
@@ -1064,9 +1079,9 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                 {tag}
               </Badge>
             ))}
-            <span className="flex items-center gap-1 text-xs text-muted-foreground ml-1">
+            <span className="ml-1 flex items-center gap-1 text-muted-foreground text-xs">
               <Clock className="h-3.5 w-3.5" />
-              {new Date(ticket.createdAt).toLocaleString("it-IT", {
+              {new Date(ticket.createdAt).toLocaleString(undefined, {
                 day: "numeric",
                 month: "short",
                 year: "numeric",
@@ -1078,12 +1093,12 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
         </div>
 
         {/* ── Body grid ───────────────────────────────────────────────────── */}
-        <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1fr_300px]">
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_300px]">
           {/* ── Left: Conversation ──────────────────────────────────────── */}
-          <div className="flex flex-col min-h-0 border-r">
+          <div className="flex min-h-0 flex-col border-r">
             {/* Typing presence banner */}
             {typingUsers.length > 0 && (
-              <div className="flex items-center gap-2 border-b bg-amber-50/80 px-6 py-2 text-xs text-amber-700 dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-400">
+              <div className="flex items-center gap-2 border-b bg-amber-50/80 px-6 py-2 text-amber-700 text-xs dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-400">
                 <span className="flex gap-0.5">
                   {[0, 150, 300].map((d) => (
                     <span
@@ -1098,12 +1113,12 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             )}
 
             {/* Timeline */}
-            <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-4">
+            <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
               {timeline.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <MessageSquare className="mb-3 h-10 w-10 text-muted-foreground/20" />
-                  <p className="text-sm text-muted-foreground">Nessun messaggio ancora.</p>
-                  <p className="text-xs text-muted-foreground/60 mt-1">Invia la prima risposta qui sotto.</p>
+                  <p className="text-muted-foreground text-sm">Nessun messaggio ancora.</p>
+                  <p className="mt-1 text-muted-foreground/60 text-xs">Invia la prima risposta qui sotto.</p>
                 </div>
               ) : (
                 timeline.map((item, i) => {
@@ -1120,10 +1135,10 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
             {/* ── Reply area ──────────────────────────────────────────── */}
             <div
-              className={`shrink-0 border-t p-4 space-y-3 ${isInternal ? "bg-amber-50/40 dark:bg-amber-950/10" : "bg-background"}`}
+              className={`shrink-0 space-y-3 border-t p-4 ${isInternal ? "bg-amber-50/40 dark:bg-amber-950/10" : "bg-background"}`}
             >
               {/* Public / Internal toggle */}
-              <div className="flex items-center gap-1 w-fit rounded-lg border bg-muted/40 p-0.5">
+              <div className="flex w-fit items-center gap-1 rounded-lg border bg-muted/40 p-0.5">
                 {[
                   { val: false, icon: Send, label: "Risposta pubblica" },
                   { val: true, icon: Lock, label: "Nota interna" },
@@ -1132,7 +1147,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                     key={String(val)}
                     type="button"
                     onClick={() => setIsInternal(val)}
-                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium transition-all ${
+                    className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 font-medium text-sm transition-all ${
                       isInternal === val
                         ? val
                           ? "bg-amber-100 text-amber-700 shadow-sm dark:bg-amber-900/40 dark:text-amber-300"
@@ -1146,7 +1161,11 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                 ))}
               </div>
 
-              {/* Editor */}
+              {/* Editor.
+                  The wrapper carries the Ctrl+Enter shortcut for the editor inside it;
+                  it is not itself a control, and giving it a role or a tab stop would
+                  put an extra, meaningless stop in the tab order. */}
+              {/* biome-ignore lint/a11y/noStaticElementInteractions: keyboard shortcut for the focusable editor within */}
               <div
                 onKeyDown={(e) => {
                   if (e.ctrlKey && e.key === "Enter") {
@@ -1163,6 +1182,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ action: "typing" }),
+                      // A failed presence ping must not interrupt the agent's reply.
+                      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
                     }).catch(() => {});
                   }}
                   placeholder={
@@ -1175,7 +1196,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
               {/* Footer */}
               <div className="flex items-center justify-between">
-                <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                <p className="flex items-center gap-1 text-muted-foreground text-xs">
                   {isInternal ? (
                     <>
                       <Shield className="h-3 w-3" /> Visibile solo agli agenti
@@ -1212,7 +1233,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                           >
                             <span className="font-medium text-sm">{macro.name}</span>
                             {macro.description && (
-                              <span className="w-full truncate text-xs text-muted-foreground">{macro.description}</span>
+                              <span className="w-full truncate text-muted-foreground text-xs">{macro.description}</span>
                             )}
                           </DropdownMenuItem>
                         ))}

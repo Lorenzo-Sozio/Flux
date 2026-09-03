@@ -190,7 +190,7 @@ export default function QuotesPage() {
                   {tc("value")} {tc("total")}
                 </p>
                 <p className="mt-1 font-bold text-2xl">
-                  ${stats.totalValue.toLocaleString("en-US", { maximumFractionDigits: 0 })}
+                  ${stats.totalValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-50">

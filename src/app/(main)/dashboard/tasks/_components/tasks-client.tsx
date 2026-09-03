@@ -263,7 +263,7 @@ function TaskCard({
                 )}
               >
                 {overdue && <AlertCircle className="-mt-0.5 mr-0.5 inline h-2.5 w-2.5" />}
-                {new Date(task.dueDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })}
+                {new Date(task.dueDate).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
               </span>
             )}
             {entity && (
@@ -708,9 +708,7 @@ export function TasksClient({
                                 className="flex items-center gap-1 px-0.5 pt-1 pb-0.5 first:pt-0"
                               >
                                 <PIcon className={cn("h-3 w-3 shrink-0", pColor)} />
-                                <span
-                                  className={cn("font-semibold uppercase tracking-wider text-[9px]", pColor)}
-                                >
+                                <span className={cn("font-semibold uppercase tracking-wider text-[9px]", pColor)}>
                                   {t(`priorities.${pKey}`)}
                                 </span>
                                 <span className="ml-auto font-medium text-[9px] text-muted-foreground/50 tabular-nums">
@@ -890,7 +888,7 @@ export function TasksClient({
                               )}
                             >
                               {overdue && <AlertCircle className="-mt-0.5 mr-1 inline h-3 w-3" />}
-                              {new Date(task.dueDate).toLocaleDateString("en-GB", {
+                              {new Date(task.dueDate).toLocaleDateString(undefined, {
                                 day: "2-digit",
                                 month: "short",
                                 year: "numeric",

@@ -1,16 +1,24 @@
-import { getCompanies, getContacts } from "@/actions/crm";
+import { getCompaniesForSelect, getContactsForSelect } from "@/actions/crm";
 import { getPipelineData } from "@/actions/pipeline";
-import { auth } from "@/auth";
+import { hasCapability } from "@/lib/auth-guard";
 
 import { PipelineBoard } from "./components/pipeline-board";
 
 export default async function PipelinePage() {
-  const session = await auth();
-  const role = session?.user?.role;
-  const canEdit = role !== "viewer";
-  const canManageStages = role === "admin" || role === "owner";
+  // Workspace role, not the platform staff field (audit rilievo U-02).
+  const [canEdit, canManageStages] = await Promise.all([
+    hasCapability("record:write"),
+    hasCapability("pipeline:manage"),
+  ]);
 
-  const [data, companies, contacts] = await Promise.all([getPipelineData(), getCompanies(), getContacts()]);
+  // The deal modal needs two dropdowns, not every column of every record. These
+  // used to load the full contact and company tables on each visit to the board
+  // (audit rilievo B-08).
+  const [data, companies, contacts] = await Promise.all([
+    getPipelineData(),
+    getCompaniesForSelect(),
+    getContactsForSelect(),
+  ]);
 
   return (
     <div className="p-4 sm:p-6 md:p-8 h-full bg-muted/10">

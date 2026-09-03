@@ -138,7 +138,7 @@ export function SubscriptionsTable({ subscriptions, currentUserId }: Subscriptio
                 <TableCell className="capitalize">{s.subscription.billingCycle}</TableCell>
                 <TableCell>
                   {s.subscription.currentPeriodEnd
-                    ? new Date(s.subscription.currentPeriodEnd).toLocaleDateString("en-GB")
+                    ? new Date(s.subscription.currentPeriodEnd).toLocaleDateString(undefined)
                     : "—"}
                 </TableCell>
                 <TableCell>
