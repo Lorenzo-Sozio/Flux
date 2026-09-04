@@ -569,7 +569,8 @@
       "note": "Note",
       "call": "Call",
       "meeting": "Meeting",
-      "email": "Email"
+      "email": "Email",
+      "order": "Order"
     },
     "priorityLow": "Low",
     "priorityNormal": "Normal",
@@ -1580,7 +1581,9 @@
       "deal": "Deal",
       "lead": "Lead",
       "contact": "Contact",
-      "company": "Company"
+      "company": "Company",
+      "ticket": "Ticket",
+      "order": "Order"
     },
     "triggers": {
       "onCreate": "On Create",
@@ -1786,12 +1789,7 @@
       "viewer": "Viewer"
     },
     "rolePerms": {
-      "owner": [
-        "All admin permissions",
-        "Transfer workspace ownership",
-        "Delete workspace",
-        "Manage billing"
-      ],
+      "owner": ["All admin permissions", "Transfer workspace ownership", "Delete workspace", "Manage billing"],
       "admin": [
         "All user permissions",
         "Invite and manage users",

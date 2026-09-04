@@ -1,12 +1,25 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { and, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { dispatchWebhook } from "@/actions/webhooks";
-import { companies, contacts, deals, orderItems, orders, products, quoteItems, quotes, users } from "@/db/schema";
+import { runAutomations } from "@/components/crm/automation/rule-engine";
+import {
+  activities,
+  companies,
+  contacts,
+  deals,
+  orderItems,
+  orders,
+  products,
+  quoteItems,
+  quotes,
+  users,
+} from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { computeDocument } from "@/lib/document-totals";
 import { nextOrderNumber } from "@/lib/order-number";
@@ -64,6 +77,40 @@ async function orderTotals(
 }
 
 // ── Queries ───────────────────────────────────────────────────────────────────
+
+/**
+ * The order's trace on the customer's own record.
+ *
+ * An order is something that happened to a customer, and the timeline on the
+ * company, the contact and the deal is where a person goes to find out what
+ * happened. Nothing was ever written there, so an order existed only for whoever
+ * thought to open the orders list (audit rilievo M-05).
+ *
+ * An order attached to nobody gets no row: there is no timeline for it to appear
+ * on, and a record no page can reach is weight, not memory.
+ */
+async function recordOrderActivity(
+  db: Awaited<ReturnType<typeof getDb>>,
+  order: { companyId: string | null; contactId: string | null; dealId: string | null; ownerId: string | null },
+  content: string,
+) {
+  if (!order.companyId && !order.contactId && !order.dealId) return;
+  try {
+    await db.insert(activities).values({
+      type: "order",
+      content,
+      date: new Date(),
+      ownerId: order.ownerId,
+      companyId: order.companyId,
+      contactId: order.contactId,
+      dealId: order.dealId,
+    });
+  } catch (err) {
+    // A trace that cannot be written is worth a line in the log, not the rules
+    // that were due to run after it.
+    console.error("[orders] Could not record the order activity:", err);
+  }
+}
 
 export async function getOrders(search?: string) {
   const db = await getDb();
@@ -280,13 +327,30 @@ export async function createOrder(data: z.input<typeof createSchema>) {
     // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
   }).catch(() => {});
 
+  // After the response, like every other module: the writer waits for none of it.
+  after(async () => {
+    await recordOrderActivity(db, order, `Order ${order.orderNumber} created · ${order.totalAmount} ${order.currency}`);
+    await runAutomations({
+      entityType: "order",
+      entityId: order.id,
+      event: "onCreate",
+      oldData: {},
+      newData: order as Record<string, unknown>,
+      currentUserId: actor.userId,
+    });
+  });
+
   return order;
 }
 
 export async function updateOrderStatus(id: string, status: OrderStatus) {
-  await requireCapability("order:write");
+  const actor = await requireCapability("order:write");
   await requirePlanModule("sales");
   const db = await getDb();
+
+  // The state it is leaving, read before it is gone. A rule that fires «when an
+  // order moves to completed» cannot tell a move from a re-save without it.
+  const [previous] = await db.select().from(orders).where(eq(orders.id, id));
   const [updated] = await db.update(orders).set({ status, updatedAt: new Date() }).where(eq(orders.id, id)).returning();
 
   revalidatePath("/dashboard/sales/orders");
@@ -300,6 +364,24 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
       currency: updated.currency,
       // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
     }).catch(() => {});
+
+    after(async () => {
+      if (previous && previous.status !== updated.status) {
+        await recordOrderActivity(
+          db,
+          updated,
+          `Order ${updated.orderNumber} moved from ${previous.status} to ${updated.status}`,
+        );
+      }
+      await runAutomations({
+        entityType: "order",
+        entityId: updated.id,
+        event: "onUpdate",
+        oldData: (previous ?? {}) as Record<string, unknown>,
+        newData: updated as Record<string, unknown>,
+        currentUserId: actor.userId,
+      });
+    });
   }
 }
 
@@ -519,6 +601,39 @@ export async function convertQuoteToOrderAction(quoteId: string) {
   revalidatePath(`/dashboard/sales/quotes/${quoteId}`);
   revalidatePath("/dashboard/sales/orders");
   revalidatePath("/dashboard/pipeline");
+
+  // An order that arrived through a quote is still an order arriving: the same
+  // trace on the record, the same rules, or half the orders are invisible to both.
+  after(async () => {
+    const customer = {
+      companyId: quote.companyId,
+      contactId: quote.contactId,
+      dealId: quote.dealId,
+      ownerId: quote.ownerId ?? actor.userId,
+    };
+    await recordOrderActivity(
+      db,
+      customer,
+      `Order ${orderNumber} created from quote ${quote.quoteNumber} · ${quote.totalAmount} ${quote.currency}`,
+    );
+    await runAutomations({
+      entityType: "order",
+      entityId: orderId,
+      event: "onCreate",
+      oldData: {},
+      newData: {
+        id: orderId,
+        orderNumber,
+        status: "draft",
+        currency: quote.currency,
+        totalAmount: quote.totalAmount,
+        discountPercent: quote.discountPercent ?? "0",
+        quoteId: quote.id,
+        ...customer,
+      },
+      currentUserId: actor.userId,
+    });
+  });
 
   return { success: true, orderId, orderNumber };
 }

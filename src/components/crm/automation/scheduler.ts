@@ -13,7 +13,7 @@
 import { eq } from "drizzle-orm";
 import cron, { type ScheduledTask } from "node-cron";
 
-import { automationRules, companies, contacts, deals, leads, tickets } from "@/db/schema";
+import { automationRules, companies, contacts, deals, leads, orders, tickets } from "@/db/schema";
 import { getDb } from "@/lib/tenant-context";
 
 import type { TargetEntity } from "../../crm/automation/types";
@@ -147,6 +147,7 @@ class SchedulerService {
       contact: contacts,
       company: companies,
       ticket: tickets,
+      order: orders,
     };
 
     const schema = schemaMap[entityType];

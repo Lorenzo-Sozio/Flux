@@ -12,22 +12,28 @@ Aggiornato dopo il primo ciclo di correzioni.
 
 | | |
 |---|---|
-| ✅ Risolti | 47 |
-| ◐ Parziali | 3 |
-| Aperti | 16 |
+| ✅ Risolti | 54 |
+| ◐ Parziali | 5 |
+| Aperti | 7 |
 
 Verifiche dopo le correzioni: build di produzione riuscito, `tsc --noEmit` pulito,
-**189 test** superati (erano 91), **105 mutazioni su 105** catturate (erano 78), zero
+**284 test** superati (erano 91), **148 mutazioni su 148** catturate (erano 78), zero
 errori Biome sui file toccati. Le nuove suite coprono il modello dei permessi,
 l'aritmetica dei documenti commerciali, l'allineamento delle traduzioni, le
 migrazioni dei tenant, il confine server/client della sidebar, la corrispondenza fra
 nomi di aziende e la paginazione — cioè le aree dove un guasto somiglia a un
 successo.
 
-I sedici punti ancora aperti sono quasi tutti opportunità (sezione 7) più quattro
-scelte di modello che richiedono una decisione di prodotto: M-01, M-02, M-06 e
-U-12. I difetti veri rimasti sono B-06 (allegati su filesystem), U-11 (polling) e
-U-13 (controllo duplicati alla digitazione).
+I sette punti ancora aperti non sono difetti. Quattro sono funzioni da costruire
+(S-04, S-05, S-06, S-10) e tre sono scelte di modello che vanno decise prima di
+essere scritte (M-01, M-02, M-06).
+
+Dei cinque parziali ciascuna voce dice cosa le manca. In breve: M-04 aspetta una
+verifica caso per caso delle scritture su più tabelle, ora che conversione lead,
+ordini e preventivi passano tutte da `db.batch`; M-09 ha ancora due librerie di
+trascinamento nello stesso bundle; U-11 lascia fuori le preferenze di notifica per
+tipo e canale; U-12 la procedura di primo accesso e gli stati vuoti; S-07
+l'escalation automatica, che chiede una gerarchia che lo schema non ha.
 
 Due migrazioni tenant. `0002_odd_ulik.sql` aggiunge le colonne mancanti (data di
 chiusura e motivo di perdita sulle trattative, imponibile/imposta/valuta sugli ordini,
@@ -35,9 +41,11 @@ fasi terminali sulla pipeline, scadenza di prima risposta sui ticket) e ripopola
 esistenti. `0003_open_jackpot.sql` rimuove la tabella `opportunity`, verificata vuota su
 ogni tenant. **Vanno applicate a ogni database tenant prima del deploy.**
 
-⚠️ Trovato durante il lavoro e non presente in questa analisi: il corpo dei messaggi
-dei ticket arriva dalle email dei clienti e viene reso senza sanitizzazione. Oggi lo
-contiene soltanto la Content-Security-Policy; il dettaglio è annotato nel codice.
+✅ Trovato durante il lavoro e non presente in questa analisi: il corpo dei messaggi
+dei ticket arriva dalle email dei clienti e veniva reso senza sanitizzazione, contenuto
+dalla sola Content-Security-Policy. Ora passa da `src/lib/sanitize-email-html.ts`, che
+gira senza DOM perché serve al server, al Worker e al browser, e toglie ciò su cui non
+può essere sicuro.
 
 Legenda: ✅ risolto · ◐ risolto in parte, il resto è annotato nel rimedio.
 
@@ -563,7 +571,7 @@ lascia un preventivo vuoto.
 
 **Rimedio.** Transazione attorno a ogni scrittura multi-tabella, e inserzione in blocco.
 
-### M-05 ◐ — Gli ordini vivono fuori dal flusso del prodotto
+### M-05 ✅ — Gli ordini vivono fuori dal flusso del prodotto
 
 Nessun webhook, nessuna automazione, nessuna attività registrata, nessun collegamento a
 preventivo o trattativa. `CLAUDE.md` descrive una sequenza precisa e questo modulo ne
@@ -571,6 +579,28 @@ esegue solo le prime tre voci.
 
 **Rimedio.** Allineare il modulo al pattern documentato ed emettere gli eventi di ciclo
 di vita.
+
+**✅ Risolto.** Il collegamento a preventivo e trattativa e il webhook erano già arrivati;
+mancavano le altre due voci della sequenza. `createOrder`, `convertQuoteToOrderAction` e
+`updateOrderStatus` eseguono ora le regole dentro `after()`, come ogni altro modulo, e
+scrivono una riga di attività sulla scheda del cliente — azienda, contatto e trattativa —
+così un ordine esiste anche per chi non apre la lista ordini. Un ordine legato a nessuno
+non produce la riga: non c'è una cronologia su cui comparirebbe, e un record che nessuna
+pagina raggiunge è peso, non memoria.
+
+`order` è diventata un'entità di automazione a tutti gli effetti, perché emettere l'evento
+non basta se poi nessuno può scrivere la regola che lo ascolta: compare nel costruttore
+con i propri campi — stato, totale, valuta, sconto, numero, note — il dispatcher sa
+aggiornarne lo stato e puntare la notifica alla pagina giusta, e lo scheduler la conosce.
+Un'azione «crea task» su un ordine aggancia il task al cliente: la tabella dei task non ha
+una colonna per l'ordine, e un task appeso al nulla non lo ritrova nessuno.
+
+`updateOrderStatus` rilegge lo stato precedente prima di sovrascriverlo. Senza, una regola
+su «passa a completato» non distingue un passaggio da un salvataggio.
+
+**Resta fuori** il ricalcolo delle righe: aggiungere o togliere una riga cambia il totale
+senza emettere `onUpdate`. È una modifica del documento, non un evento del suo ciclo di
+vita, e farla scattare a ogni riga renderebbe inservibile qualunque regola sul totale.
 
 ### M-06 — Due sistemi di chat che non si conoscono
 

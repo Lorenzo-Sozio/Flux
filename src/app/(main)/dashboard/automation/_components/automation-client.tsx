@@ -50,6 +50,8 @@ const ENTITY_COLORS: Record<string, string> = {
   lead: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
   contact: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300",
   company: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+  ticket: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300",
+  order: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
 };
 
 const TRIGGER_STYLES: Record<string, { icon: React.ReactNode; color: string }> = {
@@ -171,7 +173,9 @@ export function AutomationClient({ rules, canEdit }: Props) {
         <div className="overflow-hidden rounded-xl border">
           {rules.map((rule, i) => {
             const entityColor = ENTITY_COLORS[rule.targetEntity];
-            const entityLabel = t(`entities.${rule.targetEntity as "deal" | "lead" | "contact" | "company"}`);
+            const entityLabel = t(
+              `entities.${rule.targetEntity as "deal" | "lead" | "contact" | "company" | "ticket" | "order"}`,
+            );
             return (
               <div
                 key={rule.id}

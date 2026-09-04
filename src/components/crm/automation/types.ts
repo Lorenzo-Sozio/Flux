@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // ─── Entities & Events ────────────────────────────────────────────────────────
 
-export const TARGET_ENTITIES = ["deal", "lead", "contact", "company", "ticket"] as const;
+export const TARGET_ENTITIES = ["deal", "lead", "contact", "company", "ticket", "order"] as const;
 export const TRIGGER_EVENTS = ["onCreate", "onUpdate", "onSLABreach"] as const;
 
 export type TargetEntity = (typeof TARGET_ENTITIES)[number];
@@ -326,6 +326,26 @@ export const ENTITY_FIELDS: Record<TargetEntity, FieldDef[]> = {
     { key: "severity", label: "Severity", type: "text" },
     { key: "channel", label: "Channel", type: "text" },
     { key: "subject", label: "Subject", type: "text" },
+  ],
+  // An order completing is the moment the business gets paid, and until now
+  // nothing could be asked to happen at it (audit rilievo M-05).
+  order: [
+    {
+      key: "status",
+      label: "Status",
+      type: "enum",
+      options: [
+        { value: "draft", label: "Draft" },
+        { value: "processing", label: "Processing" },
+        { value: "completed", label: "Completed" },
+        { value: "cancelled", label: "Cancelled" },
+      ],
+    },
+    { key: "totalAmount", label: "Total", type: "number" },
+    { key: "currency", label: "Currency", type: "text" },
+    { key: "discountPercent", label: "Discount (%)", type: "number" },
+    { key: "orderNumber", label: "Order number", type: "text" },
+    { key: "notes", label: "Notes", type: "text" },
   ],
 };
 

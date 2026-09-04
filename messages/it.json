@@ -569,7 +569,8 @@
       "note": "Nota",
       "call": "Chiamata",
       "meeting": "Riunione",
-      "email": "Email"
+      "email": "Email",
+      "order": "Ordine"
     },
     "priorityLow": "Bassa",
     "priorityNormal": "Normale",
@@ -1580,7 +1581,9 @@
       "deal": "Trattativa",
       "lead": "Lead",
       "contact": "Contatto",
-      "company": "Azienda"
+      "company": "Azienda",
+      "ticket": "Ticket",
+      "order": "Ordine"
     },
     "triggers": {
       "onCreate": "Alla Creazione",

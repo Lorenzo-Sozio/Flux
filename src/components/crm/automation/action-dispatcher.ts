@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { dispatchWebhook } from "@/actions/webhooks";
-import { companies, contacts, deals, emailTemplates, leads, notifications, tasks, tickets } from "@/db/schema";
+import { companies, contacts, deals, emailTemplates, leads, notifications, orders, tasks, tickets } from "@/db/schema";
 import { getDb } from "@/lib/tenant-context";
 
 import { sendAutomationEmailWithContext } from "../../crm/automation/email-service";
@@ -123,7 +123,20 @@ export class ActionDispatcher {
       company: "companyId",
       ticket: "ticketId",
     };
+    // An order has no column of its own on the task table, so the task hangs off
+    // the customer the order is for — which is where the person doing the work
+    // would look for it anyway. An entity with neither gets an unlinked task
+    // rather than a column named `undefined`.
+    const link: Record<string, string> = {};
     const entityFk = entityFkMap[context.entityType];
+    if (entityFk) {
+      link[entityFk] = context.entityId;
+    } else if (context.entityType === "order") {
+      const order = context.newData as { dealId?: string | null; contactId?: string | null; companyId?: string | null };
+      if (order.dealId) link.dealId = order.dealId;
+      else if (order.contactId) link.contactId = order.contactId;
+      else if (order.companyId) link.companyId = order.companyId;
+    }
 
     const db = await getDb();
     await db.insert(tasks).values({
@@ -134,7 +147,7 @@ export class ActionDispatcher {
       status: "todo",
       assigneeId: assigneeId ?? null,
       ownerId: context.currentUserId ?? null,
-      [entityFk]: context.entityId,
+      ...link,
     } as any);
   }
 
@@ -312,6 +325,8 @@ export class ActionDispatcher {
         return companies;
       case "ticket":
         return tickets;
+      case "order":
+        return orders;
       default:
         return null;
     }
@@ -329,6 +344,8 @@ export class ActionDispatcher {
         return `/dashboard/companies/${context.entityId}`;
       case "ticket":
         return `/dashboard/support/tickets/${context.entityId}`;
+      case "order":
+        return `/dashboard/sales/orders/${context.entityId}`;
       default:
         return "/dashboard";
     }

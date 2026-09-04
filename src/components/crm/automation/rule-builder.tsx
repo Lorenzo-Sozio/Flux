@@ -167,6 +167,22 @@ const UPDATE_FIELDS_BY_ENTITY: Record<string, UpdField[]> = {
       ],
     },
   ],
+  // Only what a rule has any business rewriting on an order: its state and the
+  // note that travels with it. The figures are what the customer agreed to.
+  order: [
+    {
+      value: "status",
+      label: "Status",
+      kind: "enum",
+      options: [
+        { value: "draft", label: "Draft" },
+        { value: "processing", label: "Processing" },
+        { value: "completed", label: "Completed" },
+        { value: "cancelled", label: "Cancelled" },
+      ],
+    },
+    { value: "notes", label: "Notes", kind: "textarea" },
+  ],
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -177,6 +193,7 @@ const ENTITY_META: Record<string, { label: string; emoji: string }> = {
   contact: { label: "Contact", emoji: "👤" },
   company: { label: "Company", emoji: "🏢" },
   ticket: { label: "Ticket", emoji: "🎫" },
+  order: { label: "Order", emoji: "🛒" },
 };
 
 const OPERATOR_LABELS: Record<string, string> = {
@@ -472,7 +489,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                     control={control}
                     name="targetEntity"
                     render={({ field }) => (
-                      <div className="mt-0.5 grid grid-cols-4 gap-2">
+                      <div className="mt-0.5 grid grid-cols-3 gap-2">
                         {TARGET_ENTITIES.map((e) => {
                           const meta = ENTITY_META[e];
                           return (
