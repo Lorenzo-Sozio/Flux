@@ -62,26 +62,6 @@ export const AddMessageSchema = z.object({
 
 // ── SLA schemas ──────────────────────────────────────────────────────────────
 
-export const CreateSLASchema = z.object({
-  name: z.string().min(1, "Name required"),
-  description: z.string().optional(),
-  priority: z.enum(["low", "normal", "high", "urgent"]),
-  firstResponseTimeMinutes: z.number().int().positive(),
-  resolutionTimeMinutes: z.number().int().positive(),
-  // Whether those minutes are working minutes or wall-clock ones.
-  useBusinessHours: z.boolean().optional(),
-});
-
-export const UpdateSLASchema = z.object({
-  name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
-  firstResponseTimeMinutes: z.number().int().positive().optional(),
-  resolutionTimeMinutes: z.number().int().positive().optional(),
-  useBusinessHours: z.boolean().optional(),
-  isActive: z.boolean().optional(),
-});
-
 // ── Macro schemas ────────────────────────────────────────────────────────────
 
 export const CreateMacroSchema = z.object({

@@ -969,6 +969,11 @@ export const slas = pgTable("sla", {
   // on existing policies: quietly changing what a promise already made means is
   // not a correction, it is a surprise (audit rilievo S-07).
   useBusinessHours: boolean("use_business_hours").default(false).notNull(),
+  // Who hears about it when this promise is missed, beyond whoever holds the
+  // ticket. A group rather than a manager: the schema has no hierarchy, and
+  // adding one means maintaining an org chart nobody updates, while a support
+  // team already exists as a group (audit rilievo S-07).
+  escalationGroupId: text("escalation_group_id").references(() => userGroups.id, { onDelete: "set null" }),
   isActive: boolean("is_active").default(true).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });

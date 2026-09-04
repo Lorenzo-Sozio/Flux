@@ -46,9 +46,16 @@ type Sla = {
   priority: string;
   firstResponseTimeMinutes: number;
   resolutionTimeMinutes: number;
+  useBusinessHours: boolean;
+  escalationGroupId: string | null;
   isActive: boolean;
   createdAt: Date;
 };
+
+type Group = { id: string; name: string; memberCount: number };
+
+/** The select needs a value for "nobody", and an empty string is not one. */
+const NO_GROUP = "__none__";
 
 type FormValues = z.infer<typeof SlaSchema>;
 type PriorityKey = "low" | "normal" | "high" | "urgent";
@@ -69,9 +76,10 @@ function formatMinutes(minutes: number): string {
 
 interface Props {
   slas: Sla[];
+  groups: Group[];
 }
 
-export function SlaClient({ slas: initial }: Props) {
+export function SlaClient({ slas: initial, groups }: Props) {
   const t = useTranslations("support.sla");
   const tc = useTranslations("common");
   const [slas, setSlas] = useState(initial);
@@ -88,6 +96,8 @@ export function SlaClient({ slas: initial }: Props) {
       priority: "normal",
       firstResponseTimeMinutes: 60,
       resolutionTimeMinutes: 480,
+      useBusinessHours: false,
+      escalationGroupId: null,
       isActive: true,
     },
   });
@@ -100,6 +110,8 @@ export function SlaClient({ slas: initial }: Props) {
       priority: "normal",
       firstResponseTimeMinutes: 60,
       resolutionTimeMinutes: 480,
+      useBusinessHours: false,
+      escalationGroupId: null,
       isActive: true,
     });
     setDialogOpen(true);
@@ -113,6 +125,8 @@ export function SlaClient({ slas: initial }: Props) {
       priority: sla.priority as FormValues["priority"],
       firstResponseTimeMinutes: sla.firstResponseTimeMinutes,
       resolutionTimeMinutes: sla.resolutionTimeMinutes,
+      useBusinessHours: sla.useBusinessHours,
+      escalationGroupId: sla.escalationGroupId,
       isActive: sla.isActive,
     });
     setDialogOpen(true);
@@ -335,6 +349,40 @@ export function SlaClient({ slas: initial }: Props) {
                   <p className="text-xs text-destructive">{form.formState.errors.resolutionTimeMinutes.message}</p>
                 )}
               </div>
+            </div>
+
+            {/* What "four hours" means. The column existed and no form could set
+                it, so the clock ran overnight whatever the calendar said. */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <Switch
+                  checked={form.watch("useBusinessHours")}
+                  onCheckedChange={(v) => form.setValue("useBusinessHours", v)}
+                />
+                <Label className="cursor-pointer">{t("dialog.businessHoursLabel")}</Label>
+              </div>
+              <p className="text-muted-foreground text-xs">{t("dialog.businessHoursHint")}</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{t("dialog.escalationLabel")}</Label>
+              <Select
+                value={form.watch("escalationGroupId") ?? NO_GROUP}
+                onValueChange={(v) => form.setValue("escalationGroupId", v === NO_GROUP ? null : v)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_GROUP}>{t("dialog.escalationNone")}</SelectItem>
+                  {groups.map((g) => (
+                    <SelectItem key={g.id} value={g.id}>
+                      {g.name} · {g.memberCount}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-xs">{t("dialog.escalationHint")}</p>
             </div>
 
             <div className="flex items-center gap-3">

@@ -12,9 +12,9 @@ Aggiornato dopo il primo ciclo di correzioni.
 
 | | |
 |---|---|
-| ✅ Risolti | 55 |
-| ◐ Parziali | 4 |
-| Aperti | 7 |
+| ✅ Risolti | 58 |
+| ◐ Parziali | 3 |
+| Aperti | 5 |
 
 Verifiche dopo le correzioni: build di produzione riuscito, `tsc --noEmit` pulito,
 **293 test** superati (erano 91), **152 mutazioni su 152** catturate (erano 78), zero
@@ -24,15 +24,14 @@ migrazioni dei tenant, il confine server/client della sidebar, la corrispondenza
 nomi di aziende e la paginazione — cioè le aree dove un guasto somiglia a un
 successo.
 
-I sette punti ancora aperti non sono difetti. Quattro sono funzioni da costruire
-(S-04, S-05, S-06, S-10) e tre sono scelte di modello che vanno decise prima di
-essere scritte (M-01, M-02, M-06).
+I cinque punti ancora aperti non sono difetti. Quattro sono funzioni da costruire
+(S-04, S-05, S-06, S-10) e uno è la scelta di modello su lead e contatto, M-02,
+che va decisa prima di essere scritta.
 
-Dei quattro parziali ciascuna voce dice cosa le manca. In breve: M-09 ha una sola
+Dei tre parziali ciascuna voce dice cosa le manca. In breve: M-09 ha una sola
 libreria di trascinamento ormai, e sulla lingua dei commenti la regola sta nel
 `CLAUDE.md`; U-11 lascia fuori le preferenze di notifica per tipo e canale; U-12 la
-procedura di primo accesso e gli stati vuoti; S-07 l'escalation automatica, che
-chiede una gerarchia che lo schema non ha.
+procedura di primo accesso e gli stati vuoti.
 
 Due migrazioni tenant. `0002_odd_ulik.sql` aggiunge le colonne mancanti (data di
 chiusura e motivo di perdita sulle trattative, imponibile/imposta/valuta sugli ordini,
@@ -662,12 +661,30 @@ su «passa a completato» non distingue un passaggio da un salvataggio.
 senza emettere `onUpdate`. È una modifica del documento, non un evento del suo ciclo di
 vita, e farla scattare a ogni riga renderebbe inservibile qualunque regola sul totale.
 
-### M-06 — Due sistemi di chat che non si conoscono
+### M-06 ✅ — Due sistemi di chat che non si conoscono
 
 Canali e sessioni di chat per il visitatore da un lato, conversazioni dirette interne
 dall'altro. La seconda ha una pagina; la prima solo azioni server.
 
 **Rimedio.** Completare la chat verso il cliente come canale del supporto, o rimuoverla.
+
+**✅ Rimossa**, perché non era una scelta fra due sistemi vivi. Cercando in tutta la
+storia del repository, nessuna delle cinque azioni della chat visitatore è mai stata
+chiamata da una pagina, da un widget o da una rotta, e non esisteva nemmeno una tabella
+per i messaggi: la sessione puntava a un ticket, quindi la conversazione sarebbe stata
+quella del ticket. Due delle cinque azioni non chiedevano nessuna capacità, il che le
+rendeva un endpoint scrivibile per chiunque avesse una sessione.
+
+Renderla vera vuol dire un widget da incorporare, un trasporto in tempo reale, una coda
+per gli agenti e la presenza: è un prodotto, non un vuoto da riempire, e il cliente
+raggiunge già il supporto per email e dal modulo ticket.
+
+La migrazione tenant lascia cadere le due tabelle dentro una guardia: da qui non si può
+guardare nel database di nessuno, quindi una tabella che contenga anche una sola riga
+resta dov'è e resta leggibile. Sono già andate la capacità `chatChannel:manage`, che
+nessuno chiedeva più, e il passaggio di cancellazione GDPR che anonimizzava i visitatori
+della chat: un percorso che ripulisce righe che non possono esistere non è una tutela,
+è l'apparenza di una tutela.
 
 ### M-07 ✅ — Due interfacce di autenticazione e tre percorsi di login
 
@@ -963,7 +980,7 @@ risposta dalle macro esistenti, riassunto del thread per chi subentra.
 Bozza del sollecito su un preventivo, risposta al ticket, verbale della riunione
 dall'attività registrata. Sempre proposta, sempre modificabile, mai spedita da sola.
 
-### S-07 — SLA con orari lavorativi e scala di escalation ◐
+### S-07 ✅ — SLA con orari lavorativi e scala di escalation
 
 Calendario lavorativo per workspace con festività. Avvisi al 50% e all'80% del tempo
 residuo, non solo alla violazione avvenuta. Escalation automatica al responsabile.
@@ -987,9 +1004,31 @@ politica da quattro ore e una da due giorni avvisano allo stesso punto nei propr
 Il livello raggiunto è memorizzato sul ticket, altrimenti il job ripeterebbe la stessa
 cosa ogni quindici minuti.
 
-**Resta aperta l'escalation automatica al responsabile**: nello schema non esiste una
-gerarchia — un utente non ha un responsabile — quindi va deciso prima cosa significhi.
-Oggi l'avviso va a chi ha il ticket in carico.
+**✅ Chiusa anche l'escalation**, ma a un **gruppo**, non a un responsabile. Nello schema
+non esiste una gerarchia e aggiungerne una significa mantenere un organigramma che nessuno
+aggiorna; una squadra di supporto invece esiste già come gruppo utenti. La politica SLA
+nomina un gruppo, e alla violazione le persone di quel gruppo ricevono l'avviso insieme a
+chi ha il ticket in carico, ciascuna una volta sola. Le politiche esistenti nascono senza
+gruppo, quindi chi non sceglie niente tiene esattamente il comportamento di oggi.
+
+Due cose trovate mentre la si chiudeva, e sistemate.
+
+**La violazione non avvisava nessuno.** Segnava una colonna ed eseguiva le regole di
+automazione che il workspace avesse scritto — per quasi tutti, nessuna. La promessa
+saltava e nessuno lo sapeva.
+
+**⚠⚠ E l'interruttore degli orari lavorativi non era raggiungibile.** La prima metà di
+S-07 aveva aggiunto `use_business_hours` alla politica, ma il form della pagina SLA valida
+con `SlaSchema`, che non lo conteneva: l'unico schema che lo accettava stava in
+`support-validation.ts`, usato da tre azioni che nessuna pagina chiama. Due modi di
+scrivere la stessa riga, e quello vivo aveva perso un campo per strada. Il calendario
+lavorativo c'era, l'aritmetica c'era, e l'orologio continuava a correre di notte perché
+nessuno poteva accendere l'interruttore. Ora è nel form, con accanto la scelta del gruppo,
+e le tre azioni irraggiungibili sono state rimosse insieme ai loro schemi.
+
+Un ticket che non è in carico a nessuno, infine, non era avvisato da nessuno: era proprio
+quello con più probabilità di sforare. Adesso l'avviso al 50% e all'80% va al gruppo
+quando non c'è un incaricato.
 
 ### S-08 — Segnaposto documentati, anteprima reale, disiscrizione garantita ✅
 

@@ -1380,7 +1380,12 @@
         "resolution": "Risoluzione (min)",
         "activeLabel": "Attivo",
         "saveChanges": "Salva Modifiche",
-        "createSla": "Crea SLA"
+        "createSla": "Crea SLA",
+        "businessHoursLabel": "Conta solo le ore lavorative",
+        "businessHoursHint": "Spento, l'orologio corre anche di notte e nel fine settimana: una promessa fatta venerdì pomeriggio può scadere quando non c'è nessuno.",
+        "escalationLabel": "Escalation a",
+        "escalationHint": "Chi altro ne viene informato, oltre a chi ha il ticket in carico. Sono anche quelli avvisati quando non ce l'ha nessuno.",
+        "escalationNone": "Nessuno"
       },
       "deleteTitle": "Elimina Policy SLA",
       "deleteDescription": "Eliminare {name}? I ticket che usano questa policy perderanno il loro obiettivo SLA.",

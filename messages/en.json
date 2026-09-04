@@ -1380,7 +1380,12 @@
         "resolution": "Resolution (min)",
         "activeLabel": "Active",
         "saveChanges": "Save Changes",
-        "createSla": "Create SLA"
+        "createSla": "Create SLA",
+        "businessHoursLabel": "Count working hours only",
+        "businessHoursHint": "Off means the clock runs overnight and at the weekend, so a promise made on Friday afternoon can expire when nobody is in.",
+        "escalationLabel": "Escalate to",
+        "escalationHint": "Who else hears about it, beyond whoever is holding the ticket. They are also the ones warned when nobody is holding it.",
+        "escalationNone": "Nobody"
       },
       "deleteTitle": "Delete SLA Policy",
       "deleteDescription": "Delete {name}? Tickets currently using this policy will lose their SLA target.",

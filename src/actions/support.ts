@@ -11,10 +11,8 @@ import type { z } from "zod";
 import {
   AddMessageSchema,
   CreateMacroSchema,
-  CreateSLASchema,
   CreateTicketSchema,
   UpdateMacroSchema,
-  UpdateSLASchema,
   UpdateTicketSchema,
 } from "@/actions/support-validation";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
@@ -537,37 +535,12 @@ export async function getSLAs() {
   });
 }
 
-export async function createSLAAction(data: z.infer<typeof CreateSLASchema>) {
-  const db = await getDb();
-  await requireCapability("sla:manage");
-  await requirePlanModule("support");
-
-  const validated = CreateSLASchema.parse(data);
-  const [sla] = await db.insert(slas).values(validated).returning();
-
-  return { success: true, sla };
-}
-
-export async function updateSLAAction(slaId: string, data: z.infer<typeof UpdateSLASchema>) {
-  const db = await getDb();
-  await requireCapability("sla:manage");
-  await requirePlanModule("support");
-
-  const validated = UpdateSLASchema.parse(data);
-  const [updated] = await db.update(slas).set(validated).where(eq(slas.id, slaId)).returning();
-
-  return { success: true, sla: updated };
-}
-
-export async function deleteSLAAction(slaId: string) {
-  const db = await getDb();
-  await requireCapability("sla:manage");
-  await requirePlanModule("support");
-
-  await db.delete(slas).where(eq(slas.id, slaId));
-
-  return { success: true };
-}
+// ⚠️ A second way to write an SLA policy used to live here, with its own Zod
+// schemas, and no page called it. The two drifted, which is what a second way
+// always does: `useBusinessHours` was accepted **only** by this unreachable one,
+// so the switch that stops the SLA clock at closing time could not be turned on
+// from the product at all (audit rilievo S-07). The policies are written by
+// `src/actions/sla.ts`, which the settings page uses.
 
 // The visitor chat lived here: two tables, five actions, and no caller anywhere in
 // the history of the repository. No widget, no message table, no inbox — the

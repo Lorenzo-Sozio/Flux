@@ -1,9 +1,10 @@
-import { and, eq, isNotNull, isNull, lt } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lt } from "drizzle-orm";
 
 import { createNotificationsBatch } from "@/actions/auth";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
-import { tickets } from "@/db/schema";
+import { slas, tickets, userGroupMembers } from "@/db/schema";
 import { runCronJob } from "@/lib/cron-runner";
+import type { getDb } from "@/lib/tenant-context";
 
 const OPEN_STATUSES = ["new", "open", "in_progress"];
 
@@ -19,6 +20,45 @@ const WARN_AT = [
   { level: 80, consumed: 0.8, label: "80%" },
   { level: 50, consumed: 0.5, label: "50%" },
 ];
+
+/**
+ * Who else hears about a policy being missed, by policy.
+ *
+ * The remedy asked for escalation to a manager and the schema has no hierarchy,
+ * so the policy names a **group** instead: a support team already exists as one,
+ * and nobody has to keep an org chart true for the escalation to work (audit
+ * rilievo S-07). A policy with no group chosen returns nobody, which is the
+ * behaviour every workspace has today.
+ */
+async function escalationByPolicy(
+  db: Awaited<ReturnType<typeof getDb>>,
+  slaIds: (string | null)[],
+): Promise<Map<string, string[]>> {
+  const ids = [...new Set(slaIds.filter((id): id is string => Boolean(id)))];
+  if (ids.length === 0) return new Map();
+
+  const policies = await db
+    .select({ id: slas.id, groupId: slas.escalationGroupId })
+    .from(slas)
+    .where(inArray(slas.id, ids));
+
+  const groupIds = [...new Set(policies.map((p) => p.groupId).filter((g): g is string => Boolean(g)))];
+  if (groupIds.length === 0) return new Map();
+
+  const members = await db
+    .select({ groupId: userGroupMembers.groupId, userId: userGroupMembers.userId })
+    .from(userGroupMembers)
+    .where(inArray(userGroupMembers.groupId, groupIds));
+
+  const byGroup = new Map<string, string[]>();
+  for (const m of members) byGroup.set(m.groupId, [...(byGroup.get(m.groupId) ?? []), m.userId]);
+
+  const byPolicy = new Map<string, string[]>();
+  for (const p of policies) {
+    if (p.groupId) byPolicy.set(p.id, byGroup.get(p.groupId) ?? []);
+  }
+  return byPolicy;
+}
 
 /**
  * Flags tickets that have passed their SLA deadline, and warns about the ones
@@ -59,6 +99,31 @@ export async function GET(req: Request) {
           }),
         ),
       );
+
+      // A breach used to set a column and run whatever rules the workspace had
+      // written, which for most workspaces is none: the promise was missed and
+      // nobody was told. Now the person holding it hears, and so does the group
+      // the policy escalates to, each of them once (rilievo S-07).
+      const escalation = await escalationByPolicy(
+        db,
+        active.map((t) => t.slaId),
+      );
+
+      const breachRows = active.flatMap((t) => {
+        const recipients = new Set<string>();
+        const holder = t.assigneeId ?? t.ownerId;
+        if (holder) recipients.add(holder);
+        for (const userId of escalation.get(t.slaId ?? "") ?? []) recipients.add(userId);
+        return [...recipients].map((userId) => ({
+          userId,
+          type: "sla_breach",
+          title: `SLA missed — ${t.ticketNumber}`,
+          message: t.subject,
+          link: `/dashboard/support/tickets/${t.id}`,
+        }));
+      });
+
+      if (breachRows.length > 0) await createNotificationsBatch(breachRows).catch(() => undefined);
     }
 
     // ── Approaching the deadline ─────────────────────────────────────────────
@@ -95,17 +160,25 @@ export async function GET(req: Request) {
         ),
       );
 
-      // Only somebody who can act on it. A ticket nobody owns has nobody to warn,
-      // and a notification addressed to no one is noise in a table.
-      const rows = warnings
-        .map((w) => ({
-          userId: w.ticket.assigneeId ?? w.ticket.ownerId,
+      // Whoever is holding it, and when nobody is, the group the policy escalates
+      // to. A ticket nobody owns used to be a ticket nobody was warned about,
+      // which is the one most likely to run out of time (rilievo S-07).
+      const warnEscalation = await escalationByPolicy(
+        db,
+        warnings.map((w) => w.ticket.slaId),
+      );
+
+      const rows = warnings.flatMap((w) => {
+        const holder = w.ticket.assigneeId ?? w.ticket.ownerId;
+        const recipients = holder ? [holder] : (warnEscalation.get(w.ticket.slaId ?? "") ?? []);
+        return recipients.map((userId) => ({
+          userId,
           type: "sla_warning",
           title: `${w.label} of the SLA used — ${w.ticket.ticketNumber}`,
           message: w.ticket.subject,
           link: `/dashboard/support/tickets/${w.ticket.id}`,
-        }))
-        .filter((r): r is typeof r & { userId: string } => Boolean(r.userId));
+        }));
+      });
 
       if (rows.length > 0) await createNotificationsBatch(rows).catch(() => undefined);
     }

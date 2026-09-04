@@ -36,6 +36,8 @@ const TYPE_ICONS: Record<string, string> = {
   lead_assigned: "👤",
   email_sent: "📧",
   chat_message: "💬",
+  sla_warning: "⏳",
+  sla_breach: "⏰",
   system: "ℹ️",
 };
 
