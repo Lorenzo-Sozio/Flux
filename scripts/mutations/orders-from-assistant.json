@@ -70,5 +70,11 @@
     "description": "la nota di riga non viene scritta: quello che il cliente ha chiesto su quell'articolo non arriva a chi lo prepara",
     "find": "      notes: notaDiRiga(r) || null,",
     "replace": "      notes: null,"
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "⚠️⚠️ a quale riga appartiene un'aggiunta sparisce: su un ordine con due pizze chi prepara deve indovinare a quale metterla",
+    "find": "    [\"Per\", r.appliesTo ?? \"\"],",
+    "replace": ""
   }
 ]

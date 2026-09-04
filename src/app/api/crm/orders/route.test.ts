@@ -138,6 +138,25 @@ describe("an order taken by an assistant", () => {
     expect(String(righe[1].valori.notes)).toContain("Modifiche: poco piccante");
   });
 
+  it("⚠️⚠️ says which line an extra belongs to", async () => {
+    // Un'aggiunta che il listino prezza e' una riga a se' — e' l'unico modo perche' il suo
+    // prezzo sia quello detto al cliente — e su un ordine con due pizze «impasto
+    // integrale» da solo non dice a quale delle due appartenga.
+    await POST(
+      richiesta({
+        ...ORDINE,
+        lines: [
+          { description: "Quattro formaggi", quantity: 1, unitPrice: 9.5 },
+          { description: "impasto integrale", quantity: 1, unitPrice: 1, appliesTo: "Quattro formaggi" },
+        ],
+        total: 10.5,
+      }),
+    );
+
+    const righe = inseriti.filter((i) => i.tabella === "order_item");
+    expect(String(righe[1].valori.notes)).toContain("Per: Quattro formaggi");
+  });
+
   it("⚠️⚠️ records what the customer called it when the match changed the words", async () => {
     // Chi ha preso l'ordine ha fatto una corrispondenza fra quello che il cliente ha detto
     // e una voce di listino. Se era sbagliata — «capricciosa» diventata «quattro stagioni»,

@@ -29,6 +29,12 @@ const SEPARATORE = String.fromCharCode(10);
 function notaDiRiga(r: RigaIn): string {
   const diverso = r.requestedAs && r.requestedAs.toLowerCase() !== r.description.toLowerCase();
   return [
+    // ⚠️⚠️ **First, because it decides what the line even means.** An extra a price list
+    // charges for is a line of its own — that is the only way its price is the one the
+    // customer was told — and on an order with two pizzas «impasto integrale» standing
+    // alone does not say which of them it belongs to. Whoever prepares it would have to
+    // guess, and guessing is the one thing a written order must never require.
+    ["Per", r.appliesTo ?? ""],
     ["Modifiche", r.note ?? ""],
     ["Richiesto come", diverso ? r.requestedAs : ""],
   ]
@@ -48,6 +54,8 @@ interface RigaIn {
   note?: string;
   /** What the customer called it, when that is not the catalogue name. */
   requestedAs?: string;
+  /** The line this one belongs to, for extras and variants priced separately. */
+  appliesTo?: string;
 }
 
 /**
@@ -122,6 +130,7 @@ export async function POST(req: NextRequest) {
       unitPrice,
       note: typeof r.note === "string" ? r.note.trim() : "",
       requestedAs: typeof r.requestedAs === "string" ? r.requestedAs.trim() : "",
+      appliesTo: typeof r.appliesTo === "string" ? r.appliesTo.trim() : "",
     });
   }
 
