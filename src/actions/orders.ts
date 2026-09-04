@@ -9,6 +9,7 @@ import { dispatchWebhook } from "@/actions/webhooks";
 import { companies, contacts, deals, orderItems, orders, products, quoteItems, quotes, users } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { computeDocument } from "@/lib/document-totals";
+import { nextOrderNumber } from "@/lib/order-number";
 import { getDb } from "@/lib/tenant-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -16,31 +17,6 @@ import { getDb } from "@/lib/tenant-context";
 export type OrderStatus = "draft" | "processing" | "completed" | "cancelled";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-/**
- * The next order number for the current year.
- *
- * The previous version appended four random digits to a date. On a unique column
- * that means a collision surfaces to the user as a raw SQL error on a save they
- * believe succeeded, and a customer receives a document whose number carries no
- * sequence — which is not what a commercial document is for (audit rilievo C-05).
- *
- * Derived from the highest number already issued this year, so it survives the
- * absence of a database sequence and stays readable: ORD-2026-0007.
- */
-async function nextOrderNumber(db: Awaited<ReturnType<typeof getDb>>): Promise<string> {
-  const year = new Date().getFullYear();
-  const prefix = `ORD-${year}-`;
-
-  const [row] = await db
-    .select({ last: sql<string | null>`max(${orders.orderNumber})` })
-    .from(orders)
-    .where(sql`${orders.orderNumber} LIKE ${`${prefix}%`}`);
-
-  const lastSeq = row?.last ? Number.parseInt(row.last.slice(prefix.length), 10) : 0;
-  const next = Number.isFinite(lastSeq) ? lastSeq + 1 : 1;
-  return `${prefix}${String(next).padStart(4, "0")}`;
-}
 
 /**
  * Totals for an order, using the same arithmetic as a quote.

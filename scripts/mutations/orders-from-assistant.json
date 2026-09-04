@@ -1,0 +1,44 @@
+[
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "⚠️⚠️ il totale dichiarato non viene piu' confrontato con quello delle righe: si registra un ordine a una cifra diversa da quella che il cliente ha sentito",
+    "find": "  if (Number.isFinite(dichiarato) && Math.abs(dichiarato - totali.total) > TOLLERANZA) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "⚠️ l'ordine nasce gia' preso in carico: chi guarda la coda non distingue cio' che nessuno ha ancora lavorato",
+    "find": "      status: \"draft\",",
+    "replace": "      status: \"processing\","
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "cio' che il cliente ha chiesto di cambiare sparisce dalla riga: l'ordine si prepara sbagliato",
+    "find": "      description: r.note ? `${r.description} (${r.note})` : r.description,",
+    "replace": "      description: r.description,"
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "una riga senza prezzo passa e vale zero invece di far rifiutare l'ordine",
+    "find": "    if (!description || quantity < 1 || !Number.isFinite(unitPrice) || unitPrice < 0) continue;",
+    "replace": "    if (!description || quantity < 1) continue;"
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "si crea un secondo contatto per una persona che il CRM conosce gia': due schede per lo stesso cliente",
+    "find": "  if (!contactId) {",
+    "replace": "  if (true) {"
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "le regole del titolare non scattano sul cliente nuovo: «avvisami quando arriva un cliente» e' cieco proprio su quelli che porta l'assistente",
+    "find": "    if (creato && contactId) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "nessuno viene avvisato che e' arrivato un ordine: chi sorvegliava quella coda non lo sa",
+    "find": "    dispatchWebhook(\"order.created\", { order: { ...ordine, contactId } }, ORIGINE_API);",
+    "replace": ""
+  }
+]
