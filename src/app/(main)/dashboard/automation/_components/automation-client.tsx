@@ -27,6 +27,8 @@ import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
+import { RecipeLibrary } from "./recipe-library";
+
 type Rule = {
   id: string;
   name: string;
@@ -144,11 +146,15 @@ export function AutomationClient({ rules, canEdit }: Props) {
           <p className="mt-1.5 text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
         {canEdit && (
-          <RuleModal onSaved={() => router.refresh()}>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" /> {t("newRule")}
-            </Button>
-          </RuleModal>
+          <div className="flex items-center gap-2">
+            {/* Offered before the empty builder, not after it. */}
+            <RecipeLibrary />
+            <RuleModal onSaved={() => router.refresh()}>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" /> {t("newRule")}
+              </Button>
+            </RuleModal>
+          </div>
         )}
       </div>
 
@@ -161,11 +167,14 @@ export function AutomationClient({ rules, canEdit }: Props) {
           <p className="font-semibold">{t("emptyTitle")}</p>
           <p className="mt-1 text-muted-foreground text-sm">{t("emptyDesc")}</p>
           {canEdit && (
-            <RuleModal onSaved={() => router.refresh()}>
-              <Button className="mt-5 gap-2">
-                <Plus className="h-4 w-4" /> {t("createFirstRule")}
-              </Button>
-            </RuleModal>
+            <div className="mt-5 flex items-center justify-center gap-2">
+              <RecipeLibrary />
+              <RuleModal onSaved={() => router.refresh()}>
+                <Button className="gap-2">
+                  <Plus className="h-4 w-4" /> {t("createFirstRule")}
+                </Button>
+              </RuleModal>
+            </div>
           )}
         </div>
       ) : (

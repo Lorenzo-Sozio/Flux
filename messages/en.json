@@ -1652,6 +1652,17 @@
       "colSentAt": "Sent At",
       "colOpened": "Opened",
       "colClicked": "Clicked"
+    },
+    "recipes": {
+      "open": "Recipes",
+      "title": "Rules worth having",
+      "subtitle": "Each one is an ordinary rule, written in advance. Add it and the builder can open it and change anything.",
+      "add": "Add",
+      "added": "Added",
+      "installed": "Rule added. It is on and running.",
+      "installFailed": "Could not add that rule.",
+      "onChange": "Fires on a change, so there is nothing to count yet",
+      "matchesNow": "{count} records match this right now"
     }
   },
   "analytics": {

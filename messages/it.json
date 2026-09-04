@@ -1652,6 +1652,17 @@
       "colSentAt": "Inviata il",
       "colOpened": "Aperta",
       "colClicked": "Cliccata"
+    },
+    "recipes": {
+      "open": "Ricette",
+      "title": "Regole che vale la pena avere",
+      "subtitle": "Ognuna è una regola normale, scritta in anticipo. Aggiungila e il costruttore la apre e ne cambia quello che vuoi.",
+      "add": "Aggiungi",
+      "added": "Aggiunta",
+      "installed": "Regola aggiunta. È attiva.",
+      "installFailed": "Non è stato possibile aggiungere la regola.",
+      "onChange": "Scatta su un cambiamento, quindi non c'è ancora niente da contare",
+      "matchesNow": "{count} record la soddisfano in questo momento"
     }
   },
   "analytics": {

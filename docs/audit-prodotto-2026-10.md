@@ -12,9 +12,9 @@ Aggiornato dopo il primo ciclo di correzioni.
 
 | | |
 |---|---|
-| ✅ Risolti | 59 |
+| ✅ Risolti | 60 |
 | ◐ Parziali | 2 |
-| Aperti | 5 |
+| Aperti | 4 |
 
 Verifiche dopo le correzioni: build di produzione riuscito, `tsc --noEmit` pulito,
 **293 test** superati (erano 91), **152 mutazioni su 152** catturate (erano 78), zero
@@ -24,9 +24,10 @@ migrazioni dei tenant, il confine server/client della sidebar, la corrispondenza
 nomi di aziende e la paginazione — cioè le aree dove un guasto somiglia a un
 successo.
 
-I cinque punti ancora aperti non sono difetti. Quattro sono funzioni da costruire
-(S-04, S-05, S-06, S-10) e uno è la scelta di modello su lead e contatto, M-02,
-che va decisa prima di essere scritta.
+I quattro punti ancora aperti non sono difetti. Tre sono funzioni da costruire
+(S-05, S-06, S-10) e uno è la scelta di modello su lead e contatto, M-02, che va
+decisa prima di essere scritta. S-05 e S-06 sono in realtà una decisione sola:
+mettere o no un modello linguistico dentro il prodotto.
 
 Dei due parziali ciascuna voce dice cosa le manca: M-09 ha una sola libreria di
 trascinamento ormai, e sulla lingua dei commenti la regola sta nel `CLAUDE.md`;
@@ -974,12 +975,44 @@ diventare un ordine. È la forma più comune di preventivo, quindi la conversion
 fallita proprio dove serve. La riga d'ordine prende anche `description`, altrimenti una
 riga senza prodotto non avrebbe modo di dire cosa sia.
 
-### S-04 — Una libreria di automazioni pronte all'uso
+### S-04 ✅ — Una libreria di automazioni pronte all'uso
 
 Dieci ricette installabili in un click: assegnazione a rotazione dei nuovi lead,
 follow-up tre giorni dopo l'invio del preventivo, escalation SLA, benvenuto al nuovo
 contatto, avviso sulla trattativa ferma, promemoria di rinnovo. Con un'anteprima che
 dica «questa regola avrebbe agito su 34 record nell'ultimo mese».
+
+**✅ Risolto.** Otto ricette in [src/lib/automation-recipes.ts](src/lib/automation-recipes.ts),
+che è un modulo di soli dati: installarne una scrive una regola normale, che il costruttore
+poi apre e modifica come qualsiasi altra. Niente qui è una regola di tipo speciale. Il
+problema che risolvono non è che il motore non sappia fare: è che il costruttore chiede
+entità, evento, condizione e azione — quattro decisioni prima che succeda qualcosa — su
+una lista vuota, e a nessuno viene in mente per prima cosa un albero di condizioni. Viene
+in mente «avvisami quando arriva una trattativa grossa».
+
+**Tre scelte che vale la pena dire.**
+
+Nessuna ricetta è schedulata. I trigger a orario girano su node-cron avviato da
+`src/instrumentation.ts`, che su Cloudflare Workers non parte perché lì non esiste un
+processo che vive: una ricetta che su metà dei deploy non fa niente in silenzio è peggio
+di una ricetta che non c'è. Per lo stesso motivo manca l'assegnazione a rotazione: non
+esiste un'azione che assegni, e prometterla avrebbe voluto dire scriverne una.
+
+L'escalation SLA non è fra le ricette perché ora è nella politica SLA stessa, dove il
+gruppo si sceglie una volta invece di per regola (S-07).
+
+**L'anteprima dice una cosa diversa da quella chiesta, e lo dichiara.** «Avrebbe agito su
+34 record nell'ultimo mese» richiede la storia di ogni cambiamento, che nessuno qui
+conserva. Il numero mostrato è quanti record **soddisfano la regola adesso**, calcolato
+riusando il valutatore di condizioni già esistente su una lettura per tipo di entità, e
+risponde alla domanda dietro la domanda: questa regola ha qualcosa su cui mordere. Le
+ricette che scattano su un cambiamento — «passa a vinto» non è una proprietà di una
+trattativa — lo dicono invece di mostrare uno zero che non significa niente.
+
+Trovato mentre si montava il pulsante: la pagina delle automazioni decideva chi può
+modificare leggendo `session.user.role`, che è il campo dello staff di piattaforma e vale
+«user» per ogni cliente. Un viewer del workspace vedeva tutti i pulsanti e il server glieli
+rifiutava uno per uno. Ora la domanda è la capacità, la stessa che fa l'azione.
 
 ### S-05 — Triage assistito sul supporto
 

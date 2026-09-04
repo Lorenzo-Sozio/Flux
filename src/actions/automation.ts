@@ -4,9 +4,21 @@ import { revalidatePath } from "next/cache";
 
 import { desc, eq, isNull } from "drizzle-orm";
 
+import { ConditionEvaluator } from "@/components/crm/automation/condition-evaluator";
 import { type AutomationRuleFormData, AutomationRuleFormSchema } from "@/components/crm/automation/types";
-import { automationLogs, automationRules, campaignLogs, contacts, leads } from "@/db/schema";
+import {
+  automationLogs,
+  automationRules,
+  campaignLogs,
+  companies,
+  contacts,
+  deals,
+  leads,
+  orders,
+  tickets,
+} from "@/db/schema";
 import { requireAdminAccess, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
+import { AUTOMATION_RECIPES, findRecipe, isPreviewable } from "@/lib/automation-recipes";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
@@ -169,4 +181,73 @@ export async function deleteAutomationRule(id: string) {
   await db.delete(automationRules).where(eq(automationRules.id, id));
   revalidatePath("/dashboard/automation");
   return { success: true };
+}
+
+// ─── Recipes ──────────────────────────────────────────────────────────────────
+//
+// A rule builder on an empty list asks for an entity, a trigger, a condition and
+// an action, which is four decisions before anything useful happens. The recipes
+// are ordinary rules written in advance: installing one writes exactly what the
+// builder would have written, and the builder can then open and change it
+// (audit rilievo S-04).
+
+/**
+ * How many records a recipe would match, today.
+ *
+ * Not "would have acted on in the last month": that needs the history of every
+ * change, which nothing here keeps. What it can honestly answer is whether the
+ * rule has anything to bite on at all — a recipe that matches nothing in the
+ * whole workspace is one worth not installing yet.
+ *
+ * Recipes whose conditions ask about a change rather than a state get no count:
+ * "moved to won" is not a property a deal has, so counting deals for it would be
+ * a number that means nothing.
+ */
+export async function getRecipeMatchCounts(): Promise<Record<string, number | null>> {
+  // The same bar as installing one: whoever is shown the dialog can ask it.
+  await requireWriteAccess();
+  await requirePlanModule("automation");
+  const db = await getDb();
+
+  const evaluator = new ConditionEvaluator();
+  const tables = { lead: leads, contact: contacts, company: companies, deal: deals, ticket: tickets, order: orders };
+  const counts: Record<string, number | null> = {};
+
+  // One read per entity type, not one per recipe.
+  const rowCache = new Map<string, Record<string, unknown>[]>();
+
+  for (const recipe of AUTOMATION_RECIPES) {
+    if (!isPreviewable(recipe)) {
+      counts[recipe.id] = null;
+      continue;
+    }
+
+    const entity = recipe.rule.targetEntity;
+    const table = tables[entity as keyof typeof tables];
+    if (!table) {
+      counts[recipe.id] = null;
+      continue;
+    }
+
+    let rows = rowCache.get(entity);
+    if (!rows) {
+      // Capped: this is a hint on a dialog, not a report, and a workspace with
+      // fifty thousand contacts should not pay for one either way.
+      rows = (await db.select().from(table).limit(1000)) as Record<string, unknown>[];
+      rowCache.set(entity, rows);
+    }
+
+    counts[recipe.id] = rows.filter((row) =>
+      evaluator.evaluate(recipe.rule.conditions, recipe.rule.conditionLogic ?? "AND", {}, row),
+    ).length;
+  }
+
+  return counts;
+}
+
+/** Writes one recipe as a rule of its own. Nothing marks it as having come from here. */
+export async function installAutomationRecipe(recipeId: string) {
+  const recipe = findRecipe(recipeId);
+  if (!recipe) return { success: false, error: "No such recipe" };
+  return createAutomationRule(recipe.rule);
 }
