@@ -171,6 +171,34 @@ export async function getOrderStats() {
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
 
+/**
+ * A line on an order.
+ *
+ * Either a catalogue product or something written out by hand. The database has
+ * allowed the second since migration 0004, and this schema was still refusing it,
+ * so an order could not carry a customisation, a day of consulting or a one-off
+ * charge — which is most of what a real order has on it beyond the catalogue.
+ *
+ * A line with a product takes its tax rate from the product; a free-text line has
+ * nowhere else to get one, so it carries its own.
+ */
+const orderItemSchema = z
+  .object({
+    productId: z.string().optional(),
+    description: z.string().max(500).optional(),
+    notes: z.string().max(500).optional(),
+    quantity: z.coerce.number().int().min(1),
+    unitPrice: z.coerce.number().min(0),
+    discountPercent: z.coerce.number().min(0).max(100).default(0),
+    taxPercent: z.coerce.number().min(0).max(100).optional(),
+  })
+  .refine((line) => Boolean(line.productId?.trim() || line.description?.trim()), {
+    // Without this a line is a price attached to nothing, and the person preparing
+    // the order has no way of knowing what it was for.
+    message: "Pick a product or describe what the line is for",
+    path: ["description"],
+  });
+
 const createSchema = z.object({
   companyId: z.string().optional(),
   contactId: z.string().optional(),
@@ -180,16 +208,8 @@ const createSchema = z.object({
   orderDate: z.string().optional(),
   currency: z.string().default("EUR"),
   discountPercent: z.coerce.number().min(0).max(100).default(0),
-  items: z
-    .array(
-      z.object({
-        productId: z.string().min(1),
-        quantity: z.coerce.number().int().min(1),
-        unitPrice: z.coerce.number().min(0),
-        discountPercent: z.coerce.number().min(0).max(100).default(0),
-      }),
-    )
-    .min(1, "At least one item is required"),
+  notes: z.string().max(2000).optional(),
+  items: z.array(orderItemSchema).min(1, "At least one item is required"),
 });
 
 export async function createOrder(data: z.input<typeof createSchema>) {
@@ -221,6 +241,7 @@ export async function createOrder(data: z.input<typeof createSchema>) {
       discountAmount: String(totals.discountAmount),
       taxAmount: String(totals.taxAmount),
       totalAmount: String(totals.total),
+      notes: validated.notes?.trim() || null,
       orderDate: validated.orderDate ? new Date(validated.orderDate) : new Date(),
     })
     .returning();
@@ -230,7 +251,10 @@ export async function createOrder(data: z.input<typeof createSchema>) {
       const line = totals.lines[i];
       return {
         orderId: order.id,
-        productId: item.productId,
+        // Empty means a free-text line, not a missing product.
+        productId: item.productId?.trim() || null,
+        description: item.description?.trim() || null,
+        notes: item.notes?.trim() || null,
         quantity: item.quantity,
         unitPrice: String(item.unitPrice),
         discountPercent: String(item.discountPercent ?? 0),
@@ -497,4 +521,65 @@ export async function convertQuoteToOrderAction(quoteId: string) {
   revalidatePath("/dashboard/pipeline");
 
   return { success: true, orderId, orderNumber };
+}
+
+/**
+ * Everything the order form needs to fill its selectors, in one round trip.
+ *
+ * The creation dialog offered a product list and nothing else — no customer, no
+ * contact, no link back to the quote or the deal the order came from — so an
+ * order created by hand was a set of figures belonging to nobody.
+ */
+export async function getOrderFormData() {
+  await requireCapability("record:read");
+  await requirePlanModule("sales");
+  const db = await getDb();
+
+  const [companyList, contactList, productList, dealList, quoteList] = await Promise.all([
+    db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(companies.name),
+    db
+      .select({
+        id: contacts.id,
+        firstName: contacts.firstName,
+        lastName: contacts.lastName,
+        email: contacts.email,
+        companyId: contacts.companyId,
+      })
+      .from(contacts)
+      .orderBy(contacts.firstName, contacts.lastName),
+    db
+      .select({
+        id: products.id,
+        name: products.name,
+        sku: products.sku,
+        price: products.price,
+        taxPercent: products.taxPercent,
+        unit: products.unit,
+      })
+      .from(products)
+      .where(eq(products.isActive, true))
+      .orderBy(products.name),
+    db
+      .select({ id: deals.id, name: deals.name, companyId: deals.companyId, contactId: deals.contactId })
+      .from(deals)
+      .where(eq(deals.status, "open"))
+      .orderBy(desc(deals.createdAt))
+      .limit(200),
+    // Only quotes the customer has accepted: an order for anything else is a
+    // document nobody agreed to.
+    db
+      .select({
+        id: quotes.id,
+        quoteNumber: quotes.quoteNumber,
+        companyId: quotes.companyId,
+        contactId: quotes.contactId,
+        totalAmount: quotes.totalAmount,
+      })
+      .from(quotes)
+      .where(eq(quotes.status, "accepted"))
+      .orderBy(desc(quotes.createdAt))
+      .limit(200),
+  ]);
+
+  return { companies: companyList, contacts: contactList, products: productList, deals: dealList, quotes: quoteList };
 }
