@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import Link from "next/link";
+
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   BellIcon,
@@ -148,14 +150,23 @@ export function ActivityModal(props: Props) {
   });
 
   const selectedType = form.watch("type");
+
+  // An activity is the record of something that happened. A date in the future
+  // means the person is trying to schedule, and this object cannot do it: no end
+  // time, no attendees, no invitation that reaches anybody (audit rilievo M-01).
+  const enteredDate = form.watch("date");
+  const isInTheFuture = Boolean(enteredDate) && new Date(enteredDate as string).getTime() > Date.now();
   const showDuration = selectedType === "call" || selectedType === "meeting";
   const showParticipants = selectedType === "meeting";
 
-  // Reset defaults when type changes
+  // Clears the fields the chosen type does not show. The type itself is not a
+  // dependency: both flags are a function of it, and the two changes it can make
+  // without moving either flag (note to email, and back) would set the same
+  // values the previous run already set.
   useEffect(() => {
     if (!showDuration) form.setValue("durationMinutes", null);
     if (!showParticipants) form.setValue("participants", "");
-  }, [selectedType, showDuration, showParticipants, form]);
+  }, [showDuration, showParticipants, form]);
 
   const onSubmit = async (data: ActivityFormValues) => {
     try {
@@ -220,13 +231,13 @@ export function ActivityModal(props: Props) {
         )}
       </DialogTrigger>
 
-      <DialogContent className="sm:max-w-[560px] p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+      <DialogContent className="gap-0 p-0 sm:max-w-[560px]">
+        <DialogHeader className="border-b px-6 pt-6 pb-4">
           <DialogTitle className="text-lg">{title}</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
-          <div className="px-6 py-5 space-y-5">
+          <div className="space-y-5 px-6 py-5">
             {/* ── Activity type selector ───────────────────────────── */}
             <div className="space-y-2">
               <Label>Type</Label>
@@ -245,10 +256,12 @@ export function ActivityModal(props: Props) {
                       type="button"
                       onClick={() => form.setValue("type", type)}
                       className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-xs font-medium transition-all",
-                        active
-                          ? "border-primary " + cfg.color
-                          : "border-border text-muted-foreground hover:border-muted-foreground/40",
+                        "flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 font-medium text-xs transition-all",
+                        // Two arguments rather than one concatenation: the class
+                        // sorter trims the string it sorts, and a trailing space
+                        // holding two class names apart does not survive that.
+                        active && "border-primary",
+                        active ? cfg.color : "border-border text-muted-foreground hover:border-muted-foreground/40",
                       )}
                     >
                       <Icon className="h-4 w-4" />
@@ -271,6 +284,15 @@ export function ActivityModal(props: Props) {
                   {...form.register("date")}
                   className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
+                {isInTheFuture && (
+                  <p className="text-amber-600 text-xs leading-relaxed dark:text-amber-400">
+                    This records what happened. For something still to come, the calendar keeps an appointment: it has
+                    an end time, the people invited, and an invitation that actually reaches them.{" "}
+                    <Link href="/dashboard/calendar" className="underline underline-offset-2">
+                      Open the calendar
+                    </Link>
+                  </p>
+                )}
               </div>
 
               {showDuration && (
@@ -329,7 +351,7 @@ export function ActivityModal(props: Props) {
                 className="min-h-[100px] resize-none"
               />
               {form.formState.errors.content && (
-                <p className="text-xs text-destructive">{form.formState.errors.content.message}</p>
+                <p className="text-destructive text-xs">{form.formState.errors.content.message}</p>
               )}
             </div>
 
@@ -410,7 +432,7 @@ export function ActivityModal(props: Props) {
             </div>
           </div>
 
-          <DialogFooter className="px-6 py-4 border-t bg-muted/10">
+          <DialogFooter className="border-t bg-muted/10 px-6 py-4">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>

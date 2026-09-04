@@ -2364,22 +2364,6 @@
       "sat": "Sat",
       "sun": "Sun"
     },
-    "newEventDialog": {
-      "titleLabel": "Task title",
-      "descLabel": "Description",
-      "titlePlaceholderTask": "Follow up with…",
-      "titlePlaceholderOther": "Topic or notes…",
-      "dateTimeLabel": "Date & Time",
-      "priorityLabel": "Priority",
-      "priorityLow": "Low",
-      "priorityNormal": "Normal",
-      "priorityHigh": "High",
-      "createBtn": "Create {label}",
-      "cancel": "Cancel",
-      "titleRequired": "Title is required.",
-      "dateRequired": "Date and time are required.",
-      "createError": "Failed to create event."
-    },
     "typeAppointment": "Appointment",
     "filterAll": "All",
     "filterMine": "Mine",

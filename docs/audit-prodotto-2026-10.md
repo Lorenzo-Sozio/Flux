@@ -544,7 +544,7 @@ automatica oltre soglia, verifica di proprietà sull'arresto.
 Non difetti, biforcazioni: due modi di fare la stessa cosa, che raddoppiano il costo di
 apprendimento e quello di manutenzione.
 
-### M-01 — Tre modi diversi di fissare un incontro
+### M-01 ✅ — Tre modi diversi di fissare un incontro
 
 Un incontro può essere un'attività di tipo `meeting` (partecipanti in stringa libera,
 nessuna ora di fine), un appuntamento (tabella dedicata, invitati, RSVP, iCal) o un task
@@ -553,6 +553,26 @@ titolo di un'attività sul calendario è il corpo della nota troncato a 50 carat
 
 **Rimedio.** L'appuntamento come unico oggetto d'agenda. L'attività torna a essere il
 registro di ciò che è successo. Il task resta l'unità di lavoro.
+
+**✅ Risolto**, e guardando l'interfaccia viva invece dello schema il terzo modo era già
+mezzo morto. Il pulsante «nuovo evento» del calendario offriva task, riunione e chiamata,
+e la riunione la creava come **attività**: nessuna ora di fine, nessun invitato, nessun
+invito che arrivi a qualcuno. Quel componente non era montato in nessuna pagina — il
+calendario è stato riscritto e monta il dialogo dell'appuntamento — ma è rimasto nel
+repository, pronto a rimettere in circolo la confusione al primo che lo rimonta. È stato
+cancellato, con le sue stringhe di traduzione.
+
+Restano due modi, e adesso significano due cose diverse. L'appuntamento è l'unico oggetto
+d'agenda: è l'unico che ha un'ora di fine, gli invitati, l'RSVP e l'iCal, quindi non era
+mai stata una scelta fra pari. L'attività è il registro di ciò che è successo, e le
+quattro pagine che ne creano una passano tutte `date: new Date()`: registrano adesso.
+Quando qualcuno mette una data futura nel modulo dell'attività, il modulo lo dice e apre la
+strada al calendario, invece di rifiutare: togliere il campo avrebbe rotto la registrazione
+di un incontro di stamattina per impedire quella di uno di domani.
+
+Il titolo sul calendario non è più la nota tagliata a cinquanta caratteri a metà parola,
+ma la sua prima riga, che è dove le persone scrivono l'intestazione; quando la nota è
+vuota, il tipo dell'attività dice più di mezza frase.
 
 ### M-02 — Cinque entità per lo stesso arco commerciale
 

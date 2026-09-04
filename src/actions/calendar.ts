@@ -36,6 +36,23 @@ async function resolveFilterUserIds(filter: CalendarFilter): Promise<string[] | 
   return [...new Set(members.map((m) => m.userId))];
 }
 
+/**
+ * A title for an activity, rather than its body.
+ *
+ * The calendar printed the note cut at fifty characters, so a paragraph became a
+ * sentence that stops mid-word and tells the reader nothing they can act on
+ * (audit rilievo M-01). People put a heading on the first line; when they have
+ * not, what kind of activity it was is a truer label than half a sentence.
+ *
+ * English, like `No Entity` below it, because this action hands the page plain
+ * strings and the page localises the type badge next to them.
+ */
+function activityTitle(content: string | null, type: string): string {
+  const first = (content ?? "").split("\n")[0].trim();
+  if (!first) return type === "call" ? "Call" : "Meeting";
+  return first.length > 60 ? `${first.slice(0, 59).trimEnd()}…` : first;
+}
+
 export async function getCalendarEvents(filter: CalendarFilter = "all", range?: { start: Date; end: Date }) {
   const db = await getDb();
   const filterIds = await resolveFilterUserIds(filter);
@@ -126,39 +143,41 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
   const formattedAppointments = await getAppointmentCalendarEvents(filterIds, range);
 
   // ── Format ───────────────────────────────────────────────────────────────────
-  const formattedTasks = allTasks.map((t) => {
-    const isAllDay = t.allDay ?? true;
-    const date = !isAllDay && t.startDate ? t.startDate : t.dueDate!;
-    return {
-      id: t.id,
-      title: t.title,
-      date,
-      endAt: !isAllDay ? t.dueDate : undefined,
-      allDay: isAllDay,
-      type: "task" as const,
-      status: t.status,
-      priority: t.priority,
-      displayTitle: t.title,
-      entityName: t.leadName
-        ? `${t.leadName} ${t.leadLastName}`
-        : t.contactName
-          ? `${t.contactName} ${t.contactLastName}`
-          : t.companyName || t.dealName || "No Entity",
-      link: `/dashboard/tasks?task=${t.id}`,
-      leadId: t.leadId,
-    };
-  });
+  const formattedTasks = allTasks
+    .filter((t): t is typeof t & { dueDate: Date } => t.dueDate !== null)
+    .map((t) => {
+      const isAllDay = t.allDay ?? true;
+      const date = !isAllDay && t.startDate ? t.startDate : t.dueDate;
+      return {
+        id: t.id,
+        title: t.title,
+        date,
+        endAt: !isAllDay ? t.dueDate : undefined,
+        allDay: isAllDay,
+        type: "task" as const,
+        status: t.status,
+        priority: t.priority,
+        displayTitle: t.title,
+        entityName: t.leadName
+          ? `${t.leadName} ${t.leadLastName}`
+          : t.contactName
+            ? `${t.contactName} ${t.contactLastName}`
+            : t.companyName || t.dealName || "No Entity",
+        link: `/dashboard/tasks?task=${t.id}`,
+        leadId: t.leadId,
+      };
+    });
 
   const formattedActivities = allActivities
-    .filter((a) => a.date)
+    .filter((a): a is typeof a & { date: Date } => a.date !== null)
     .map((a) => ({
       id: a.id,
       title: a.title || "",
-      date: a.date!,
+      date: a.date,
       type: a.type as "meeting" | "call",
       status: "active",
       priority: "normal",
-      displayTitle: (a.title || "").substring(0, 50) + ((a.title || "").length > 50 ? "..." : ""),
+      displayTitle: activityTitle(a.title, a.type),
       entityName: a.leadName
         ? `${a.leadName} ${a.leadLastName}`
         : a.contactName

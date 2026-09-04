@@ -2369,22 +2369,6 @@
       "sat": "Sab",
       "sun": "Dom"
     },
-    "newEventDialog": {
-      "titleLabel": "Titolo del task",
-      "descLabel": "Descrizione",
-      "titlePlaceholderTask": "Follow up con…",
-      "titlePlaceholderOther": "Argomento o note…",
-      "dateTimeLabel": "Data e ora",
-      "priorityLabel": "Priorità",
-      "priorityLow": "Bassa",
-      "priorityNormal": "Normale",
-      "priorityHigh": "Alta",
-      "createBtn": "Crea {label}",
-      "cancel": "Annulla",
-      "titleRequired": "Il titolo è obbligatorio.",
-      "dateRequired": "Data e ora sono obbligatorie.",
-      "createError": "Creazione evento fallita."
-    },
     "typeAppointment": "Appuntamento",
     "filterAll": "Tutti",
     "filterMine": "I miei",
