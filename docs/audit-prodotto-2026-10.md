@@ -751,7 +751,7 @@ di riposo e la proposta di creare quando la ricerca non trova nulla.
 È l'intervento che abbassa di più la curva di apprendimento, perché sostituisce «devi
 sapere dove sta» con «chiedilo».
 
-### S-02 — Una prossima azione calcolata per ogni record
+### S-02 — Una prossima azione calcolata per ogni record ✅
 
 Trattativa ferma da più di N giorni; preventivo inviato e mai aperto da cinque giorni;
 ticket entro il 20% dalla scadenza SLA; lead qualificato senza attività; cliente senza
@@ -759,6 +759,24 @@ contatti da tre mesi. Tutte interrogazioni sui dati presenti, presentate come el
 lavoro ordinato per urgenza.
 
 La dashboard oggi elenca ciò che esiste; questa versione dice cosa fare adesso.
+
+**✅ Risolto.** Le soglie e l'ordinamento stanno in `src/lib/next-actions.ts`, modulo
+puro: sono la parte su cui vale la pena discutere, e tenerli fuori dalle interrogazioni
+significa poterli leggere in un posto solo invece di dedurli da sei clausole `WHERE`.
+`getNextActions` in `src/actions/next-actions.ts` esegue le sei regole — SLA violato o
+in scadenza, preventivo che scade, preventivo inviato e mai aperto, trattativa ferma o
+oltre la data di chiusura, lead mai contattato, cliente silenzioso — ognuna una query
+piccola con il proprio tetto, quindi il costo resta limitato comunque cresca il
+workspace.
+
+Due scelte che contano. «Toccata» per una trattativa significa che è stata registrata
+un'attività, non che la riga è stata scritta: risalvare per correggere un refuso non è
+contatto con il cliente. E il rischio SLA è calcolato come frazione della finestra
+propria del ticket, non come numero fisso di ore: il 20% di quattro ore e il 20% di due
+giorni sono entrambi «sta per scadere», e un'ora fissa sbaglierebbe su uno dei due.
+
+L'elenco sta in cima alla dashboard, sopra tutto il resto, e se fallisce non porta giù
+lo schermo con sé: torna vuoto, che si legge come «non c'è nulla in attesa».
 
 ### S-03 — Chiudere il ciclo preventivo → ordine → trattativa ✅
 

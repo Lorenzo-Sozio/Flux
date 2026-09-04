@@ -22,6 +22,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { getAppointmentCalendarEvents } from "@/actions/appointments";
 import { getRecentLeads } from "@/actions/crm";
 import { getDashboardStats, getRecentActivities, getTopDeals } from "@/actions/dashboard";
+import { getNextActions } from "@/actions/next-actions";
 import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
 import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
 import CRMCharts from "@/components/dashboard/CRMCharts.client";
@@ -36,6 +37,7 @@ import { getDb } from "@/lib/tenant-context";
 
 import { type AgendaItem, AgendaWidget } from "./_components/agenda-widget";
 import { MonthTargetCard } from "./_components/month-target-card";
+import { NextActionsCard } from "./_components/next-actions-card";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -117,6 +119,7 @@ export default async function CRMPage() {
     myTickets,
     myTarget,
     wonThisMonth,
+    nextActions,
   ] = await Promise.all([
     getDashboardStats(),
     getRecentLeads(5),
@@ -250,6 +253,11 @@ export default async function CRMPage() {
           .where(and(eq(deals.status, "won"), eq(deals.ownerId, userId), gte(deals.updatedAt, monthStart)))
           .then((rows) => parseFloat(rows[0]?.total ?? "0"))
       : Promise.resolve(0 as number),
+
+    // What needs doing, rather than what exists (audit rilievo S-02). Failing to
+    // build the work list must not take the whole dashboard down with it: an
+    // empty list reads as "nothing waiting", which is the safe way to be wrong.
+    getNextActions(8).catch(() => []),
   ]);
 
   // ── Build agenda items ───────────────────────────────────────────────────────
@@ -366,6 +374,14 @@ export default async function CRMPage() {
         </h1>
         <p className="mt-0.5 text-muted-foreground capitalize">{formatToday(now, locale)}</p>
       </div>
+
+      {/* ── What needs doing ─────────────────────────────────────────── */}
+      {/*
+        Above everything else on purpose. The cards below say what exists; this
+        one says what to do about it, which is the question the screen is opened
+        with (audit rilievo S-02).
+      */}
+      <NextActionsCard actions={nextActions} />
 
       {/* ── Agenda + Tickets ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
