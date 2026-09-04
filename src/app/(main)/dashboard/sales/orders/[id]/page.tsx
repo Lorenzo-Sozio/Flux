@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft,
+  ArrowRight,
   Building2,
   Calendar,
   CheckCircle2,
@@ -41,12 +42,30 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCurrency } from "@/hooks/use-currency";
+import { advanceLabel, isTerminalStatus, nextStatus } from "@/lib/order-status";
 import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type OrderDetail = Awaited<ReturnType<typeof getOrderById>>;
 type Product = Awaited<ReturnType<typeof getProducts>>[number];
+
+/**
+ * Day and time, in the reader's own locale.
+ *
+ * These fields showed the day alone. On an order taken by phone at 09:10 and
+ * another at 17:40 that is the difference between knowing the sequence and
+ * guessing it, and the value was in the column all along.
+ */
+function formatDateTime(value: Date | string): string {
+  return new Date(value).toLocaleString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
   draft: { label: "Draft", class: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
@@ -101,7 +120,7 @@ function AddItemDialog({
 
   return (
     <>
-      <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => setOpen(true)}>
+      <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => setOpen(true)}>
         <Plus className="h-3.5 w-3.5" /> Add Item
       </Button>
       <Dialog
@@ -113,12 +132,12 @@ function AddItemDialog({
           }
         }}
       >
-        <DialogContent className="sm:max-w-sm p-0 gap-0">
-          <DialogHeader className="px-5 pt-5 pb-4 border-b">
+        <DialogContent className="gap-0 p-0 sm:max-w-sm">
+          <DialogHeader className="border-b px-5 pt-5 pb-4">
             <DialogTitle>Add Line Item</DialogTitle>
           </DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="px-5 py-4 space-y-3">
+            <div className="space-y-3 px-5 py-4">
               <div className="space-y-1.5">
                 <Label>Product</Label>
                 <Select value={form.watch("productId")} onValueChange={handleProductChange}>
@@ -135,7 +154,7 @@ function AddItemDialog({
                   </SelectContent>
                 </Select>
                 {form.formState.errors.productId && (
-                  <p className="text-xs text-destructive">{form.formState.errors.productId.message}</p>
+                  <p className="text-destructive text-xs">{form.formState.errors.productId.message}</p>
                 )}
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -149,7 +168,7 @@ function AddItemDialog({
                 </div>
               </div>
             </div>
-            <DialogFooter className="px-5 py-4 border-t bg-muted/10">
+            <DialogFooter className="border-t bg-muted/10 px-5 py-4">
               <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
                 Cancel
               </Button>
@@ -170,7 +189,10 @@ function AddItemDialog({
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const router = useRouter();
-  const [, startTransition] = useTransition();
+  // The pending flag was discarded. The two status buttons need it: without it a
+  // slow save invites a second click, and a second click on "Close order" is a
+  // second write of the same thing.
+  const [isPending, startTransition] = useTransition();
   const { formatAmount } = useCurrency();
 
   const [order, setOrder] = useState<OrderDetail>(null);
@@ -221,12 +243,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   if (loading) {
     return (
-      <div className="space-y-4 animate-pulse">
-        <div className="h-5 w-28 bg-muted rounded" />
-        <div className="h-10 w-64 bg-muted rounded" />
+      <div className="animate-pulse space-y-4">
+        <div className="h-5 w-28 rounded bg-muted" />
+        <div className="h-10 w-64 rounded bg-muted" />
         <div className="grid grid-cols-3 gap-4">
-          <div className="col-span-2 h-64 bg-muted rounded-xl" />
-          <div className="h-64 bg-muted rounded-xl" />
+          <div className="col-span-2 h-64 rounded-xl bg-muted" />
+          <div className="h-64 rounded-xl bg-muted" />
         </div>
       </div>
     );
@@ -234,9 +256,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   if (!order) {
     return (
-      <div className="text-center py-20">
-        <ShoppingCart className="h-12 w-12 text-muted-foreground/30 mx-auto mb-4" />
-        <p className="text-muted-foreground mb-4">Order not found</p>
+      <div className="py-20 text-center">
+        <ShoppingCart className="mx-auto mb-4 h-12 w-12 text-muted-foreground/30" />
+        <p className="mb-4 text-muted-foreground">Order not found</p>
         <Button asChild>
           <Link href="/dashboard/sales/orders">Back to Orders</Link>
         </Button>
@@ -250,11 +272,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     : (order.companyName ?? null);
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-5 p-6">
       {/* Back nav */}
       <Link
         href="/dashboard/sales/orders"
-        className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        className="inline-flex items-center gap-1.5 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" /> All Orders
       </Link>
@@ -262,28 +284,24 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <span className="font-mono text-xs font-semibold text-muted-foreground">{order.orderNumber}</span>
-          <h1 className="text-2xl font-bold tracking-tight mt-0.5">{customer ?? "Order Details"}</h1>
-          <div className="flex items-center gap-2 mt-2">
+          <span className="font-mono font-semibold text-muted-foreground text-xs">{order.orderNumber}</span>
+          <h1 className="mt-0.5 font-bold text-2xl tracking-tight">{customer ?? "Order Details"}</h1>
+          <div className="mt-2 flex items-center gap-2">
             <Badge variant="outline" className={cn("text-xs", statusCfg.class)}>
               {statusCfg.label}
             </Badge>
-            <span className="text-xs text-muted-foreground flex items-center gap-1">
+            <span className="flex items-center gap-1 text-muted-foreground text-xs">
               <Calendar className="h-3 w-3" />
-              {new Date(order.orderDate).toLocaleDateString(undefined, {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })}
+              {formatDateTime(order.orderDate)}
             </span>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           <Button
             variant="outline"
             size="sm"
-            className="text-destructive hover:text-destructive gap-1.5"
+            className="gap-1.5 text-destructive hover:text-destructive"
             onClick={handleDelete}
           >
             <Trash2 className="h-3.5 w-3.5" /> Delete
@@ -292,12 +310,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {/* Content grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
         {/* Left — line items */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="space-y-4 lg:col-span-2">
           <Card>
-            <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
+            <CardHeader className="flex flex-row items-center justify-between border-b pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <Package className="h-4 w-4 text-muted-foreground" />
                 Line Items
               </CardTitle>
@@ -306,13 +324,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <CardContent className="p-0">
               {order.items.length === 0 ? (
                 <div className="py-10 text-center">
-                  <Package className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">No items yet.</p>
+                  <Package className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
+                  <p className="text-muted-foreground text-sm">No items yet.</p>
                 </div>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b bg-muted/30 text-xs text-muted-foreground">
+                    <tr className="border-b bg-muted/30 text-muted-foreground text-xs">
                       <th className="px-4 py-2.5 text-left font-medium">Product</th>
                       <th className="px-4 py-2.5 text-right font-medium">Qty</th>
                       <th className="px-4 py-2.5 text-right font-medium">Unit Price</th>
@@ -322,7 +340,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </thead>
                   <tbody className="divide-y">
                     {order.items.map((item) => (
-                      <tr key={item.id} className="hover:bg-muted/20 group">
+                      <tr key={item.id} className="group hover:bg-muted/20">
                         <td className="px-4 py-3">
                           <p className="font-medium">{item.productName ?? item.description ?? "Unknown"}</p>
                           {item.productSku && (
@@ -333,19 +351,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                               catalogue name. Under the item, where whoever prepares it
                               reads before touching anything. */}
                           {item.itemNotes && (
-                            <p className="whitespace-pre-line text-xs text-muted-foreground mt-0.5">{item.itemNotes}</p>
+                            <p className="mt-0.5 whitespace-pre-line text-muted-foreground text-xs">{item.itemNotes}</p>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{item.quantity}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{formatAmount(Number(item.unitPrice))}</td>
-                        <td className="px-4 py-3 text-right tabular-nums font-semibold">
+                        <td className="px-4 py-3 text-right font-semibold tabular-nums">
                           {formatAmount(Number(item.totalPrice))}
                         </td>
                         <td className="px-4 py-3">
                           <button
                             type="button"
                             onClick={() => handleRemoveItem(item.id)}
-                            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground/50 hover:text-destructive"
+                            className="text-muted-foreground/50 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -353,10 +371,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       </tr>
                     ))}
                     <tr className="border-t bg-muted/20">
-                      <td colSpan={3} className="px-4 py-3 text-right text-sm font-medium text-muted-foreground">
+                      <td colSpan={3} className="px-4 py-3 text-right font-medium text-muted-foreground text-sm">
                         Total
                       </td>
-                      <td className="px-4 py-3 text-right text-base font-bold tabular-nums">
+                      <td className="px-4 py-3 text-right font-bold text-base tabular-nums">
                         {formatAmount(Number(order.totalAmount))}
                       </td>
                       <td />
@@ -377,7 +395,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <CardContent className="space-y-4 text-sm">
               {/* Status */}
               <div>
-                <p className="text-xs text-muted-foreground mb-1.5">Status</p>
+                <p className="mb-1.5 text-muted-foreground text-xs">Status</p>
                 <Select value={order.status} onValueChange={handleStatusChange}>
                   <SelectTrigger className="h-8 text-xs">
                     <SelectValue />
@@ -390,11 +408,61 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     ))}
                   </SelectContent>
                 </Select>
+
+                {/*
+                  The two moves anyone actually makes, as buttons rather than as a
+                  menu the user has to remember the shape of.
+
+                  Each names where the order ends up, not what the button does, so
+                  it is a sentence you can disagree with before clicking. The
+                  shortcut appears only while it would skip a step: from
+                  "processing" the two would do the same thing, and two buttons
+                  with one effect is exactly the confusion this is meant to remove.
+                */}
+                {!isTerminalStatus(order.status) && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {advanceLabel(order.status) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 flex-1 text-xs"
+                        disabled={isPending}
+                        onClick={() => {
+                          const next = nextStatus(order.status);
+                          if (next) handleStatusChange(next);
+                        }}
+                      >
+                        <ArrowRight className="mr-1.5 h-3.5 w-3.5" />
+                        {advanceLabel(order.status)}
+                      </Button>
+                    )}
+
+                    {nextStatus(order.status) !== "completed" && (
+                      <Button
+                        size="sm"
+                        className="h-8 flex-1 bg-emerald-600 text-xs hover:bg-emerald-700"
+                        disabled={isPending}
+                        onClick={() => handleStatusChange("completed")}
+                      >
+                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                        Close order
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {isTerminalStatus(order.status) && (
+                  <p className="mt-2 text-muted-foreground text-xs">
+                    {order.status === "completed"
+                      ? "This order is closed. Change the status above to reopen it."
+                      : "This order was cancelled."}
+                  </p>
+                )}
               </div>
 
               {/* Amount */}
               <div className="flex items-center justify-between border-t pt-3">
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <span className="flex items-center gap-1 text-muted-foreground text-xs">
                   <DollarSign className="h-3 w-3" /> Total Amount
                 </span>
                 <span className="font-bold tabular-nums">{formatAmount(Number(order.totalAmount))}</span>
@@ -403,11 +471,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               {/* Customer */}
               {customer && (
                 <div className="flex items-center gap-2 border-t pt-3">
-                  <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <div className="min-w-0">
-                    <p className="text-xs font-medium truncate">{customer}</p>
+                    <p className="truncate font-medium text-xs">{customer}</p>
                     {order.contactEmail && (
-                      <p className="text-[10px] text-muted-foreground truncate">{order.contactEmail}</p>
+                      <p className="truncate text-[10px] text-muted-foreground">{order.contactEmail}</p>
                     )}
                   </div>
                 </div>
@@ -416,18 +484,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               {/* Company */}
               {order.companyName && order.contactId && (
                 <div className="flex items-center gap-2">
-                  <Building2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <p className="text-xs text-muted-foreground truncate">{order.companyName}</p>
+                  <Building2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                  <p className="truncate text-muted-foreground text-xs">{order.companyName}</p>
                 </div>
               )}
 
               {/* Owner */}
               {order.ownerName && (
                 <div className="flex items-center gap-2 border-t pt-3">
-                  <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <div>
                     <p className="text-[10px] text-muted-foreground">Owner</p>
-                    <p className="text-xs font-medium">{order.ownerName}</p>
+                    <p className="font-medium text-xs">{order.ownerName}</p>
                   </div>
                 </div>
               )}
@@ -436,38 +504,26 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   Written by whoever took the order — an assistant, or a person. */}
               {order.notes && (
                 <div className="border-t pt-3">
-                  <p className="text-muted-foreground mb-1 text-xs">Notes</p>
+                  <p className="mb-1 text-muted-foreground text-xs">Notes</p>
                   <p className="whitespace-pre-line text-xs">{order.notes}</p>
                 </div>
               )}
 
               {/* Dates */}
-              <div className="border-t pt-3 space-y-1.5">
+              <div className="space-y-1.5 border-t pt-3">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground flex items-center gap-1">
+                  <span className="flex items-center gap-1 text-muted-foreground">
                     <Clock className="h-3 w-3" />
                     Order date
                   </span>
-                  <span>
-                    {new Date(order.orderDate).toLocaleDateString(undefined, {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>
+                  <span className="tabular-nums">{formatDateTime(order.orderDate)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground flex items-center gap-1">
+                  <span className="flex items-center gap-1 text-muted-foreground">
                     <CheckCircle2 className="h-3 w-3" />
                     Created
                   </span>
-                  <span>
-                    {new Date(order.createdAt).toLocaleDateString(undefined, {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </span>
+                  <span className="tabular-nums">{formatDateTime(order.createdAt)}</span>
                 </div>
               </div>
             </CardContent>

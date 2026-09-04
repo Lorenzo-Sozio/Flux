@@ -10,11 +10,14 @@ import { companies, contacts, deals, orderItems, orders, products, quoteItems, q
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { computeDocument } from "@/lib/document-totals";
 import { nextOrderNumber } from "@/lib/order-number";
+import type { OrderStatus } from "@/lib/order-status";
 import { getDb } from "@/lib/tenant-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type OrderStatus = "draft" | "processing" | "completed" | "cancelled";
+// One definition, in a module a client component can import: the page needs the
+// flow as a value, and a "use server" file cannot hand one over.
+export type { OrderStatus };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
