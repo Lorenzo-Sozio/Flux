@@ -636,9 +636,12 @@ si trascinano davvero — pipeline, task, kanban dei ticket, costruttore email �
 la pagina che la conteneva è un redirect da tempo e la riga era commentata. Tabella e
 quattro pacchetti rimossi, build di produzione riuscito.
 
-**Resta aperta la lingua**: 382 righe di commento in 28 file sono in italiano, quasi tutte
-le spiegazioni lunghe sul confine di importazione. Non è una pulizia, è una scelta su chi
-legge questo codice, e va fatta in un colpo solo o non serve a niente.
+Sulla lingua la regola c'è ed è scritta nel `CLAUDE.md`: i commenti si scrivono in inglese,
+che è già la maggioranza. Le 382 righe italiane rimaste, quasi tutte spiegazioni lunghe sul
+confine di importazione, si traducono quando si tocca il file per un motivo vero, non in una
+passata a sé: alcune sono citate parola per parola dentro `scripts/mutations/*.json`, e una
+riscrittura che ne dimentica una fa fallire `npm run test:mutations` per un motivo che non
+c'entra con il codice. I file dell'automazione toccati oggi sono già allineati.
 
 ---
 

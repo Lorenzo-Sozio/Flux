@@ -837,7 +837,8 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                         expression={watch("conditionExpression") ?? ""}
                         onChange={(expr) => setValue("conditionExpression", expr)}
                         onValidationChange={(_isValid) => {
-                          // Puoi usare questo per disabilitare il pulsante save se l'espressione non è valida
+                          // Deliberately nothing: the hook a save button would use
+                          // to refuse an invalid expression, once one refuses.
                         }}
                       />
                     </div>

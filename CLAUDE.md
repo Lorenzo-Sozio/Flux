@@ -392,3 +392,9 @@ Defined in [src/navigation/sidebar/sidebar-items.ts](src/navigation/sidebar/side
 - **Husky + lint-staged** runs `biome check --write` on staged files pre-commit.
 - **shadcn/ui** components are added via `npx shadcn add <component>`. Config in [components.json](components.json).
 - Path alias `@/` maps to `src/`.
+- **Comments are written in English.** Both languages were in use, sometimes in the same
+  file, which costs the reader a language switch in the middle of an argument. English wins
+  because it is already the majority. Existing Italian comments are translated when the file
+  is being edited for another reason, never in a sweep of their own: some of them are quoted
+  verbatim inside `scripts/mutations/*.json`, and a rewrite that misses one turns
+  `npm run test:mutations` red for a reason that has nothing to do with the code.

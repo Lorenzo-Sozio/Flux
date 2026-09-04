@@ -1,13 +1,13 @@
 /**
  * Scheduled Triggers Engine (Cron-based)
  *
- * Fase 2: Supporta triggering basato su cron expressions
- * Esempio: "0 8 * * 1" = lunedì ore 8:00
+ * Rules that fire on a clock rather than on an event: "0 8 * * 1" is Monday at
+ * eight. The cron expression is read from the rule, and every record of the
+ * rule's target entity is put through runAutomations, loop detection and retry
+ * included.
  *
- * Implementazione semplificata:
- * - Cron expressions definite in code o metadata
- * - Esegue runAutomations su tutti i record del targetEntity
- * - Supporta loop detection e retry logic
+ * ⚠️ There is no long-lived process on Workers, so `src/instrumentation.ts`
+ * does not start this there and scheduled rules do not run on that deploy.
  */
 
 import { eq } from "drizzle-orm";
@@ -37,7 +37,7 @@ class SchedulerService {
   private jobs: Map<string, RegisteredCronJob> = new Map();
 
   /**
-   * Inizializza tutti gli scheduled triggers dal database
+   * Registers every scheduled trigger held in the database.
    */
   async initialize() {
     console.log("🔄 Initializing scheduled triggers...");
@@ -47,7 +47,7 @@ class SchedulerService {
       const rules = await db.select().from(automationRules).where(eq(automationRules.isActive, true));
 
       for (const rule of rules) {
-        // Cerca trigger di tipo scheduled
+        // Only the rules that fire on a clock
         const triggerOnArray = rule.triggerOn || [];
         for (const trigger of triggerOnArray) {
           const cronExpr = parseScheduledTrigger(trigger);
@@ -76,7 +76,7 @@ class SchedulerService {
   }
 
   /**
-   * Registra un nuovo cron job
+   * Registers one cron job.
    */
   private registerCronJob({
     ruleId,
@@ -87,13 +87,13 @@ class SchedulerService {
     targetEntity: TargetEntity;
     cronExpression: string;
   }) {
-    // Controlla se esiste già
+    // Already registered: replace it rather than run it twice
     if (this.jobs.has(ruleId)) {
       console.warn(`⚠️  Cron job ${ruleId} already registered, unregistering...`);
       this.unregister(ruleId);
     }
 
-    // Crea il task
+    // The task itself
     const task = cron.schedule(cronExpression, async () => {
       await this.executeTrigger(ruleId, targetEntity);
     });
@@ -109,22 +109,24 @@ class SchedulerService {
   }
 
   /**
-   * Esegue un trigger scheduled
+   * Runs one scheduled trigger.
    */
   private async executeTrigger(ruleId: string, targetEntity: TargetEntity) {
     try {
       console.log(`⏰ Executing scheduled trigger: ${ruleId}`);
 
-      // Recupera tutti i record della entity type
+      // Every record of the entity the rule targets
       const records = await this.getAllRecords(targetEntity);
 
-      // Esegui automation per ogni record
+      // One run per record
       for (const record of records) {
         try {
           await runAutomations({
             entityType: targetEntity,
             entityId: record.id,
-            event: "onCreate", // ⚠️ Workaround: usiamo onCreate perché event è limitato a onCreate|onUpdate
+            // ⚠️ A scheduled run is neither a create nor an update, and the event
+            // vocabulary has no third word for it, so it borrows onCreate.
+            event: "onCreate",
             oldData: record,
             newData: record,
           });
@@ -138,7 +140,7 @@ class SchedulerService {
   }
 
   /**
-   * Recupera tutti i record di un tipo di entity
+   * Every record of one entity type, capped so a large workspace cannot stall the job.
    */
   private async getAllRecords(entityType: TargetEntity): Promise<Array<{ id: string; [key: string]: unknown }>> {
     const schemaMap = {
@@ -159,7 +161,7 @@ class SchedulerService {
   }
 
   /**
-   * Deregistra un cron job
+   * Stops and forgets one cron job.
    */
   unregister(ruleId: string) {
     const job = this.jobs.get(ruleId);
@@ -171,7 +173,7 @@ class SchedulerService {
   }
 
   /**
-   * Ferma tutti i cron jobs
+   * Stops every cron job.
    */
   shutdown() {
     console.log("🛑 Shutting down scheduler...");
@@ -181,7 +183,7 @@ class SchedulerService {
   }
 
   /**
-   * Ritorna stato dei cron jobs attivi
+   * What is currently scheduled.
    */
   getStatus() {
     return {
@@ -229,7 +231,7 @@ export function getSchedulerStatus() {
 // ============================================================================
 
 /**
- * Helper per costruire cron expressions
+ * Builds cron expressions, so the common ones are not written by hand.
  * @example
  *   cronBuilder().everyDayAt(8, 0) // "0 8 * * *"
  *   cronBuilder().everyMondayAt(8, 0) // "0 8 * * 1"
@@ -237,7 +239,7 @@ export function getSchedulerStatus() {
 export function cronBuilder() {
   return {
     /**
-     * Ogni giorno a un'ora specifica
+     * Every day at a given time.
      * @param hour 0-23
      * @param minute 0-59
      */
@@ -246,8 +248,8 @@ export function cronBuilder() {
     },
 
     /**
-     * Un giorno della settimana a un'ora specifica
-     * @param dayOfWeek 0=domenica, 1=lunedì, ..., 6=sabato
+     * One weekday at a given time.
+     * @param dayOfWeek 0=Sunday, 1=Monday, …, 6=Saturday
      * @param hour 0-23
      * @param minute 0-59
      */
@@ -256,14 +258,14 @@ export function cronBuilder() {
     },
 
     /**
-     * Ogni N ore
+     * Every N hours.
      */
     everyNHours(n: number): string {
       return `0 */${n} * * *`;
     },
 
     /**
-     * Ogni N minuti (non usare in prod, testing only)
+     * Every N minutes. Testing only — never a production schedule.
      */
     everyNMinutes(n: number): string {
       return `*/${n} * * * *`;

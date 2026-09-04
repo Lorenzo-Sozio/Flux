@@ -266,26 +266,26 @@ export class ActionDispatcher {
     if (!table) throw new Error(`Unknown entity type: ${context.entityType}`);
 
     const db = await getDb();
-    // Fetch old data prima dell'update
+    // The row as it stands, before the write
     const [oldEntity] = await db
       .select()
       .from(table as any)
       .where(eq((table as any).id, context.entityId));
 
-    // Update il campo
+    // The write itself
     await (db.update(table as any) as any)
       .set({ [field]: value, updatedAt: new Date() })
       .where(eq((table as any).id, context.entityId));
 
-    // Fetch new data dopo l'update
+    // And as it stands after it
     const [newEntity] = await db
       .select()
       .from(table as any)
       .where(eq((table as any).id, context.entityId));
 
-    // Se il campo è effettivamente cambiato, trigghera altre automazioni
+    // Only a real change carries on: a write that changed nothing starts nothing
     if (oldEntity && newEntity && (oldEntity as any)[field] !== (newEntity as any)[field]) {
-      // Propagare il cambio a cascata (con execution context per loop detection)
+      // The change cascades, carrying the execution context so a loop is seen
       await runAutomations(
         {
           entityType: context.entityType,
@@ -295,7 +295,7 @@ export class ActionDispatcher {
           newData: newEntity as Record<string, unknown>,
           currentUserId: context.currentUserId,
         },
-        executionCtx, // Passa il contesto per tracciare la catena
+        executionCtx, // so the chain can be traced back
       );
     }
   }
