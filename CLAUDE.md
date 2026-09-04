@@ -182,10 +182,24 @@ provides, rather than from a flag that can disagree with reality:
 1. an R2 bucket bound as `DOCUMENTS` — production on Workers, declared in wrangler.jsonc;
 2. any S3-compatible endpoint, when `S3_ENDPOINT` / `S3_BUCKET` / `S3_ACCESS_KEY_ID` /
    `S3_SECRET_ACCESS_KEY` are set — Vercel, or self-hosting;
-3. the local disk, development only, and it logs an error if it ends up there in
-   production.
+3. the local disk, development only. On Workers there is no disk, so rather than
+   fall back to one that cannot work, `getStorage()` throws and says what to set.
 
-⚠️ Create the bucket once: `npx wrangler r2 bucket create flux-documents`.
+⚠️⚠️ **A binding for a resource the account does not have breaks every deploy.** The
+`r2_buckets` block in wrangler.jsonc is currently **commented out**, because R2 was not
+enabled on the account and wrangler checks bindings against the account at deploy time.
+Declaring `flux-documents` there took production down on 4 September 2026 — the same
+mechanism as the `WORKER_SELF_REFERENCE` error below, and just as quiet: the failure is
+in the deploy step of a job whose build succeeded.
+
+To turn document storage on, in this order:
+
+1. enable R2 in the Cloudflare dashboard (once, for the account);
+2. `npx wrangler r2 bucket create flux-documents`;
+3. uncomment the `r2_buckets` block in wrangler.jsonc and deploy.
+
+Until then uploads fail with a message naming what to configure, and everything else
+works. The alternative to R2 is any S3-compatible store, set as Worker secrets.
 
 ⚠️ The storage key carries **nothing** from the uploaded filename except an extension
 matched against a strict pattern, and the read path re-checks the key's shape before

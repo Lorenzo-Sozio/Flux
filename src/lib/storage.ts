@@ -209,6 +209,11 @@ function localDriver(): StorageDriver {
 
 let warnedAboutLocal = false;
 
+/** True inside a Cloudflare Worker, where there is no filesystem to fall back to. */
+function isWorkers(): boolean {
+  return typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers";
+}
+
 /** The DOCUMENTS binding, when running on Cloudflare. Null anywhere else. */
 async function cloudflareBucket(): Promise<R2Bucket | null> {
   const fromGlobal = (globalThis as { DOCUMENTS?: unknown }).DOCUMENTS as R2Bucket | undefined;
@@ -248,6 +253,17 @@ export async function getStorage(): Promise<StorageDriver> {
       accessKeyId,
       secretAccessKey,
     });
+  }
+
+  // On Workers there is no disk at all, so the local driver is not a degraded
+  // fallback, it is a guaranteed failure a few frames later with an error that
+  // says nothing useful. Say the true thing here instead.
+  if (isWorkers()) {
+    throw new Error(
+      "Document storage is not configured. Bind an R2 bucket as DOCUMENTS in wrangler.jsonc " +
+        "(R2 has to be enabled on the account first), or set S3_ENDPOINT, S3_BUCKET, " +
+        "S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY as Worker secrets.",
+    );
   }
 
   if (process.env.NODE_ENV === "production" && !warnedAboutLocal) {

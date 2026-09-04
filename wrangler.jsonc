@@ -45,21 +45,31 @@
   },
 
   /**
-   * Dove vivono i documenti caricati.
+   * Dove vivono i documenti caricati — DISATTIVATO, va riattivato.
    *
-   * ⚠️ Senza questo binding gli allegati finiscono sul disco locale, che su Workers
-   * non esiste e su Vercel non sopravvive al deploy successivo: il caricamento
-   * riesce e il file sparisce, lasciando una riga che punta al nulla.
+   * ⚠️⚠️ Questo binding è commentato perché **R2 non è ancora attivo sull'account**,
+   * e wrangler verifica i binding sull'account al momento del deploy: dichiarare un
+   * bucket che non esiste fa fallire OGNI deploy, build compresa. È esattamente ciò
+   * che ha bloccato la produzione dal 4 settembre 2026, con lo stesso meccanismo
+   * dell'errore su `WORKER_SELF_REFERENCE` descritto in CLAUDE.md.
    *
-   * Il bucket va creato una volta:
-   *     npx wrangler r2 bucket create flux-documents
+   * Per riattivarlo, nell'ordine:
+   *   1. attivare R2 dalla dashboard Cloudflare (una volta, per l'account);
+   *   2. npx wrangler r2 bucket create flux-documents
+   *   3. togliere i commenti al blocco qui sotto e fare il deploy.
+   *
+   * ⚠️ Finché resta commentato, `getStorage()` non trova né R2 né S3 e ricade sul
+   * disco locale, che su Workers non esiste: i caricamenti di documenti falliscono.
+   * L'alternativa senza R2 è impostare S3_ENDPOINT / S3_BUCKET / S3_ACCESS_KEY_ID /
+   * S3_SECRET_ACCESS_KEY come secret del Worker — qualunque storage S3-compatibile
+   * va bene. Tutto il resto del prodotto funziona senza.
    */
-  "r2_buckets": [
-    {
-      "binding": "DOCUMENTS",
-      "bucket_name": "flux-documents"
-    }
-  ],
+  // "r2_buckets": [
+  //   {
+  //     "binding": "DOCUMENTS",
+  //     "bucket_name": "flux-documents"
+  //   }
+  // ],
 
   "observability": {
     "enabled": true
