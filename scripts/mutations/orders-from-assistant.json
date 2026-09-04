@@ -13,12 +13,6 @@
   },
   {
     "file": "src/app/api/crm/orders/route.ts",
-    "description": "cio' che il cliente ha chiesto di cambiare sparisce dalla riga: l'ordine si prepara sbagliato",
-    "find": "      description: r.note ? `${r.description} (${r.note})` : r.description,",
-    "replace": "      description: r.description,"
-  },
-  {
-    "file": "src/app/api/crm/orders/route.ts",
     "description": "una riga senza prezzo passa e vale zero invece di far rifiutare l'ordine",
     "find": "    if (!description || quantity < 1 || !Number.isFinite(unitPrice) || unitPrice < 0) continue;",
     "replace": "    if (!description || quantity < 1) continue;"
@@ -40,5 +34,41 @@
     "description": "nessuno viene avvisato che e' arrivato un ordine: chi sorvegliava quella coda non lo sa",
     "find": "    dispatchWebhook(\"order.created\", { order: { ...ordine, contactId } }, ORIGINE_API);",
     "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "⚠️⚠️ cio' che serve per preparare l'ordine non viene scritto: le righe ci sono e nessuno sa se vada consegnato",
+    "find": "      notes: note || null,",
+    "replace": "      notes: null,"
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "le etichette si scrivono anche senza il dato: «Consegna:» seguito dal vuoto manda a cercare un'informazione che non e' stata data",
+    "find": "  const note = [\n    [\"Consegna\", typeof dati.fulfillment === \"string\" ? dati.fulfillment.trim() : \"\"],\n    [\"Per quando\", typeof dati.when === \"string\" ? dati.when.trim() : \"\"],\n    [\"Indirizzo\", typeof dati.address === \"string\" ? dati.address.trim() : \"\"],\n  ]\n    .filter(([, valore]) => valore)",
+    "replace": "  const note = [\n    [\"Consegna\", typeof dati.fulfillment === \"string\" ? dati.fulfillment.trim() : \"\"],\n    [\"Per quando\", typeof dati.when === \"string\" ? dati.when.trim() : \"\"],\n    [\"Indirizzo\", typeof dati.address === \"string\" ? dati.address.trim() : \"\"],\n  ]"
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "⚠️⚠️ come il cliente ha chiamato l'articolo sparisce: una corrispondenza sbagliata — «capricciosa» diventata «quattro stagioni» — non la vede piu' nessuno",
+    "find": "    [\"Richiesto come\", diverso ? r.requestedAs : \"\"],",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "le modifiche chieste sulla riga spariscono: la pizza si prepara come se nessuno avesse detto niente",
+    "find": "    [\"Modifiche\", r.note ?? \"\"],",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "«Richiesto come» si scrive anche quando coincide con la voce: rumore sotto ogni riga, e si smette di leggere quelle che dicono qualcosa",
+    "find": "  const diverso = r.requestedAs && r.requestedAs.toLowerCase() !== r.description.toLowerCase();",
+    "replace": "  const diverso = Boolean(r.requestedAs);"
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "la nota di riga non viene scritta: quello che il cliente ha chiesto su quell'articolo non arriva a chi lo prepara",
+    "find": "      notes: notaDiRiga(r) || null,",
+    "replace": "      notes: null,"
   }
 ]

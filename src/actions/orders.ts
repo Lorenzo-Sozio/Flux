@@ -99,6 +99,8 @@ export async function getOrderById(id: string) {
       orderNumber: orders.orderNumber,
       status: orders.status,
       totalAmount: orders.totalAmount,
+      // What has to be known to prepare it: pickup or delivery, when, where.
+      notes: orders.notes,
       orderDate: orders.orderDate,
       createdAt: orders.createdAt,
       updatedAt: orders.updatedAt,
@@ -129,6 +131,14 @@ export async function getOrderById(id: string) {
       quantity: orderItems.quantity,
       unitPrice: orderItems.unitPrice,
       totalPrice: orderItems.totalPrice,
+      // ⚠️ **What a line without a product says it is.** `product_id` became optional so
+      // that an order could carry a one-off — a customisation, a day of consulting, a
+      // pizza priced from the business's own list — but nothing read the column that says
+      // what it is, so the detail page showed «Unknown». The write side was opened and the
+      // read side was not.
+      description: orderItems.description,
+      // What was asked for on this line, in full: see `orderItems.notes`.
+      itemNotes: orderItems.notes,
       productName: products.name,
       productSku: products.sku,
     })

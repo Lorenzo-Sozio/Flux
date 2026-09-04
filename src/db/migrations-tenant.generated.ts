@@ -268,4 +268,13 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nDO $$ BEGIN\n  ALTER TABLE "deal" ADD CONSTRAINT "deal_lost_at_stage_id_fk"\n    FOREIGN KEY ("lost_at_stage_id") REFERENCES "pipeline_stage"("id") ON DELETE set null;\nEXCEPTION WHEN duplicate_object THEN NULL; END $$;\n',
     ],
   },
+  {
+    tag: "0006_what_the_customer_asked_for",
+    folderMillis: 1788920000000,
+    hash: "514410e62010b5c1a10f3e3fd7d04e5c3910b338a08085e3c5cdfebf4dbb706c",
+    sql: [
+      "-- Un ordine può portare una nota, come già la porta un preventivo.\r\n--\r\n-- `quote.notes` esiste da sempre e `order.notes` no: il preventivo poteva dire\r\n-- «consegnare al piano terra, citofono Rossi» e l'ordine che ne nasce, cioè il\r\n-- documento che qualcuno prepara davvero, no. L'asimmetria si vedeva poco finché gli\r\n-- ordini nascevano solo dai preventivi.\r\n--\r\n-- Si vede adesso, perché un ordine può arrivare da un assistente che l'ha preso a\r\n-- parole: ritiro o consegna, per quando, a che indirizzo. Sono le tre cose che un\r\n-- operatore deve leggere per prepararlo, e senza questa colonna finivano nel nulla —\r\n-- l'ordine compariva con le righe giuste e nessuno sapeva se andasse consegnato.\r\n--\r\n-- ⚠️ Il driver Neon HTTP non tiene una transazione fra istruzioni: ogni istruzione è\r\n-- scritta per poter essere rieseguita senza fallire.\r\nALTER TABLE \"order\" ADD COLUMN IF NOT EXISTS \"notes\" text;",
+      "\r\n\r\n-- E la **riga** può dire per esteso che cosa è stato chiesto.\r\n--\r\n-- `description` dice che cosa si prepara — la voce del listino, quella a cui il prezzo\r\n-- appartiene — e non è il posto dove infilare anche il resto: chi legge un ordine deve\r\n-- poter distinguere l'articolo dalle indicazioni, e un unico campo che li mescola si\r\n-- legge male proprio quando ci sono entrambi.\r\n--\r\n-- Ci finiscono due cose. Le **modifiche** che il cliente ha chiesto su quella riga, con\r\n-- le sue parole: «poco piccante» cambia come si prepara la pizza, e senza un posto dove\r\n-- scriverlo l'ordine si prepara sbagliato. E **come l'ha chiamata**, quando è diverso\r\n-- dalla voce di listino: chi ha preso l'ordine ha fatto una corrispondenza, e questa è\r\n-- l'unica riga su cui una persona può accorgersi che era sbagliata.\r\nALTER TABLE \"order_item\" ADD COLUMN IF NOT EXISTS \"notes\" text;\r\n",
+    ],
+  },
 ];

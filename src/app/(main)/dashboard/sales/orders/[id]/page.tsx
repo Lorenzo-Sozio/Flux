@@ -324,9 +324,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     {order.items.map((item) => (
                       <tr key={item.id} className="hover:bg-muted/20 group">
                         <td className="px-4 py-3">
-                          <p className="font-medium">{item.productName ?? "Unknown"}</p>
+                          <p className="font-medium">{item.productName ?? item.description ?? "Unknown"}</p>
                           {item.productSku && (
                             <span className="font-mono text-[10px] text-muted-foreground">{item.productSku}</span>
+                          )}
+                          {/* What was asked for on this line: the changes the customer
+                              wanted, and what they called it when that is not the
+                              catalogue name. Under the item, where whoever prepares it
+                              reads before touching anything. */}
+                          {item.itemNotes && (
+                            <p className="whitespace-pre-line text-xs text-muted-foreground mt-0.5">{item.itemNotes}</p>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{item.quantity}</td>
@@ -422,6 +429,15 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     <p className="text-[10px] text-muted-foreground">Owner</p>
                     <p className="text-xs font-medium">{order.ownerName}</p>
                   </div>
+                </div>
+              )}
+
+              {/* What has to be known to prepare it: pickup or delivery, when, where.
+                  Written by whoever took the order — an assistant, or a person. */}
+              {order.notes && (
+                <div className="border-t pt-3">
+                  <p className="text-muted-foreground mb-1 text-xs">Notes</p>
+                  <p className="whitespace-pre-line text-xs">{order.notes}</p>
                 </div>
               )}
 

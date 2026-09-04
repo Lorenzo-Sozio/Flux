@@ -283,6 +283,11 @@ export const orders = pgTable("order", {
   quoteId: text("quote_id"), // FK set via migration → quote.id (set null)
   dealId: text("deal_id"), // FK set via migration → deal.id (set null)
   status: text("status").default("draft").notNull(), // draft, processing, completed, cancelled
+  // What has to be known to prepare it: pickup or delivery, when, where. A quote has
+  // carried a note for ever and the order produced from it could not — the asymmetry
+  // showed little while orders only came from quotes, and shows now that one can arrive
+  // from an assistant that took it in words.
+  notes: text("notes"),
   orderDate: timestamp("order_date", { mode: "date" }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
@@ -301,6 +306,10 @@ export const orderItems = pgTable("order_item", {
   // (rilievo S-03).
   productId: text("product_id").references(() => products.id, { onDelete: "restrict" }),
   description: text("description"),
+  // What was asked for on this line, in full: the changes the customer wanted, and what
+  // they called it when that is not the catalogue name. `description` says what to
+  // prepare; a single field holding both reads worst exactly when both are there.
+  notes: text("notes"),
   quantity: integer("quantity").notNull(),
   unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
   discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }).default("0"),

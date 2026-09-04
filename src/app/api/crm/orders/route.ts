@@ -13,6 +13,30 @@ import { decryptDbUrl } from "@/lib/tenant-db";
 
 const ORIGINE_API = { via: "api" as const, actor: null };
 
+/** One line each, so whoever prepares the order reads them one under the other. */
+const SEPARATORE = String.fromCharCode(10);
+
+/**
+ * Everything asked for on one line, written out.
+ *
+ * ⚠️⚠️ **«Come l'ha chiamata» is not decoration.** Whoever took the order matched what the
+ * customer said against a price list, and replaced their words with the catalogue entry.
+ * If that match was wrong — «capricciosa» recorded as «quattro stagioni», same price,
+ * different pizza — nothing else in this order would ever show it. This is the only line a
+ * person can catch it on, so it is written whenever the two differ, and left out when they
+ * agree because then it says nothing.
+ */
+function notaDiRiga(r: RigaIn): string {
+  const diverso = r.requestedAs && r.requestedAs.toLowerCase() !== r.description.toLowerCase();
+  return [
+    ["Modifiche", r.note ?? ""],
+    ["Richiesto come", diverso ? r.requestedAs : ""],
+  ]
+    .filter(([, valore]) => valore)
+    .map(([etichetta, valore]) => `${etichetta}: ${valore}`)
+    .join(SEPARATORE);
+}
+
 /** How far the caller's total may differ from ours before the order is refused. */
 const TOLLERANZA = 0.01;
 
@@ -22,6 +46,8 @@ interface RigaIn {
   quantity: number;
   unitPrice: number;
   note?: string;
+  /** What the customer called it, when that is not the catalogue name. */
+  requestedAs?: string;
 }
 
 /**
@@ -95,6 +121,7 @@ export async function POST(req: NextRequest) {
       quantity,
       unitPrice,
       note: typeof r.note === "string" ? r.note.trim() : "",
+      requestedAs: typeof r.requestedAs === "string" ? r.requestedAs.trim() : "",
     });
   }
 
@@ -169,6 +196,23 @@ export async function POST(req: NextRequest) {
     creato = true;
   }
 
+  // ⚠️⚠️ **Quello che serve per prepararlo, dove chi lo prepara guarda.** Ritiro o
+  // consegna, per quando, a che indirizzo: senza, l'ordine compare con le righe giuste e
+  // nessuno sa se vada consegnato. Una nota sul contatto sarebbe «da un'altra parte», che
+  // è esattamente ciò che chi lavora un ordine non deve dover fare.
+  //
+  // ⚠️ Sono **parole del cliente**, non campi normalizzati: «verso le otto e mezza» è
+  // quello che ha detto, e riscriverlo in un orario sarebbe inventare una precisione che
+  // non ha dato. Le etichette le mette il codice, il contenuto resta suo.
+  const note = [
+    ["Consegna", typeof dati.fulfillment === "string" ? dati.fulfillment.trim() : ""],
+    ["Per quando", typeof dati.when === "string" ? dati.when.trim() : ""],
+    ["Indirizzo", typeof dati.address === "string" ? dati.address.trim() : ""],
+  ]
+    .filter(([, valore]) => valore)
+    .map(([etichetta, valore]) => `${etichetta}: ${valore}`)
+    .join(SEPARATORE);
+
   const numero = await nextOrderNumber(db);
   const adesso = new Date();
   const [ordine] = await db
@@ -180,6 +224,7 @@ export async function POST(req: NextRequest) {
       taxAmount: String(totali.taxAmount),
       totalAmount: String(totali.total),
       status: "draft",
+      notes: note || null,
       orderDate: adesso,
     })
     .returning({ id: orders.id, orderNumber: orders.orderNumber });
@@ -189,10 +234,13 @@ export async function POST(req: NextRequest) {
     const linea = totali.lines[i];
     await db.insert(orderItems).values({
       orderId: ordine.id,
-      // ⚠️ The customer's own words travel **inside the description**, where whoever
-      // prepares the order reads them. A line saying «Diavola» while the customer asked for
-      // it without chilli is an order prepared wrong.
-      description: r.note ? `${r.description} (${r.note})` : r.description,
+      // ⚠️⚠️ **The line says what to prepare; the note says what was asked.** They used
+      // to share one field, with the customer's words in brackets after the item — which
+      // reads worst exactly when both are there, and gives nowhere to record the second
+      // thing below. `description` stays the catalogue entry: it is what the price belongs
+      // to, and what somebody looks up on the menu.
+      description: r.description,
+      notes: notaDiRiga(r) || null,
       quantity: r.quantity,
       unitPrice: String(r.unitPrice),
       taxPercent: "0",

@@ -127,13 +127,45 @@ describe("an order taken by an assistant", () => {
     expect(inseriti).toHaveLength(0);
   });
 
-  it("⚠️ writes what the customer asked to change into the line a person reads", async () => {
-    // Una riga che dice «Diavola» mentre il cliente l'ha chiesta senza piccante e' un ordine
-    // preparato sbagliato.
+  it("⚠️ the line says what to prepare, and the note says what was asked", async () => {
+    // Una riga che dice «Diavola» mentre il cliente l'ha chiesta senza piccante e' un
+    // ordine preparato sbagliato. Ma la voce resta quella di listino: e' cio' a cui il
+    // prezzo appartiene, ed e' quello che si cerca sul menu'.
     await POST(richiesta(ORDINE));
 
     const righe = inseriti.filter((i) => i.tabella === "order_item");
-    expect(righe[1].valori.description).toBe("Diavola (poco piccante)");
+    expect(righe[1].valori.description).toBe("Diavola");
+    expect(String(righe[1].valori.notes)).toContain("Modifiche: poco piccante");
+  });
+
+  it("⚠️⚠️ records what the customer called it when the match changed the words", async () => {
+    // Chi ha preso l'ordine ha fatto una corrispondenza fra quello che il cliente ha detto
+    // e una voce di listino. Se era sbagliata — «capricciosa» diventata «quattro stagioni»,
+    // stesso prezzo, pizza diversa — nient'altro in questo ordine lo mostrerebbe.
+    await POST(
+      richiesta({
+        ...ORDINE,
+        lines: [{ description: "Quattro stagioni", quantity: 1, unitPrice: 9.5, requestedAs: "capricciosa" }],
+        total: 9.5,
+      }),
+    );
+
+    const riga = inseriti.find((i) => i.tabella === "order_item");
+    expect(String(riga?.valori.notes)).toContain("Richiesto come: capricciosa");
+  });
+
+  it("⚠️ says nothing when the words agree, instead of repeating the item", async () => {
+    // «Richiesto come: Margherita» sotto una riga che dice «Margherita» e' rumore, e il
+    // rumore fa smettere di leggere proprio le righe che avrebbero qualcosa da dire.
+    await POST(
+      richiesta({
+        ...ORDINE,
+        lines: [{ description: "Margherita", quantity: 1, unitPrice: 6.5, requestedAs: "margherita" }],
+        total: 6.5,
+      }),
+    );
+
+    expect(inseriti.find((i) => i.tabella === "order_item")?.valori.notes).toBeNull();
   });
 
   it("creates the customer when there is none, and leaves the lead alone", async () => {
@@ -153,6 +185,26 @@ describe("an order taken by an assistant", () => {
 
     expect(inseriti.some((i) => i.tabella === "contact")).toBe(false);
     expect(regole).toHaveLength(0);
+  });
+
+  it("⚠️⚠️ writes what has to be known to prepare it, where whoever prepares it looks", async () => {
+    // Ritiro o consegna, per quando, a che indirizzo. Senza, l'ordine compare con le righe
+    // giuste e nessuno sa se vada consegnato — e una nota sul contatto sarebbe «da
+    // un'altra parte», che e' esattamente cio' che chi lavora un ordine non deve fare.
+    await POST(richiesta({ ...ORDINE, address: "via Roma 10" }));
+
+    const note = String(inseriti.find((i) => i.tabella === "order")?.valori.notes ?? "");
+    expect(note).toContain("Consegna: ritiro");
+    expect(note).toContain("Per quando: alle 20:30");
+    expect(note).toContain("Indirizzo: via Roma 10");
+  });
+
+  it("⚠️ leaves the note empty rather than writing labels with nothing after them", async () => {
+    // «Consegna:» seguito dal vuoto e' peggio di niente: chi legge crede che manchi il
+    // dato per un guasto, e va a cercarlo.
+    await POST(richiesta({ ...ORDINE, fulfillment: "", when: "", address: "" }));
+
+    expect(inseriti.find((i) => i.tabella === "order")?.valori.notes).toBeNull();
   });
 
   it("tells the CRM's own listeners that an order arrived", async () => {
