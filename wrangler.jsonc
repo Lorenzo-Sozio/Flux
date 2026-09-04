@@ -125,19 +125,19 @@
   // richiede Workers Paid.
   "triggers": {
     "crons": ["* * * * *", "*/5 * * * *", "*/15 * * * *", "0 6 * * *", "0 3 * * *"]
-  }
+  },
 
   // Cache incrementale su R2 (ISR/data cache persistente fra le invocazioni).
   // Disattivata di default perché richiede un bucket già esistente, altrimenti il
   // deploy fallisce. Per abilitarla:
-  //   1. npx wrangler r2 bucket create flux-opennext-cache
+  //   1. npx wrangler r2 bucket create flux-documents
   //   2. togli il commento al blocco qui sotto
   //   3. togli il commento a `incrementalCache` in open-next.config.ts
   //
-  // "r2_buckets": [
-  //   {
-  //     "binding": "NEXT_INC_CACHE_R2_BUCKET",
-  //     "bucket_name": "flux-opennext-cache"
-  //   }
-  // ]
+   "r2_buckets": [
+     {
+       "binding": "NEXT_INC_CACHE_R2_BUCKET",
+       "bucket_name": "flux-documents"
+     }
+   ]
 }

@@ -1,8 +1,7 @@
 import { defineCloudflareConfig } from "@opennextjs/cloudflare";
-
 // Cache incrementale su R2. Richiede il bucket e il binding
 // NEXT_INC_CACHE_R2_BUCKET in wrangler.jsonc — vedi il commento lì.
-// import r2IncrementalCache from "@opennextjs/cloudflare/overrides/incremental-cache/r2-incremental-cache";
+import r2IncrementalCache from "@opennextjs/cloudflare/overrides/incremental-cache/r2-incremental-cache";
 
 /**
  * Configurazione dell'adapter OpenNext → Cloudflare Workers.
@@ -12,5 +11,5 @@ import { defineCloudflareConfig } from "@opennextjs/cloudflare";
  * quasi tutta la dashboard) non se ne accorgono, le pagine ISR sì.
  */
 export default defineCloudflareConfig({
-  // incrementalCache: r2IncrementalCache,
+  incrementalCache: r2IncrementalCache,
 });
