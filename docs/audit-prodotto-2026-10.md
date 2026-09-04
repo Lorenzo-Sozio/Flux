@@ -764,7 +764,7 @@ accenti — «Acme S.r.l.» e «Acme Srl» sono la stessa azienda.
 
 Tutto quanto segue è costruibile sui dati già presenti nello schema.
 
-### S-01 — La palette come lanciatore di azioni
+### S-01 — La palette come lanciatore di azioni ✅
 
 ⌘K, e accanto ai record anche i verbi: «nuovo preventivo per Acme», «assegna a Giulia»,
 «chiudi il ticket», «registra una chiamata». Con gli ultimi record visitati nello stato
@@ -772,6 +772,29 @@ di riposo e la proposta di creare quando la ricerca non trova nulla.
 
 È l'intervento che abbassa di più la curva di apprendimento, perché sostituisce «devi
 sapere dove sta» con «chiedilo».
+
+**✅ Risolto.** Le azioni stanno in `src/lib/palette-commands.ts`, elenco puro: aggiungere
+un verbo è una riga lì, non una modifica alla finestra. Compaiono sopra i record mentre
+si scrive, filtrate sulla capability di chi cerca — un viewer non vede verbi che non può
+eseguire.
+
+La corrispondenza guarda anche le parole che una persona usa davvero: chi vuole fatturare
+scrive «invoice», non «quote»; chi arriva da un altro CRM scrive «opportunity» per una
+trattativa. È a prefisso di parola e non a sottostringa, così «or» propone «New order» e
+non tutto ciò che contiene «or» in mezzo.
+
+A riposo la palette mostra prima gli ultimi record aperti da qui — nel browser, per
+persona e per dispositivo, perché è una comodità e non un dato — e poi i verbi. L'elenco
+delle pagine indice che c'era prima è la barra laterale in una scatola più piccola, e
+serve solo a chi non è ancora stato da nessuna parte.
+
+Quando la ricerca non trova niente, propone di creare: non trovare qualcosa è di solito
+il momento in cui la si voleva creare, ed è la differenza fra un vicolo cieco e il passo
+successivo.
+
+I comandi usano `?new=true`, la convenzione che i modali di creazione già leggevano.
+Dove nessuno la legge — ticket e task — il comando porta all'elenco e basta, invece di
+promettere un modulo che non si aprirebbe.
 
 ### S-02 — Una prossima azione calcolata per ogni record ✅
 

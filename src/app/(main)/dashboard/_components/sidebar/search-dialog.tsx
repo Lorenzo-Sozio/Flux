@@ -8,13 +8,19 @@ import { Command as CommandPrimitive } from "cmdk";
 import {
   ArrowRight,
   Building2,
+  CheckSquare,
+  Clock,
   Contact,
+  CornerDownLeft,
   FileText,
   Headphones,
   Kanban,
   Loader2,
+  Plus,
   Search,
   ShoppingCart,
+  Sunrise,
+  Swords,
   Users,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -28,6 +34,9 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
+import { matchCommands, PALETTE_COMMANDS, type PaletteCommand } from "@/lib/palette-commands";
+import { can, type TenantRole } from "@/lib/permissions";
+import { type RecentRecord, readRecentRecords, rememberRecord } from "@/lib/recent-records";
 
 type SearchResult = {
   id: string;
@@ -47,7 +56,21 @@ type SearchResults = {
   orders: SearchResult[];
 };
 
-export function SearchDialog() {
+/** The pure command list names its icon; this is where the name becomes one. */
+const COMMAND_ICONS: Record<string, React.ReactNode> = {
+  FileText: <FileText className="h-4 w-4" />,
+  ShoppingCart: <ShoppingCart className="h-4 w-4" />,
+  Contact: <Contact className="h-4 w-4" />,
+  Users: <Users className="h-4 w-4" />,
+  Building2: <Building2 className="h-4 w-4" />,
+  Kanban: <Kanban className="h-4 w-4" />,
+  Headphones: <Headphones className="h-4 w-4" />,
+  CheckSquare: <CheckSquare className="h-4 w-4" />,
+  Sunrise: <Sunrise className="h-4 w-4" />,
+  Swords: <Swords className="h-4 w-4" />,
+};
+
+export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
   const t = useTranslations("search");
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -56,6 +79,16 @@ export function SearchDialog() {
   const [loading, setLoading] = React.useState(false);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+  const [recent, setRecent] = React.useState<RecentRecord[]>([]);
+
+  /** Only the verbs this person is allowed to use. */
+  const allow = React.useCallback(
+    (capability?: Parameters<typeof can>[1]) => (capability ? can(tenantRole ?? null, capability) : true),
+    [tenantRole],
+  );
+
+  const commandMatches = React.useMemo(() => matchCommands(query, allow), [query, allow]);
+  const idleCommands = React.useMemo(() => PALETTE_COMMANDS.filter((c) => allow(c.capability)).slice(0, 6), [allow]);
 
   const ENTITY_CONFIG: Record<string, { icon: React.ReactNode; badge: string; badgeClass: string; href: string }> = {
     contact: {
@@ -139,6 +172,8 @@ export function SearchDialog() {
   React.useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 50);
+      // Read on open rather than on mount: another tab may have moved things.
+      setRecent(readRecentRecords());
     }
   }, [open]);
 
@@ -175,6 +210,14 @@ export function SearchDialog() {
     handleClose();
     router.push(url);
   };
+
+  /** Opening a record from here is what makes it recent. */
+  const openRecord = (item: { id: string; label: string; sub?: string | null; url: string; entity: string }) => {
+    rememberRecord(item);
+    handleSelect(item.url);
+  };
+
+  const runCommand = (command: PaletteCommand) => handleSelect(command.href);
 
   const hasResults = results && groups.some((g) => results[g.key]?.length > 0);
   const totalCount = results ? groups.reduce((acc, g) => acc + (results[g.key]?.length ?? 0), 0) : 0;
@@ -234,6 +277,69 @@ export function SearchDialog() {
             {/* Idle state */}
             {!query && (
               <div className="p-4">
+                {/*
+                  What was open twenty minutes ago, before anything else. The list
+                  of module index pages below it is the sidebar again in a smaller
+                  box, and only helps somebody who has not been anywhere yet.
+                */}
+                {recent.length > 0 && (
+                  <div className="mb-4">
+                    <p className="mb-2 flex items-center gap-1.5 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                      <Clock className="h-3 w-3" /> Recent
+                    </p>
+                    <div className="space-y-0.5">
+                      {recent.map((item) => {
+                        const cfg = ENTITY_CONFIG[item.entity];
+                        return (
+                          <button
+                            type="button"
+                            key={item.id}
+                            onClick={() => openRecord(item)}
+                            className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted"
+                          >
+                            <span
+                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${cfg?.badgeClass ?? ""}`}
+                            >
+                              {cfg?.icon}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="block truncate font-medium text-sm leading-tight">{item.label}</span>
+                              {item.sub && (
+                                <span className="mt-0.5 block truncate text-muted-foreground text-xs leading-tight">
+                                  {item.sub}
+                                </span>
+                              )}
+                            </span>
+                            <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* The verbs. Searching found nouns, and only nouns. */}
+                {idleCommands.length > 0 && (
+                  <div className="mb-4">
+                    <p className="mb-2 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                      Create
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                      {idleCommands.map((command) => (
+                        <button
+                          type="button"
+                          key={command.id}
+                          onClick={() => runCommand(command)}
+                          className="flex items-center gap-2.5 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-left text-sm transition-colors hover:border-border hover:bg-muted"
+                        >
+                          <span className="text-muted-foreground">{COMMAND_ICONS[command.icon]}</span>
+                          <span className="truncate font-medium">{command.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <p className="mb-3 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
                   {t("quickAccess")}
                 </p>
@@ -263,15 +369,63 @@ export function SearchDialog() {
             )}
 
             {/* No results */}
-            {!loading && query.length >= 2 && !hasResults && (
+            {!loading && query.length >= 2 && !hasResults && commandMatches.length === 0 && (
               <CommandEmpty>
-                <div className="py-8">
+                <div className="py-6">
                   <p className="text-muted-foreground text-sm">
                     {t("noResults")} <span className="font-medium text-foreground">&ldquo;{query}&rdquo;</span>
                   </p>
-                  <p className="mt-1 text-muted-foreground/60 text-xs">{t("noResultsTip")}</p>
+                  {/*
+                    Not finding something is usually the moment you wanted to make
+                    it. Offering that here is the difference between a dead end and
+                    the next step.
+                  */}
+                  {allow("record:write") ? (
+                    <div className="mt-4 flex flex-wrap justify-center gap-1.5">
+                      {["new-contact", "new-lead", "new-company"].map((id) => {
+                        const command = PALETTE_COMMANDS.find((c) => c.id === id);
+                        if (!command || !allow(command.capability)) return null;
+                        return (
+                          <button
+                            type="button"
+                            key={id}
+                            onClick={() => runCommand(command)}
+                            className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm transition-colors hover:bg-muted"
+                          >
+                            <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                            {command.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-muted-foreground/60 text-xs">{t("noResultsTip")}</p>
+                  )}
                 </div>
               </CommandEmpty>
+            )}
+
+            {/*
+              The verbs, above the records. Typing "ord" should offer to write one
+              as readily as it offers the ones already written.
+            */}
+            {query.length >= 1 && commandMatches.length > 0 && (
+              <CommandGroup heading="Actions">
+                {commandMatches.map((command) => (
+                  <CommandItem
+                    key={command.id}
+                    value={`cmd-${command.id}`}
+                    onSelect={() => runCommand(command)}
+                    className="flex items-center gap-3 px-3 py-2.5"
+                  >
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                      {COMMAND_ICONS[command.icon] ?? <Plus className="h-4 w-4" />}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-medium text-sm">{command.label}</span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">{command.group}</span>
+                  </CommandItem>
+                ))}
+              </CommandGroup>
             )}
 
             {/* Results */}
@@ -296,7 +450,7 @@ export function SearchDialog() {
                             <CommandItem
                               key={item.id}
                               value={item.id}
-                              onSelect={() => handleSelect(item.url)}
+                              onSelect={() => openRecord(item)}
                               className="flex items-center gap-3 px-3 py-2.5"
                             >
                               <span

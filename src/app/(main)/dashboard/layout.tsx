@@ -124,7 +124,8 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
                   orientation="vertical"
                   className="mx-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
                 />
-                <SearchDialog />
+                {/* The palette offers verbs now, so it needs to know which are allowed. */}
+                <SearchDialog tenantRole={normalizeTenantRole(member.role)} />
               </div>
               <div className="flex items-center gap-2">
                 <RecentlyVisited />
