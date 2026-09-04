@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { ChevronLeft, GripVertical, Loader2, Package, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { ChevronLeft, Loader2, Package, Plus, ShoppingCart, StickyNote, Trash2 } from "lucide-react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -21,11 +21,21 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
 import { ORDER_FLOW } from "@/lib/order-status";
+import { cn } from "@/lib/utils";
 
 type FormData = Awaited<ReturnType<typeof getOrderFormData>>;
 
 /** Marks a line as written by hand rather than picked from the catalogue. */
 const CUSTOM = "_custom";
+
+/**
+ * One column template, shared by the header strip and every line, so the two
+ * cannot drift apart. Below `xl` there is not enough room for nine columns, so a
+ * line folds: four fields to the row on a laptop, two on a phone, each under its
+ * own label.
+ */
+const LINE_GRID =
+  "grid grid-cols-2 gap-x-3 gap-y-3 lg:grid-cols-4 xl:grid-cols-[28px_minmax(0,1.6fr)_minmax(0,2fr)_76px_116px_84px_84px_minmax(92px,auto)_64px] xl:items-center xl:gap-x-2 xl:gap-y-0";
 
 interface LineValues {
   productId: string;
@@ -75,11 +85,13 @@ const STATUS_LABEL: Record<string, string> = {
  * customer actually asked for — so the commonest real order could not be entered
  * at all, and the ones that could belonged to nobody.
  *
- * It is a page now. Who it is for and what kind of order it is are short answers,
- * so they sit in a narrow column on the left; the lines take the width they need on
- * the right; and the note — which is prose, and can run long — spans the foot of the
- * page next to the money, rather than wrapping every four words in a 340-pixel
- * sidebar. The header does not scroll away, so the total and the way out stay put.
+ * It is a page now, and the page is a stack of full-width bands rather than a
+ * short sidebar beside a long list — that arrangement left a hole in the middle of
+ * the screen as soon as the list grew. Reading down: who and when, then what is
+ * being sold, then what is worth knowing about it and what it comes to. The lines
+ * are a table on a wide screen, one band of the eye per line, because that is the
+ * part that needs the width. The bar at the top does not scroll away, so the total
+ * and the way out are always to hand.
  */
 export default function NewOrderPage() {
   const router = useRouter();
@@ -88,6 +100,8 @@ export default function NewOrderPage() {
   const [data, setData] = useState<FormData | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  /** Which lines have their note open. A note with something in it is never hidden. */
+  const [openNotes, setOpenNotes] = useState<Record<string, boolean>>({});
 
   const form = useForm<OrderFormValues>({
     defaultValues: {
@@ -261,84 +275,81 @@ export default function NewOrderPage() {
         </div>
       </div>
 
-      <div className="flex flex-col items-start gap-6 lg:flex-row">
-        {/* ── Left: who it is for, and what kind of order this is ────────── */}
-        <div className="flex w-full flex-col gap-6 lg:w-[320px] lg:shrink-0">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                Customer
-              </CardTitle>
-              <CardDescription>Who the order is for.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
+      {/* ── Band one: who it is for, and what kind of order it is ─────────── */}
+      <Card>
+        <CardContent className="grid gap-6 md:grid-cols-12 md:gap-6 md:divide-x xl:gap-8">
+          <section className="space-y-4 md:col-span-5">
+            <div className="space-y-0.5">
+              <h2 className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Customer</h2>
+              <p className="text-muted-foreground text-xs">Who the order is for.</p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Company</Label>
+              <SearchableSelect
+                disabled={loading}
+                options={(data?.companies ?? []).map((c) => ({ value: c.id, label: c.name }))}
+                value={form.watch("companyId")}
+                onChange={(v) => {
+                  form.setValue("companyId", v);
+                  // A contact from the previous company is worse than none.
+                  form.setValue("contactId", "");
+                }}
+                placeholder={loading ? "Loading…" : "Search company…"}
+                searchPlaceholder="Type to search…"
+                emptyText="No companies found."
+                className="h-9"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Contact</Label>
+              <SearchableSelect
+                disabled={loading}
+                options={contactOptions}
+                value={form.watch("contactId")}
+                onChange={(v) => form.setValue("contactId", v)}
+                placeholder="Search contact…"
+                searchPlaceholder="Type to search…"
+                emptyText={companyId ? "No contacts at this company." : "No contacts found."}
+                className="h-9"
+              />
+            </div>
+          </section>
+
+          {/* Four short answers, two by two, so this half is exactly as tall as the other. */}
+          <section className="space-y-4 md:col-span-7 md:pl-6 xl:pl-8">
+            <div className="space-y-0.5">
+              <h2 className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Order details</h2>
+              <p className="text-muted-foreground text-xs">
+                Its state, its date, and — optionally, and worth filling in — where it came from.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label className="text-xs">Company</Label>
-                <SearchableSelect
-                  disabled={loading}
-                  options={(data?.companies ?? []).map((c) => ({ value: c.id, label: c.name }))}
-                  value={form.watch("companyId")}
-                  onChange={(v) => {
-                    form.setValue("companyId", v);
-                    // A contact from the previous company is worse than none.
-                    form.setValue("contactId", "");
-                  }}
-                  placeholder={loading ? "Loading…" : "Search company…"}
-                  searchPlaceholder="Type to search…"
-                  emptyText="No companies found."
-                />
+                <Label className="text-xs">Status</Label>
+                <Select
+                  value={form.watch("status")}
+                  onValueChange={(v) => form.setValue("status", v as OrderFormValues["status"])}
+                >
+                  <SelectTrigger className="h-9 w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[...ORDER_FLOW, "cancelled"].map((v) => (
+                      <SelectItem key={v} value={v}>
+                        {STATUS_LABEL[v]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs">Contact</Label>
-                <SearchableSelect
-                  disabled={loading}
-                  options={contactOptions}
-                  value={form.watch("contactId")}
-                  onChange={(v) => form.setValue("contactId", v)}
-                  placeholder="Search contact…"
-                  searchPlaceholder="Type to search…"
-                  emptyText={companyId ? "No contacts at this company." : "No contacts found."}
-                />
+                <Label className="text-xs">Order date</Label>
+                <Input type="date" className="h-9" {...form.register("orderDate")} />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Status, date and provenance are four short answers: one card, not two. */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                Order details
-              </CardTitle>
-              <CardDescription>Its state, its date, and where it came from.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Status</Label>
-                  <Select
-                    value={form.watch("status")}
-                    onValueChange={(v) => form.setValue("status", v as OrderFormValues["status"])}
-                  >
-                    <SelectTrigger className="h-9 w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[...ORDER_FLOW, "cancelled"].map((v) => (
-                        <SelectItem key={v} value={v}>
-                          {STATUS_LABEL[v]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Order date</Label>
-                  <Input type="date" className="h-9" {...form.register("orderDate")} />
-                </div>
-              </div>
-
-              <Separator />
 
               <div className="space-y-1.5">
                 <Label className="text-xs">Accepted quote</Label>
@@ -350,6 +361,7 @@ export default function NewOrderPage() {
                   placeholder="None"
                   searchPlaceholder="Type to search…"
                   emptyText="No accepted quotes."
+                  className="h-9"
                 />
               </div>
 
@@ -363,210 +375,258 @@ export default function NewOrderPage() {
                   placeholder="None"
                   searchPlaceholder="Type to search…"
                   emptyText="No open deals."
+                  className="h-9"
                 />
               </div>
+            </div>
+          </section>
+        </CardContent>
+      </Card>
 
-              <p className="text-muted-foreground text-xs">
-                Both are optional, and worth filling in: they are how this order is traced back.
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+      {/* ── Band two: what is being sold, given the whole width ───────────── */}
+      <Card>
+        <CardHeader className="flex flex-row items-start justify-between gap-4">
+          <div>
+            <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Lines</CardTitle>
+            <CardDescription>A catalogue product, or anything else written out by hand.</CardDescription>
+          </div>
+          <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => append(emptyLine())}>
+            <Plus className="h-3.5 w-3.5" /> Add line
+          </Button>
+        </CardHeader>
 
-        {/* ── Right: the lines, which is where the width belongs ─────────── */}
-        <div className="w-full min-w-0 flex-1">
-          <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-4 pb-3">
-              <div>
-                <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                  Lines
-                </CardTitle>
-                <CardDescription>A catalogue product, or anything else written out by hand.</CardDescription>
-              </div>
-              <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => append(emptyLine())}>
-                <Plus className="h-3.5 w-3.5" /> Add line
-              </Button>
-            </CardHeader>
+        <CardContent>
+          {/* Column names once, at the top, instead of on every field of every line. */}
+          <div
+            className={cn(
+              LINE_GRID,
+              "hidden border-b pb-2 font-medium text-[11px] text-muted-foreground uppercase tracking-wide xl:grid",
+            )}
+          >
+            <span />
+            <span>Product</span>
+            <span>Description</span>
+            <span>Qty</span>
+            <span>Unit price</span>
+            <span>Disc %</span>
+            <span>Tax %</span>
+            <span className="text-right">Total</span>
+            <span />
+          </div>
 
-            <CardContent className="space-y-3">
-              {fields.map((field, index) => {
-                const line = items?.[index];
-                const isCustom = !line?.productId;
-                const lineTotal =
-                  (Number(line?.quantity) || 0) *
-                  (Number(line?.unitPrice) || 0) *
-                  (1 - (Number(line?.discountPercent) || 0) / 100);
+          <div className="space-y-3 xl:space-y-0">
+            {fields.map((field, index) => {
+              const line = items?.[index];
+              const isCustom = !line?.productId;
+              const lineTotal =
+                (Number(line?.quantity) || 0) *
+                (Number(line?.unitPrice) || 0) *
+                (1 - (Number(line?.discountPercent) || 0) / 100);
+              const noteOpen = openNotes[field.id] || Boolean(line?.notes);
 
-                return (
-                  <div key={field.id} className="rounded-lg border bg-muted/20 p-3">
-                    <div className="mb-3 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
-                        <span className="font-medium text-muted-foreground text-xs">Line {index + 1}</span>
-                        {isCustom && (
-                          <Badge
-                            variant="outline"
-                            className="h-5 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
-                          >
-                            Off catalogue
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="font-semibold text-sm tabular-nums">{formatAmount(lineTotal)}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => remove(index)}
-                          disabled={fields.length === 1}
-                          aria-label="Remove line"
+              const noteButton = (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className={cn("h-7 w-7 text-muted-foreground hover:text-foreground", noteOpen && "text-primary")}
+                  onClick={() => setOpenNotes((prev) => ({ ...prev, [field.id]: !prev[field.id] }))}
+                  aria-label="Note on this line"
+                  aria-pressed={noteOpen}
+                >
+                  <StickyNote className="h-3.5 w-3.5" />
+                </Button>
+              );
+
+              const removeButton = (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                  onClick={() => remove(index)}
+                  disabled={fields.length === 1}
+                  aria-label="Remove line"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              );
+
+              return (
+                <div
+                  key={field.id}
+                  className="rounded-lg border bg-muted/20 p-3 xl:rounded-none xl:border-0 xl:border-b xl:bg-transparent xl:px-0 xl:py-2 xl:hover:bg-muted/20 xl:last:border-b-0"
+                >
+                  {/* Narrow screens get the line's own header; wide ones read it off the row. */}
+                  <div className="mb-3 flex items-center justify-between gap-2 xl:hidden">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-muted-foreground text-xs">Line {index + 1}</span>
+                      {isCustom && (
+                        <Badge
+                          variant="outline"
+                          className="h-5 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
+                          Off catalogue
+                        </Badge>
+                      )}
                     </div>
-
-                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Product</Label>
-                        <SearchableSelect
-                          disabled={loading}
-                          options={[
-                            { value: CUSTOM, label: "Off catalogue — describe it below" },
-                            ...(data?.products ?? []).map((p) => ({
-                              value: p.id,
-                              label: p.sku ? `${p.name} · ${p.sku}` : p.name,
-                            })),
-                          ]}
-                          value={line?.productId || CUSTOM}
-                          onChange={(v) => selectProduct(index, v)}
-                          placeholder="Off catalogue"
-                          searchPlaceholder="Type to search products…"
-                          emptyText="No products found."
-                          className="h-9"
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">
-                          Description {isCustom && <span className="text-destructive">*</span>}
-                        </Label>
-                        <Input
-                          className="h-9"
-                          placeholder={isCustom ? "What is being sold" : "Defaults to the product name"}
-                          {...form.register(`items.${index}.description`)}
-                        />
-                      </div>
-                    </div>
-
-                    {/* On a wide screen the line note shares the row with the numbers,
-                        so a line reads as one band rather than three stacked ones. */}
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-[repeat(4,minmax(0,6.5rem))_minmax(0,1fr)]">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Qty</Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          step="1"
-                          className="h-9 tabular-nums"
-                          {...form.register(`items.${index}.quantity`, { valueAsNumber: true })}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Unit price</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          className="h-9 tabular-nums"
-                          {...form.register(`items.${index}.unitPrice`, { valueAsNumber: true })}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Discount %</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          className="h-9 tabular-nums"
-                          {...form.register(`items.${index}.discountPercent`, { valueAsNumber: true })}
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs">Tax %</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          className="h-9 tabular-nums"
-                          {...form.register(`items.${index}.taxPercent`, { valueAsNumber: true })}
-                        />
-                      </div>
-
-                      <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
-                        <Label className="text-xs">Line notes</Label>
-                        <Input
-                          className="h-9"
-                          placeholder="What was asked for on this line — “no onions”, “engraved”, “collect Friday”"
-                          {...form.register(`items.${index}.notes`)}
-                        />
-                      </div>
+                    <div className="flex items-center gap-1">
+                      <span className="mr-1 font-semibold text-sm tabular-nums">{formatAmount(lineTotal)}</span>
+                      {noteButton}
+                      {removeButton}
                     </div>
                   </div>
-                );
-              })}
 
-              {fields.length === 0 && (
-                <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
-                  <Package className="h-8 w-8 opacity-30" />
-                  <p className="text-sm">No lines yet.</p>
+                  <div className={LINE_GRID}>
+                    <span className="hidden text-muted-foreground text-xs tabular-nums xl:block">{index + 1}</span>
+
+                    <div className="col-span-2 space-y-1.5 xl:col-span-1 xl:space-y-0">
+                      <Label className="text-xs xl:hidden">Product</Label>
+                      <SearchableSelect
+                        disabled={loading}
+                        options={[
+                          { value: CUSTOM, label: "Off catalogue" },
+                          ...(data?.products ?? []).map((p) => ({
+                            value: p.id,
+                            label: p.sku ? `${p.name} · ${p.sku}` : p.name,
+                          })),
+                        ]}
+                        value={line?.productId || CUSTOM}
+                        onChange={(v) => selectProduct(index, v)}
+                        placeholder="Off catalogue"
+                        searchPlaceholder="Type to search products…"
+                        emptyText="No products found."
+                        className="h-9"
+                      />
+                    </div>
+
+                    <div className="col-span-2 space-y-1.5 xl:col-span-1 xl:space-y-0">
+                      <Label className="text-xs xl:hidden">
+                        Description {isCustom && <span className="text-destructive">*</span>}
+                      </Label>
+                      <Input
+                        className="h-9"
+                        placeholder={isCustom ? "What is being sold" : "Defaults to the product name"}
+                        {...form.register(`items.${index}.description`)}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 xl:space-y-0">
+                      <Label className="text-xs xl:hidden">Qty</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        className="h-9 tabular-nums"
+                        {...form.register(`items.${index}.quantity`, { valueAsNumber: true })}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 xl:space-y-0">
+                      <Label className="text-xs xl:hidden">Unit price</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className="h-9 tabular-nums"
+                        {...form.register(`items.${index}.unitPrice`, { valueAsNumber: true })}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 xl:space-y-0">
+                      <Label className="text-xs xl:hidden">Discount %</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        className="h-9 tabular-nums"
+                        {...form.register(`items.${index}.discountPercent`, { valueAsNumber: true })}
+                      />
+                    </div>
+
+                    <div className="space-y-1.5 xl:space-y-0">
+                      <Label className="text-xs xl:hidden">Tax %</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        className="h-9 tabular-nums"
+                        {...form.register(`items.${index}.taxPercent`, { valueAsNumber: true })}
+                      />
+                    </div>
+
+                    <span className="hidden text-right font-semibold text-sm tabular-nums xl:block">
+                      {formatAmount(lineTotal)}
+                    </span>
+
+                    <div className="hidden items-center justify-end gap-0.5 xl:flex">
+                      {noteButton}
+                      {removeButton}
+                    </div>
+                  </div>
+
+                  {noteOpen && (
+                    <div className="mt-2 xl:pb-1 xl:pl-9">
+                      <Input
+                        className="h-8 bg-background text-xs"
+                        placeholder="Note on this line — “no onions”, “engraved”, “collect Friday”"
+                        {...form.register(`items.${index}.notes`)}
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
+              );
+            })}
+          </div>
 
-              {/* A second way to add one, at the end, where the hand already is. */}
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-10 w-full gap-1.5 border border-dashed text-muted-foreground hover:text-foreground"
-                onClick={() => append(emptyLine())}
-              >
-                <Plus className="h-4 w-4" /> Add another line
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+          {fields.length === 0 && (
+            <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+              <Package className="h-8 w-8 opacity-30" />
+              <p className="text-sm">No lines yet.</p>
+            </div>
+          )}
 
-      {/* ── Full width, because notes are prose and prose needs a line ──── */}
-      <div className="grid items-start gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-3">
+          {/* A second way to add one, at the end, where the hand already is. */}
+          <Button
+            type="button"
+            variant="ghost"
+            className="mt-3 h-10 w-full gap-1.5 border border-dashed text-muted-foreground hover:text-foreground"
+            onClick={() => append(emptyLine())}
+          >
+            <Plus className="h-4 w-4" /> Add another line
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* ── Band three: what to know about it, and what it comes to ───────── */}
+      <div className="grid gap-6 lg:grid-cols-12">
+        <Card className="lg:col-span-7 xl:col-span-8">
+          <CardHeader>
             <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Notes</CardTitle>
             <CardDescription>
               Delivery or collection, for when, to what address — anything the person preparing this has to read.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex-1">
             <Textarea
-              className="min-h-[180px] resize-y leading-relaxed"
+              className="h-full min-h-[168px] resize-y leading-relaxed"
               placeholder="Write it as you would say it to whoever picks the order up."
               {...form.register("notes")}
             />
           </CardContent>
         </Card>
 
-        {/* ── The money, where the eye ends ──────────────────────────────── */}
-        <Card>
-          <CardHeader className="pb-3">
+        {/* The money, where the eye ends. */}
+        <Card className="lg:col-span-5 xl:col-span-4">
+          <CardHeader>
             <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
               Summary
             </CardTitle>
+            <CardDescription>What this order comes to.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2 text-sm">
+          <CardContent className="space-y-2.5 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Net</span>
               <span className="tabular-nums">{formatAmount(totals.net)}</span>
@@ -602,9 +662,9 @@ export default function NewOrderPage() {
               <span className="tabular-nums">{formatAmount(totals.tax)}</span>
             </div>
 
-            <Separator />
+            <Separator className="my-1" />
 
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2.5">
               <span className="font-semibold">Total</span>
               <span className="font-bold text-lg tabular-nums">{formatAmount(totals.total)}</span>
             </div>
