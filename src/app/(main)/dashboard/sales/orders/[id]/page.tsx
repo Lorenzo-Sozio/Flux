@@ -8,10 +8,11 @@ import { useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   ArrowLeft,
-  ArrowRight,
   Building2,
   Calendar,
+  Check,
   CheckCircle2,
+  ChevronRight,
   Clock,
   DollarSign,
   Loader2,
@@ -41,6 +42,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCurrency } from "@/hooks/use-currency";
 import { advanceLabel, isTerminalStatus, nextStatus } from "@/lib/order-status";
 import { cn } from "@/lib/utils";
@@ -396,66 +398,79 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               {/* Status */}
               <div>
                 <p className="mb-1.5 text-muted-foreground text-xs">Status</p>
-                <Select value={order.status} onValueChange={handleStatusChange}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(STATUS_CONFIG).map(([v, cfg]) => (
-                      <SelectItem key={v} value={v} className="text-xs">
-                        {cfg.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
 
                 {/*
-                  The two moves anyone actually makes, as buttons rather than as a
-                  menu the user has to remember the shape of.
-
-                  Each names where the order ends up, not what the button does, so
-                  it is a sentence you can disagree with before clicking. The
-                  shortcut appears only while it would skip a step: from
-                  "processing" the two would do the same thing, and two buttons
-                  with one effect is exactly the confusion this is meant to remove.
+                  The dropdown and the two moves anyone actually makes, on one row.
+                  The buttons carry no label: at this size a word wraps the row and
+                  pushes the panel about, and the two icons are the conventional
+                  ones for "next" and "done". The name is still there for a hover
+                  and for a screen reader, which is where it costs nothing.
                 */}
-                {!isTerminalStatus(order.status) && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {advanceLabel(order.status) && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 flex-1 text-xs"
-                        disabled={isPending}
-                        onClick={() => {
-                          const next = nextStatus(order.status);
-                          if (next) handleStatusChange(next);
-                        }}
-                      >
-                        <ArrowRight className="mr-1.5 h-3.5 w-3.5" />
-                        {advanceLabel(order.status)}
-                      </Button>
-                    )}
+                <div className="flex items-center gap-1.5">
+                  <Select value={order.status} onValueChange={handleStatusChange}>
+                    <SelectTrigger className="h-8 min-w-0 flex-1 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(STATUS_CONFIG).map(([v, cfg]) => (
+                        <SelectItem key={v} value={v} className="text-xs">
+                          {cfg.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                    {nextStatus(order.status) !== "completed" && (
-                      <Button
-                        size="sm"
-                        className="h-8 flex-1 bg-emerald-600 text-xs hover:bg-emerald-700"
-                        disabled={isPending}
-                        onClick={() => handleStatusChange("completed")}
-                      >
-                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
-                        Close order
-                      </Button>
-                    )}
-                  </div>
-                )}
+                  {!isTerminalStatus(order.status) && (
+                    <TooltipProvider delayDuration={200}>
+                      {advanceLabel(order.status) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              className="h-8 w-8 shrink-0"
+                              disabled={isPending}
+                              aria-label={advanceLabel(order.status) ?? undefined}
+                              onClick={() => {
+                                const next = nextStatus(order.status);
+                                if (next) handleStatusChange(next);
+                              }}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>{advanceLabel(order.status)}</TooltipContent>
+                        </Tooltip>
+                      )}
+
+                      {/*
+                        Only while it would skip a step. From "processing" this and
+                        the arrow do the same thing, and two controls with one
+                        effect is the confusion this is meant to remove.
+                      */}
+                      {nextStatus(order.status) !== "completed" && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="icon"
+                              className="h-8 w-8 shrink-0 bg-emerald-600 hover:bg-emerald-700"
+                              disabled={isPending}
+                              aria-label="Close order"
+                              onClick={() => handleStatusChange("completed")}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Close order</TooltipContent>
+                        </Tooltip>
+                      )}
+                    </TooltipProvider>
+                  )}
+                </div>
 
                 {isTerminalStatus(order.status) && (
-                  <p className="mt-2 text-muted-foreground text-xs">
-                    {order.status === "completed"
-                      ? "This order is closed. Change the status above to reopen it."
-                      : "This order was cancelled."}
+                  <p className="mt-1.5 text-muted-foreground text-xs">
+                    {order.status === "completed" ? "Closed. Change the status to reopen it." : "Cancelled."}
                   </p>
                 )}
               </div>
