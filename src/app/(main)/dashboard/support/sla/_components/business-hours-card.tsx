@@ -45,10 +45,13 @@ export function BusinessHoursCard({
   timeZone: initialTimeZone,
   week: initialWeek,
   holidays: initialHolidays,
+  ready = true,
 }: {
   timeZone: string;
   week: WeekSchedule;
   holidays: Holiday[];
+  /** False until the workspace database has the tables. */
+  ready?: boolean;
 }) {
   const [timeZone, setTimeZone] = useState(initialTimeZone);
   const [week, setWeek] = useState<WeekSchedule>(initialWeek);
@@ -114,6 +117,17 @@ export function BusinessHoursCard({
       </CardHeader>
 
       <CardContent className="space-y-5">
+        {/*
+          Saying so beats offering an editor whose Save would fail. The tables
+          arrive with a migration somebody runs by hand from the admin panel.
+        */}
+        {!ready && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2.5 text-amber-900 text-sm dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            The workspace database has not been migrated for this yet, so these are the defaults and cannot be saved.
+            Run <span className="font-medium">Migrate DB</span> from the platform admin panel, then reload.
+          </div>
+        )}
+
         <div className="grid gap-1.5 sm:max-w-xs">
           <Label htmlFor="tz" className="text-xs">
             Time zone

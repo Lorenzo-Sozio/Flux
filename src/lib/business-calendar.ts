@@ -41,17 +41,37 @@ export function parseWeek(value: unknown): WeekSchedule {
   return week.some((d) => d !== null) ? week : DEFAULT_WEEK;
 }
 
-/** The calendar for this workspace, with the defaults when none has been set. */
-export async function loadBusinessCalendar(db: AnyDb): Promise<BusinessCalendar> {
-  const [row] = await db.select().from(businessCalendar).limit(1);
-  const holidayRows = await db
-    .select({ day: businessHolidays.day })
-    .from(businessHolidays)
-    .orderBy(asc(businessHolidays.day));
+/** What a workspace gets before anybody has configured anything. */
+export const FALLBACK_CALENDAR: BusinessCalendar = {
+  timeZone: "Europe/Rome",
+  week: DEFAULT_WEEK,
+  holidays: [],
+};
 
-  return {
-    timeZone: row?.timeZone ?? "Europe/Rome",
-    week: parseWeek(row?.week),
-    holidays: holidayRows.map((h) => h.day),
-  };
+/**
+ * The calendar for this workspace, with the defaults when none has been set.
+ *
+ * ⚠️ Tolerates the tables not existing yet. A tenant database is migrated by hand
+ * from the admin panel, so between the deploy that ships this code and the moment
+ * somebody presses the button there is a window in which these tables are absent.
+ * Throwing there would take the SLA settings page down — the very page you go to
+ * in order to notice — and would break ticket creation with it.
+ */
+export async function loadBusinessCalendar(db: AnyDb): Promise<BusinessCalendar> {
+  try {
+    const [row] = await db.select().from(businessCalendar).limit(1);
+    const holidayRows = await db
+      .select({ day: businessHolidays.day })
+      .from(businessHolidays)
+      .orderBy(asc(businessHolidays.day));
+
+    return {
+      timeZone: row?.timeZone ?? FALLBACK_CALENDAR.timeZone,
+      week: parseWeek(row?.week),
+      holidays: holidayRows.map((h) => h.day),
+    };
+  } catch (err) {
+    console.error("[business-calendar] could not be read, using the defaults:", err);
+    return FALLBACK_CALENDAR;
+  }
 }

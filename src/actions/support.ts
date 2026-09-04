@@ -32,7 +32,7 @@ import {
   users,
 } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
-import { loadBusinessCalendar, parseWeek } from "@/lib/business-calendar";
+import { FALLBACK_CALENDAR, loadBusinessCalendar, parseWeek } from "@/lib/business-calendar";
 import { addBusinessMinutes } from "@/lib/business-hours";
 import { sendEmail } from "@/lib/email-provider";
 import { getDb } from "@/lib/tenant-context";
@@ -877,15 +877,31 @@ export async function getBusinessCalendar() {
   await requirePlanModule("support");
   const db = await getDb();
 
-  const [row] = await db.select().from(businessCalendar).limit(1);
-  const holidays = await db.select().from(businessHolidays).orderBy(asc(businessHolidays.day));
+  // ⚠️ The tables may not be there yet: a tenant database is migrated by hand from
+  // the admin panel, so between the deploy that ships this page and the moment
+  // somebody presses the button they do not exist. Failing here would break the
+  // one page you would go to in order to find out.
+  try {
+    const [row] = await db.select().from(businessCalendar).limit(1);
+    const holidays = await db.select().from(businessHolidays).orderBy(asc(businessHolidays.day));
 
-  return {
-    id: row?.id ?? null,
-    timeZone: row?.timeZone ?? "Europe/Rome",
-    week: parseWeek(row?.week),
-    holidays,
-  };
+    return {
+      id: row?.id ?? null,
+      timeZone: row?.timeZone ?? FALLBACK_CALENDAR.timeZone,
+      week: parseWeek(row?.week),
+      holidays,
+      ready: true,
+    };
+  } catch {
+    return {
+      id: null,
+      timeZone: FALLBACK_CALENDAR.timeZone,
+      week: FALLBACK_CALENDAR.week,
+      holidays: [] as { id: string; day: string; name: string | null }[],
+      // The page says so, rather than presenting an editor whose Save will fail.
+      ready: false,
+    };
+  }
 }
 
 /**

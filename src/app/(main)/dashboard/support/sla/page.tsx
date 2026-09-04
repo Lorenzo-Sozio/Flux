@@ -26,7 +26,12 @@ export default async function SlaPage() {
 
       {/* What "four hours" means. Without it the promise runs overnight and over
           the weekend, and every support metric is wrong the same way. */}
-      <BusinessHoursCard timeZone={calendar.timeZone} week={calendar.week} holidays={calendar.holidays} />
+      <BusinessHoursCard
+        timeZone={calendar.timeZone}
+        week={calendar.week}
+        holidays={calendar.holidays}
+        ready={calendar.ready}
+      />
     </div>
   );
 }
