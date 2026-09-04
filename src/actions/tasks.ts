@@ -19,7 +19,8 @@ import {
   tickets,
   users,
 } from "@/db/schema";
-import { requireWriteAccess } from "@/lib/auth-guard";
+import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
+import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
 
 export async function createTask(data: {
@@ -174,7 +175,7 @@ async function getTasksGeneric(where: { leadId?: string; contactId?: string; com
   const creator = alias(users, "creator");
   const assignee = alias(users, "assignee");
 
-  let query = db
+  const query = db
     .select({
       id: tasks.id,
       title: tasks.title,
@@ -200,17 +201,19 @@ async function getTasksGeneric(where: { leadId?: string; contactId?: string; com
     .leftJoin(creator, eq(tasks.ownerId, creator.id))
     .leftJoin(assignee, eq(tasks.assigneeId, assignee.id));
 
-  if (where.leadId) {
-    query = query.where(eq(tasks.leadId, where.leadId)) as any;
-  } else if (where.contactId) {
-    query = query.where(eq(tasks.contactId, where.contactId)) as any;
-  } else if (where.companyId) {
-    query = query.where(eq(tasks.companyId, where.companyId)) as any;
-  } else if (where.dealId) {
-    query = query.where(eq(tasks.dealId, where.dealId)) as any;
-  }
+  // Building the condition first and applying `where` once keeps the builder's
+  // type intact, instead of reassigning through a cast at each branch.
+  const condition = where.leadId
+    ? eq(tasks.leadId, where.leadId)
+    : where.contactId
+      ? eq(tasks.contactId, where.contactId)
+      : where.companyId
+        ? eq(tasks.companyId, where.companyId)
+        : where.dealId
+          ? eq(tasks.dealId, where.dealId)
+          : undefined;
 
-  return await query.orderBy(desc(tasks.createdAt));
+  return await query.where(condition).orderBy(desc(tasks.createdAt));
 }
 
 export async function updateTask(id: string, data: Partial<typeof tasks.$inferInsert>, revalidatePathStr?: string) {
@@ -314,7 +317,22 @@ export async function getCalendarTasks() {
 
 // Returns tasks due today (for email/notification dispatch)
 /** All tasks visible to the current user (admin = all, user = own+assigned). */
-export async function getAllTasks(userId: string, role: string) {
+/**
+ * Every task this person is allowed to see.
+ *
+ * ⚠️⚠️ This took the user id **and the privilege level** as arguments, and had no
+ * guard at all. A server action's caller is the browser, so anyone with a session
+ * could ask for `getAllTasks(someoneElse, "admin")` and read the whole workspace.
+ * Both now come from the session, and the arguments are gone.
+ *
+ * The privilege was also read from `session.user.role`, the platform staff field,
+ * which is "user" for every customer — so it was never true, and a workspace
+ * admin saw only their own tasks. That is audit rilievo P-01 again, in a corner
+ * the fix did not reach.
+ */
+export async function getAllTasks() {
+  const actor = await requireCapability("record:read");
+  const userId = actor.userId;
   const db = await getDb();
   const ownerAlias = alias(users, "owner");
   const assigneeAlias = alias(users, "assignee");
@@ -364,16 +382,11 @@ export async function getAllTasks(userId: string, role: string) {
     .leftJoin(companyAlias, eq(tasks.companyId, companyAlias.id))
     .leftJoin(tickets, eq(tasks.ticketId, tickets.id));
 
-  const isPrivileged = role === "admin" || role === "owner";
+  const isPrivileged = can(actor, "user:read");
   const result = isPrivileged
     ? await base.orderBy(desc(tasks.createdAt))
     : await base
-        .where(
-          and(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            sql`(${tasks.ownerId} = ${userId} OR ${tasks.assigneeId} = ${userId})` as any,
-          ),
-        )
+        .where(and(sql`(${tasks.ownerId} = ${userId} OR ${tasks.assigneeId} = ${userId})`))
         .orderBy(desc(tasks.createdAt));
 
   // Compute blockedByDeps: count open FS predecessors per task (one query, O(1) round-trips)
@@ -504,7 +517,12 @@ export async function stopTimer(logId: string) {
   if (!log) throw new Error("Timer log not found");
   // Stopping somebody else's timer is not something the UI offers and was not
   // something the action prevented.
-  if (log.userId !== session.user.id && session.user.role !== "admin" && session.user.role !== "owner") {
+  //
+  // The exception is for the workspace role, not the platform staff field:
+  // comparing `session.user.role` here meant it never applied, so an admin could
+  // not clear a colleague's stuck timer (audit rilievo P-01, in a corner the fix
+  // did not reach).
+  if (log.userId !== session.user.id && !can(session.user.role, "user:read")) {
     throw new Error("You can only stop your own timer.");
   }
   const hours = (stoppedAt.getTime() - new Date(log.startedAt).getTime()) / 3_600_000;

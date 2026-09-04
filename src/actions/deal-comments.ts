@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, asc, eq, or } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 
 import { dealComments, users } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
+import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
 
 export type DealComment = {
@@ -48,7 +49,7 @@ export async function addDealComment(dealId: string, content: string, parentId?:
   if (!content.trim()) throw new Error("Comment cannot be empty");
   await db.insert(dealComments).values({
     dealId,
-    userId: session.user.id!,
+    userId: session.user.id,
     content: content.trim(),
     parentId,
   });
@@ -62,7 +63,7 @@ export async function editDealComment(commentId: string, content: string, dealId
   const updated = await db
     .update(dealComments)
     .set({ content: content.trim(), editedAt: new Date() })
-    .where(and(eq(dealComments.id, commentId), eq(dealComments.userId, session.user.id!)))
+    .where(and(eq(dealComments.id, commentId), eq(dealComments.userId, session.user.id)))
     .returning({ id: dealComments.id });
   if (updated.length === 0) throw new Error("Comment not found or unauthorized");
   revalidatePath(`/dashboard/pipeline/${dealId}`);
@@ -71,13 +72,16 @@ export async function editDealComment(commentId: string, content: string, dealId
 export async function deleteDealComment(commentId: string, dealId: string) {
   const session = await requireWriteAccess();
   const db = await getDb();
-  const isPrivileged = session.user.role === "admin" || session.user.role === "owner";
+  // The workspace role, not the platform staff field: `session.user.role` is
+  // "user" for every customer, so a workspace admin could never remove anybody
+  // else's comment (audit rilievo P-01, in a corner the fix did not reach).
+  const isPrivileged = can(session.user.role, "user:read");
   const deleted = await db
     .delete(dealComments)
     .where(
       isPrivileged
         ? eq(dealComments.id, commentId)
-        : and(eq(dealComments.id, commentId), eq(dealComments.userId, session.user.id!)),
+        : and(eq(dealComments.id, commentId), eq(dealComments.userId, session.user.id)),
     )
     .returning({ id: dealComments.id });
   if (deleted.length === 0) throw new Error("Comment not found or unauthorized");

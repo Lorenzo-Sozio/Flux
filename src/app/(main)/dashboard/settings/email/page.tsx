@@ -84,14 +84,18 @@ export default function EmailSettingsPage() {
     });
   }, []);
 
-  const set = (field: keyof Settings, value: any) => setSettings((s) => ({ ...s, [field]: value }));
+  const set = <K extends keyof Settings>(field: K, value: Settings[K]) =>
+    setSettings((s) => ({ ...s, [field]: value }));
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      const result = await saveEmailSettings(settings);
-      if ("error" in result) toast.error(result.error);
-      else toast.success(t("savedSuccess"));
+      // The action throws when the person may not manage settings, rather than
+      // returning a shape the caller has to remember to inspect.
+      await saveEmailSettings(settings);
+      toast.success(t("savedSuccess"));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not save the email settings.");
     } finally {
       setSaving(false);
     }
@@ -126,11 +130,11 @@ export default function EmailSettingsPage() {
   }
 
   return (
-    <div className="p-6 w-full space-y-6 max-w-none">
+    <div className="w-full max-w-none space-y-6 p-6">
       {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
-        <p className="text-muted-foreground mt-1">{t("subtitle")}</p>
+        <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
+        <p className="mt-1 text-muted-foreground">{t("subtitle")}</p>
       </div>
 
       {/* Provider selection + config */}
@@ -145,6 +149,7 @@ export default function EmailSettingsPage() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <button
+              type="button"
               onClick={() => set("provider", "resend")}
               className={`flex items-center gap-3 rounded-lg border-2 p-4 text-left transition-all ${
                 settings.provider === "resend"
@@ -159,10 +164,11 @@ export default function EmailSettingsPage() {
               />
               <div>
                 <p className="font-medium text-sm">Resend</p>
-                <p className="text-xs text-muted-foreground">{t("resendDesc")}</p>
+                <p className="text-muted-foreground text-xs">{t("resendDesc")}</p>
               </div>
             </button>
             <button
+              type="button"
               onClick={() => set("provider", "smtp")}
               className={`flex items-center gap-3 rounded-lg border-2 p-4 text-left transition-all ${
                 settings.provider === "smtp"
@@ -177,21 +183,21 @@ export default function EmailSettingsPage() {
               />
               <div>
                 <p className="font-medium text-sm">SMTP</p>
-                <p className="text-xs text-muted-foreground">{t("smtpDesc")}</p>
+                <p className="text-muted-foreground text-xs">{t("smtpDesc")}</p>
               </div>
             </button>
           </div>
 
           {/* Dynamic provider configuration */}
           {settings.provider === "resend" && (
-            <div className="space-y-3 pt-2 w-full">
+            <div className="w-full space-y-3 pt-2">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-sm">{t("resendConfig")}</h3>
                 <Badge variant="secondary" className="text-xs">
                   resend.com
                 </Badge>
               </div>
-              <div className="space-y-1.5 w-full">
+              <div className="w-full space-y-1.5">
                 <Label htmlFor="resend-key">{t("apiKey")}</Label>
                 <div className="relative w-full">
                   <Input
@@ -200,24 +206,24 @@ export default function EmailSettingsPage() {
                     value={settings.resendApiKey}
                     onChange={(e) => set("resendApiKey", e.target.value)}
                     placeholder="re_xxxxxxxxxxxxxxxxxxxx"
-                    className="pr-10 w-full"
+                    className="w-full pr-10"
                   />
                   <button
                     type="button"
                     onClick={() => setShowApiKey((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="-translate-y-1/2 absolute top-1/2 right-3 text-muted-foreground hover:text-foreground"
                     tabIndex={-1}
                   >
                     {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                <p className="text-xs text-muted-foreground">{t("apiKeyHint")}</p>
+                <p className="text-muted-foreground text-xs">{t("apiKeyHint")}</p>
               </div>
             </div>
           )}
 
           {settings.provider === "smtp" && (
-            <div className="space-y-4 pt-2 w-full">
+            <div className="w-full space-y-4 pt-2">
               <h3 className="font-semibold text-sm">{t("smtpConfig")}</h3>
 
               <div className="grid grid-cols-3 gap-3">
@@ -237,7 +243,7 @@ export default function EmailSettingsPage() {
                     id="smtp-port"
                     type="number"
                     value={settings.smtpPort}
-                    onChange={(e) => set("smtpPort", parseInt(e.target.value) || 587)}
+                    onChange={(e) => set("smtpPort", parseInt(e.target.value, 10) || 587)}
                     placeholder="587"
                     className="w-full"
                   />
@@ -252,7 +258,7 @@ export default function EmailSettingsPage() {
                   onChange={(e) => set("smtpSecure", e.target.checked)}
                   className="h-4 w-4 rounded border-input"
                 />
-                <Label htmlFor="smtp-secure" className="font-normal cursor-pointer">
+                <Label htmlFor="smtp-secure" className="cursor-pointer font-normal">
                   {t("useSsl")}
                 </Label>
               </div>
@@ -278,13 +284,13 @@ export default function EmailSettingsPage() {
                       value={settings.smtpPassword}
                       onChange={(e) => set("smtpPassword", e.target.value)}
                       placeholder="••••••••"
-                      className="pr-10 w-full"
+                      className="w-full pr-10"
                       autoComplete="new-password"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="-translate-y-1/2 absolute top-1/2 right-3 text-muted-foreground hover:text-foreground"
                       tabIndex={-1}
                     >
                       {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -294,12 +300,12 @@ export default function EmailSettingsPage() {
               </div>
 
               {/* Common configurations list */}
-              <div className="rounded-md border bg-muted/30 p-3 w-full">
-                <p className="text-xs font-semibold text-foreground mb-2">{t("commonConfigs")}</p>
-                <ul className="space-y-1.5 text-xs text-muted-foreground">
+              <div className="w-full rounded-md border bg-muted/30 p-3">
+                <p className="mb-2 font-semibold text-foreground text-xs">{t("commonConfigs")}</p>
+                <ul className="space-y-1.5 text-muted-foreground text-xs">
                   {COMMON_SMTP_CONFIGS.map((cfg) => (
                     <li key={cfg.label} className="flex items-start gap-1.5">
-                      <Server className="h-3.5 w-3.5 mt-0.5 shrink-0 text-muted-foreground/70" />
+                      <Server className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
                       <span>
                         <strong className="text-foreground/90">{cfg.label}:</strong> {cfg.host} : {cfg.port}
                         {cfg.note ? ` (${cfg.note})` : ""}
@@ -345,7 +351,7 @@ export default function EmailSettingsPage() {
               />
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             {t("recipientsWillSee", {
               identity: `${settings.fromName || "CRM"} <${settings.fromEmail || "noreply@yourdomain.com"}>`,
             })}
@@ -362,26 +368,26 @@ export default function EmailSettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="flex gap-2 w-full">
+          <div className="flex w-full gap-2">
             <Input
               type="email"
               value={testTo}
               onChange={(e) => setTestTo(e.target.value)}
               placeholder="your@email.com"
-              className="flex-1 w-full"
+              className="w-full flex-1"
             />
-            <Button variant="outline" onClick={handleTest} disabled={testing} className="gap-2 shrink-0">
+            <Button variant="outline" onClick={handleTest} disabled={testing} className="shrink-0 gap-2">
               {testing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               {t("sendTest")}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground">{t("testHint")}</p>
+          <p className="text-muted-foreground text-xs">{t("testHint")}</p>
         </CardContent>
       </Card>
 
       {/* Save button */}
-      <div className="flex justify-end w-full">
-        <Button onClick={handleSave} disabled={saving} className="gap-2 min-w-[120px]">
+      <div className="flex w-full justify-end">
+        <Button onClick={handleSave} disabled={saving} className="min-w-[120px] gap-2">
           {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
           {t("saveSettings")}
         </Button>

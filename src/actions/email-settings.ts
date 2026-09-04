@@ -4,14 +4,17 @@ import { revalidatePath } from "next/cache";
 
 import { eq } from "drizzle-orm";
 
-import { auth } from "@/auth";
 import { emailSettings } from "@/db/schema";
+import { requireCapability } from "@/lib/auth-guard";
 import { type EmailConfig, testEmailConfig } from "@/lib/email-provider";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Load current settings (secrets masked) ───────────────────────────────────
 
 export async function getEmailSettings() {
+  // Reading is guarded too: the row names the provider, the sending address and
+  // the host, which is reconnaissance for the write path below.
+  await requireCapability("settings:manage");
   const db = await getDb();
   const [row] = await db.select().from(emailSettings).limit(1);
   if (!row) {
@@ -20,7 +23,7 @@ export async function getEmailSettings() {
       provider: (process.env.EMAIL_PROVIDER as "resend" | "smtp") ?? "resend",
       resendApiKey: process.env.RESEND_API_KEY ? "••••••••" : "",
       smtpHost: process.env.SMTP_HOST ?? "",
-      smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587,
+      smtpPort: process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT, 10) : 587,
       smtpUser: process.env.SMTP_USER ?? "",
       smtpPassword: process.env.SMTP_PASSWORD ? "••••••••" : "",
       smtpSecure: process.env.SMTP_SECURE === "true",
@@ -48,9 +51,11 @@ export async function saveEmailSettings(data: {
   fromEmail: string;
   fromName: string;
 }) {
+  // ⚠️ This checked only that a session existed, so any member of the workspace —
+  // a read-only viewer included — could rewrite the credentials the whole
+  // workspace sends mail with.
+  await requireCapability("settings:manage");
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user) return { error: "Unauthorized" };
 
   const base = {
     provider: data.provider,
@@ -79,11 +84,11 @@ export async function saveEmailSettings(data: {
       .set({ ...payload, updatedAt: new Date() })
       .where(eq(emailSettings.id, existing.id));
   } else {
-    await db.insert(emailSettings).values(payload as any);
+    await db.insert(emailSettings).values(payload);
   }
 
   revalidatePath("/dashboard/settings/email");
-  return { success: true };
+  return { success: true as const };
 }
 
 // ─── Test connection ──────────────────────────────────────────────────────────
@@ -100,33 +105,55 @@ export async function testEmailConnection(data: {
   fromName: string;
   testTo: string;
 }) {
+  const actor = await requireCapability("settings:manage");
   const db = await getDb();
-  const session = await auth();
-  if (!session?.user?.email) return { error: "Unauthorized" };
 
-  // If user left secrets as masked placeholder, load real values from DB
-  let resolvedApiKey = data.resendApiKey;
-  let resolvedPassword = data.smtpPassword;
+  // ⚠️⚠️ **A masked secret means "use the one you have", and that is the whole
+  // stored configuration, not this one field of it.**
+  //
+  // This used to take the host, the user and the port from the caller and fill in
+  // only the password from the database. Anyone with a session could therefore
+  // post their own `smtpHost` together with the mask and have the server open a
+  // connection to them carrying the workspace's real password — the same trick
+  // reads back the Resend key. It was authenticated credential exfiltration, and
+  // it looked like a button called "Send test email".
+  const usesStoredSecret = data.resendApiKey?.includes("•") || data.smtpPassword?.includes("•");
 
-  if (resolvedApiKey?.includes("•") || resolvedPassword?.includes("•")) {
+  let config: EmailConfig;
+
+  if (usesStoredSecret) {
     const [row] = await db.select().from(emailSettings).limit(1);
-    if (row) {
-      if (resolvedApiKey?.includes("•")) resolvedApiKey = row.resendApiKey ?? undefined;
-      if (resolvedPassword?.includes("•")) resolvedPassword = row.smtpPassword ?? undefined;
-    }
+    if (!row) return { error: "There is no saved configuration to test." };
+
+    // Every field from the row. Testing a new host means typing its password.
+    config = {
+      provider: row.provider as EmailConfig["provider"],
+      resendApiKey: row.resendApiKey ?? undefined,
+      smtpHost: row.smtpHost ?? undefined,
+      smtpPort: row.smtpPort ?? 587,
+      smtpUser: row.smtpUser ?? undefined,
+      smtpPassword: row.smtpPassword ?? undefined,
+      smtpSecure: row.smtpSecure ?? false,
+      fromEmail: row.fromEmail,
+      fromName: row.fromName,
+    };
+  } else {
+    config = {
+      provider: data.provider,
+      resendApiKey: data.resendApiKey,
+      smtpHost: data.smtpHost,
+      smtpPort: data.smtpPort ?? 587,
+      smtpUser: data.smtpUser,
+      smtpPassword: data.smtpPassword,
+      smtpSecure: data.smtpSecure ?? false,
+      fromEmail: data.fromEmail,
+      fromName: data.fromName,
+    };
   }
 
-  const config: EmailConfig = {
-    provider: data.provider,
-    resendApiKey: resolvedApiKey,
-    smtpHost: data.smtpHost,
-    smtpPort: data.smtpPort ?? 587,
-    smtpUser: data.smtpUser,
-    smtpPassword: resolvedPassword,
-    smtpSecure: data.smtpSecure ?? false,
-    fromEmail: data.fromEmail,
-    fromName: data.fromName,
-  };
-
-  return testEmailConfig(config, data.testTo || session.user.email!);
+  // The test message goes to the person who asked for it, never to an address
+  // supplied alongside someone else's credentials.
+  const recipient = actor.email ?? data.testTo;
+  if (!recipient) return { error: "No address to send the test to." };
+  return testEmailConfig(config, recipient);
 }

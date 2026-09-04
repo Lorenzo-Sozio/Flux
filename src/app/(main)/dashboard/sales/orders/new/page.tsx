@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
+import { computeDocument } from "@/lib/document-totals";
 import { ORDER_FLOW } from "@/lib/order-status";
 import { cn } from "@/lib/utils";
 
@@ -140,27 +141,28 @@ export default function NewOrderPage() {
     }));
   }, [data, companyId]);
 
-  const totals = useMemo(() => {
-    let net = 0;
-    let tax = 0;
-    for (const line of items ?? []) {
-      const qty = Number(line.quantity) || 0;
-      const price = Number(line.unitPrice) || 0;
-      const lineNet = qty * price * (1 - (Number(line.discountPercent) || 0) / 100);
-      net += lineNet;
-      tax += lineNet * ((Number(line.taxPercent) || 0) / 100);
-    }
-    const discountAmount = net * (headerDiscount / 100);
-    const afterDiscount = net - discountAmount;
-    // The header discount reduces the taxable base, so the tax follows it down.
-    const taxAfterDiscount = net > 0 ? tax * (afterDiscount / net) : 0;
-    return {
-      net,
-      discountAmount,
-      tax: taxAfterDiscount,
-      total: afterDiscount + taxAfterDiscount,
-    };
-  }, [items, headerDiscount]);
+  /**
+   * The same arithmetic the server will use, not a second version of it.
+   *
+   * `computeDocument` is a pure module with no server imports, so the browser can
+   * run the very function that produces the saved figures. Writing the sums again
+   * here — which is what this did — rounds at different moments and shows a total
+   * a few cents from the one the order ends up with (the shape of audit rilievo
+   * C-03, on a smaller scale).
+   */
+  const totals = useMemo(
+    () =>
+      computeDocument({
+        lines: (items ?? []).map((line) => ({
+          quantity: Number(line.quantity) || 0,
+          unitPrice: Number(line.unitPrice) || 0,
+          discountPercent: Number(line.discountPercent) || 0,
+          taxPercent: Number(line.taxPercent) || 0,
+        })),
+        discountPercent: headerDiscount,
+      }),
+    [items, headerDiscount],
+  );
 
   /** Picking a product fills in the line; picking "custom" clears it for typing. */
   function selectProduct(index: number, value: string) {
@@ -631,7 +633,7 @@ export default function NewOrderPage() {
           <CardContent className="space-y-2.5 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Net</span>
-              <span className="tabular-nums">{formatAmount(totals.net)}</span>
+              <span className="tabular-nums">{formatAmount(totals.subtotal)}</span>
             </div>
 
             <div className="flex items-center justify-between gap-3">
@@ -661,7 +663,7 @@ export default function NewOrderPage() {
 
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Tax</span>
-              <span className="tabular-nums">{formatAmount(totals.tax)}</span>
+              <span className="tabular-nums">{formatAmount(totals.taxAmount)}</span>
             </div>
 
             <Separator className="my-1" />

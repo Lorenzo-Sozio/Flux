@@ -16,7 +16,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const { task: openTaskId } = await searchParams;
 
   const [taskList, allUsers, leadsList, contactsList, companiesList, dealsList, ticketsList] = await Promise.all([
-    getAllTasks(session.user.id, (session.user as any).role ?? "user"),
+    getAllTasks(),
     getAllUsers(),
     getLeadsForSelect(),
     getContactsForSelect(),

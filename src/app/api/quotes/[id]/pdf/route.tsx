@@ -3,10 +3,11 @@ import { type NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { desc, eq } from "drizzle-orm";
 
-import { auth } from "@/auth";
 import { QuotePDF } from "@/components/pdf/quote-pdf";
 import { APP_CONFIG } from "@/config/app-config";
 import { quoteActivities, quotes } from "@/db/schema";
+import { getActor } from "@/lib/auth-guard";
+import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -37,15 +38,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return new NextResponse("Forbidden", { status: 403 });
     }
   } else {
-    const session = await auth();
-    if (!session?.user?.id) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
-    const canView =
-      session.user.id === q.ownerId ||
-      session.user.id === q.deal?.ownerId ||
-      session.user.role === "admin" ||
-      session.user.role === "owner";
+    // ⚠️ This read `session.user.role`, the platform staff field, which is "user"
+    // for every customer — so the exception never applied and a workspace owner
+    // could not open a quote a colleague owned (audit rilievo P-01, in a corner
+    // the fix did not reach). It is the capability table now, like everywhere
+    // else, because a role string compared at a call site is how the two scales
+    // got confused in the first place.
+    const actor = await getActor();
+    if (!actor) return new NextResponse("Unauthorized", { status: 401 });
+
+    const canView = actor.userId === q.ownerId || actor.userId === q.deal?.ownerId || can(actor, "quote:write");
     if (!canView) return new NextResponse("Forbidden", { status: 403 });
   }
 
