@@ -22,6 +22,7 @@ import {
   Settings,
   Settings2,
   ShoppingCart,
+  Swords,
   Target,
   TrendingUp,
   Users,
@@ -110,6 +111,7 @@ export const sidebarItems: NavGroup[] = [
       { titleKey: "pipeline", url: "/dashboard/pipeline", icon: Kanban, module: "sales" },
       { titleKey: "salesTargets", url: "/dashboard/pipeline/targets", icon: TrendingUp, module: "sales" },
       { titleKey: "salesFunnel", url: "/dashboard/pipeline/funnel", icon: GitMerge, module: "sales" },
+      { titleKey: "winLoss", url: "/dashboard/pipeline/win-loss", icon: Swords, module: "sales" },
     ],
   },
   {

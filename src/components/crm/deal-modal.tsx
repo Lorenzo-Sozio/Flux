@@ -21,6 +21,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import type { deals } from "@/db/schema";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 const dealSchema = z.object({
@@ -80,10 +81,14 @@ export function DealModal({
   children,
   onSuccess,
 }: {
-  deal?: any;
-  stages: any[];
-  companies?: any[];
-  contacts?: any[];
+  // The row as the board holds it. Partial because the modal is also the create
+  // form, where there is no row yet.
+  deal?: Partial<typeof deals.$inferSelect> & { id: string };
+  stages: { id: string; name: string; color?: string | null; defaultProbability?: number | null }[];
+  // Only what the two selects draw. `any[]` here meant a typo in either list
+  // compiled fine and produced empty options at runtime.
+  companies?: { id: string; name: string }[];
+  contacts?: { id: string; firstName: string | null; lastName: string | null }[];
   children?: React.ReactNode;
   onSuccess?: () => void;
 }) {
@@ -155,10 +160,10 @@ export function DealModal({
       };
 
       if (isEditing) {
-        await updateDeal(deal.id, payload as any);
+        await updateDeal(deal.id, payload as Partial<typeof deals.$inferInsert>);
         toast.success(t("updateSuccess"));
       } else {
-        await createDeal(payload as any);
+        await createDeal(payload as Partial<typeof deals.$inferInsert>);
         toast.success(t("createSuccess"));
       }
       setOpen(false);
@@ -192,7 +197,7 @@ export function DealModal({
         <DialogHeader className="border-b px-6 pt-6 pb-4">
           <div className="flex items-center justify-between gap-2">
             <DialogTitle className="text-lg">
-              {isEditing ? t("modal.editTitle", { name: deal.name }) : t("modal.newTitle")}
+              {isEditing ? t("modal.editTitle", { name: deal.name ?? "" }) : t("modal.newTitle")}
             </DialogTitle>
             {isEditing && deal && (
               <Link href={`/dashboard/pipeline/${deal.id}`} onClick={() => setOpen(false)}>

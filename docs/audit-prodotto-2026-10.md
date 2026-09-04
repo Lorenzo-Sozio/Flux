@@ -849,10 +849,39 @@ I segnaposto sono cinque, solo in italiano, e non compaiono in nessun elenco: ch
 personalizzati come segnaposto, l'anteprima con un contatto reale, l'invio di prova, e
 l'inserimento automatico del link di disiscrizione con blocco della partenza se manca.
 
-### S-09 — Motivi di perdita e analisi win/loss
+### S-09 — Motivi di perdita e analisi win/loss ✅
 
 Motivo obbligatorio alla chiusura persa, con elenco configurabile, e una vista che
 incroci motivo, fase di abbandono, valore e concorrente.
+
+**✅ Risolto.** Trascinare una scheda nella colonna «Persa» apre la domanda: è l'unico
+momento in cui la risposta si conosce ancora. Chiesta alla riunione commerciale una
+settimana dopo, non se la ricorda nessuno; chiesta al momento, costa un click. Annullare
+lascia la scheda dov'era — una perdita senza motivo è esattamente ciò che si sta
+correggendo.
+
+Il motivo viene da un elenco configurabile (`deal_loss_reason`, seminato con otto voci
+che valgono per chiunque venda qualcosa) e non da una casella libera, perché il testo
+libero non si aggrega: «prezzo», «Prezzo» e «troppo caro» sono tre righe in qualsiasi
+analisi. La casella resta sotto per il dettaglio che un elenco non può contenere, e c'è
+il campo concorrente. Un motivo ritirato non viene cancellato: toglierlo dall'elenco non
+deve cancellarlo dalle trattative già chiuse sotto di esso.
+
+Serviva anche `lost_at_stage_id`, che non è ricavabile da `stage_id`: spostando la
+scheda nella colonna «Persa», la fase in cui la conversazione si è davvero fermata viene
+sovrascritta.
+
+La vista `/dashboard/pipeline/win-loss` taglia i dati nei tre modi in cui la domanda
+viene posta davvero: per motivo, che mostra lo schema; per fase di abbandono, che dice se
+il problema è la qualifica o la chiusura; e per concorrente. Ogni taglio porta il valore
+oltre al conteggio, perché dieci perdite piccole e una grande sono problemi diversi. Il
+tasso di vittoria è calcolato su ciò che ha chiuso: una trattativa aperta non è una
+perdita, e contarla come tale è il modo in cui quel numero smette di significare qualcosa.
+
+Trovato strada facendo: `getPipelineData` seminava cinque fasi proprie, nessuna marcata
+vinta o persa, quindi un workspace che arrivava alla pipeline da lì otteneva una lavagna
+senza modo di chiudere nulla. Ora usa gli stessi valori predefiniti di ogni altro
+percorso.
 
 ### S-10 — Sincronizzazione con calendario ed email
 

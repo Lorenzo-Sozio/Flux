@@ -255,4 +255,17 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nALTER TABLE "order_item" ADD COLUMN IF NOT EXISTS "description" text;\n',
     ],
   },
+  {
+    tag: "0005_why_a_deal_was_lost",
+    folderMillis: 1788910000000,
+    hash: "37269e1aa0af640f61a06cbf6fb211fc69585f738dad31763ac63cf8a4e92280",
+    sql: [
+      '-- Perché una trattativa è stata persa (audit rilievo S-09).\n--\n-- `deal.lost_reason` esisteva già come testo libero e non lo scriveva nessuno:\n-- il prodotto sapeva quanto era stato perso e mai perché. Un campo libero\n-- comunque non si aggrega — «prezzo», «Prezzo», «troppo caro» e «costo» sono\n-- quattro righe diverse in qualsiasi analisi.\n--\n-- Serve inoltre la fase di abbandono, che non è ricavabile da `stage_id`: quando\n-- la trattativa entra nella colonna «Persa», la fase in cui la conversazione si è\n-- davvero fermata è quella precedente, e viene sovrascritta.\n--\n-- ⚠️ Il driver Neon HTTP non tiene una transazione fra istruzioni: ogni\n-- istruzione è additiva e rieseguibile.\nCREATE TABLE IF NOT EXISTS "deal_loss_reason" (\n  "id" text PRIMARY KEY NOT NULL,\n  "name" text NOT NULL,\n  "order" integer DEFAULT 0 NOT NULL,\n  "is_active" boolean DEFAULT true NOT NULL,\n  "created_at" timestamp DEFAULT now() NOT NULL\n);',
+      '\nALTER TABLE "deal" ADD COLUMN IF NOT EXISTS "loss_reason_id" text;',
+      '\nALTER TABLE "deal" ADD COLUMN IF NOT EXISTS "lost_competitor" text;',
+      '\nALTER TABLE "deal" ADD COLUMN IF NOT EXISTS "lost_at_stage_id" text;',
+      '\nDO $$ BEGIN\n  ALTER TABLE "deal" ADD CONSTRAINT "deal_loss_reason_id_fk"\n    FOREIGN KEY ("loss_reason_id") REFERENCES "deal_loss_reason"("id") ON DELETE set null;\nEXCEPTION WHEN duplicate_object THEN NULL; END $$;',
+      '\nDO $$ BEGIN\n  ALTER TABLE "deal" ADD CONSTRAINT "deal_lost_at_stage_id_fk"\n    FOREIGN KEY ("lost_at_stage_id") REFERENCES "pipeline_stage"("id") ON DELETE set null;\nEXCEPTION WHEN duplicate_object THEN NULL; END $$;\n',
+    ],
+  },
 ];

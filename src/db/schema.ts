@@ -348,12 +348,38 @@ export const deals = pgTable("deal", {
   // it into the current month's revenue (audit rilievo C-07).
   closedAt: timestamp("closed_at", { mode: "date" }),
   // Without a reason there is no win/loss analysis at all — the product knew how
-  // much was lost and never why.
+  // much was lost and never why. The free-text field stays for the detail a list
+  // cannot hold; the aggregation happens on `lossReasonId`, because "price",
+  // "Price", "too expensive" and "cost" are four rows in any analysis built on
+  // typing (audit rilievo S-09).
   lostReason: text("lost_reason"),
+  lossReasonId: text("loss_reason_id"),
+  lostCompetitor: text("lost_competitor"),
+  // The stage where the conversation actually stopped. Not derivable from
+  // `stageId`: moving the card into the "Lost" column overwrites it.
+  lostAtStageId: text("lost_at_stage_id"),
   healthScore: integer("health_score").default(0),
   notes: text("notes"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/**
+ * The reasons a deal can be lost, as a list rather than a free-text box.
+ *
+ * Configurable per workspace, because the reasons a company loses business are
+ * particular to it, and seeded with the ones nearly everyone needs.
+ */
+export const dealLossReasons = pgTable("deal_loss_reason", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  order: integer("order").default(0).notNull(),
+  // Retired rather than deleted: a reason removed from the list must not erase
+  // itself from the deals already closed under it.
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 export const pipelineStagesRelations = relations(pipelineStages, ({ many }) => ({

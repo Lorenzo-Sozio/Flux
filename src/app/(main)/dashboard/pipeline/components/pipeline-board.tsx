@@ -8,8 +8,9 @@ import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-p
 import { BarChart2, CalendarIcon, CoinsIcon, PencilIcon, PlusIcon, Settings2, TrendingUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { updateDealStage } from "@/actions/pipeline";
+import { getLossReasons, updateDealStage } from "@/actions/pipeline";
 import { DealModal } from "@/components/crm/deal-modal";
+import { type LossAnswer, type LossReason, LostDealDialog } from "@/components/crm/lost-deal-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +37,10 @@ type Stage = {
   name: string;
   order: number;
   color: string | null;
+  // Which columns end the deal. The board needs to know, because dropping a card
+  // into the losing one is the moment to ask why (audit rilievo S-09).
+  isWon?: boolean;
+  isLost?: boolean;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -50,22 +55,45 @@ export function PipelineBoard({
 }: {
   initialStages: Stage[];
   initialDeals: Deal[];
-  companies: any[];
-  contacts: any[];
+  companies: { id: string; name: string }[];
+  contacts: { id: string; firstName: string | null; lastName: string | null }[];
   canEdit?: boolean;
   canManageStages?: boolean;
 }) {
   const t = useTranslations("pipeline");
   const [isMounted, setIsMounted] = useState(false);
   const [deals, setDeals] = useState(initialDeals);
+  const [pendingLoss, setPendingLoss] = useState<{ dealId: string; dealName: string; stageId: string } | null>(null);
+  const [lossReasons, setLossReasons] = useState<LossReason[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  // Loaded once, and only where there is a losing column to drop into.
+  useEffect(() => {
+    if (!initialStages.some((st) => st.isLost)) return;
+    getLossReasons()
+      .then((rows) => setLossReasons(rows.map((r) => ({ id: r.id, name: r.name }))))
+      .catch(() => setLossReasons([]));
+  }, [initialStages]);
+
   useEffect(() => {
     setDeals(initialDeals);
   }, [initialDeals]);
+
+  /**
+   * Applies a move, optimistically, and puts the board back if the server refuses.
+   */
+  const commitMove = async (dealId: string, stageId: string, loss?: LossAnswer) => {
+    setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stageId } : d)));
+    try {
+      await updateDealStage(dealId, stageId, loss);
+    } catch (e) {
+      console.error(e);
+      setDeals(initialDeals);
+    }
+  };
 
   const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
@@ -73,30 +101,38 @@ export function PipelineBoard({
     if (!destination) return;
     if (source.droppableId === destination.droppableId && source.index === destination.index) return;
 
-    const newDeals = [...deals];
-    const dealIndex = newDeals.findIndex((d) => d.id === draggableId);
-    if (dealIndex < 0) return;
+    const deal = deals.find((d) => d.id === draggableId);
+    if (!deal) return;
 
-    const deal = { ...newDeals[dealIndex] };
-    deal.stageId = destination.droppableId;
-
-    newDeals.splice(dealIndex, 1); // remove from old position
-    // We don't have true sorting logic for deals yet, just simple filtering
-    // So we just update the stageId
-    setDeals(deals.map((d) => (d.id === draggableId ? deal : d)));
-
-    try {
-      await updateDealStage(deal.id, destination.droppableId);
-    } catch (e) {
-      console.error(e);
-      setDeals(initialDeals); // Revert on failure
+    // Dropping into the losing column is the one moment the reason is still
+    // known. Ask now; asked at the sales meeting a week later, nobody remembers.
+    const target = initialStages.find((st) => st.id === destination.droppableId);
+    if (target?.isLost) {
+      setPendingLoss({ dealId: deal.id, dealName: deal.name, stageId: destination.droppableId });
+      return;
     }
+
+    await commitMove(deal.id, destination.droppableId);
   };
 
   if (!isMounted) return null;
 
   return (
     <div className="flex h-[calc(100vh-120px)] w-full flex-col overflow-hidden">
+      <LostDealDialog
+        open={pendingLoss !== null}
+        dealName={pendingLoss?.dealName ?? ""}
+        reasons={lossReasons}
+        // Cancelling leaves the card where it was: the move never happened,
+        // because a loss without its reason is the thing being fixed here.
+        onCancel={() => setPendingLoss(null)}
+        onConfirm={async (answer) => {
+          if (!pendingLoss) return;
+          await commitMove(pendingLoss.dealId, pendingLoss.stageId, answer);
+          setPendingLoss(null);
+        }}
+      />
+
       <div className="mb-6 flex shrink-0 items-center justify-between px-1">
         <div>
           <h2 className="font-bold text-xl">{t("title")}</h2>

@@ -14,7 +14,7 @@
 import { count } from "drizzle-orm";
 import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 
-import { companyCategories, companyTypes, pipelineStages, slas } from "@/db/schema";
+import { companyCategories, companyTypes, dealLossReasons, pipelineStages, slas } from "@/db/schema";
 
 /**
  * Any tenant handle.
@@ -55,12 +55,32 @@ const DEFAULT_SLAS = [
   { name: "Low", priority: "low", firstResponseTimeMinutes: 1440, resolutionTimeMinutes: 5760 },
 ];
 
+/**
+ * Why deals get lost.
+ *
+ * A list rather than a free-text box, because free text does not aggregate:
+ * "price", "Price", "too expensive" and "cost" are four rows in any analysis
+ * (audit rilievo S-09). Editable, and every one of these applies to almost any
+ * business selling anything.
+ */
+const DEFAULT_LOSS_REASONS = [
+  "Price",
+  "Lost to a competitor",
+  "No budget",
+  "No decision made",
+  "Bad timing",
+  "Missing feature or capability",
+  "Went with an in-house solution",
+  "No response",
+];
+
 const DEFAULT_COMPANY_TYPES = ["Prospect", "Customer", "Partner", "Supplier"];
 const DEFAULT_COMPANY_CATEGORIES = ["Small business", "Mid-market", "Enterprise", "Public sector"];
 
 export interface SeedResult {
   stages: number;
   slas: number;
+  lossReasons: number;
   companyTypes: number;
   companyCategories: number;
 }
@@ -73,7 +93,7 @@ export interface SeedResult {
  * purpose.
  */
 export async function seedWorkspace(db: SeedDb): Promise<SeedResult> {
-  const result: SeedResult = { stages: 0, slas: 0, companyTypes: 0, companyCategories: 0 };
+  const result: SeedResult = { stages: 0, slas: 0, lossReasons: 0, companyTypes: 0, companyCategories: 0 };
 
   const [stageCount] = await db.select({ n: count() }).from(pipelineStages);
   if (Number(stageCount?.n ?? 0) === 0) {
@@ -85,6 +105,12 @@ export async function seedWorkspace(db: SeedDb): Promise<SeedResult> {
   if (Number(slaCount?.n ?? 0) === 0) {
     await db.insert(slas).values(DEFAULT_SLAS);
     result.slas = DEFAULT_SLAS.length;
+  }
+
+  const [reasonCount] = await db.select({ n: count() }).from(dealLossReasons);
+  if (Number(reasonCount?.n ?? 0) === 0) {
+    await db.insert(dealLossReasons).values(DEFAULT_LOSS_REASONS.map((name, i) => ({ name, order: i + 1 })));
+    result.lossReasons = DEFAULT_LOSS_REASONS.length;
   }
 
   const [typeCount] = await db.select({ n: count() }).from(companyTypes);
@@ -102,4 +128,4 @@ export async function seedWorkspace(db: SeedDb): Promise<SeedResult> {
   return result;
 }
 
-export { DEFAULT_STAGES, DEFAULT_SLAS, DEFAULT_COMPANY_TYPES, DEFAULT_COMPANY_CATEGORIES };
+export { DEFAULT_STAGES, DEFAULT_SLAS, DEFAULT_LOSS_REASONS, DEFAULT_COMPANY_TYPES, DEFAULT_COMPANY_CATEGORIES };

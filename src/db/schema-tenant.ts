@@ -37,6 +37,7 @@ export {
   customFilterTagsRelations,
   dealComments,
   dealCommentsRelations,
+  dealLossReasons,
   deals,
   dealsRelations,
   dmConversationMembers,

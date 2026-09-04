@@ -8,8 +8,19 @@ import { and, count, eq, gte, inArray } from "drizzle-orm";
 import { createNotificationAction } from "@/actions/auth";
 import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
-import { activities, companies, contacts, deals, leads, pipelineStages, salesTargets, users } from "@/db/schema";
-import { requireAdminAccess, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
+import {
+  activities,
+  companies,
+  contacts,
+  dealLossReasons,
+  deals,
+  leads,
+  pipelineStages,
+  salesTargets,
+  users,
+} from "@/db/schema";
+import { DEFAULT_STAGES } from "@/db/seed-workspace";
+import { requireAdminAccess, requireCapability, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
 import { convertToEur, getExchangeRates } from "@/lib/exchange-rates";
 import { getDb } from "@/lib/tenant-context";
 
@@ -17,15 +28,14 @@ export async function getPipelineData() {
   const db = await getDb();
   let stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
 
-  // Seed default stages if pipeline is completely empty
+  // Seed default stages if pipeline is completely empty.
+  //
+  // This used to write its own five stages, none of them marked won or lost, so
+  // a workspace that first reached the pipeline through this path got a board
+  // with no way to close anything. It now uses the same defaults every other
+  // path seeds (audit rilievo U-12).
   if (stages.length === 0) {
-    await db.insert(pipelineStages).values([
-      { name: "Lead In", order: 1, color: "#94a3b8" },
-      { name: "Contact Made", order: 2, color: "#60a5fa" },
-      { name: "Meeting Scheduled", order: 3, color: "#fcd34d" },
-      { name: "Proposal Sent", order: 4, color: "#fb923c" },
-      { name: "Negotiation", order: 5, color: "#f43f5e" },
-    ]);
+    await db.insert(pipelineStages).values(DEFAULT_STAGES);
     stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
   }
 
@@ -91,7 +101,20 @@ export async function createDeal(data: Partial<typeof deals.$inferInsert>) {
   return newDeal;
 }
 
-export async function updateDealStage(dealId: string, newStageId: string) {
+/**
+ * What a deal carries when it is lost.
+ *
+ * `lossReasonId` is the part that aggregates; the note is for the detail a list
+ * cannot hold, and the competitor for the question every sales meeting asks
+ * (audit rilievo S-09).
+ */
+export interface LossDetails {
+  lossReasonId?: string | null;
+  lostCompetitor?: string | null;
+  note?: string | null;
+}
+
+export async function updateDealStage(dealId: string, newStageId: string, loss?: LossDetails) {
   await requireWriteAccess();
   const db = await getDb();
 
@@ -127,12 +150,25 @@ export async function updateDealStage(dealId: string, newStageId: string) {
   const closing = stage?.isWon ? "won" : stage?.isLost ? "lost" : null;
   const now = new Date();
 
+  // Where the conversation actually stopped. Not derivable afterwards: the move
+  // about to happen overwrites `stageId` with the "Lost" column itself.
+  const lostFields =
+    closing === "lost"
+      ? {
+          lostAtStageId: oldDeal?.stageId ?? null,
+          ...(loss?.lossReasonId !== undefined ? { lossReasonId: loss.lossReasonId } : {}),
+          ...(loss?.lostCompetitor !== undefined ? { lostCompetitor: loss.lostCompetitor } : {}),
+          ...(loss?.note !== undefined ? { lostReason: loss.note } : {}),
+        }
+      : {};
+
   const [updatedDeal] = await db
     .update(deals)
     .set({
       stageId: newStageId,
       probability: probabilityWasManual ? currentProbability : (stage?.defaultProbability ?? 0),
       ...(closing ? { status: closing, closedAt: now } : {}),
+      ...lostFields,
       updatedAt: now,
     })
     .where(eq(deals.id, dealId))
@@ -154,6 +190,15 @@ export async function updateDealStage(dealId: string, newStageId: string) {
       name: updatedDeal.name,
       amount: updatedDeal.amount,
       currency: updatedDeal.currency,
+      // Why it was lost travels with the event, or there is no win/loss analysis
+      // downstream either.
+      ...(closing === "lost"
+        ? {
+            lossReasonId: updatedDeal.lossReasonId,
+            competitor: updatedDeal.lostCompetitor,
+            note: updatedDeal.lostReason,
+          }
+        : {}),
       // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
     }).catch(() => {});
   }
@@ -587,5 +632,165 @@ export async function getForecastData() {
     committed: months.reduce((s, m) => s + m.committed, 0),
     bestCase: months.reduce((s, m) => s + m.bestCase, 0),
     currentMonthTarget,
+  };
+}
+
+// ─── Why deals are lost ───────────────────────────────────────────────────────
+
+/**
+ * The reasons this workspace can pick from.
+ *
+ * Retired reasons are kept, not deleted: removing one from the list must not
+ * erase itself from the deals already closed under it.
+ */
+export async function getLossReasons(includeRetired = false) {
+  await requireCapability("record:read");
+  const db = await getDb();
+  const rows = await db.select().from(dealLossReasons).orderBy(dealLossReasons.order, dealLossReasons.name);
+  return includeRetired ? rows : rows.filter((r) => r.isActive);
+}
+
+export async function createLossReason(name: string) {
+  await requireAdminAccess();
+  const db = await getDb();
+  const clean = name.trim();
+  if (!clean) throw new Error("A reason needs a name.");
+
+  const [{ n }] = await db.select({ n: count() }).from(dealLossReasons);
+  const [row] = await db
+    .insert(dealLossReasons)
+    .values({ name: clean, order: Number(n) + 1 })
+    .returning();
+  revalidatePath("/dashboard/settings/pipeline");
+  return row;
+}
+
+export async function updateLossReason(id: string, data: { name?: string; isActive?: boolean; order?: number }) {
+  await requireAdminAccess();
+  const db = await getDb();
+  const [row] = await db
+    .update(dealLossReasons)
+    .set({
+      ...(data.name !== undefined ? { name: data.name.trim() } : {}),
+      ...(data.isActive !== undefined ? { isActive: data.isActive } : {}),
+      ...(data.order !== undefined ? { order: data.order } : {}),
+    })
+    .where(eq(dealLossReasons.id, id))
+    .returning();
+  revalidatePath("/dashboard/settings/pipeline");
+  return row;
+}
+
+/**
+ * Closes a deal as lost, with the reason attached.
+ *
+ * Separate from `updateDeal` because losing a deal is not an edit: it is the end
+ * of the arc, and the one moment at which the reason is still known. Asked for
+ * later, nobody remembers.
+ */
+export async function loseDeal(dealId: string, loss: LossDetails) {
+  await requireWriteAccess();
+  const db = await getDb();
+
+  const [oldDeal] = await db.select().from(deals).where(eq(deals.id, dealId));
+  if (!oldDeal) throw new Error("Deal not found.");
+  if (oldDeal.status === "lost") throw new Error("This deal is already closed as lost.");
+
+  // Move it to the losing column if the pipeline has one, so the board agrees
+  // with the record. A pipeline without one still closes the deal.
+  const [lostStage] = await db.select().from(pipelineStages).where(eq(pipelineStages.isLost, true)).limit(1);
+
+  if (lostStage) return updateDealStage(dealId, lostStage.id, loss);
+
+  const now = new Date();
+  const [updated] = await db
+    .update(deals)
+    .set({
+      status: "lost",
+      closedAt: now,
+      lostAtStageId: oldDeal.stageId,
+      lossReasonId: loss.lossReasonId ?? null,
+      lostCompetitor: loss.lostCompetitor ?? null,
+      lostReason: loss.note ?? null,
+      updatedAt: now,
+    })
+    .where(eq(deals.id, dealId))
+    .returning();
+
+  dispatchWebhook("deal.lost", {
+    id: updated.id,
+    name: updated.name,
+    amount: updated.amount,
+    currency: updated.currency,
+    lossReasonId: updated.lossReasonId,
+    competitor: updated.lostCompetitor,
+    note: updated.lostReason,
+  });
+
+  revalidatePath("/dashboard/pipeline");
+  return updated;
+}
+
+/**
+ * Win/loss, cut the three ways the question is actually asked.
+ *
+ * By reason, so the pattern is visible; by the stage where it stopped, which says
+ * whether the problem is qualification or closing; and by competitor, which is
+ * what every sales meeting asks first. All three carry value, not just counts,
+ * because ten small losses and one large one are different problems.
+ */
+export async function getWinLossAnalysis(sinceDays = 365) {
+  await requireCapability("report:read");
+  const db = await getDb();
+  const since = new Date(Date.now() - sinceDays * 86_400_000);
+
+  const closed = await db
+    .select({
+      id: deals.id,
+      status: deals.status,
+      amount: deals.amount,
+      closedAt: deals.closedAt,
+      lossReasonId: deals.lossReasonId,
+      lostCompetitor: deals.lostCompetitor,
+      lostAtStageId: deals.lostAtStageId,
+    })
+    .from(deals)
+    .where(and(inArray(deals.status, ["won", "lost"]), gte(deals.closedAt, since)));
+
+  const [reasons, stages] = await Promise.all([
+    db.select().from(dealLossReasons),
+    db.select({ id: pipelineStages.id, name: pipelineStages.name }).from(pipelineStages),
+  ]);
+  const reasonName = new Map(reasons.map((r) => [r.id, r.name]));
+  const stageName = new Map(stages.map((s) => [s.id, s.name]));
+
+  const won = closed.filter((d) => d.status === "won");
+  const lost = closed.filter((d) => d.status === "lost");
+  const value = (rows: typeof closed) => rows.reduce((sum, d) => sum + Number(d.amount ?? 0), 0);
+
+  /** Groups losses by a key, keeping both the count and the money. */
+  const groupLosses = (keyOf: (d: (typeof closed)[number]) => string) => {
+    const buckets = new Map<string, { key: string; count: number; value: number }>();
+    for (const d of lost) {
+      const key = keyOf(d);
+      const bucket = buckets.get(key) ?? { key, count: 0, value: 0 };
+      bucket.count += 1;
+      bucket.value += Number(d.amount ?? 0);
+      buckets.set(key, bucket);
+    }
+    return [...buckets.values()].sort((a, b) => b.value - a.value || b.count - a.count);
+  };
+
+  return {
+    wonCount: won.length,
+    lostCount: lost.length,
+    wonValue: value(won),
+    lostValue: value(lost),
+    // Of everything that actually closed. Open deals are not a loss yet, and
+    // counting them as one is how a win rate quietly becomes meaningless.
+    winRate: closed.length ? Math.round((won.length / closed.length) * 100) : 0,
+    byReason: groupLosses((d) => (d.lossReasonId ? (reasonName.get(d.lossReasonId) ?? "Unknown") : "Not recorded")),
+    byStage: groupLosses((d) => (d.lostAtStageId ? (stageName.get(d.lostAtStageId) ?? "Unknown") : "Not recorded")),
+    byCompetitor: groupLosses((d) => d.lostCompetitor?.trim() || "None named"),
   };
 }
