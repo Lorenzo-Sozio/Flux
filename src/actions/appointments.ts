@@ -186,30 +186,15 @@ export async function createAppointment(data: {
 
   const icalUid = `${crypto.randomUUID()}@fluxcrm.app`;
 
-  const [appt] = await db
-    .insert(appointments)
-    .values({
-      title: data.title,
-      description: data.description,
-      startAt: data.startAt,
-      endAt: data.endAt,
-      timezone: data.timezone ?? "Europe/Rome",
-      location: data.location,
-      locationUrl: data.locationUrl,
-      conferenceType: data.conferenceType,
-      conferenceLink,
-      icalUid,
-      sequence: 0,
-      organizerId,
-      contactId: data.contactId,
-      dealId: data.dealId,
-      companyId: data.companyId,
-      leadId: data.leadId,
-      reminderMinutes: data.reminderMinutes,
-    })
-    .returning();
+  // The id is made here so the meeting and the people invited to it are one
+  // commit. They were an insert followed by a loop of inserts, one round trip
+  // each: a failure partway through left a meeting with some of its invitees, and
+  // the invitations then went out to exactly that half (audit rilievo M-04).
+  const appointmentId = crypto.randomUUID();
 
-  // Insert organizer as attendee
+  const attendeeRows: (typeof appointmentAttendees.$inferInsert)[] = [];
+
+  // Whoever is calling is in the room by definition, and already accepted.
   if (organizerId) {
     const organizer = await db
       .select({ email: users.email, name: users.name })
@@ -218,8 +203,8 @@ export async function createAppointment(data: {
       .then((r) => r[0]);
 
     if (organizer?.email) {
-      await db.insert(appointmentAttendees).values({
-        appointmentId: appt.id,
+      attendeeRows.push({
+        appointmentId,
         userId: organizerId,
         email: organizer.email,
         name: organizer.name ?? "Organizer",
@@ -229,10 +214,9 @@ export async function createAppointment(data: {
     }
   }
 
-  // Insert remaining attendees
   for (const a of data.attendees) {
-    await db.insert(appointmentAttendees).values({
-      appointmentId: appt.id,
+    attendeeRows.push({
+      appointmentId,
       userId: a.userId,
       contactId: a.contactId,
       email: a.email,
@@ -242,6 +226,38 @@ export async function createAppointment(data: {
       responseToken: generateResponseToken(),
     });
   }
+
+  const writes: unknown[] = [
+    db
+      .insert(appointments)
+      .values({
+        id: appointmentId,
+        title: data.title,
+        description: data.description,
+        startAt: data.startAt,
+        endAt: data.endAt,
+        timezone: data.timezone ?? "Europe/Rome",
+        location: data.location,
+        locationUrl: data.locationUrl,
+        conferenceType: data.conferenceType,
+        conferenceLink,
+        icalUid,
+        sequence: 0,
+        organizerId,
+        contactId: data.contactId,
+        dealId: data.dealId,
+        companyId: data.companyId,
+        leadId: data.leadId,
+        reminderMinutes: data.reminderMinutes,
+      })
+      .returning(),
+  ];
+  if (attendeeRows.length > 0) {
+    writes.push(db.insert(appointmentAttendees).values(attendeeRows));
+  }
+
+  const results = await db.batch(writes as unknown as Parameters<typeof db.batch>[0]);
+  const [appt] = results[0] as (typeof appointments.$inferSelect)[];
 
   revalidatePath("/dashboard/calendar");
 
@@ -307,27 +323,32 @@ export async function updateAppointment(
     const existingEmails = new Set(existingAttendees.map((a) => a.email));
     const newEmails = new Set(data.attendees.map((a) => a.email));
 
-    // Remove attendees no longer in the list
-    for (const ea of existingAttendees) {
-      if (!newEmails.has(ea.email)) {
-        await db.delete(appointmentAttendees).where(eq(appointmentAttendees.id, ea.id));
-      }
-    }
+    const dropped = existingAttendees.filter((ea) => !newEmails.has(ea.email)).map((ea) => ea.id);
+    const added = data.attendees
+      .filter((a) => !existingEmails.has(a.email))
+      .map((a) => ({
+        appointmentId: id,
+        userId: a.userId,
+        contactId: a.contactId,
+        email: a.email,
+        name: a.name,
+        role: a.role ?? "required",
+        status: "pending",
+        responseToken: generateResponseToken(),
+      }));
 
-    // Add newly-added attendees
-    for (const a of data.attendees) {
-      if (!existingEmails.has(a.email)) {
-        await db.insert(appointmentAttendees).values({
-          appointmentId: id,
-          userId: a.userId,
-          contactId: a.contactId,
-          email: a.email,
-          name: a.name,
-          role: a.role ?? "required",
-          status: "pending",
-          responseToken: generateResponseToken(),
-        });
-      }
+    // One commit, and one round trip each way rather than one per person. The
+    // invitations are sent from this list a moment later, so a half-applied
+    // change is a half-invited meeting (audit rilievo M-04).
+    const writes: unknown[] = [];
+    if (dropped.length > 0) {
+      writes.push(db.delete(appointmentAttendees).where(inArray(appointmentAttendees.id, dropped)));
+    }
+    if (added.length > 0) {
+      writes.push(db.insert(appointmentAttendees).values(added));
+    }
+    if (writes.length > 0) {
+      await db.batch(writes as unknown as Parameters<typeof db.batch>[0]);
     }
   }
 

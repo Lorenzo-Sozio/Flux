@@ -12,12 +12,12 @@ Aggiornato dopo il primo ciclo di correzioni.
 
 | | |
 |---|---|
-| ✅ Risolti | 54 |
-| ◐ Parziali | 5 |
+| ✅ Risolti | 55 |
+| ◐ Parziali | 4 |
 | Aperti | 7 |
 
 Verifiche dopo le correzioni: build di produzione riuscito, `tsc --noEmit` pulito,
-**284 test** superati (erano 91), **148 mutazioni su 148** catturate (erano 78), zero
+**293 test** superati (erano 91), **152 mutazioni su 152** catturate (erano 78), zero
 errori Biome sui file toccati. Le nuove suite coprono il modello dei permessi,
 l'aritmetica dei documenti commerciali, l'allineamento delle traduzioni, le
 migrazioni dei tenant, il confine server/client della sidebar, la corrispondenza fra
@@ -28,18 +28,27 @@ I sette punti ancora aperti non sono difetti. Quattro sono funzioni da costruire
 (S-04, S-05, S-06, S-10) e tre sono scelte di modello che vanno decise prima di
 essere scritte (M-01, M-02, M-06).
 
-Dei cinque parziali ciascuna voce dice cosa le manca. In breve: M-04 aspetta una
-verifica caso per caso delle scritture su più tabelle, ora che conversione lead,
-ordini e preventivi passano tutte da `db.batch`; M-09 ha ancora due librerie di
-trascinamento nello stesso bundle; U-11 lascia fuori le preferenze di notifica per
-tipo e canale; U-12 la procedura di primo accesso e gli stati vuoti; S-07
-l'escalation automatica, che chiede una gerarchia che lo schema non ha.
+Dei quattro parziali ciascuna voce dice cosa le manca. In breve: M-09 ha una sola
+libreria di trascinamento ormai, e sulla lingua dei commenti la regola sta nel
+`CLAUDE.md`; U-11 lascia fuori le preferenze di notifica per tipo e canale; U-12 la
+procedura di primo accesso e gli stati vuoti; S-07 l'escalation automatica, che
+chiede una gerarchia che lo schema non ha.
 
 Due migrazioni tenant. `0002_odd_ulik.sql` aggiunge le colonne mancanti (data di
 chiusura e motivo di perdita sulle trattative, imponibile/imposta/valuta sugli ordini,
 fasi terminali sulla pipeline, scadenza di prima risposta sui ticket) e ripopola i dati
 esistenti. `0003_open_jackpot.sql` rimuove la tabella `opportunity`, verificata vuota su
 ogni tenant. **Vanno applicate a ogni database tenant prima del deploy.**
+
+⚠️ Trovato durante il lavoro e non presente in questa analisi: **le viste salvate non
+avevano alcun controllo d'accesso**. Ogni funzione in `src/actions/filters.ts` prendeva
+l'identificativo dal chiamante e agiva, senza chiedere una capacità e senza verificare che
+la riga fosse di chi stava chiedendo. Il chiamante di una server action è il browser,
+quindi bastava passare l'identificativo di un collega per cancellargli o ripuntargli i
+filtri, e dopo non si vedeva niente di strano. Ora servono `record:read` — non
+`record:write`, perché salvarsi una vista su record che già si possono leggere non è
+scrivere un record, e un viewer tiene le sue — e il proprietario nella clausola where di
+ogni scrittura. I preset, che sono predefiniti di workspace, chiedono `settings:manage`.
 
 ✅ Trovato durante il lavoro e non presente in questa analisi: il corpo dei messaggi
 dei ticket arriva dalle email dei clienti e veniva reso senza sanitizzazione, contenuto
@@ -563,13 +572,44 @@ nasce a zero, senza data attesa.
 **Rimedio.** Transazione. Riusare il rilevamento duplicati con nome normalizzato e
 partita IVA. Chiedere valore e data attesa nello stesso passaggio.
 
-### M-04 ◐ — Nessuna azione usa una transazione
+### M-04 ✅ — Nessuna azione usa una transazione
 
 Preventivi, ordini e conversioni scrivono le righe in ciclo. L'aggiornamento di un
 preventivo cancella tutte le righe e le reinserisce: un errore dopo la cancellazione
 lascia un preventivo vuoto.
 
 **Rimedio.** Transazione attorno a ogni scrittura multi-tabella, e inserzione in blocco.
+
+**✅ Risolto**, passando in rassegna una per una le sedici funzioni che scrivono più di
+una volta. Preventivi, ordini e conversione del lead erano già su `db.batch`, che sul
+driver HTTP di Neon è l'unica transazione disponibile: `db.transaction()` lì solleva
+un'eccezione.
+
+Ne sono state chiuse altre sei, e la rassegna ha trovato molto peggio dell'atomicità.
+
+**Le tre fusioni perdevano dei figli.** Fondere due schede sposta tutto ciò che puntava
+alla scheda perdente e poi la cancella, e l'elenco di cosa spostare era scritto a mano al
+punto di chiamata. Era rimasto indietro rispetto allo schema: `order.company_id` e
+`order.contact_id` sono arrivati dopo e non erano nell'elenco, quindi fondere due clienti
+lasciava indietro gli ordini del perdente, senza più un intestatario. Peggio,
+`campaign_log.contact_id` cancella in cascata: fondere due contatti non spostava la storia
+di marketing, **la distruggeva** — ogni invio, apertura e clic del contatto perdente se ne
+andava con la riga, in silenzio, e la fusione riusciva.
+
+L'elenco ora sta in [src/lib/merge-children.ts](src/lib/merge-children.ts), accanto a un
+test che rilegge le chiavi esterne dallo schema e fallisce quando una non è nell'elenco.
+Aggiungere domani una tabella con un `companyId` e dimenticare quel file è esattamente
+l'errore già commesso: adesso è un test rosso invece del passato mancante di un cliente.
+Quattro mutazioni lo tengono onesto.
+
+Le altre cinque: l'appuntamento e i suoi invitati (erano un inserimento per persona, con
+gli inviti spediti subito dopo a quella metà di lista che era passata), la risincronizzazione
+degli invitati in modifica, la conversazione di gruppo con i suoi membri, il gruppo utenti
+che si svuotava prima di riempirsi, e il filtro salvato con le sue etichette.
+
+Restano fuori di proposito `sendMessage`, dove il secondo aggiornamento sposta solo la data
+dell'ultima lettura e il messaggio successivo lo rimette a posto, e `dispatchWebhook`, le
+cui tre scritture sono rami alternativi dello stesso tentativo, non una sequenza.
 
 ### M-05 ✅ — Gli ordini vivono fuori dal flusso del prodotto
 

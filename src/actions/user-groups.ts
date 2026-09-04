@@ -119,17 +119,20 @@ export async function updateUserGroup(id: string, data: UserGroupFormData) {
 
   const { name, description, color, memberIds } = parsed.data;
 
-  await db
-    .update(userGroups)
-    .set({ name, description: description ?? null, color, updatedAt: new Date() })
-    .where(eq(userGroups.id, id));
-
-  // Sync members: delete all, re-insert current
-  await db.delete(userGroupMembers).where(eq(userGroupMembers.groupId, id));
-
+  // One commit. The middle statement empties the group, so a failure after it and
+  // before the re-insert leaves a group nobody is in — and nothing on screen says
+  // the members were dropped rather than never there (audit rilievo M-04).
+  const writes: unknown[] = [
+    db
+      .update(userGroups)
+      .set({ name, description: description ?? null, color, updatedAt: new Date() })
+      .where(eq(userGroups.id, id)),
+    db.delete(userGroupMembers).where(eq(userGroupMembers.groupId, id)),
+  ];
   if (memberIds.length > 0) {
-    await db.insert(userGroupMembers).values(memberIds.map((userId) => ({ groupId: id, userId })));
+    writes.push(db.insert(userGroupMembers).values(memberIds.map((userId) => ({ groupId: id, userId }))));
   }
+  await db.batch(writes as unknown as Parameters<typeof db.batch>[0]);
 
   revalidatePath("/dashboard/users");
   return { success: true };

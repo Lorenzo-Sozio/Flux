@@ -51,7 +51,10 @@ export async function getConversations() {
 
   const result = await Promise.all(
     convos.map(async (c) => {
-      const m = memberMap.get(c.id)!;
+      // The conversations were selected from these very memberships, so the
+      // fallback is unreachable; if it ever were reached, never-read and unmuted
+      // is the reading that shows the badge rather than hiding it.
+      const m = memberMap.get(c.id) ?? { lastReadAt: null, mutedUntil: null };
       const muted = isMuted(m.mutedUntil ?? null);
 
       let unread = 0;
@@ -147,9 +150,16 @@ export async function createGroupConversation(name: string, memberIds: string[])
   const allIds = Array.from(new Set([me.id, ...memberIds]));
   if (allIds.length < 2) throw new Error("Group needs at least 2 members");
 
-  const [conv] = await db.insert(dmConversations).values({ type: "group", name }).returning();
-  await db.insert(dmConversationMembers).values(allIds.map((userId) => ({ conversationId: conv.id, userId })));
-  return conv;
+  // The id is made here rather than read back, so the conversation and the people
+  // in it are one commit. A group nobody belongs to cannot be opened, cannot be
+  // left, and does not appear anywhere it could be deleted from (rilievo M-04).
+  const id = crypto.randomUUID();
+  const now = new Date();
+  await db.batch([
+    db.insert(dmConversations).values({ id, type: "group", name }),
+    db.insert(dmConversationMembers).values(allIds.map((userId) => ({ conversationId: id, userId }))),
+  ]);
+  return { id, type: "group" as const, name, createdAt: now, updatedAt: now };
 }
 
 // ── Get messages ──────────────────────────────────────────────────────────────
@@ -212,6 +222,7 @@ export async function sendMessage(conversationId: string, content: string) {
       title: `New message from ${senderName}`,
       message: preview,
       link: undefined,
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
     }).catch(() => {});
   }
 

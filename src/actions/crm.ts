@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { and, asc, count, desc, eq, getTableColumns, ilike, isNull, ne, or, type SQL, sql } from "drizzle-orm";
-import type { AnyPgColumn } from "drizzle-orm/pg-core";
+import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 import { getTranslations } from "next-intl/server";
 
 import { createNotificationAction } from "@/actions/auth";
@@ -48,6 +48,7 @@ import {
 } from "@/lib/filter-engine";
 import { decodeFilter } from "@/lib/filter-types";
 import { computeLeadScore } from "@/lib/lead-score";
+import { COMPANY_CHILDREN, CONTACT_CHILDREN, childColumn, LEAD_CHILDREN, type MergeChild } from "@/lib/merge-children";
 import { type ListParams, offsetOf, type Page, toPage } from "@/lib/pagination";
 import { getDb } from "@/lib/tenant-context";
 
@@ -865,18 +866,7 @@ type LeadMergeFields = {
 export async function mergeLeads(keepId: string, mergeId: string, fields: LeadMergeFields) {
   await requireWriteAccess();
   const db = await getDb();
-  await db
-    .update(leads)
-    .set({ ...fields, updatedAt: new Date() })
-    .where(eq(leads.id, keepId));
-  await Promise.all([
-    db.update(activities).set({ leadId: keepId }).where(eq(activities.leadId, mergeId)),
-    db.update(tasks).set({ leadId: keepId }).where(eq(tasks.leadId, mergeId)),
-    db.update(campaignLogs).set({ leadId: keepId }).where(eq(campaignLogs.leadId, mergeId)),
-    db.update(tickets).set({ leadId: keepId }).where(eq(tickets.leadId, mergeId)),
-    db.update(appointments).set({ leadId: keepId }).where(eq(appointments.leadId, mergeId)),
-  ]);
-  await db.delete(leads).where(eq(leads.id, mergeId));
+  await mergeRecords(db, { table: leads, id: leads.id }, LEAD_CHILDREN, keepId, mergeId, fields);
   revalidatePath("/dashboard/leads");
 }
 
@@ -916,19 +906,7 @@ type ContactMergeFields = {
 export async function mergeContacts(keepId: string, mergeId: string, fields: ContactMergeFields) {
   await requireWriteAccess();
   const db = await getDb();
-  await db
-    .update(contacts)
-    .set({ ...fields, updatedAt: new Date() })
-    .where(eq(contacts.id, keepId));
-  await Promise.all([
-    db.update(activities).set({ contactId: keepId }).where(eq(activities.contactId, mergeId)),
-    db.update(tasks).set({ contactId: keepId }).where(eq(tasks.contactId, mergeId)),
-    db.update(deals).set({ contactId: keepId }).where(eq(deals.contactId, mergeId)),
-    db.update(quotes).set({ contactId: keepId }).where(eq(quotes.contactId, mergeId)),
-    db.update(tickets).set({ contactId: keepId }).where(eq(tickets.contactId, mergeId)),
-    db.update(appointments).set({ contactId: keepId }).where(eq(appointments.contactId, mergeId)),
-  ]);
-  await db.delete(contacts).where(eq(contacts.id, mergeId));
+  await mergeRecords(db, { table: contacts, id: contacts.id }, CONTACT_CHILDREN, keepId, mergeId, fields);
   revalidatePath("/dashboard/contacts");
 }
 
@@ -950,23 +928,43 @@ type CompanyMergeFields = {
   ownerId?: string | null;
 };
 
+/**
+ * One merge, as one commit.
+ *
+ * Everything that pointed at the losing record is carried across and the loser is
+ * deleted, in a single ordered statement list. `db.transaction()` throws on the
+ * Neon HTTP driver; `db.batch()` maps to its transaction endpoint, and nowhere
+ * else in the codebase does that matter as much: the last statement is a delete,
+ * so half a merge means rows still pointing at a record that is on its way out —
+ * and the foreign keys that cascade would take them with it (audit rilievo M-04).
+ *
+ * What to carry is not written here. It comes from `@/lib/merge-children`, which
+ * a test compares against the foreign keys in the schema, because the hand-written
+ * version of this list quietly fell behind the tables it was supposed to describe.
+ */
+async function mergeRecords(
+  db: Awaited<ReturnType<typeof getDb>>,
+  parent: { table: AnyPgTable; id: AnyPgColumn },
+  children: MergeChild[],
+  keepId: string,
+  mergeId: string,
+  fields: Record<string, unknown>,
+) {
+  type Update = ReturnType<typeof db.update>;
+  const writes: unknown[] = [
+    (db.update(parent.table as never) as Update).set({ ...fields, updatedAt: new Date() }).where(eq(parent.id, keepId)),
+    ...children.map((child) =>
+      (db.update(child.table as never) as Update).set({ [child.field]: keepId }).where(eq(childColumn(child), mergeId)),
+    ),
+    db.delete(parent.table as never).where(eq(parent.id, mergeId)),
+  ];
+  await db.batch(writes as unknown as Parameters<typeof db.batch>[0]);
+}
+
 export async function mergeCompanies(keepId: string, mergeId: string, fields: CompanyMergeFields) {
   await requireWriteAccess();
   const db = await getDb();
-  await db
-    .update(companies)
-    .set({ ...fields, updatedAt: new Date() })
-    .where(eq(companies.id, keepId));
-  await Promise.all([
-    db.update(contacts).set({ companyId: keepId }).where(eq(contacts.companyId, mergeId)),
-    db.update(activities).set({ companyId: keepId }).where(eq(activities.companyId, mergeId)),
-    db.update(tasks).set({ companyId: keepId }).where(eq(tasks.companyId, mergeId)),
-    db.update(deals).set({ companyId: keepId }).where(eq(deals.companyId, mergeId)),
-    db.update(quotes).set({ companyId: keepId }).where(eq(quotes.companyId, mergeId)),
-    db.update(tickets).set({ companyId: keepId }).where(eq(tickets.companyId, mergeId)),
-    db.update(appointments).set({ companyId: keepId }).where(eq(appointments.companyId, mergeId)),
-  ]);
-  await db.delete(companies).where(eq(companies.id, mergeId));
+  await mergeRecords(db, { table: companies, id: companies.id }, COMPANY_CHILDREN, keepId, mergeId, fields);
   revalidatePath("/dashboard/companies");
 }
 

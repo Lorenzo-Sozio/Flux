@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/lib/merge-children.ts",
+    "description": "⚠️⚠️ orders drop off the company merge list: the losing company's orders stay behind with nobody to bill, which is what actually happened",
+    "find": "  { table: orders, field: \"companyId\" },\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/merge-children.ts",
+    "description": "⚠️⚠️ campaign_log drops off the contact merge list: it cascades, so merging two contacts deletes the losing one's entire send, open and click history in silence",
+    "find": "  { table: campaignLogs, field: \"contactId\" },\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/merge-children.ts",
+    "description": "the appointment attendee keeps pointing at the contact that was deleted: the invitee on a past meeting stops being anybody",
+    "find": "  { table: appointmentAttendees, field: \"contactId\" },\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/merge-children.ts",
+    "description": "the lead's tickets are left behind by the merge: the support history of the person who was merged away is no longer theirs",
+    "find": "  { table: tickets, field: \"leadId\" },\n",
+    "replace": ""
+  }
+]
