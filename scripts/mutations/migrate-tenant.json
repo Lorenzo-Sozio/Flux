@@ -46,5 +46,17 @@
     "description": "una riga di commento conta come istruzione eseguibile",
     "find": "  return statement.split(\"\\n\").some((line) => line.trim() !== \"\" && !line.trimStart().startsWith(\"--\"));",
     "replace": "  return statement.split(\"\\n\").some((line) => line.trim() !== \"\");"
+  },
+  {
+    "file": "src/db/migrate-tenant.ts",
+    "description": "⚠️⚠️ il risultato del driver torna a essere letto come array: con drizzle e' un oggetto, quindi ogni tenant sembra non migrato e 0000 riparte su un database pieno — nessuna migrazione viene applicata",
+    "find": "  if (Array.isArray(result)) return result as T[];\n  const rows = (result as { rows?: unknown })?.rows;\n  return Array.isArray(rows) ? (rows as T[]) : [];",
+    "replace": "  return result as T[];"
+  },
+  {
+    "file": "src/db/migrate-tenant.ts",
+    "description": "⚠️ solo la forma a oggetto viene riconosciuta: il client neon grezzo, che torna un array, smette di funzionare",
+    "find": "  if (Array.isArray(result)) return result as T[];\n  const rows = (result as { rows?: unknown })?.rows;\n  return Array.isArray(rows) ? (rows as T[]) : [];",
+    "replace": "  const rows = (result as { rows?: unknown })?.rows;\n  return Array.isArray(rows) ? (rows as T[]) : [];"
   }
 ]

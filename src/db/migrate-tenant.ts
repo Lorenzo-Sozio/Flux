@@ -46,6 +46,28 @@ export interface MigrationOutcome {
 type Runner = { execute(query: SQL): Promise<unknown> };
 
 /**
+ * The rows out of whatever `execute` handed back.
+ *
+ * ⚠️⚠️ This is the whole reason migrations stopped being applied in production.
+ * Drizzle's `db.execute()` on the Neon HTTP driver resolves to the driver's full
+ * result — `{ fields, rows, rowCount, … }` — not to an array of rows. Indexing it
+ * as an array gave `undefined`, so the migrator concluded that nothing had ever
+ * been applied and set out to run migration 0000 against a populated database.
+ * The first `CREATE TABLE` failed, the call threw, and **not one** migration was
+ * applied. Three of them sat unapplied for days while the panel reported an error
+ * that pointed nowhere near the cause.
+ *
+ * Both shapes are accepted because both are real: the raw `neon()` client returns
+ * an array, drizzle's wrapper returns the result object, and this module is
+ * called with each of them from different places.
+ */
+function toRows<T>(result: unknown): T[] {
+  if (Array.isArray(result)) return result as T[];
+  const rows = (result as { rows?: unknown })?.rows;
+  return Array.isArray(rows) ? (rows as T[]) : [];
+}
+
+/**
  * Brings one tenant database up to date.
  *
  * Safe to call repeatedly: nothing is applied twice.
@@ -71,9 +93,11 @@ export async function applyTenantMigrations(
     )
   `);
 
-  const rows = (await db.execute(
-    sql`select id, hash, created_at from ${sql.identifier(MIGRATIONS_SCHEMA)}.${sql.identifier(MIGRATIONS_TABLE)} order by created_at desc limit 1`,
-  )) as unknown as { created_at: string | number | null }[];
+  const rows = toRows<{ created_at: string | number | null }>(
+    await db.execute(
+      sql`select id, hash, created_at from ${sql.identifier(MIGRATIONS_SCHEMA)}.${sql.identifier(MIGRATIONS_TABLE)} order by created_at desc limit 1`,
+    ),
+  );
 
   const lastApplied = rows[0] ? Number(rows[0].created_at) : null;
 

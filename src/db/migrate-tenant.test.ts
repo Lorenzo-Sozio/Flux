@@ -82,7 +82,24 @@ describe("hasExecutableSql", () => {
 // ─── The decision rule ────────────────────────────────────────────────────────
 
 /** A database that records what it was asked to run, and nothing else. */
-function fakeDb(alreadyAppliedUpTo: number | null) {
+/**
+ * How a driver hands rows back.
+ *
+ * ⚠️⚠️ Both of these are real, and this double used to imitate only the first.
+ * The raw `neon()` client resolves to an array of rows; drizzle's `db.execute()`
+ * on the same driver resolves to the driver's full result, `{ fields, rows, … }`.
+ * The admin panel uses the second. With only the first modelled here, every test
+ * passed while the migrator in production read `undefined`, concluded no
+ * migration had ever been applied, and tried to run 0000 against a live database
+ * — so nothing was applied at all, for days.
+ */
+type DriverShape = "array" | "result";
+
+function wrap(rows: unknown[], shape: DriverShape) {
+  return shape === "array" ? rows : { fields: [], rows, rowCount: rows.length };
+}
+
+function fakeDb(alreadyAppliedUpTo: number | null, shape: DriverShape = "array") {
   const statements: string[] = [];
   const inserts: { hash: string; when: number }[] = [];
 
@@ -94,16 +111,17 @@ function fakeDb(alreadyAppliedUpTo: number | null) {
       const text = renderForTest(q);
 
       if (text.startsWith("select id, hash, created_at")) {
-        return Promise.resolve(alreadyAppliedUpTo === null ? [] : [{ created_at: alreadyAppliedUpTo }]);
+        const rows = alreadyAppliedUpTo === null ? [] : [{ created_at: alreadyAppliedUpTo }];
+        return Promise.resolve(wrap(rows, shape));
       }
       if (text.startsWith("insert into")) {
         const params = collectParams(q);
         inserts.push({ hash: String(params[0]), when: Number(params[1]) });
-        return Promise.resolve([]);
+        return Promise.resolve(wrap([], shape));
       }
 
       statements.push(text);
-      return Promise.resolve([]);
+      return Promise.resolve(wrap([], shape));
     },
   };
 }
@@ -216,5 +234,39 @@ describe("listTenantMigrations", () => {
     for (let i = 1; i < list.length; i++) {
       expect(list[i].folderMillis).toBeGreaterThan(list[i - 1].folderMillis);
     }
+  });
+});
+
+/**
+ * The same decisions, against the shape drizzle's wrapper actually returns.
+ *
+ * This is the production path — the admin panel calls `applyTenantMigrations`
+ * with a drizzle instance, not with the raw client — and it was the only one not
+ * covered.
+ */
+describe("applyTenantMigrations, against a driver that returns a result object", () => {
+  it("reads the last applied migration out of the result", async () => {
+    const db = fakeDb(2000, "result");
+    const result = await applyTenantMigrations(db, MIGRATIONS);
+
+    expect(result.applied).toEqual(["0002_third"]);
+    expect(result.skipped).toEqual(["0000_first", "0001_second"]);
+  });
+
+  it("does not mistake a migrated database for an empty one", async () => {
+    // The failure exactly as it happened: reading the history as `undefined`
+    // makes a live database look untouched, and 0000 runs again.
+    const db = fakeDb(3000, "result");
+    const result = await applyTenantMigrations(db, MIGRATIONS);
+
+    expect(result.applied).toEqual([]);
+    expect(db.inserts).toEqual([]);
+  });
+
+  it("still applies everything to a database that really is empty", async () => {
+    const db = fakeDb(null, "result");
+    const result = await applyTenantMigrations(db, MIGRATIONS);
+
+    expect(result.applied).toEqual(["0000_first", "0001_second", "0002_third"]);
   });
 });
