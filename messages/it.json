@@ -2824,5 +2824,45 @@
     "cancel": "Annulla",
     "save": "Salva",
     "triggerLabel": "Filtri"
+  },
+  "emptyStates": {
+    "filteredTitle": "Nessun risultato",
+    "filteredDescription": "Nessun record qui risponde al filtro impostato. Toglilo per rivedere gli altri.",
+    "contacts": {
+      "title": "Ancora nessun contatto",
+      "description": "Un contatto è una persona con cui hai a che fare. Aggiungi il primo e tutto il resto — preventivi, ticket, cronologia — ha qualcuno a cui appartenere."
+    },
+    "companies": {
+      "title": "Ancora nessuna azienda",
+      "description": "L'azienda raggruppa le persone che lavorano per lo stesso cliente, e dà ai loro preventivi e ordini un posto solo dove essere contati."
+    },
+    "leads": {
+      "title": "Ancora nessun lead",
+      "description": "Un lead è qualcuno che potrebbe diventare cliente. Convertirlo crea contatto, azienda e trattativa in un passaggio solo."
+    },
+    "deals": {
+      "title": "Pipeline vuota",
+      "description": "Una trattativa è una vendita su cui stai lavorando. Attraversa le fasi e, trascinata su Vinto, si chiude da sola e smette di pesare sul forecast."
+    },
+    "tickets": {
+      "title": "Ancora nessun ticket",
+      "description": "Un ticket è un cliente che aspetta una risposta. Ognuno riceve una scadenza dalla sua politica SLA, e ti avvisa prima di quella scadenza invece che dopo."
+    },
+    "quotes": {
+      "title": "Ancora nessun preventivo",
+      "description": "Il preventivo è ciò che il cliente accetta. Uno accettato diventa un ordine e chiude la sua trattativa senza che nulla venga riscritto."
+    },
+    "orders": {
+      "title": "Ancora nessun ordine",
+      "description": "Un ordine è lavoro concordato. Scrivilo a mano, oppure lascia che sia un preventivo accettato a diventarlo."
+    },
+    "products": {
+      "title": "Ancora nessun prodotto",
+      "description": "Un prodotto porta con sé prezzo e aliquota, così una riga di preventivo non va digitata sperando bene."
+    },
+    "tasks": {
+      "title": "Ancora nessuna attività da fare",
+      "description": "Un task è un lavoro con una data sopra. Quelli con una scadenza compaiono sul calendario e nella vista di oggi."
+    }
   }
 }

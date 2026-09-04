@@ -2819,5 +2819,45 @@
     "cancel": "Cancel",
     "save": "Save",
     "triggerLabel": "Filters"
+  },
+  "emptyStates": {
+    "filteredTitle": "Nothing matches",
+    "filteredDescription": "No record here answers the filter you have set. Clear it to see the rest.",
+    "contacts": {
+      "title": "No contacts yet",
+      "description": "A contact is a person you deal with. Add the first one and everything else — quotes, tickets, the history — has somebody to belong to."
+    },
+    "companies": {
+      "title": "No companies yet",
+      "description": "A company groups the people who work for the same customer, and gives their quotes and orders one place to be counted."
+    },
+    "leads": {
+      "title": "No leads yet",
+      "description": "A lead is someone who might become a customer. Converting one creates the contact, the company and the deal in a single step."
+    },
+    "deals": {
+      "title": "Nothing in the pipeline",
+      "description": "A deal is a sale you are working on. It moves through the stages and, dropped on Won, closes itself and stops weighing on the forecast."
+    },
+    "tickets": {
+      "title": "No tickets yet",
+      "description": "A ticket is a customer waiting for an answer. Each one gets a deadline from its SLA policy, and warns you before that deadline rather than after."
+    },
+    "quotes": {
+      "title": "No quotes yet",
+      "description": "A quote is what the customer is asked to accept. An accepted one becomes an order and closes its deal without anything being retyped."
+    },
+    "orders": {
+      "title": "No orders yet",
+      "description": "An order is work that has been agreed. Write one by hand, or let an accepted quote become one."
+    },
+    "products": {
+      "title": "No products yet",
+      "description": "A product carries its price and its tax rate, so a quote line does not have to be typed and hoped for."
+    },
+    "tasks": {
+      "title": "No tasks yet",
+      "description": "A task is a piece of work with a date on it. Tasks with a due date show up on the calendar and in the day view."
+    }
   }
 }

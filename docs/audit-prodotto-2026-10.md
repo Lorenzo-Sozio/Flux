@@ -12,8 +12,8 @@ Aggiornato dopo il primo ciclo di correzioni.
 
 | | |
 |---|---|
-| ✅ Risolti | 58 |
-| ◐ Parziali | 3 |
+| ✅ Risolti | 59 |
+| ◐ Parziali | 2 |
 | Aperti | 5 |
 
 Verifiche dopo le correzioni: build di produzione riuscito, `tsc --noEmit` pulito,
@@ -28,10 +28,10 @@ I cinque punti ancora aperti non sono difetti. Quattro sono funzioni da costruir
 (S-04, S-05, S-06, S-10) e uno è la scelta di modello su lead e contatto, M-02,
 che va decisa prima di essere scritta.
 
-Dei tre parziali ciascuna voce dice cosa le manca. In breve: M-09 ha una sola
-libreria di trascinamento ormai, e sulla lingua dei commenti la regola sta nel
-`CLAUDE.md`; U-11 lascia fuori le preferenze di notifica per tipo e canale; U-12 la
-procedura di primo accesso e gli stati vuoti.
+Dei due parziali ciascuna voce dice cosa le manca: M-09 ha una sola libreria di
+trascinamento ormai, e sulla lingua dei commenti la regola sta nel `CLAUDE.md`;
+U-11 lascia fuori le preferenze di notifica per tipo e canale, che l'audit stesso
+riconosce non più giustificate ora che il polling non costa più quello che costava.
 
 Due migrazioni tenant. `0002_odd_ulik.sql` aggiunge le colonne mancanti (data di
 chiusura e motivo di perdita sulle trattative, imponibile/imposta/valuta sugli ordini,
@@ -839,19 +839,30 @@ lette. L'id ora viene dalla sessione e l'argomento non esiste più.
 **Restano aperti** le preferenze per tipo e canale, e il flusso di eventi: entrambi
 aggiungono superficie, e il costo che li giustificava è già stato tolto.
 
-### U-12 — Non esiste un primo avvio ◐
+### U-12 ✅ — Non esiste un primo avvio
 
 Nessuna procedura di configurazione iniziale, nessuno stato vuoto che spieghi cosa fare,
 nessun dato di esempio. Senza fasi pipeline la prima conversione fallisce con un
 messaggio tecnico.
 
-**◐ Parziale.** `src/db/seed-workspace.ts` riempie ciò senza cui il prodotto non parte:
+**◐→✅ Chiuso.** `src/db/seed-workspace.ts` riempie ciò senza cui il prodotto non parte:
 sei fasi di pipeline (con «Won» e «Lost» marcate, che è ciò che fa davvero chiudere una
 trattativa trascinata dentro), quattro politiche SLA per priorità, tipi e categorie
 azienda. Gira su ogni percorso di migrazione e semina solo le tabelle vuote, quindi è
-sicuro riapplicarlo e non resuscita ciò che il cliente ha cancellato apposta. **Restano
-aperti** la procedura guidata di primo accesso e gli stati vuoti che spiegano cosa
-fare: sono decisioni di prodotto, non di codice.
+sicuro riapplicarlo e non resuscita ciò che il cliente ha cancellato apposta.
+
+**Gli stati vuoti ci sono**, e la procedura guidata è stata scartata di proposito. Una
+lista di avvio in cinque passi è un artefatto unico che si clicca via una volta e che poi
+qualcuno deve mantenere; lo stato vuoto arriva invece nel momento in cui la domanda viene
+posta davvero, sulla schermata che la pone. `EmptyState` è uno solo, e distingue due
+vuoti che non devono somigliarsi: **non c'è ancora niente**, che è un invito e porta con
+sé il pulsante, e **niente corrisponde al filtro**, che non porta nessun invito, perché
+proporre di creare un record quando una ricerca non trova nulla è rispondere a una domanda
+che nessuno ha fatto.
+
+Sei schermate lo montano — contatti, aziende, lead, ordini, prodotti e ticket — ognuna
+con l'unica azione che ha senso lì e una riga che dice a cosa serve quella schermata. I
+preventivi ne avevano già uno buono ed è rimasto com'era.
 
 **Rimedio.** Fasi, SLA e categorie predefiniti alla creazione del workspace. Una lista di
 avvio in cinque passi con avanzamento visibile. Stati vuoti che propongono l'azione.

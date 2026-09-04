@@ -4,15 +4,18 @@ import { useState, useTransition } from "react";
 
 import Link from "next/link";
 
+import { Building2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { bulkAssignCompanies, bulkDeleteCompanies, bulkUpdateCompanyStatus } from "@/actions/bulk";
 import { BulkActionBar } from "@/components/crm/bulk-action-bar";
+import { EmptyState } from "@/components/crm/empty-state";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { CompanyActions } from "./company-modal";
+import { CompanyActions, CompanyModal } from "./company-modal";
 
 const TYPE_COLORS: Record<string, string> = {
   customer: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -55,6 +58,7 @@ interface Props {
 
 export function CompaniesTable({ companies, users, canEdit, activeCount, categories = [], companyTypes = [] }: Props) {
   const t = useTranslations("companies");
+  const te = useTranslations("emptyStates");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
 
@@ -174,7 +178,7 @@ export function CompaniesTable({ companies, users, canEdit, activeCount, categor
                   {company.name}
                 </Link>
                 {company.website && (
-                  <p className="text-xs text-muted-foreground truncate max-w-[180px]">{company.website}</p>
+                  <p className="max-w-[180px] truncate text-muted-foreground text-xs">{company.website}</p>
                 )}
               </TableCell>
               <TableCell>{company.industry}</TableCell>
@@ -182,7 +186,7 @@ export function CompaniesTable({ companies, users, canEdit, activeCount, categor
               <TableCell>
                 {company.type && (
                   <span
-                    className={`text-xs font-medium px-1.5 py-0.5 rounded capitalize ${TYPE_COLORS[company.type] ?? ""}`}
+                    className={`rounded px-1.5 py-0.5 font-medium text-xs capitalize ${TYPE_COLORS[company.type] ?? ""}`}
                   >
                     {t(`types.${company.type as "customer" | "prospect" | "partner" | "vendor"}`)}
                   </span>
@@ -193,13 +197,13 @@ export function CompaniesTable({ companies, users, canEdit, activeCount, categor
               <TableCell>
                 {company.ownerName ? (
                   <div className="flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-[10px] text-primary">
                       {company.ownerName.charAt(0).toUpperCase()}
                     </span>
                     <span className="text-sm">{company.ownerName}</span>
                   </div>
                 ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-muted-foreground text-xs">—</span>
                 )}
               </TableCell>
               {canEdit && (
@@ -210,9 +214,28 @@ export function CompaniesTable({ companies, users, canEdit, activeCount, categor
             </TableRow>
           ))}
           {companies.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={canEdit ? 9 : 8} className="text-center py-10 text-muted-foreground">
-                {activeCount > 0 ? t("noCompaniesFiltered") : t("noCompaniesYet")}
+            <TableRow className="hover:bg-transparent">
+              <TableCell colSpan={canEdit ? 9 : 8} className="p-0">
+                {activeCount > 0 ? (
+                  <EmptyState
+                    icon={Building2Icon}
+                    title={te("filteredTitle")}
+                    description={te("filteredDescription")}
+                  />
+                ) : (
+                  <EmptyState
+                    icon={Building2Icon}
+                    title={te("companies.title")}
+                    description={te("companies.description")}
+                    action={
+                      canEdit ? (
+                        <CompanyModal categories={categories} companyTypes={companyTypes}>
+                          <Button size="sm">{t("newCompany")}</Button>
+                        </CompanyModal>
+                      ) : undefined
+                    }
+                  />
+                )}
               </TableCell>
             </TableRow>
           )}

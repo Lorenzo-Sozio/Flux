@@ -4,16 +4,19 @@ import { useState, useTransition } from "react";
 
 import Link from "next/link";
 
+import { TargetIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { bulkAssignLeads, bulkDeleteLeads, bulkUpdateLeadStatus } from "@/actions/bulk";
 import { BulkActionBar } from "@/components/crm/bulk-action-bar";
+import { EmptyState } from "@/components/crm/empty-state";
 import { LeadScoreBadge } from "@/components/crm/lead-score-badge";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { LeadActions } from "./lead-modal";
+import { LeadActions, LeadModal } from "./lead-modal";
 
 const RATING_COLORS: Record<string, string> = {
   hot: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
@@ -56,6 +59,7 @@ interface Props {
 
 export function LeadsTable({ leads, users, canEdit, activeCount, categories = [], companyTypes = [] }: Props) {
   const t = useTranslations("leads");
+  const te = useTranslations("emptyStates");
   const tc = useTranslations("common");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
@@ -184,7 +188,7 @@ export function LeadsTable({ leads, users, canEdit, activeCount, categories = []
               <TableCell>
                 {lead.rating && (
                   <span
-                    className={`text-xs font-medium px-1.5 py-0.5 rounded capitalize ${RATING_COLORS[lead.rating] ?? ""}`}
+                    className={`rounded px-1.5 py-0.5 font-medium text-xs capitalize ${RATING_COLORS[lead.rating] ?? ""}`}
                   >
                     {t(`ratings.${lead.rating as "hot" | "warm" | "cold"}`)}
                   </span>
@@ -196,13 +200,13 @@ export function LeadsTable({ leads, users, canEdit, activeCount, categories = []
               <TableCell>
                 {lead.ownerName ? (
                   <div className="flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-[10px] text-primary">
                       {lead.ownerName.charAt(0).toUpperCase()}
                     </span>
                     <span className="text-sm">{lead.ownerName}</span>
                   </div>
                 ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-muted-foreground text-xs">—</span>
                 )}
               </TableCell>
               {canEdit && (
@@ -213,9 +217,24 @@ export function LeadsTable({ leads, users, canEdit, activeCount, categories = []
             </TableRow>
           ))}
           {leads.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={canEdit ? 10 : 9} className="text-center py-10 text-muted-foreground">
-                {activeCount > 0 ? t("noLeadsFiltered") : t("noLeadsYet")}
+            <TableRow className="hover:bg-transparent">
+              <TableCell colSpan={canEdit ? 10 : 9} className="p-0">
+                {activeCount > 0 ? (
+                  <EmptyState icon={TargetIcon} title={te("filteredTitle")} description={te("filteredDescription")} />
+                ) : (
+                  <EmptyState
+                    icon={TargetIcon}
+                    title={te("leads.title")}
+                    description={te("leads.description")}
+                    action={
+                      canEdit ? (
+                        <LeadModal categories={categories} companyTypes={companyTypes}>
+                          <Button size="sm">{t("newLead")}</Button>
+                        </LeadModal>
+                      ) : undefined
+                    }
+                  />
+                )}
               </TableCell>
             </TableRow>
           )}

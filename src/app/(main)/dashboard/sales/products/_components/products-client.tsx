@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { createProduct, deleteProduct, toggleProductActive, updateProduct } from "@/actions/products";
+import { EmptyState } from "@/components/crm/empty-state";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,7 +23,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -93,6 +93,10 @@ function ProductDialog({
     },
   });
 
+  // The product being edited is the trigger. `form` is a new object on every
+  // render, so depending on it would reset the fields under the hands of whoever
+  // is typing in them.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the product is the trigger
   useEffect(() => {
     form.reset({
       name: product?.name ?? "",
@@ -137,8 +141,8 @@ function ProductDialog({
         }
       }}
     >
-      <DialogContent className="sm:max-w-[480px] p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+      <DialogContent className="gap-0 p-0 sm:max-w-[480px]">
+        <DialogHeader className="border-b px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-4.5 w-4.5 text-primary" />
             {isEdit ? t("dialog.editTitle") : t("dialog.newTitle")}
@@ -146,7 +150,7 @@ function ProductDialog({
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)}>
-          <div className="px-6 py-5 space-y-4">
+          <div className="space-y-4 px-6 py-5">
             {/* Name */}
             <div className="space-y-1.5">
               <Label>
@@ -154,7 +158,7 @@ function ProductDialog({
               </Label>
               <Input {...form.register("name")} placeholder={t("form.namePlaceholder")} />
               {form.formState.errors.name && (
-                <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
+                <p className="text-destructive text-xs">{form.formState.errors.name.message}</p>
               )}
             </div>
 
@@ -173,7 +177,7 @@ function ProductDialog({
                 </Label>
                 <Input type="number" step="0.01" min="0" {...form.register("price")} placeholder="0.00" />
                 {form.formState.errors.price && (
-                  <p className="text-xs text-destructive">{form.formState.errors.price.message}</p>
+                  <p className="text-destructive text-xs">{form.formState.errors.price.message}</p>
                 )}
               </div>
             </div>
@@ -182,13 +186,13 @@ function ProductDialog({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>
-                  {t("category")} <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span>
+                  {t("category")} <span className="font-normal text-muted-foreground">{t("dialog.optional")}</span>
                 </Label>
                 <Input {...form.register("category")} placeholder={t("form.categoryPlaceholder")} />
               </div>
               <div className="space-y-1.5">
                 <Label>
-                  {t("taxRate")} % <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span>
+                  {t("taxRate")} % <span className="font-normal text-muted-foreground">{t("dialog.optional")}</span>
                 </Label>
                 <Input type="number" step="0.01" min="0" max="100" {...form.register("taxPercent")} placeholder="0" />
               </div>
@@ -198,7 +202,7 @@ function ProductDialog({
             <div className="space-y-1.5">
               <Label>
                 {t("dialog.unitLabel")}{" "}
-                <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span>
+                <span className="font-normal text-muted-foreground">{t("dialog.optional")}</span>
               </Label>
               <Input {...form.register("unit")} placeholder={t("form.unitPlaceholder")} />
             </div>
@@ -207,26 +211,26 @@ function ProductDialog({
             <div className="space-y-1.5">
               <Label>
                 {t("dialog.descriptionLabel")}{" "}
-                <span className="text-muted-foreground font-normal">{t("dialog.optional")}</span>
+                <span className="font-normal text-muted-foreground">{t("dialog.optional")}</span>
               </Label>
               <Textarea
                 {...form.register("description")}
                 placeholder={t("form.descriptionPlaceholder")}
-                className="resize-none min-h-[72px]"
+                className="min-h-[72px] resize-none"
               />
             </div>
 
             {/* Active toggle */}
             <div className="flex items-center justify-between rounded-lg border px-4 py-3">
               <div>
-                <p className="text-sm font-medium">{t("dialog.activeLabel")}</p>
-                <p className="text-xs text-muted-foreground">{t("dialog.activeDesc")}</p>
+                <p className="font-medium text-sm">{t("dialog.activeLabel")}</p>
+                <p className="text-muted-foreground text-xs">{t("dialog.activeDesc")}</p>
               </div>
               <Switch checked={form.watch("isActive")} onCheckedChange={(v) => form.setValue("isActive", v)} />
             </div>
           </div>
 
-          <DialogFooter className="px-6 py-4 border-t bg-muted/10">
+          <DialogFooter className="border-t bg-muted/10 px-6 py-4">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
               Cancel
             </Button>
@@ -249,8 +253,9 @@ interface Props {
 
 export function ProductsClient({ products: initial }: Props) {
   const t = useTranslations("products");
+  const te = useTranslations("emptyStates");
   const { formatAmount } = useCurrency();
-  const router = useRouter();
+  const _router = useRouter();
   const [, startTransition] = useTransition();
   const [products, setProducts] = useState(initial);
   const [search, setSearch] = useState("");
@@ -326,11 +331,11 @@ export function ProductsClient({ products: initial }: Props) {
   const formatPrice = (price: string) => formatAmount(Number(price));
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-5 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
           <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
         <Button onClick={handleOpenCreate} className="gap-1.5">
@@ -360,16 +365,16 @@ export function ProductsClient({ products: initial }: Props) {
               active ? "border-primary bg-primary/5" : "bg-card hover:bg-muted/30",
             )}
           >
-            <p className="text-xl font-bold leading-none">{value}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{label}</p>
+            <p className="font-bold text-xl leading-none">{value}</p>
+            <p className="mt-0.5 text-muted-foreground text-xs">{label}</p>
           </button>
         ))}
       </div>
 
       {/* Toolbar */}
       <div className="flex items-center gap-2">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+        <div className="relative max-w-xs flex-1">
+          <Search className="-translate-y-1/2 absolute top-1/2 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
           <Input
             placeholder={t("searchPlaceholder")}
             value={search}
@@ -380,15 +385,15 @@ export function ProductsClient({ products: initial }: Props) {
       </div>
 
       {/* Table */}
-      <div className="rounded-md border overflow-hidden">
+      <div className="overflow-hidden rounded-md border">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-muted/40 text-xs text-muted-foreground">
+            <tr className="border-b bg-muted/40 text-muted-foreground text-xs">
               <th className="px-4 py-2.5 text-left font-medium">{t("columns.name")}</th>
-              <th className="px-4 py-2.5 text-left font-medium hidden sm:table-cell">{t("columns.sku")}</th>
-              <th className="px-4 py-2.5 text-left font-medium hidden lg:table-cell">{t("category")}</th>
+              <th className="hidden px-4 py-2.5 text-left font-medium sm:table-cell">{t("columns.sku")}</th>
+              <th className="hidden px-4 py-2.5 text-left font-medium lg:table-cell">{t("category")}</th>
               <th className="px-4 py-2.5 text-left font-medium">{t("columns.price")}</th>
-              <th className="px-4 py-2.5 text-left font-medium hidden md:table-cell">{t("taxRate")} %</th>
+              <th className="hidden px-4 py-2.5 text-left font-medium md:table-cell">{t("taxRate")} %</th>
               <th className="px-4 py-2.5 text-center font-medium">{t("columns.active")}</th>
               <th className="w-20 px-4 py-2.5" />
             </tr>
@@ -396,29 +401,39 @@ export function ProductsClient({ products: initial }: Props) {
           <tbody className="divide-y">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-14 text-center">
-                  <Package className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
-                  <p className="text-muted-foreground text-sm">
-                    {search || filter !== "all" ? t("noMatchSearch") : t("noProductsYet")}
-                  </p>
+                <td colSpan={7} className="p-0">
+                  {search || filter !== "all" ? (
+                    <EmptyState icon={Package} title={te("filteredTitle")} description={te("filteredDescription")} />
+                  ) : (
+                    <EmptyState
+                      icon={Package}
+                      title={te("products.title")}
+                      description={te("products.description")}
+                      action={
+                        <Button size="sm" onClick={handleOpenCreate}>
+                          {t("newProduct")}
+                        </Button>
+                      }
+                    />
+                  )}
                 </td>
               </tr>
             ) : (
               filtered.map((product) => (
-                <tr key={product.id} className="hover:bg-muted/30 transition-colors group">
+                <tr key={product.id} className="group transition-colors hover:bg-muted/30">
                   <td className="px-4 py-3">
                     <p className={cn("font-medium", !product.isActive && "text-muted-foreground")}>{product.name}</p>
                   </td>
-                  <td className="px-4 py-3 hidden sm:table-cell">
+                  <td className="hidden px-4 py-3 sm:table-cell">
                     {product.sku ? (
-                      <span className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{product.sku}</span>
+                      <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{product.sku}</span>
                     ) : (
                       <span className="text-muted-foreground/40">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 hidden lg:table-cell">
+                  <td className="hidden px-4 py-3 lg:table-cell">
                     {product.category ? (
-                      <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-primary text-xs">
                         {product.category}
                       </span>
                     ) : (
@@ -428,10 +443,10 @@ export function ProductsClient({ products: initial }: Props) {
                   <td className="px-4 py-3">
                     <div>
                       <span className="font-semibold tabular-nums">{formatPrice(product.price)}</span>
-                      {product.unit && <span className="text-xs text-muted-foreground ml-1">/ {product.unit}</span>}
+                      {product.unit && <span className="ml-1 text-muted-foreground text-xs">/ {product.unit}</span>}
                     </div>
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell">
+                  <td className="hidden px-4 py-3 md:table-cell">
                     <span className="text-sm tabular-nums">
                       {parseFloat(product.taxPercent ?? "0") > 0 ? (
                         `${parseFloat(product.taxPercent ?? "0")}%`
@@ -455,7 +470,7 @@ export function ProductsClient({ products: initial }: Props) {
                     </button>
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleOpenEdit(product)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>
@@ -477,7 +492,7 @@ export function ProductsClient({ products: initial }: Props) {
       </div>
 
       {filtered.length > 0 && (
-        <p className="text-xs text-muted-foreground text-right">
+        <p className="text-right text-muted-foreground text-xs">
           {t("showingOf", { shown: filtered.length, total: products.length })}
         </p>
       )}
@@ -506,7 +521,7 @@ export function ProductsClient({ products: initial }: Props) {
               disabled={deleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
               {t("deleteProduct")}
             </AlertDialogAction>
           </AlertDialogFooter>

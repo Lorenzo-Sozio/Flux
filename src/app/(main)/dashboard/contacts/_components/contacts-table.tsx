@@ -4,16 +4,19 @@ import { useState, useTransition } from "react";
 
 import Link from "next/link";
 
+import { UsersIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { bulkAssignContacts, bulkDeleteContacts, bulkUpdateContactStatus } from "@/actions/bulk";
 import { BulkActionBar } from "@/components/crm/bulk-action-bar";
+import { EmptyState } from "@/components/crm/empty-state";
 import { LeadScoreBadge } from "@/components/crm/lead-score-badge";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { ContactActions } from "./contact-modal";
+import { ContactActions, ContactModal } from "./contact-modal";
 
 interface Contact {
   id: string;
@@ -42,6 +45,7 @@ interface Props {
 
 export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) {
   const t = useTranslations("contacts");
+  const te = useTranslations("emptyStates");
   const tc = useTranslations("common");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
@@ -172,13 +176,13 @@ export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) 
               <TableCell>
                 {contact.ownerName ? (
                   <div className="flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-[10px] text-primary">
                       {contact.ownerName.charAt(0).toUpperCase()}
                     </span>
                     <span className="text-sm">{contact.ownerName}</span>
                   </div>
                 ) : (
-                  <span className="text-xs text-muted-foreground">—</span>
+                  <span className="text-muted-foreground text-xs">—</span>
                 )}
               </TableCell>
               {canEdit && (
@@ -189,9 +193,24 @@ export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) 
             </TableRow>
           ))}
           {contacts.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={canEdit ? 9 : 8} className="text-center py-10 text-muted-foreground">
-                {activeCount > 0 ? t("noContactsFiltered") : t("noContactsYet")}
+            <TableRow className="hover:bg-transparent">
+              <TableCell colSpan={canEdit ? 9 : 8} className="p-0">
+                {activeCount > 0 ? (
+                  <EmptyState icon={UsersIcon} title={te("filteredTitle")} description={te("filteredDescription")} />
+                ) : (
+                  <EmptyState
+                    icon={UsersIcon}
+                    title={te("contacts.title")}
+                    description={te("contacts.description")}
+                    action={
+                      canEdit ? (
+                        <ContactModal>
+                          <Button size="sm">{t("newContact")}</Button>
+                        </ContactModal>
+                      ) : undefined
+                    }
+                  />
+                )}
               </TableCell>
             </TableRow>
           )}

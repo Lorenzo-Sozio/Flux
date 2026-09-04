@@ -10,6 +10,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteOrder, type OrderStatus, updateOrderStatus } from "@/actions/orders";
+import { EmptyState } from "@/components/crm/empty-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,7 @@ function formatDate(date: Date | string) {
 
 export function OrdersClient({ orders: initial, stats: initialStats }: { orders: Order[]; stats: Stats }) {
   const t = useTranslations("orders");
+  const te = useTranslations("emptyStates");
   const tc = useTranslations("common");
   const { formatAmount } = useCurrency();
   const _router = useRouter();
@@ -210,11 +212,27 @@ export function OrdersClient({ orders: initial, stats: initialStats }: { orders:
           <tbody className="divide-y">
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-14 text-center">
-                  <ShoppingCart className="mx-auto mb-3 h-8 w-8 text-muted-foreground/30" />
-                  <p className="text-muted-foreground text-sm">
-                    {search || filterStatus !== "all" ? t("noOrdersSearch") : t("noOrdersYet")}
-                  </p>
+                <td colSpan={6} className="p-0">
+                  {search || filterStatus !== "all" ? (
+                    <EmptyState
+                      icon={ShoppingCart}
+                      title={te("filteredTitle")}
+                      description={te("filteredDescription")}
+                    />
+                  ) : (
+                    <EmptyState
+                      icon={ShoppingCart}
+                      title={te("orders.title")}
+                      description={te("orders.description")}
+                      action={
+                        <Button asChild size="sm">
+                          <Link href="/dashboard/sales/orders/new">
+                            <Plus className="h-4 w-4" /> {t("newOrder")}
+                          </Link>
+                        </Button>
+                      }
+                    />
+                  )}
                 </td>
               </tr>
             ) : (
