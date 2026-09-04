@@ -85,7 +85,7 @@ const STATUS_LABEL: Record<string, string> = {
  * customer actually asked for — so the commonest real order could not be entered
  * at all, and the ones that could belonged to nobody.
  *
- * It is a page now, and the page is a stack of full-width bands rather than a
+ * It is a page now, and the page is a stack of bands rather than a
  * short sidebar beside a long list — that arrangement left a hole in the middle of
  * the screen as soon as the list grew. Reading down: who and when, then what is
  * being sold, then what is worth knowing about it and what it comes to. The lines
@@ -276,14 +276,15 @@ export default function NewOrderPage() {
       </div>
 
       {/* ── Band one: who it is for, and what kind of order it is ─────────── */}
-      <Card>
-        <CardContent className="grid gap-6 md:grid-cols-12 md:gap-6 md:divide-x xl:gap-8">
-          <section className="space-y-4 md:col-span-5">
-            <div className="space-y-0.5">
-              <h2 className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Customer</h2>
-              <p className="text-muted-foreground text-xs">Who the order is for.</p>
-            </div>
-
+      <div className="grid gap-6 md:grid-cols-12">
+        <Card className="md:col-span-5">
+          <CardHeader>
+            <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+              Customer
+            </CardTitle>
+            <CardDescription>Who the order is for.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label className="text-xs">Company</Label>
               <SearchableSelect
@@ -315,17 +316,18 @@ export default function NewOrderPage() {
                 className="h-9"
               />
             </div>
-          </section>
+          </CardContent>
+        </Card>
 
-          {/* Four short answers, two by two, so this half is exactly as tall as the other. */}
-          <section className="space-y-4 md:col-span-7 md:pl-6 xl:pl-8">
-            <div className="space-y-0.5">
-              <h2 className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Order details</h2>
-              <p className="text-muted-foreground text-xs">
-                Its state, its date, and — optionally, and worth filling in — where it came from.
-              </p>
-            </div>
-
+        {/* Four short answers, two by two, so this card ends level with the one beside it. */}
+        <Card className="md:col-span-7">
+          <CardHeader>
+            <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+              Order details
+            </CardTitle>
+            <CardDescription>Its state, its date, and, optionally, where it came from.</CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label className="text-xs">Status</Label>
@@ -379,9 +381,9 @@ export default function NewOrderPage() {
                 />
               </div>
             </div>
-          </section>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* ── Band two: what is being sold, given the whole width ───────────── */}
       <Card>
