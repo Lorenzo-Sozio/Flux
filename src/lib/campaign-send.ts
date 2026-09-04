@@ -15,6 +15,7 @@ import {
   marketingCampaigns,
 } from "@/db/schema";
 import { getAppUrl } from "@/lib/app-url";
+import { ensureUnsubscribe, renderPlaceholders, valuesForRecipient } from "@/lib/email-placeholders";
 import { getDb } from "@/lib/tenant-context";
 import { signTrackingUrl } from "@/lib/tracking-token";
 import { generateUnsubscribeToken } from "@/lib/unsubscribe-token";
@@ -103,15 +104,19 @@ export async function executeCampaignSend(data: {
       })
       .returning();
 
-    let html = template.body
-      .replace(/\{\{nome\}\}/gi, recipient.firstName ?? "")
-      .replace(/\{\{cognome\}\}/gi, recipient.lastName ?? "")
-      .replace(/\{\{email\}\}/gi, recipient.email)
-      .replace(/\{\{contatto\.nome\}\}/gi, recipient.firstName ?? "")
-      .replace(/\{\{contatto\.cognome\}\}/gi, recipient.lastName ?? "");
-
     const unsubToken = generateUnsubscribeToken(recipient.email, log.id);
-    html = html.replace(/\{\{link_unsubscribe\}\}/gi, `${appBase()}/api/unsubscribe?token=${unsubToken}`);
+    const unsubscribeUrl = `${appBase()}/api/unsubscribe?token=${unsubToken}`;
+    const values = valuesForRecipient({ ...recipient, unsubscribeUrl });
+
+    // The unsubscribe link is added when the author left it out. A marketing
+    // email without one is not a rendering defect but an unlawful one, and the
+    // send reported success either way (audit rilievo S-08).
+    let html = ensureUnsubscribe(renderPlaceholders(template.body, values), unsubscribeUrl);
+
+    // The subject was never substituted at all, so a line reading "A question for
+    // {{nome}}" went out saying exactly that.
+    const subject = renderPlaceholders(template.subject, values);
+
     html = wrapLinksForTracking(html, log.id);
     html = `${html}\n<img src="${appBase()}/api/track/open?log=${encodeURIComponent(log.id)}" width="1" height="1" alt="" style="display:none" />`;
 
@@ -119,7 +124,7 @@ export async function executeCampaignSend(data: {
       campaignId,
       campaignLogId: log.id,
       toEmail: recipient.email,
-      subject: template.subject,
+      subject,
       htmlBody: html,
       status: "pending",
       scheduledAt: new Date(),

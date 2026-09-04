@@ -30,6 +30,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PLACEHOLDERS } from "@/lib/email-placeholders";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -70,7 +71,10 @@ function ToolbarButton({ onClick, active, disabled, label, children }: ToolbarBu
   );
 }
 
-const EMAIL_VARS = ["{{nome}}", "{{cognome}}", "{{email}}"];
+// Three of the eight, hand-written here and nowhere documented, so anyone wanting
+// the other five had to guess — and a wrong guess ships to a customer verbatim
+// (audit rilievo S-08). The catalogue is the list now.
+const EMAIL_VARS = PLACEHOLDERS.map((p) => `{{${p.aliases[0]}}}`);
 const MACRO_VARS = ["{ticket.number}", "{contact.firstName}", "{agent.name}"];
 
 export function RichTextEditor({ value, onChange, placeholder, className, macroVariables = false }: Props) {
@@ -252,7 +256,7 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
             <button
               key={v}
               type="button"
-              className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] hover:bg-primary hover:text-primary-foreground transition-colors"
+              className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] transition-colors hover:bg-primary hover:text-primary-foreground"
               onClick={() => editor.chain().focus().insertContent(v).run()}
             >
               {v}

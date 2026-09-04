@@ -1,0 +1,38 @@
+[
+  {
+    "file": "src/lib/email-placeholders.ts",
+    "description": "⚠️⚠️ la disiscrizione non viene piu' aggiunta quando l'autore la dimentica: la campagna parte senza via d'uscita, ed e' illegale",
+    "find": "  if (hasUnsubscribePlaceholder(html)) return renderPlaceholders(html, { unsubscribe: url });",
+    "replace": "  return renderPlaceholders(html, { unsubscribe: url });"
+  },
+  {
+    "file": "src/lib/email-placeholders.ts",
+    "description": "⚠️ il link viene aggiunto anche quando c'e' gia': il destinatario ne vede due, uno dei quali in mezzo al testo",
+    "find": "  if (hasUnsubscribePlaceholder(html)) return renderPlaceholders(html, { unsubscribe: url });",
+    "replace": "  if (false) return renderPlaceholders(html, { unsubscribe: url });"
+  },
+  {
+    "file": "src/lib/email-placeholders.ts",
+    "description": "⚠️ un segnaposto sconosciuto viene svuotato invece che lasciato visibile: l'errore non si vede piu' finche' non lo legge un cliente",
+    "find": "    if (!key) return whole;",
+    "replace": "    if (!key) return \"\";"
+  },
+  {
+    "file": "src/lib/email-placeholders.ts",
+    "description": "gli alias non vengono piu' registrati tutti: «{{firstName}}» smette di risolvere e parte cosi' com'e'",
+    "find": "  PLACEHOLDERS.flatMap((p) => p.aliases.map((a) => [a.toLowerCase(), p.key] as const)),",
+    "replace": "  PLACEHOLDERS.map((p) => [p.aliases[0].toLowerCase(), p.key] as const),"
+  },
+  {
+    "file": "src/lib/email-placeholders.ts",
+    "description": "gli spazi dentro le graffe non sono piu' tollerati: «{{ nome }}» arriva al cliente com'e' scritto",
+    "find": "const TOKEN = /\\{\\{\\s*([\\w.]+)\\s*\\}\\}/g;",
+    "replace": "const TOKEN = /\\{\\{([\\w.]+)\\}\\}/g;"
+  },
+  {
+    "file": "src/lib/email-placeholders.ts",
+    "description": "il nome completo non toglie piu' la meta' mancante: chi non ha cognome riceve un nome con uno spazio in coda",
+    "find": "    fullName: [r.firstName, r.lastName].filter(Boolean).join(\" \"),",
+    "replace": "    fullName: `${r.firstName ?? \"\"} ${r.lastName ?? \"\"}`,"
+  }
+]

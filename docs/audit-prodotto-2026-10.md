@@ -842,12 +842,45 @@ dall'attività registrata. Sempre proposta, sempre modificabile, mai spedita da 
 Calendario lavorativo per workspace con festività. Avvisi al 50% e all'80% del tempo
 residuo, non solo alla violazione avvenuta. Escalation automatica al responsabile.
 
-### S-08 — Segnaposto documentati, anteprima reale, disiscrizione garantita
+### S-08 — Segnaposto documentati, anteprima reale, disiscrizione garantita ✅
 
 I segnaposto sono cinque, solo in italiano, e non compaiono in nessun elenco: chi scrive
 `{{firstName}}` lo spedisce così com'è. Servono il catalogo nell'editor, i campi
 personalizzati come segnaposto, l'anteprima con un contatto reale, l'invio di prova, e
 l'inserimento automatico del link di disiscrizione con blocco della partenza se manca.
+
+**✅ Risolto.** `src/lib/email-placeholders.ts` è il catalogo unico: otto segnaposto, con
+gli alias in entrambe le lingue, così sia «{{nome}}» sia «{{firstName}}» risolvono invece
+di partire come sono scritti. Da lì prendono il menu dell'editor, la sostituzione
+all'invio e l'avviso su ciò che non si risolverà.
+
+Erano **quattro implementazioni diverse** della stessa sostituzione, ognuna con la propria
+lista, e nessuna che concordasse con le altre. La spia più chiara: il piè di pagina
+dell'editor dei template pubblicizzava `firstName`, `lastName`, `email`, `companyName`,
+`phone` — di cui l'invio non sostituiva **nessuno**. Chi seguiva quel suggerimento li
+spediva al cliente alla lettera.
+
+Altri due difetti chiusi. L'oggetto non veniva sostituito affatto, quindi una riga «Una
+domanda per {{nome}}» partiva dicendo esattamente questo. E `{{azienda}}` era offerto nel
+menu delle variabili e sostituito da nessuna parte.
+
+Il link di disiscrizione viene aggiunto quando l'autore lo dimentica: una mail marketing
+senza non è un difetto di resa ma un illecito, e l'invio riusciva comunque. Il pannello
+dice in anticipo che verrà aggiunto, così chi vuole deciderne la posizione può metterlo
+dove preferisce.
+
+L'anteprima usa i valori d'esempio del catalogo, non un terzo insieme di nomi come faceva
+prima.
+
+**Trovato strada facendo — e più grave di S-08.** `src/lib/sanitize-email-html.ts`: il
+corpo di una mail veniva reso dentro l'applicazione in quattro punti, e l'unica difesa era
+una espressione regolare per `<script>`. `<img src=x onerror=…>` e `<a
+href="javascript:…">` passavano interi. Nel thread dei ticket quel testo lo scrive uno
+sconosciuto e viene reso nella sessione autenticata di un operatore: era XSS persistente
+tenuto a bada dalla sola CSP. Ora c'è un sanificatore che gira ovunque senza un parser
+HTML — jsdom non funziona su Workers — con dieci mutazioni che tengono la linea. La CSS
+resta la seconda difesa e va lasciata dov'è: un elenco di divieti vale quanto il suo
+elenco.
 
 ### S-09 — Motivi di perdita e analisi win/loss ✅
 

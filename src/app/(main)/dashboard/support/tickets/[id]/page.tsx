@@ -70,6 +70,27 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import type { ticketMacros } from "@/db/schema";
+import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
+
+// ─── Row shapes ───────────────────────────────────────────────────────────────
+//
+// Derived from what the loaders actually return, rather than `any`. Every prop on
+// this page was untyped, so a renamed column compiled fine and rendered blank.
+
+type TicketRow = NonNullable<Awaited<ReturnType<typeof getTicketById>>>;
+type TicketMessage = TicketRow["messages"][number];
+type TicketAuditEntry = TicketRow["auditLogs"][number];
+type TicketDocument = { id: string; name: string; url: string; mimeType?: string | null; size?: number | null };
+type TicketMacro = typeof ticketMacros.$inferSelect;
+type PresenceEntry = { userId?: string; userName?: string; typing?: boolean; action?: string };
+type TicketStatus = NonNullable<Parameters<typeof updateTicketAction>[1]["status"]>;
+type TicketPriority = NonNullable<Parameters<typeof updateTicketAction>[1]["priority"]>;
+
+/** The message from a caught value, which is `unknown` and not an Error. */
+function messageOf(err: unknown, fallback = "Errore"): string {
+  return err instanceof Error && err.message ? err.message : fallback;
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -375,7 +396,7 @@ function SLATimer({ targetDate }: { targetDate: Date | null }) {
 
 // ─── Timeline sub-components ──────────────────────────────────────────────────
 
-function AuditEvent({ entry }: { entry: any }) {
+function AuditEvent({ entry }: { entry: TicketAuditEntry }) {
   const actor = entry.actor?.name ?? entry.actorName ?? "Sistema";
   const label = AUDIT_LABELS[entry.action] ?? entry.action;
   return (
@@ -401,7 +422,7 @@ function AuditEvent({ entry }: { entry: any }) {
   );
 }
 
-function AttachmentChips({ docs }: { docs: any[] }) {
+function AttachmentChips({ docs }: { docs: TicketDocument[] }) {
   if (!docs.length) return null;
   return (
     <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -426,7 +447,7 @@ function AttachmentChips({ docs }: { docs: any[] }) {
   );
 }
 
-function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent: boolean }) {
+function MessageBubble({ msg, docs, isAgent }: { msg: TicketMessage; docs?: TicketDocument[]; isAgent: boolean }) {
   const senderName = msg.sender?.name ?? msg.senderName ?? msg.senderEmail?.split("@")[0] ?? "Sconosciuto";
   const isInternal = !msg.isPublic;
   const stamp = formatStamp(new Date(msg.createdAt));
@@ -452,20 +473,20 @@ function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent
         {msg.content?.startsWith("<") ? (
           <div
             className="prose prose-sm dark:prose-invert max-w-none prose-p:text-amber-900 text-sm leading-relaxed dark:prose-p:text-amber-100"
-            // WARN Message bodies arrive from inbound customer email and are rendered without
-            // sanitisation. What stops that being stored XSS today is the Content-Security-Policy
-            // in src/proxy.ts, and only that: no `unsafe-inline` in script-src blocks <script>,
-            // inline handlers and javascript: URLs; `frame-src 'none'` blocks iframes;
-            // `form-action 'self'` blocks credential-harvesting forms; `img-src 'self' data: blob:`
-            // blocks tracking pixels. What remains possible is visual defacement through inline
-            // CSS, which style-src does allow.
+            // Message bodies arrive from inbound customer email: this is markup written by a
+            // stranger, rendered inside an authenticated agent's session.
             //
-            // WARN Weakening that CSP turns this into code execution in an authenticated agent's
-            // browser. Sanitising properly needs an HTML parser that runs on Workers — jsdom does
-            // not, and the bundle is already near the 10 MB limit — so this is a known open item,
-            // not an oversight.
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML, contained by the CSP
-            dangerouslySetInnerHTML={{ __html: msg.content }}
+            // Two independent things stop that being stored XSS, and it needs to stay two.
+            // `sanitizeEmailHtml` removes what executes without needing an HTML parser, which
+            // matters because jsdom does not run on Workers and the bundle is already near the
+            // 10 MB limit. Behind it the Content-Security-Policy in src/proxy.ts still holds the
+            // line: no `unsafe-inline` in script-src, `frame-src 'none'`, `form-action 'self'`,
+            // `img-src 'self' data: blob:`.
+            //
+            // WARN The sanitiser is a denylist, so it is only ever as good as its list. Do not
+            // weaken the CSP on the strength of it.
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML by definition; sanitised
+            dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(msg.content ?? "") }}
           />
         ) : (
           <p className="whitespace-pre-wrap text-amber-900 text-sm leading-relaxed dark:text-amber-100">
@@ -490,8 +511,8 @@ function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent
             {msg.content?.startsWith("<") ? (
               <div
                 className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML, contained by the CSP; see the first occurrence
-                dangerouslySetInnerHTML={{ __html: msg.content }}
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML by definition; sanitised
+                dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(msg.content ?? "") }}
               />
             ) : (
               <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
@@ -527,8 +548,8 @@ function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent
           {msg.content?.startsWith("<") ? (
             <div
               className="prose prose-sm dark:prose-invert max-w-none text-sm leading-relaxed"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML, contained by the CSP; see the first occurrence
-              dangerouslySetInnerHTML={{ __html: msg.content }}
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: email HTML by definition; sanitised
+              dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(msg.content ?? "") }}
             />
           ) : (
             <p className="whitespace-pre-wrap text-sm leading-relaxed">{msg.content}</p>
@@ -542,7 +563,7 @@ function MessageBubble({ msg, docs, isAgent }: { msg: any; docs?: any[]; isAgent
 
 // ─── Sidebar cards ────────────────────────────────────────────────────────────
 
-function ContactCard({ ticket }: { ticket: any }) {
+function ContactCard({ ticket }: { ticket: TicketRow }) {
   const contact = ticket.contact;
   if (!contact) {
     return (
@@ -553,7 +574,7 @@ function ContactCard({ ticket }: { ticket: any }) {
       </Card>
     );
   }
-  const name = contact.name ?? (`${contact.firstName ?? ""} ${contact.lastName ?? ""}`.trim() || "—");
+  const name = `${contact.firstName ?? ""} ${contact.lastName ?? ""}`.trim() || "—";
   return (
     <Card>
       <CardHeader className="px-3 pt-3 pb-2">
@@ -596,9 +617,9 @@ function PropertiesCard({
   onPriorityChange,
   onReassign,
 }: {
-  ticket: any;
-  onStatusChange: (s: string) => void;
-  onPriorityChange: (p: string) => void;
+  ticket: TicketRow;
+  onStatusChange: (s: TicketStatus) => void;
+  onPriorityChange: (p: TicketPriority) => void;
   onReassign: () => void;
 }) {
   return (
@@ -615,7 +636,7 @@ function PropertiesCard({
               <button
                 key={opt.value}
                 type="button"
-                onClick={() => onStatusChange(opt.value)}
+                onClick={() => onStatusChange(opt.value as TicketStatus)}
                 className={`rounded-full px-2.5 py-0.5 font-semibold text-xs transition-all ${
                   ticket.status === opt.value
                     ? `${opt.color} ring-1 ring-current/30 ring-inset`
@@ -636,7 +657,7 @@ function PropertiesCard({
               <button
                 key={opt.value}
                 type="button"
-                onClick={() => onPriorityChange(opt.value)}
+                onClick={() => onPriorityChange(opt.value as TicketPriority)}
                 className={`rounded-full px-2.5 py-0.5 font-semibold text-xs transition-all ${
                   (ticket.priority ?? "normal") === opt.value
                     ? `bg-muted ${opt.color} ring-1 ring-current/20 ring-inset`
@@ -690,7 +711,7 @@ function SLACard({
   slaFirstTarget,
   slaResTarget,
 }: {
-  ticket: any;
+  ticket: TicketRow;
   slaFirstTarget: Date | null;
   slaResTarget: Date | null;
 }) {
@@ -741,7 +762,7 @@ function SLACard({
   );
 }
 
-function AttachmentsCard({ docs }: { docs: any[] }) {
+function AttachmentsCard({ docs }: { docs: TicketDocument[] }) {
   return (
     <Card>
       <CardHeader className="px-3 pt-3 pb-2">
@@ -792,13 +813,13 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const [ticket, setTicket] = useState<any>(null);
-  const [messages, setMessages] = useState<any[]>([]);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [macros, setMacros] = useState<any[]>([]);
+  const [ticket, setTicket] = useState<TicketRow | null>(null);
+  const [messages, setMessages] = useState<TicketMessage[]>([]);
+  const [auditLogs, setAuditLogs] = useState<TicketAuditEntry[]>([]);
+  const [macros, setMacros] = useState<TicketMacro[]>([]);
   const [loading, setLoading] = useState(true);
-  const [presence, setPresence] = useState<any[]>([]);
-  const [ticketDocs, setTicketDocs] = useState<Record<string, any>>({});
+  const [presence, setPresence] = useState<PresenceEntry[]>([]);
+  const [ticketDocs, setTicketDocs] = useState<Record<string, TicketDocument>>({});
 
   const [replyContent, setReplyContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
@@ -834,7 +855,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
         );
         setSelectedAssignee(encodeAssignee(data.assigneeId, null));
       }
-      const docsById: Record<string, any> = {};
+      const docsById: Record<string, TicketDocument> = {};
       for (const doc of docsRes.documents ?? []) docsById[doc.id] = doc;
       setTicketDocs(docsById);
     } catch (e) {
@@ -861,7 +882,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     const poll = () =>
       fetch(`/api/tickets/${id}/presence`)
         .then((r) => r.json())
-        .then((d: unknown[]) => setPresence(d))
+        .then((d: PresenceEntry[]) => setPresence(d))
         .catch(console.error);
     announce("viewing");
     poll();
@@ -880,7 +901,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     try {
       const result = await addTicketMessageAction(id, {
         content: replyContent,
-        channel: ticket?.channel ?? "email",
+        channel: (ticket?.channel ?? "email") as "email" | "phone" | "chat" | "social",
         isPublic: !isInternal,
       });
       if (result?.linkedFromClosed) {
@@ -891,34 +912,34 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       setReplyContent("<p></p>");
       await loadTicket();
       scrollToBottom();
-    } catch (err: any) {
-      toast.error(err.message ?? "Invio fallito");
+    } catch (err) {
+      toast.error(messageOf(err, "Invio fallito"));
     } finally {
       setSending(false);
     }
   }, [id, isInternal, isReplyEmpty, loadTicket, replyContent, router, scrollToBottom, ticket?.channel]);
 
   const handleStatusChange = useCallback(
-    async (status: string) => {
+    async (status: TicketStatus) => {
       try {
-        await updateTicketAction(id, { status: status as any });
-        setTicket((p: any) => ({ ...p, status }));
+        await updateTicketAction(id, { status });
+        setTicket((p) => (p ? { ...p, status } : p));
         toast.success("Stato aggiornato");
-      } catch (err: any) {
-        toast.error(err.message ?? "Errore");
+      } catch (err) {
+        toast.error(messageOf(err));
       }
     },
     [id],
   );
 
   const handlePriorityChange = useCallback(
-    async (priority: string) => {
+    async (priority: TicketPriority) => {
       try {
-        await updateTicketAction(id, { priority: priority as any });
-        setTicket((p: any) => ({ ...p, priority }));
+        await updateTicketAction(id, { priority });
+        setTicket((p) => (p ? { ...p, priority } : p));
         toast.success("Priorità aggiornata");
-      } catch (err: any) {
-        toast.error(err.message ?? "Errore");
+      } catch (err) {
+        toast.error(messageOf(err));
       }
     },
     [id],
@@ -931,10 +952,10 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
         toast.info("Priorità già al massimo (Urgente)");
         return;
       }
-      setTicket((p: any) => ({ ...p, priority: result.newPriority }));
+      setTicket((p) => (p && result.newPriority ? { ...p, priority: result.newPriority } : p));
       toast.success(`Priorità escalata a ${result.newPriority}`);
-    } catch (err: any) {
-      toast.error(err.message ?? "Errore");
+    } catch (err) {
+      toast.error(messageOf(err));
     }
   }, [id]);
 
@@ -946,8 +967,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       await loadTicket();
       setReassignOpen(false);
       toast.success(ownerId ? "Ticket riassegnato" : "Assegnatario rimosso");
-    } catch (err: any) {
-      toast.error(err.message ?? "Errore");
+    } catch (err) {
+      toast.error(messageOf(err));
     } finally {
       setReassigning(false);
     }
@@ -959,8 +980,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       await deleteTicketAction(id);
       toast.success("Ticket eliminato");
       router.push("/dashboard/support/tickets");
-    } catch (err: any) {
-      toast.error(err.message ?? "Errore");
+    } catch (err) {
+      toast.error(messageOf(err));
       setDeleting(false);
       setDeleteOpen(false);
     }
@@ -1108,7 +1129,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                     />
                   ))}
                 </span>
-                {typingUsers.map((p: any) => p.userName).join(", ")} sta scrivendo…
+                {typingUsers.map((p) => p.userName).join(", ")} sta scrivendo…
               </div>
             )}
 
@@ -1214,7 +1235,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="max-h-60 w-52 overflow-y-auto">
-                        {macros.map((macro: any) => (
+                        {macros.map((macro) => (
                           <DropdownMenuItem
                             key={macro.id}
                             className="flex flex-col items-start gap-0.5 py-2"
@@ -1222,10 +1243,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                               setReplyContent(
                                 macro.body
                                   .replace(/\{ticket\.number\}/g, ticket?.ticketNumber ?? "")
-                                  .replace(
-                                    /\{contact\.firstName\}/g,
-                                    ticket?.contact?.firstName ?? ticket?.contact?.name?.split(" ")[0] ?? "",
-                                  )
+                                  .replace(/\{contact\.firstName\}/g, ticket?.contact?.firstName ?? "")
                                   .replace(/\{agent\.name\}/g, ""),
                               );
                               setIsInternal(!macro.isPublic);

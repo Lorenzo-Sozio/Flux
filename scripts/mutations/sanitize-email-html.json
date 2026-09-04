@@ -1,0 +1,56 @@
+[
+  {
+    "file": "src/lib/sanitize-email-html.ts",
+    "description": "⚠️⚠️ i gestori di eventi tra virgolette sopravvivono: «onerror=\"…\"» in una mail di un cliente esegue nella sessione dell'operatore",
+    "find": "  out = out.replace(/\\son[a-z]+\\s*=\\s*\"[^\"]*\"/gi, \"\");",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sanitize-email-html.ts",
+    "description": "⚠️⚠️ i gestori senza virgolette sopravvivono: «<img src=x onerror=alert(1)>» passa intero",
+    "find": "  out = out.replace(/\\son[a-z]+\\s*=\\s*[^\\s>]+/gi, \"\");",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sanitize-email-html.ts",
+    "description": "⚠️⚠️ nessun controllo sullo schema: «href=\"javascript:…\"» resta cliccabile",
+    "find": "    return SAFE_URL.test(url) ? whole : \"\";",
+    "replace": "    return whole;"
+  },
+  {
+    "file": "src/lib/sanitize-email-html.ts",
+    "description": "⚠️⚠️ «data:» diventa lecito per qualunque tipo: un documento HTML completo viaggia dentro un attributo",
+    "find": "const SAFE_URL = /^(?:https?:|mailto:|tel:|cid:|#|\\/|data:image\\/(?:png|jpe?g|gif|webp|svg\\+xml);base64,)/i;",
+    "replace": "const SAFE_URL = /^(?:https?:|mailto:|tel:|cid:|#|\\/|data:)/i;"
+  },
+  {
+    "file": "src/lib/sanitize-email-html.ts",
+    "description": "⚠️ gli elementi pericolosi perdono il tag ma non il contenuto: il corpo di uno <script> resta nella pagina",
+    "find": "  return html.replace(re, \"\").replace(selfClosing, \"\");",
+    "replace": "  return html.replace(selfClosing, \"\");"
+  },
+  {
+    "file": "src/lib/sanitize-email-html.ts",
+    "description": "⚠️ i moduli non vengono piu' rimossi: una mail puo' disegnare una schermata di login dentro il prodotto",
+    "find": "const VOID_DANGEROUS = [\"link\", \"meta\", \"base\", \"form\", \"input\", \"button\", \"textarea\", \"select\"];",
+    "replace": "const VOID_DANGEROUS = [\"link\", \"meta\", \"base\"];"
+  },
+  {
+    "file": "src/lib/sanitize-email-html.ts",
+    "description": "«expression()» torna lecito: su Outlook datati esegue codice dal CSS in linea",
+    "find": "    flat.includes(\"expression(\") ||",
+    "replace": "    false ||"
+  },
+  {
+    "file": "src/lib/sanitize-email-html.ts",
+    "description": "«position:fixed» torna lecito: una mail puo' coprire l'interfaccia del prodotto con la propria",
+    "find": "    flat.includes(\"position:fixed\")",
+    "replace": "    false"
+  },
+  {
+    "file": "src/lib/sanitize-email-html.ts",
+    "description": "il CSS in linea non viene piu' controllato affatto",
+    "find": "  out = out.replace(/\\sstyle\\s*=\\s*\"([^\"]*)\"/gi, (whole, css: string) => (isSafeCss(css) ? whole : \"\"));",
+    "replace": ""
+  }
+]

@@ -13,6 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { renderPlaceholders, valuesForRecipient } from "@/lib/email-placeholders";
+import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
 import { cn } from "@/lib/utils";
 
 const emailSchema = z.object({
@@ -22,17 +24,25 @@ const emailSchema = z.object({
 type EmailFormValues = z.infer<typeof emailSchema>;
 type Mode = "preview" | "html";
 
-function stripScripts(html: string) {
-  return html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-}
-
 export function SendEmailModal({
   entity,
   templates = [],
   ownerId,
 }: {
-  entity: any;
-  templates?: any[];
+  // Whatever record the mail is about: a contact, a lead or a company. Only the
+  // fields the placeholders read are needed.
+  entity: {
+    id: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string | null;
+    name?: string | null;
+    companyName?: string | null;
+    jobTitle?: string | null;
+    phone?: string | null;
+    mainPhone?: string | null;
+  };
+  templates?: { id: string; name: string; subject: string; body: string }[];
   ownerId?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -50,13 +60,22 @@ export function SendEmailModal({
 
   // ─── Helpers ───────────────────────────────────────────────────────────────
 
+  // The fourth implementation of placeholder substitution in this codebase, each
+  // with its own list of names, none of which agreed (audit rilievo S-08). They
+  // all go through the one catalogue now, so a name that works in a campaign
+  // works here too.
   const resolvePlaceholders = (text: string) =>
-    text
-      .replace(/\{\{firstName\}\}/g, entity.firstName || "")
-      .replace(/\{\{lastName\}\}/g, entity.lastName || "")
-      .replace(/\{\{email\}\}/g, entity.email || "")
-      .replace(/\{\{companyName\}\}/g, entity.companyName || entity.name || "")
-      .replace(/\{\{phone\}\}/g, entity.phone || entity.mainPhone || "");
+    renderPlaceholders(
+      text,
+      valuesForRecipient({
+        firstName: entity.firstName,
+        lastName: entity.lastName,
+        email: entity.email,
+        company: entity.companyName ?? entity.name,
+        jobTitle: entity.jobTitle,
+        phone: entity.phone ?? entity.mainPhone,
+      }),
+    );
 
   const flushPreview = useCallback(() => {
     if (previewRef.current) setBody(previewRef.current.innerHTML);
@@ -101,6 +120,12 @@ export function SendEmailModal({
     const finalBody = mode === "preview" && previewRef.current ? previewRef.current.innerHTML : body;
     if (!finalBody.trim()) {
       toast.error("Email body cannot be empty.");
+      return;
+    }
+    // A record with no address is the one case this dialog cannot do anything
+    // about, and it used to send to `undefined`.
+    if (!entity.email) {
+      toast.error("This record has no email address.");
       return;
     }
     try {
@@ -158,24 +183,24 @@ export function SendEmailModal({
         Internal structure is a flex column where only the body area grows.
         No magic-number calc() — every section uses flex sizing.
       */}
-      <DialogContent className="sm:max-w-[820px] h-[88vh] flex flex-col gap-0 p-0 overflow-hidden">
+      <DialogContent className="flex h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[820px]">
         {/* ── Header ───────────────────────────────────────────────────────── */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b shrink-0">
+        <DialogHeader className="shrink-0 border-b px-6 pt-6 pb-4">
           <DialogTitle className="text-lg">{recipientName ? `New Email — ${recipientName}` : "New Email"}</DialogTitle>
-          {entity.email && <p className="text-sm text-muted-foreground font-normal mt-0.5">{entity.email}</p>}
+          {entity.email && <p className="mt-0.5 font-normal text-muted-foreground text-sm">{entity.email}</p>}
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
           {/* ── Compose fields ─────────────────────────────────────────────── */}
           <div className="shrink-0 border-b">
             {/* Template row */}
             {safeTemplates.length > 0 && (
-              <div className="flex items-center gap-0 px-6 py-2.5 border-b">
-                <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <div className="flex items-center gap-0 border-b px-6 py-2.5">
+                <span className="w-20 shrink-0 font-medium text-muted-foreground text-xs uppercase tracking-wide">
                   Template
                 </span>
                 <Select onValueChange={handleTemplateSelect}>
-                  <SelectTrigger className="flex-1 h-8 text-sm border-0 shadow-none focus:ring-0 bg-transparent pl-0">
+                  <SelectTrigger className="h-8 flex-1 border-0 bg-transparent pl-0 text-sm shadow-none focus:ring-0">
                     <SelectValue placeholder="Choose a template…" />
                   </SelectTrigger>
                   <SelectContent>
@@ -191,17 +216,17 @@ export function SendEmailModal({
 
             {/* Subject row */}
             <div className="flex items-center gap-0 px-6 py-2.5">
-              <span className="w-20 shrink-0 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <span className="w-20 shrink-0 font-medium text-muted-foreground text-xs uppercase tracking-wide">
                 Subject
               </span>
               <Input
                 {...form.register("subject")}
                 placeholder="Write a subject…"
-                className="flex-1 h-8 border-0 shadow-none focus-visible:ring-0 bg-transparent pl-0 text-sm font-medium placeholder:font-normal"
+                className="h-8 flex-1 border-0 bg-transparent pl-0 font-medium text-sm shadow-none placeholder:font-normal focus-visible:ring-0"
               />
             </div>
             {form.formState.errors.subject && (
-              <p className="px-6 pb-2 text-xs text-destructive">{form.formState.errors.subject.message}</p>
+              <p className="px-6 pb-2 text-destructive text-xs">{form.formState.errors.subject.message}</p>
             )}
           </div>
 
@@ -210,17 +235,17 @@ export function SendEmailModal({
             Underline-style tabs that sit flush against the content area below.
             The active tab's bottom border visually "connects" to the content.
           */}
-          <div className="flex items-center gap-0 px-4 border-b shrink-0 bg-muted/20">
+          <div className="flex shrink-0 items-center gap-0 border-b bg-muted/20 px-4">
             {(["preview", "html"] as Mode[]).map((m) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => switchMode(m)}
                 className={cn(
-                  "flex items-center gap-1.5 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors -mb-px",
+                  "-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2.5 font-medium text-xs transition-colors",
                   mode === m
                     ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
+                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground",
                 )}
               >
                 {m === "preview" ? (
@@ -236,7 +261,7 @@ export function SendEmailModal({
             ))}
 
             {/* Contextual hint — right-aligned, same bar */}
-            <span className="ml-auto flex items-center gap-1 text-[10px] text-muted-foreground pr-2 select-none">
+            <span className="ml-auto flex select-none items-center gap-1 pr-2 text-[10px] text-muted-foreground">
               {mode === "preview" ? (
                 <>
                   <PencilIcon className="h-2.5 w-2.5" />
@@ -256,7 +281,7 @@ export function SendEmailModal({
             flex-1 min-h-0 = fills all remaining space between tab bar and footer.
             Both panels are positioned absolute inside, so they always match this height.
           */}
-          <div className="relative flex-1 min-h-0">
+          <div className="relative min-h-0 flex-1">
             {/* Preview panel */}
             <div
               className={cn(
@@ -273,9 +298,10 @@ export function SendEmailModal({
                     contentEditable
                     suppressContentEditableWarning
                     onPaste={handlePaste}
-                    dangerouslySetInnerHTML={{ __html: stripScripts(body) }}
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: an email body is HTML by definition; sanitised
+                    dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(body) }}
                     className={cn(
-                      "max-w-[680px] mx-auto bg-white rounded-md shadow-sm",
+                      "mx-auto max-w-[680px] rounded-md bg-white shadow-sm",
                       "p-0 outline-none",
                       "ring-0 focus:ring-2 focus:ring-primary/20 focus:ring-offset-0",
                       "[&_*]:cursor-text",
@@ -283,13 +309,13 @@ export function SendEmailModal({
                   />
                 </div>
               ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-muted-foreground gap-3">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center text-muted-foreground">
                   <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
                     <MailIcon className="h-6 w-6 opacity-50" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">No content yet</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
+                    <p className="font-medium text-sm">No content yet</p>
+                    <p className="mt-0.5 text-muted-foreground text-xs">
                       {safeTemplates.length > 0
                         ? "Select a template above or switch to HTML to compose"
                         : "Switch to HTML to write your email"}
@@ -306,25 +332,25 @@ export function SendEmailModal({
               placeholder={"<!-- Paste or write your HTML here -->\n<p>Hello {{firstName}},</p>"}
               spellCheck={false}
               className={cn(
-                "absolute inset-0 w-full h-full resize-none",
+                "absolute inset-0 h-full w-full resize-none",
                 "px-6 py-4 font-mono text-xs leading-relaxed",
                 "bg-background text-foreground",
-                "outline-none focus:ring-0 border-0",
+                "border-0 outline-none focus:ring-0",
                 mode !== "html" && "hidden",
               )}
             />
           </div>
 
           {/* ── Footer ─────────────────────────────────────────────────────── */}
-          <div className="flex items-center justify-between gap-3 px-6 py-3 border-t bg-background shrink-0">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-t bg-background px-6 py-3">
             {/* Placeholder reference — unobtrusive, left side */}
-            <p className="text-[10px] text-muted-foreground hidden sm:block">
+            <p className="hidden text-[10px] text-muted-foreground sm:block">
               Tip: use <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{firstName}}"}</code>,{" "}
               <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{lastName}}"}</code>,{" "}
               <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{companyName}}"}</code> as placeholders
             </p>
 
-            <div className="flex items-center gap-2 ml-auto">
+            <div className="ml-auto flex items-center gap-2">
               <Button type="button" variant="ghost" size="sm" onClick={() => handleOpen(false)} className="gap-1.5">
                 <XIcon className="h-3.5 w-3.5" />
                 Discard

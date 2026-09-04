@@ -12,6 +12,8 @@
 
 // ─── Block types ──────────────────────────────────────────────────────────────
 
+import { PLACEHOLDERS } from "@/lib/email-placeholders";
+
 export type BlockType =
   | "heading"
   | "text"
@@ -434,10 +436,15 @@ export function estimateHtmlSize(html: string): { bytes: number; kb: number; war
 
 // ─── Variable extraction ──────────────────────────────────────────────────────
 
-export const VARIABLES = [
-  { key: "{{nome}}", label: "First Name" },
-  { key: "{{cognome}}", label: "Last Name" },
-  { key: "{{email}}", label: "Email" },
-  { key: "{{azienda}}", label: "Company" },
-  { key: "{{link_unsubscribe}}", label: "Unsubscribe Link" },
-];
+/**
+ * The editor's variable menu, built from the one catalogue.
+ *
+ * It used to be its own hand-written list, which is how `{{azienda}}` came to be
+ * offered here and substituted nowhere: picking it from the menu shipped it to a
+ * customer raw (audit rilievo S-08).
+ */
+export const VARIABLES = PLACEHOLDERS.map((p) => ({
+  key: `{{${p.aliases[0]}}}`,
+  label: p.label,
+  description: p.description,
+}));
