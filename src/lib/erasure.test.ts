@@ -177,15 +177,6 @@ describe("the trails that survive anonymising a contact, and must not", () => {
     expect(presenza?.impostati?.email).toBeNull();
     expect(presenza?.impostati?.name).toBe(ANONIMO);
   });
-
-  it("removes the visitor from a chat session", async () => {
-    const { db, chiamate } = dbFinto();
-
-    await eraseByContactPoint(db, EMAIL);
-
-    const sessione = chiamate.find((c) => c.tabella === "chat_session");
-    expect(sessione?.impostati?.visitorEmail).toBeNull();
-  });
 });
 
 describe("a lead goes, a contact is anonymised", () => {

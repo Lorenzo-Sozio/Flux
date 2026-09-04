@@ -19,10 +19,6 @@ export {
   campaignLogs,
   campaignLogsRelations,
   // Chat / DM
-  chatChannels,
-  chatChannelsRelations,
-  chatSessions,
-  chatSessionsRelations,
   // CRM core
   companies,
   contacts,

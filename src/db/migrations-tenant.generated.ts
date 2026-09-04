@@ -289,4 +289,12 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\n\n-- A che punto della finestra è già stato avvisato, per non ripetersi a ogni giro\n-- del job: 0 nessun avviso, 50 e 80 le due soglie.\nALTER TABLE "ticket" ADD COLUMN IF NOT EXISTS "sla_warn_level" integer DEFAULT 0 NOT NULL;\n',
     ],
   },
+  {
+    tag: "0008_the_chat_that_was_never_there",
+    folderMillis: 1788940000000,
+    hash: "e5b47fa5899eee5cf3a8afec012c3a578c820a9bf96ee81b9ec007b5d19a486d",
+    sql: [
+      '-- The visitor chat that was never there (audit rilievo M-06).\n--\n-- Two tables shipped with the schema and nothing ever wrote to them. The five\n-- server actions that could have are gone with this change; searching the whole\n-- history of the repository, not one of them was ever called from a page, a widget\n-- or a route, and there was no table to keep a message in — the session pointed at\n-- a ticket, so the conversation would have been the ticket\'s.\n--\n-- Leaving empty tables behind is how `opportunity` survived long enough to\n-- constrain orders that had nothing to do with it, so they go.\n--\n-- ⚠️ The drop is guarded rather than unconditional. Nothing here can look at your\n-- database before running, and a statement that cannot be undone should refuse\n-- rather than assume: a table with even one row in it stays, and stays readable.\n-- Both are checked together because chat_session holds a foreign key into\n-- chat_channel, and dropping the second while the first survives would fail.\n--\n-- Re-running is harmless. Once the tables are gone the exception handler catches\n-- the missing table and the block does nothing.\nDO $$\nBEGIN\n  IF NOT EXISTS (SELECT 1 FROM "chat_session" LIMIT 1)\n     AND NOT EXISTS (SELECT 1 FROM "chat_channel" LIMIT 1) THEN\n    DROP TABLE "chat_session";\n    DROP TABLE "chat_channel";\n  END IF;\nEXCEPTION\n  WHEN undefined_table THEN NULL;\nEND $$;\n',
+    ],
+  },
 ];

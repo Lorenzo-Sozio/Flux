@@ -36,7 +36,6 @@ import {
   activities,
   appointmentAttendees,
   campaignLogs,
-  chatSessions,
   contacts,
   emailJobs,
   leads,
@@ -168,8 +167,8 @@ export async function eraseByContactPoint(
     report.anonymised.ticket = 0;
   }
 
-  // ── 6. Le due tabelle **senza chiave esterna** si raggiungono dal recapito, non dal
-  // contatto: è la stessa regola per cui l'art. 17 parte dal recapito.
+  // ── 6. Le tabelle **senza chiave esterna verso il contatto** si raggiungono dal
+  // recapito: è la stessa regola per cui l'art. 17 parte dal recapito.
   if (email) {
     report.anonymised.ticket_message = quanti(
       await db
@@ -186,13 +185,6 @@ export async function eraseByContactPoint(
         .where(sql`lower(btrim(${quoteActivities.email})) = ${email}`)
         .returning({ id: quoteActivities.id }),
     );
-    report.anonymised.chat_session = quanti(
-      await db
-        .update(chatSessions)
-        .set({ visitorEmail: null, visitorName: ANONIMO })
-        .where(sql`lower(btrim(${chatSessions.visitorEmail})) = ${email}`)
-        .returning({ id: chatSessions.id }),
-    );
     // Messaggi in coda non legati a una campagna cancellata sopra.
     report.deleted.email_job = quanti(
       await db
@@ -203,7 +195,6 @@ export async function eraseByContactPoint(
   } else {
     report.anonymised.ticket_message = 0;
     report.deleted.quote_activity = 0;
-    report.anonymised.chat_session = 0;
     report.deleted.email_job = 0;
   }
 

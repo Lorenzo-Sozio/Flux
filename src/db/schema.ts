@@ -1000,33 +1000,6 @@ export const businessHolidays = pgTable("business_holiday", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
-export const chatChannels = pgTable("chat_channel", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  name: text("name").notNull(),
-  type: text("type").notNull(), // live_chat, whatsapp, telegram, slack
-  isActive: boolean("is_active").default(true).notNull(),
-  config: text("config"), // JSON: API keys, webhook URLs, etc.
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-});
-
-export const chatSessions = pgTable("chat_session", {
-  id: text("id")
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  ticketId: text("ticket_id").references(() => tickets.id, { onDelete: "cascade" }),
-  channelId: text("channel_id").references(() => chatChannels.id),
-  visitorId: text("visitor_id"),
-  visitorEmail: text("visitor_email"),
-  visitorName: text("visitor_name"),
-  status: text("status").default("active").notNull(), // active, waiting, assigned, closed
-  assignedAgentId: text("assigned_agent_id").references(() => users.id),
-  startedAt: timestamp("started_at", { mode: "date" }).defaultNow().notNull(),
-  endedAt: timestamp("ended_at", { mode: "date" }),
-  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
-});
-
 export const ticketAuditLogs = pgTable("ticket_audit_log", {
   id: text("id")
     .primaryKey()
@@ -1161,16 +1134,6 @@ export const ticketMacrosRelations = relations(ticketMacros, ({ one }) => ({
 
 export const slasRelations = relations(slas, ({ many }) => ({
   tickets: many(tickets),
-}));
-
-export const chatChannelsRelations = relations(chatChannels, ({ many }) => ({
-  sessions: many(chatSessions),
-}));
-
-export const chatSessionsRelations = relations(chatSessions, ({ one }) => ({
-  ticket: one(tickets, { fields: [chatSessions.ticketId], references: [tickets.id] }),
-  channel: one(chatChannels, { fields: [chatSessions.channelId], references: [chatChannels.id] }),
-  assignedAgent: one(users, { fields: [chatSessions.assignedAgentId], references: [users.id] }),
 }));
 
 // --- AUTOMATION RULES ---

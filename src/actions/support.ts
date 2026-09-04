@@ -21,8 +21,6 @@ import { runAutomations } from "@/components/crm/automation/rule-engine";
 import {
   businessCalendar,
   businessHolidays,
-  chatChannels,
-  chatSessions,
   contacts,
   slas,
   ticketAuditLogs,
@@ -571,64 +569,16 @@ export async function deleteSLAAction(slaId: string) {
   return { success: true };
 }
 
-// --- CHAT CHANNELS ---
-
-export async function getChatChannels() {
-  const db = await getDb();
-  return db.query.chatChannels.findMany({
-    where: eq(chatChannels.isActive, true),
-  });
-}
-
-export async function createChatChannelAction(name: string, type: string, config?: Record<string, unknown>) {
-  const db = await getDb();
-  await requireCapability("chatChannel:manage");
-  await requirePlanModule("support");
-
-  const [channel] = await db
-    .insert(chatChannels)
-    .values({ name, type, config: config ? JSON.stringify(config) : null })
-    .returning();
-
-  return { success: true, channel };
-}
-
-// --- CHAT SESSIONS ---
-
-export async function startChatSessionAction(channelId: string, visitorEmail?: string, visitorName?: string) {
-  const db = await getDb();
-  const [chatSession] = await db
-    .insert(chatSessions)
-    .values({ channelId, visitorEmail, visitorName, status: "active" })
-    .returning();
-
-  return { success: true, session: chatSession };
-}
-
-export async function assignChatSessionAction(sessionId: string, agentId: string, ticketId?: string) {
-  const db = await getDb();
-  await requireCapability("ticket:write");
-  await requirePlanModule("support");
-
-  const [updated] = await db
-    .update(chatSessions)
-    .set({ assignedAgentId: agentId, status: "assigned", ticketId })
-    .where(eq(chatSessions.id, sessionId))
-    .returning();
-
-  return { success: true, session: updated };
-}
-
-export async function endChatSessionAction(sessionId: string) {
-  const db = await getDb();
-  const [updated] = await db
-    .update(chatSessions)
-    .set({ status: "closed", endedAt: new Date() })
-    .where(eq(chatSessions.id, sessionId))
-    .returning();
-
-  return { success: true, session: updated };
-}
+// The visitor chat lived here: two tables, five actions, and no caller anywhere in
+// the history of the repository. No widget, no message table, no inbox — the
+// session row pointed at a ticket, so the conversation would have been the
+// ticket's. Two of the actions asked for no capability at all, which made them a
+// writable endpoint for anyone with a session (audit rilievo M-06).
+//
+// A customer reaches support here by email or by the ticket form. Making the chat
+// real means a widget, a live transport, an agent queue and presence: a product,
+// not a gap to fill in. So it goes, rather than sitting in the schema looking like
+// something that works.
 
 // --- AGENTS ---
 

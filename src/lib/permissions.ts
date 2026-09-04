@@ -81,7 +81,6 @@ export const CAPABILITIES = {
   "ticket:delete": "admin",
   "sla:manage": "admin",
   "macro:manage": "editor",
-  "chatChannel:manage": "admin",
 
   // Reporting — reading a report needs no more authority than reading the rows
   // behind it; only saving and deleting shared reports is privileged.

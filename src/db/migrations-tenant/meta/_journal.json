@@ -57,6 +57,13 @@
       "when": 1788930000000,
       "tag": "0007_the_office_has_opening_hours",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788940000000,
+      "tag": "0008_the_chat_that_was_never_there",
+      "breakpoints": true
     }
   ]
 }
