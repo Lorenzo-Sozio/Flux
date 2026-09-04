@@ -12,9 +12,10 @@ Aggiornato dopo il primo ciclo di correzioni.
 
 | | |
 |---|---|
-| ✅ Risolti | 60 |
-| ◐ Parziali | 2 |
-| Aperti | 4 |
+| ✅ Risolti | 61 |
+| ◐ Parziali | 1 |
+| ⊘ Non si fa | 1 |
+| Aperti | 3 |
 
 Verifiche dopo le correzioni: build di produzione riuscito, `tsc --noEmit` pulito,
 **293 test** superati (erano 91), **152 mutazioni su 152** catturate (erano 78), zero
@@ -24,10 +25,15 @@ migrazioni dei tenant, il confine server/client della sidebar, la corrispondenza
 nomi di aziende e la paginazione — cioè le aree dove un guasto somiglia a un
 successo.
 
-I quattro punti ancora aperti non sono difetti. Tre sono funzioni da costruire
-(S-05, S-06, S-10) e uno è la scelta di modello su lead e contatto, M-02, che va
-decisa prima di essere scritta. S-05 e S-06 sono in realtà una decisione sola:
-mettere o no un modello linguistico dentro il prodotto.
+I tre punti ancora aperti sono funzioni da costruire, non difetti: S-05, S-06 e
+S-10. I primi due sono in realtà una decisione sola — mettere o no un modello
+linguistico dentro il prodotto, con i dati dei clienti che ci passano e un costo
+per chiamata — e S-10 è un progetto con una dipendenza esterna, la verifica di
+Google sugli ambiti di calendario e posta, che decide i tempi al posto tuo.
+
+Resta un solo parziale, M-09: una sola libreria di trascinamento ormai, e sulla
+lingua dei commenti la regola sta nel `CLAUDE.md`, con i file esistenti che si
+allineano quando li si tocca.
 
 Dei due parziali ciascuna voce dice cosa le manca: M-09 ha una sola libreria di
 trascinamento ormai, e sulla lingua dei commenti la regola sta nel `CLAUDE.md`;
@@ -56,7 +62,8 @@ dalla sola Content-Security-Policy. Ora passa da `src/lib/sanitize-email-html.ts
 gira senza DOM perché serve al server, al Worker e al browser, e toglie ciò su cui non
 può essere sicuro.
 
-Legenda: ✅ risolto · ◐ risolto in parte, il resto è annotato nel rimedio.
+Legenda: ✅ risolto · ◐ risolto in parte, il resto è annotato nel rimedio ·
+⊘ non si fa, e la voce dice perché e a quale condizione riaprirla.
 
 > Nessuna credenziale, chiave o stringa di connessione è riprodotta in questo
 > documento. La variabile `NXTAUTH_URL` è citata solo per il refuso nel nome.
@@ -574,13 +581,31 @@ Il titolo sul calendario non è più la nota tagliata a cinquanta caratteri a me
 ma la sua prima riga, che è dove le persone scrivono l'intestazione; quando la nota è
 vuota, il tipo dell'attività dice più di mezza frase.
 
-### M-02 — Cinque entità per lo stesso arco commerciale
+### M-02 ⊘ — Cinque entità per lo stesso arco commerciale
 
 Lead, contatto, azienda, opportunità e trattativa, con campi ampiamente sovrapposti:
 indirizzo, sorgente, punteggio e consensi marketing duplicati tra lead e contatto.
 
 **Rimedio.** Eliminare l'opportunità. Valutare il lead come stato del contatto anziché
 tabella parallela.
+
+**⊘ Metà fatta, metà non si fa, e il perché sta qui.** L'opportunità è stata eliminata:
+le entità sono quattro, non cinque. Il lead resta una tabella a sé.
+
+La duplicazione è reale — ventitré delle trentaquattro colonne del lead esistono anche
+sul contatto — ma fondere le due tabelle tocca la spina dorsale del prodotto: liste,
+filtri salvati, API di importazione, entità delle automazioni, e il flusso di conversione
+che ha appena ricevuto la transazione e il rilevamento duplicati. Settantacinque file
+nominano i lead. Il guadagno è concettuale.
+
+**E la conseguenza pericolosa della duplicazione è già contenuta.** L'unica che poteva
+costare qualcosa era il consenso: qualcuno che si disiscrive come contatto e continua a
+ricevere posta come lead. La rotta di disiscrizione tratta **la persona**, non la riga:
+raccoglie ogni lead e ogni contatto con quel recapito e spegne il consenso su tutti. Il
+rischio legale non c'è, e ciò che resta è una ridondanza di schema che nessun utente vede.
+
+Da riaprire il giorno in cui una colonna nuova va aggiunta a entrambe le tabelle e una
+delle due se ne dimentica: è quello il momento in cui la duplicazione inizia a costare.
 
 ### M-03 ✅ — La conversione del lead non è atomica e non riconosce i duplicati
 
@@ -810,7 +835,7 @@ Ticket e ordini non sono tra le entità disponibili.
 **Rimedio.** Lettura aperta a chi ha accesso ai dati, scrittura agli amministratori.
 Relazioni predefinite, invio programmato, almeno un tipo di grafico.
 
-### U-11 — Notifiche e chat vivono di interrogazioni ripetute ◐
+### U-11 ✅ — Notifiche e chat vivono di interrogazioni ripetute
 
 Notifiche: 50 righe complete ogni minuto, senza cursore. Chat: una interrogazione ogni
 5 secondi più una ogni 10. Nessuna preferenza per tipo di notifica.
@@ -837,8 +862,15 @@ dal chiamante, e il chiamante di una server action è il browser. Chiunque avess
 sessione poteva leggere le notifiche di un altro passando il suo id, o segnargliele tutte
 lette. L'id ora viene dalla sessione e l'argomento non esiste più.
 
-**Restano aperti** le preferenze per tipo e canale, e il flusso di eventi: entrambi
-aggiungono superficie, e il costo che li giustificava è già stato tolto.
+**⊘ Il resto non si fa, e questa è la decisione.** Le preferenze per tipo e canale e il
+flusso di eventi restano fuori. Il polling adattivo ha già tolto il costo che li
+giustificava: una scheda in secondo piano non interroga, un giro a vuoto raddoppia
+l'attesa, e l'endpoint restituisce solo ciò che è arrivato dopo l'ultimo giro. Le
+preferenze aggiungerebbero schema, interfaccia e superficie di assistenza per un problema
+che non morde più; il flusso di eventi aggiungerebbe un trasporto da tenere in piedi.
+
+Da riaprire quando qualcuno si lamenterà del **rumore** delle notifiche invece che del
+loro costo: quella è la lamentela che le preferenze risolvono davvero.
 
 ### U-12 ✅ — Non esiste un primo avvio
 
