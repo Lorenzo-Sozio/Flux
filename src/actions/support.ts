@@ -5,7 +5,7 @@ import { after } from "next/server";
 
 import crypto from "node:crypto";
 
-import { and, desc, eq, isNotNull, lt, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, lt, notInArray } from "drizzle-orm";
 import type { z } from "zod";
 
 import {
@@ -19,6 +19,8 @@ import {
 } from "@/actions/support-validation";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import {
+  businessCalendar,
+  businessHolidays,
   chatChannels,
   chatSessions,
   contacts,
@@ -30,6 +32,8 @@ import {
   users,
 } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
+import { loadBusinessCalendar, parseWeek } from "@/lib/business-calendar";
+import { addBusinessMinutes } from "@/lib/business-hours";
 import { sendEmail } from "@/lib/email-provider";
 import { getDb } from "@/lib/tenant-context";
 import { logTicketChange } from "@/lib/ticket-audit";
@@ -66,12 +70,22 @@ async function resolveSla(priority: string, from: Date = new Date()) {
 
   if (!sla) return { slaId: null, firstResponseDueAt: null, slaDeadlineAt: null };
 
+  // A policy measured in working minutes needs the workspace's own week. Wall
+  // clock stays the default on existing policies, so nothing already promised
+  // changes meaning without somebody choosing it (audit rilievo S-07).
+  const advance = sla.useBusinessHours
+    ? await (async () => {
+        const calendar = await loadBusinessCalendar(db);
+        return (minutes: number) => addBusinessMinutes(from, minutes, calendar);
+      })()
+    : (minutes: number) => new Date(from.getTime() + minutes * 60_000);
+
   return {
     slaId: sla.id,
     // Two promises, tracked separately. The ticket only ever had one field, so
     // first-response compliance could not be measured even in principle.
-    firstResponseDueAt: new Date(from.getTime() + sla.firstResponseTimeMinutes * 60_000),
-    slaDeadlineAt: new Date(from.getTime() + sla.resolutionTimeMinutes * 60_000),
+    firstResponseDueAt: advance(sla.firstResponseTimeMinutes),
+    slaDeadlineAt: advance(sla.resolutionTimeMinutes),
   };
 }
 
@@ -853,4 +867,85 @@ export async function autoCloseResolvedTickets() {
     .returning({ id: tickets.id });
 
   return closed.length;
+}
+
+// --- BUSINESS CALENDAR ---
+
+/** The workspace's opening hours and holidays, with the defaults when unset. */
+export async function getBusinessCalendar() {
+  await requireCapability("ticket:read");
+  await requirePlanModule("support");
+  const db = await getDb();
+
+  const [row] = await db.select().from(businessCalendar).limit(1);
+  const holidays = await db.select().from(businessHolidays).orderBy(asc(businessHolidays.day));
+
+  return {
+    id: row?.id ?? null,
+    timeZone: row?.timeZone ?? "Europe/Rome",
+    week: parseWeek(row?.week),
+    holidays,
+  };
+}
+
+/**
+ * Saves the week and the time zone.
+ *
+ * One row per workspace, so this creates it the first time and updates it after.
+ */
+export async function saveBusinessCalendarAction(data: { timeZone: string; week: unknown }) {
+  await requireCapability("sla:manage");
+  await requirePlanModule("support");
+  const db = await getDb();
+
+  // Validated on the way in as well as on the way out: the column is `jsonb` and
+  // will take whatever it is given.
+  const week = parseWeek(data.week);
+  const timeZone = data.timeZone.trim() || "Europe/Rome";
+  try {
+    // Rejects a name no runtime recognises, before it reaches every deadline.
+    new Intl.DateTimeFormat("en-US", { timeZone });
+  } catch {
+    throw new Error(`"${timeZone}" is not a time zone this system knows.`);
+  }
+
+  const [existing] = await db.select({ id: businessCalendar.id }).from(businessCalendar).limit(1);
+
+  if (existing) {
+    await db
+      .update(businessCalendar)
+      .set({ timeZone, week, updatedAt: new Date() })
+      .where(eq(businessCalendar.id, existing.id));
+  } else {
+    await db.insert(businessCalendar).values({ timeZone, week });
+  }
+
+  revalidatePath("/dashboard/support/sla");
+  return { success: true };
+}
+
+export async function addBusinessHolidayAction(day: string, name?: string) {
+  await requireCapability("sla:manage");
+  await requirePlanModule("support");
+  const db = await getDb();
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) throw new Error("A holiday is a date, as YYYY-MM-DD.");
+
+  await db
+    .insert(businessHolidays)
+    .values({ day, name: name?.trim() || null })
+    .onConflictDoNothing();
+
+  revalidatePath("/dashboard/support/sla");
+  return { success: true };
+}
+
+export async function removeBusinessHolidayAction(id: string) {
+  await requireCapability("sla:manage");
+  await requirePlanModule("support");
+  const db = await getDb();
+
+  await db.delete(businessHolidays).where(eq(businessHolidays.id, id));
+  revalidatePath("/dashboard/support/sla");
+  return { success: true };
 }

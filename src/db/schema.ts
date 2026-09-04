@@ -1,4 +1,4 @@
-import { boolean, integer, numeric, pgTable, primaryKey, text, timestamp, unique } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, unique } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
 export const users = pgTable("user", {
@@ -920,6 +920,9 @@ export const tickets = pgTable("ticket", {
   slaPausedAt: timestamp("sla_paused_at", { mode: "date" }),
   slaPauseMinutes: integer("sla_pause_minutes").default(0).notNull(),
   slaBreachedAt: timestamp("sla_breached_at", { mode: "date" }),
+  // How far into the window the team has already been warned: 0, then 50, then
+  // 80. Without it the job would say the same thing every fifteen minutes.
+  slaWarnLevel: integer("sla_warn_level").default(0).notNull(),
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
   leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
@@ -962,7 +965,38 @@ export const slas = pgTable("sla", {
   priority: text("priority").notNull(), // low, normal, high, urgent
   firstResponseTimeMinutes: integer("first_response_time_minutes").notNull(),
   resolutionTimeMinutes: integer("resolution_time_minutes").notNull(),
+  // Whether those minutes are working minutes or wall-clock ones. Off by default
+  // on existing policies: quietly changing what a promise already made means is
+  // not a correction, it is a surprise (audit rilievo S-07).
+  useBusinessHours: boolean("use_business_hours").default(false).notNull(),
   isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/**
+ * When the office is open. One row per workspace.
+ *
+ * The week is JSON because it is seven entries always read together and never
+ * queried one at a time; holidays are rows because they are added, removed and
+ * looked up by date.
+ */
+export const businessCalendar = pgTable("business_calendar", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  timeZone: text("time_zone").default("Europe/Rome").notNull(),
+  week: jsonb("week").notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+export const businessHolidays = pgTable("business_holiday", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  /** "YYYY-MM-DD" in the calendar's own zone, not an instant. */
+  day: text("day").notNull(),
+  name: text("name"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 

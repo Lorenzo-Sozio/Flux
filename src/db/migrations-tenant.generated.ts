@@ -277,4 +277,16 @@ export const tenantMigrations: EmbeddedMigration[] = [
       "\r\n\r\n-- E la **riga** può dire per esteso che cosa è stato chiesto.\r\n--\r\n-- `description` dice che cosa si prepara — la voce del listino, quella a cui il prezzo\r\n-- appartiene — e non è il posto dove infilare anche il resto: chi legge un ordine deve\r\n-- poter distinguere l'articolo dalle indicazioni, e un unico campo che li mescola si\r\n-- legge male proprio quando ci sono entrambi.\r\n--\r\n-- Ci finiscono due cose. Le **modifiche** che il cliente ha chiesto su quella riga, con\r\n-- le sue parole: «poco piccante» cambia come si prepara la pizza, e senza un posto dove\r\n-- scriverlo l'ordine si prepara sbagliato. E **come l'ha chiamata**, quando è diverso\r\n-- dalla voce di listino: chi ha preso l'ordine ha fatto una corrispondenza, e questa è\r\n-- l'unica riga su cui una persona può accorgersi che era sbagliata.\r\nALTER TABLE \"order_item\" ADD COLUMN IF NOT EXISTS \"notes\" text;\r\n",
     ],
   },
+  {
+    tag: "0007_the_office_has_opening_hours",
+    folderMillis: 1788930000000,
+    hash: "9c385291ad03ef30327f5d167d5d9af215b47b61c267019aeebd4c42b3f55919",
+    sql: [
+      '-- Lo SLA smette di correre di notte e nei fine settimana (audit rilievo S-07).\n--\n-- Le scadenze erano calcolate sull\'orologio da parete: una promessa di quattro ore\n-- su un ticket arrivato venerdì alle 17:00 scadeva alle 21:00 di venerdì, quando\n-- non c\'era nessuno, e lunedì la squadra leggeva di aver mancato qualcosa che\n-- nessuno poteva rispettare. Lo stesso conto sbaglia ogni metrica del supporto\n-- nella stessa direzione, in silenzio.\n--\n-- Il calendario è uno per workspace: una riga sola, con la settimana in JSON\n-- perché sono sette voci lette sempre insieme e mai interrogate una per una.\n--\n-- ⚠️ Il driver Neon HTTP non tiene una transazione fra istruzioni: ogni istruzione\n-- è additiva e rieseguibile.\nCREATE TABLE IF NOT EXISTS "business_calendar" (\n  "id" text PRIMARY KEY NOT NULL,\n  "time_zone" text DEFAULT \'Europe/Rome\' NOT NULL,\n  "week" jsonb NOT NULL,\n  "created_at" timestamp DEFAULT now() NOT NULL,\n  "updated_at" timestamp DEFAULT now() NOT NULL\n);',
+      '\nCREATE TABLE IF NOT EXISTS "business_holiday" (\n  "id" text PRIMARY KEY NOT NULL,\n  "day" text NOT NULL,\n  "name" text,\n  "created_at" timestamp DEFAULT now() NOT NULL\n);',
+      '\nCREATE UNIQUE INDEX IF NOT EXISTS "business_holiday_day_idx" ON "business_holiday" ("day");',
+      '\n\n-- Le politiche esistenti continuano a misurare come prima finché qualcuno non\n-- decide diversamente: cambiare di nascosto il significato di una promessa già\n-- presa non è una correzione, è una sorpresa.\nALTER TABLE "sla" ADD COLUMN IF NOT EXISTS "use_business_hours" boolean DEFAULT false NOT NULL;',
+      '\n\n-- A che punto della finestra è già stato avvisato, per non ripetersi a ogni giro\n-- del job: 0 nessun avviso, 50 e 80 le due soglie.\nALTER TABLE "ticket" ADD COLUMN IF NOT EXISTS "sla_warn_level" integer DEFAULT 0 NOT NULL;\n',
+    ],
+  },
 ];

@@ -14,6 +14,8 @@ export {
   // Automation
   automationRules,
   automationRulesRelations,
+  businessCalendar,
+  businessHolidays,
   campaignLogs,
   campaignLogsRelations,
   // Chat / DM

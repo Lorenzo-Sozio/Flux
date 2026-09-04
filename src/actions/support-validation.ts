@@ -68,6 +68,8 @@ export const CreateSLASchema = z.object({
   priority: z.enum(["low", "normal", "high", "urgent"]),
   firstResponseTimeMinutes: z.number().int().positive(),
   resolutionTimeMinutes: z.number().int().positive(),
+  // Whether those minutes are working minutes or wall-clock ones.
+  useBusinessHours: z.boolean().optional(),
 });
 
 export const UpdateSLASchema = z.object({
@@ -76,6 +78,7 @@ export const UpdateSLASchema = z.object({
   priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
   firstResponseTimeMinutes: z.number().int().positive().optional(),
   resolutionTimeMinutes: z.number().int().positive().optional(),
+  useBusinessHours: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });
 

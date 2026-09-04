@@ -860,10 +860,33 @@ risposta dalle macro esistenti, riassunto del thread per chi subentra.
 Bozza del sollecito su un preventivo, risposta al ticket, verbale della riunione
 dall'attività registrata. Sempre proposta, sempre modificabile, mai spedita da sola.
 
-### S-07 — SLA con orari lavorativi e scala di escalation
+### S-07 — SLA con orari lavorativi e scala di escalation ◐
 
 Calendario lavorativo per workspace con festività. Avvisi al 50% e all'80% del tempo
 residuo, non solo alla violazione avvenuta. Escalation automatica al responsabile.
+
+**◐ Parziale.** Il calendario c'è: settimana, fuso orario e giorni di chiusura, modificabili
+dalla pagina SLA. L'aritmetica sta in `src/lib/business-hours.ts`, modulo puro senza
+dipendenze — `date-fns` da solo non fa i fusi e il bundle è già vicino al limite di
+Workers, mentre `Intl` c'è ovunque questo gira.
+
+Il difetto che chiude: una promessa di quattro ore su un ticket arrivato venerdì alle
+17:00 scadeva alle 21:00 di venerdì, quando non c'era nessuno, e lunedì la squadra
+leggeva di aver mancato qualcosa che nessuno poteva rispettare. Lo stesso conto sbagliava
+ogni metrica del supporto nella stessa direzione, in silenzio.
+
+Le politiche esistenti restano sull'orologio da parete finché qualcuno non sceglie
+diversamente: cambiare di nascosto il significato di una promessa già presa non è una
+correzione, è una sorpresa.
+
+Gli avvisi al 50% e all'80% ci sono, misurati sulla finestra del ticket stesso, così una
+politica da quattro ore e una da due giorni avvisano allo stesso punto nei propri termini.
+Il livello raggiunto è memorizzato sul ticket, altrimenti il job ripeterebbe la stessa
+cosa ogni quindici minuti.
+
+**Resta aperta l'escalation automatica al responsabile**: nello schema non esiste una
+gerarchia — un utente non ha un responsabile — quindi va deciso prima cosa significhi.
+Oggi l'avviso va a chi ha il ticket in carico.
 
 ### S-08 — Segnaposto documentati, anteprima reale, disiscrizione garantita ✅
 

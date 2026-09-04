@@ -1,0 +1,44 @@
+[
+  {
+    "file": "src/lib/business-hours.ts",
+    "description": "⚠️⚠️ l'orologio riparte da dove arriva il ticket invece che dall'apertura: una richiesta delle 03:00 consuma la notte, e la scadenza cade prima che qualcuno sia in ufficio",
+    "find": "      const from_ = Math.max(cursorMinute, win.openMinute);",
+    "replace": "      const from_ = cursorMinute;"
+  },
+  {
+    "file": "src/lib/business-hours.ts",
+    "description": "⚠️⚠️ le festività non chiudono più niente: la scadenza cade in un giorno in cui l'ufficio è chiuso",
+    "find": "  if (cal.holidays.includes(dateKey(year, month, day))) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/business-hours.ts",
+    "description": "⚠️⚠️ la settimana non viene più consultata: sabato e domenica diventano giorni lavorativi",
+    "find": "  return cal.week[weekday] ?? null;",
+    "replace": "  return cal.week[weekday] ?? { openMinute: 0, closeMinute: 24 * 60 };"
+  },
+  {
+    "file": "src/lib/business-hours.ts",
+    "description": "⚠️ la seconda passata sul fuso sparisce: attraversando il cambio d'ora la scadenza si sposta di un'ora",
+    "find": "  return new Date(secondOffset === firstOffset ? firstGuess : naive - secondOffset);",
+    "replace": "  return new Date(firstGuess);"
+  },
+  {
+    "file": "src/lib/business-hours.ts",
+    "description": "⚠️ l'ora di chiusura diventa inclusiva: un minuto dopo la chiusura conta ancora come tempo lavorativo",
+    "find": "  return minuteOfDay >= win.openMinute && minuteOfDay < win.closeMinute;",
+    "replace": "  return minuteOfDay >= win.openMinute && minuteOfDay <= win.closeMinute;"
+  },
+  {
+    "file": "src/lib/business-hours.ts",
+    "description": "il calendario completamente chiuso non ha più la via d'uscita: nessuna scadenza invece di una sbagliata ma visibile",
+    "find": "  if (!cal.week.some((d) => d && d.closeMinute > d.openMinute)) {\n    return new Date(from.getTime() + minutes * MINUTE);\n  }",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/business-hours.ts",
+    "description": "il conteggio non si ferma più al giorno finale: somma tempo oltre l'istante richiesto",
+    "find": "      const close = Math.min(win.closeMinute, isLastDay ? endMinute : DAY_MINUTES);",
+    "replace": "      const close = win.closeMinute;"
+  }
+]
