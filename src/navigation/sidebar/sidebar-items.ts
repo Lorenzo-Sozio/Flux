@@ -22,6 +22,7 @@ import {
   Settings,
   Settings2,
   ShoppingCart,
+  Sunrise,
   Swords,
   Target,
   TrendingUp,
@@ -83,6 +84,9 @@ export const sidebarItems: NavGroup[] = [
     id: 1,
     labelKey: "crm",
     items: [
+      // First, because it is where the day starts. The dashboard below it answers
+      // "how are we doing"; this one answers "what am I doing" (audit rilievo S-11).
+      { titleKey: "today", url: "/dashboard/today", icon: Sunrise },
       { titleKey: "dashboard", url: "/dashboard/crm", icon: ChartBar },
       { titleKey: "calendar", url: "/dashboard/calendar", icon: Calendar },
       {

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { and, desc, eq, gte, inArray, lte, notInArray, sql, sum } from "drizzle-orm";
+import { and, desc, eq, gte, notInArray, sum } from "drizzle-orm";
 import {
   AlertCircle,
   ArrowRight,
@@ -19,10 +19,10 @@ import {
 } from "lucide-react";
 import { getLocale, getTranslations } from "next-intl/server";
 
-import { getAppointmentCalendarEvents } from "@/actions/appointments";
 import { getRecentLeads } from "@/actions/crm";
 import { getDashboardStats, getRecentActivities, getTopDeals } from "@/actions/dashboard";
 import { getNextActions } from "@/actions/next-actions";
+import { getTodayView } from "@/actions/today";
 import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
 import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
 import CRMCharts from "@/components/dashboard/CRMCharts.client";
@@ -30,12 +30,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { activities, companies, contacts, deals, leads, salesTargets, tasks, tickets } from "@/db/schema";
+import { deals, salesTargets, tickets } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
 
-import { type AgendaItem, AgendaWidget } from "./_components/agenda-widget";
+import { AgendaWidget } from "./_components/agenda-widget";
 import { MonthTargetCard } from "./_components/month-target-card";
 import { NextActionsCard } from "./_components/next-actions-card";
 
@@ -94,268 +94,78 @@ export default async function CRMPage() {
   const now = new Date();
   const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  const _todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const _todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
   // Limit overdue look-back to 30 days so stale tasks don't flood the agenda
-  const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 0, 0, 0);
+  const _thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30, 0, 0, 0);
 
   // ── All fetches in parallel ──────────────────────────────────────────────────
-  // Agenda is always personal: filter by current user even for privileged roles.
-  // Checks direct owner/assignee AND the multi-assignee table.
-  const agendaTaskFilter = userId
-    ? sql`(${tasks.ownerId} = ${userId} OR ${tasks.assigneeId} = ${userId} OR EXISTS (
-        SELECT 1 FROM "task_assignee" WHERE task_id = ${tasks.id} AND user_id = ${userId}
-      ))`
-    : undefined;
 
-  const [
-    stats,
-    rawLeads,
-    topDeals,
-    recentActivities,
-    myTasks,
-    todayActivities,
-    todayAppointments,
-    myTickets,
-    myTarget,
-    wonThisMonth,
-    nextActions,
-  ] = await Promise.all([
-    getDashboardStats(),
-    getRecentLeads(5),
-    getTopDeals(5),
-    getRecentActivities(10),
+  const [stats, rawLeads, topDeals, recentActivities, myTickets, myTarget, wonThisMonth, nextActions, today] =
+    await Promise.all([
+      getDashboardStats(),
+      getRecentLeads(5),
+      getTopDeals(5),
+      getRecentActivities(10),
 
-    // Tasks due today or overdue, not done — with entity name joins
-    userId
-      ? db
-          .select({
-            id: tasks.id,
-            title: tasks.title,
-            dueDate: tasks.dueDate,
-            startDate: tasks.startDate,
-            allDay: tasks.allDay,
-            status: tasks.status,
-            priority: tasks.priority,
-            estimatedHours: tasks.estimatedHours,
-            ticketId: tasks.ticketId,
-            leadId: tasks.leadId,
-            contactId: tasks.contactId,
-            companyId: tasks.companyId,
-            dealId: tasks.dealId,
-            leadFirstName: leads.firstName,
-            leadLastName: leads.lastName,
-            contactFirstName: contacts.firstName,
-            contactLastName: contacts.lastName,
-            companyName: companies.name,
-            dealName: deals.name,
-          })
-          .from(tasks)
-          .leftJoin(leads, eq(tasks.leadId, leads.id))
-          .leftJoin(contacts, eq(tasks.contactId, contacts.id))
-          .leftJoin(companies, eq(tasks.companyId, companies.id))
-          .leftJoin(deals, eq(tasks.dealId, deals.id))
-          .where(
-            and(
-              agendaTaskFilter as any,
-              gte(tasks.dueDate, thirtyDaysAgo),
-              lte(tasks.dueDate, todayEnd),
-              notInArray(tasks.status, ["done"]),
-            ),
-          )
-          .orderBy(tasks.dueDate)
-      : Promise.resolve([]),
+      // Open tickets assigned to me
+      userId
+        ? db
+            .select({
+              id: tickets.id,
+              ticketNumber: tickets.ticketNumber,
+              subject: tickets.subject,
+              status: tickets.status,
+              priority: tickets.priority,
+              updatedAt: tickets.updatedAt,
+              slaDeadlineAt: tickets.slaDeadlineAt,
+            })
+            .from(tickets)
+            .where(
+              // `and()` already accepts undefined among its arguments, so the
+              // cast was hiding nothing and asserting nothing.
+              and(
+                isPrivileged ? undefined : eq(tickets.assigneeId, userId),
+                notInArray(tickets.status, ["resolved", "closed"]),
+              ),
+            )
+            .orderBy(desc(tickets.updatedAt))
+            .limit(8)
+        : Promise.resolve([]),
 
-    // Today's meetings and calls with entity name joins
-    userId
-      ? db
-          .select({
-            id: activities.id,
-            type: activities.type,
-            content: activities.content,
-            date: activities.date,
-            durationMinutes: activities.durationMinutes,
-            leadId: activities.leadId,
-            contactId: activities.contactId,
-            companyId: activities.companyId,
-            dealId: activities.dealId,
-            leadFirstName: leads.firstName,
-            leadLastName: leads.lastName,
-            contactFirstName: contacts.firstName,
-            contactLastName: contacts.lastName,
-            companyName: companies.name,
-            dealName: deals.name,
-          })
-          .from(activities)
-          .leftJoin(leads, eq(activities.leadId, leads.id))
-          .leftJoin(contacts, eq(activities.contactId, contacts.id))
-          .leftJoin(companies, eq(activities.companyId, companies.id))
-          .leftJoin(deals, eq(activities.dealId, deals.id))
-          .where(
-            and(
-              inArray(activities.type, ["meeting", "call"]),
-              gte(activities.date, todayStart),
-              lte(activities.date, todayEnd),
-              !isPrivileged && userId ? eq(activities.ownerId, userId) : undefined,
-            ) as any,
-          )
-          .orderBy(activities.date)
-      : Promise.resolve([]),
+      // Current month target for this user
+      userId
+        ? db
+            .select({ targetAmount: salesTargets.targetAmount, currency: salesTargets.currency })
+            .from(salesTargets)
+            .where(and(eq(salesTargets.userId, userId), eq(salesTargets.period, currentPeriod)))
+            .limit(1)
+            .then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
 
-    // Today's appointments (organizer or attendee)
-    userId
-      ? getAppointmentCalendarEvents([userId]).then((rows) =>
-          rows.filter((r) => {
-            const d = new Date(r.date);
-            return d >= todayStart && d <= todayEnd && r.status !== "cancelled";
-          }),
-        )
-      : Promise.resolve([]),
+      // Won deals this month for this user
+      userId
+        ? db
+            .select({ total: sum(deals.amount) })
+            .from(deals)
+            .where(and(eq(deals.status, "won"), eq(deals.ownerId, userId), gte(deals.updatedAt, monthStart)))
+            .then((rows) => parseFloat(rows[0]?.total ?? "0"))
+        : Promise.resolve(0 as number),
 
-    // Open tickets assigned to me
-    userId
-      ? db
-          .select({
-            id: tickets.id,
-            ticketNumber: tickets.ticketNumber,
-            subject: tickets.subject,
-            status: tickets.status,
-            priority: tickets.priority,
-            updatedAt: tickets.updatedAt,
-            slaDeadlineAt: tickets.slaDeadlineAt,
-          })
-          .from(tickets)
-          .where(
-            and(
-              isPrivileged ? undefined : sql`${tickets.assigneeId} = ${userId}`,
-              notInArray(tickets.status, ["resolved", "closed"]),
-            ) as any,
-          )
-          .orderBy(desc(tickets.updatedAt))
-          .limit(8)
-      : Promise.resolve([]),
+      // What needs doing, rather than what exists (audit rilievo S-02). Failing to
+      // build the work list must not take the whole dashboard down with it: an
+      // empty list reads as "nothing waiting", which is the safe way to be wrong.
+      getNextActions(8).catch(() => []),
 
-    // Current month target for this user
-    userId
-      ? db
-          .select({ targetAmount: salesTargets.targetAmount, currency: salesTargets.currency })
-          .from(salesTargets)
-          .where(and(eq(salesTargets.userId, userId), eq(salesTargets.period, currentPeriod)))
-          .limit(1)
-          .then((rows) => rows[0] ?? null)
-      : Promise.resolve(null),
+      // The day's agenda. This page used to assemble it from three queries of its
+      // own and a hundred and thirty lines of mapping; the "today" screen needs the
+      // same list, and two copies of it would have drifted apart within a month.
+      getTodayView(),
+    ]);
 
-    // Won deals this month for this user
-    userId
-      ? db
-          .select({ total: sum(deals.amount) })
-          .from(deals)
-          .where(and(eq(deals.status, "won"), eq(deals.ownerId, userId), gte(deals.updatedAt, monthStart)))
-          .then((rows) => parseFloat(rows[0]?.total ?? "0"))
-      : Promise.resolve(0 as number),
-
-    // What needs doing, rather than what exists (audit rilievo S-02). Failing to
-    // build the work list must not take the whole dashboard down with it: an
-    // empty list reads as "nothing waiting", which is the safe way to be wrong.
-    getNextActions(8).catch(() => []),
-  ]);
+  const agendaItems = today.agenda;
 
   // ── Build agenda items ───────────────────────────────────────────────────────
-
-  function entityNameFrom(row: {
-    dealName: string | null;
-    contactFirstName: string | null;
-    contactLastName: string | null;
-    leadFirstName: string | null;
-    leadLastName: string | null;
-    companyName: string | null;
-  }): string | null {
-    if (row.dealName) return row.dealName;
-    if (row.contactFirstName) return `${row.contactFirstName} ${row.contactLastName ?? ""}`.trim();
-    if (row.leadFirstName) return `${row.leadFirstName} ${row.leadLastName ?? ""}`.trim();
-    return row.companyName ?? null;
-  }
-
-  function entityHrefFrom(row: {
-    dealId: string | null;
-    contactId: string | null;
-    leadId: string | null;
-    companyId: string | null;
-  }): string | null {
-    if (row.dealId) return "/dashboard/pipeline";
-    if (row.contactId) return `/dashboard/contacts/${row.contactId}`;
-    if (row.leadId) return `/dashboard/leads/${row.leadId}`;
-    if (row.companyId) return `/dashboard/companies/${row.companyId}`;
-    return null;
-  }
-
-  const agendaItems: AgendaItem[] = [
-    ...myTasks.map((task): AgendaItem => {
-      const isOverdue = task.dueDate ? new Date(task.dueDate) < todayStart : false;
-      // Overdue timed tasks are moved to the flat all-day section to avoid
-      // phantom time-grid placement at a past hour.
-      const isAllDay = (task.allDay ?? true) || isOverdue;
-      const entityHref = entityHrefFrom(task as any);
-      return {
-        id: task.id,
-        kind: "task",
-        title: task.title,
-        allDay: isAllDay,
-        timeISO: isAllDay
-          ? (task.dueDate?.toISOString() ?? null)
-          : ((task.startDate ?? task.dueDate)?.toISOString() ?? null),
-        endTimeISO: isAllDay ? null : (task.dueDate?.toISOString() ?? null),
-        priority: task.priority,
-        status: task.status,
-        entityName: entityNameFrom(task as any),
-        entityHref,
-        taskHref: task.ticketId ? `/dashboard/support/tickets/${task.ticketId}` : "/dashboard/tasks",
-        durationMinutes: null,
-        estimatedHours: task.estimatedHours ? String(task.estimatedHours) : null,
-        isOverdue,
-      };
-    }),
-    ...todayActivities.map((act): AgendaItem => {
-      const entityHref = entityHrefFrom(act as any);
-      const startMs = act.date ? new Date(act.date).getTime() : null;
-      const endTimeISO =
-        startMs && act.durationMinutes ? new Date(startMs + act.durationMinutes * 60_000).toISOString() : null;
-      return {
-        id: act.id,
-        kind: act.type as "meeting" | "call",
-        title: act.content ?? (act.type === "meeting" ? "Riunione" : "Chiamata"),
-        allDay: false,
-        timeISO: act.date ? act.date.toISOString() : null,
-        endTimeISO,
-        priority: "normal",
-        status: "open",
-        entityName: entityNameFrom(act as any),
-        entityHref,
-        taskHref: entityHref,
-        durationMinutes: act.durationMinutes,
-        estimatedHours: null,
-        isOverdue: false,
-      };
-    }),
-    ...todayAppointments.map(
-      (appt): AgendaItem => ({
-        id: appt.id,
-        kind: "appointment",
-        title: appt.displayTitle,
-        allDay: false,
-        timeISO: appt.date ? new Date(appt.date).toISOString() : null,
-        endTimeISO: (appt as any).endAt ? new Date((appt as any).endAt).toISOString() : null,
-        priority: "normal",
-        status: appt.status,
-        entityName: appt.entityName !== "No Entity" ? appt.entityName : null,
-        entityHref: appt.link,
-        taskHref: appt.link,
-        durationMinutes: null,
-        estimatedHours: null,
-        isOverdue: false,
-      }),
-    ),
-  ];
 
   // Already the five most recent, ordered by the database. This used to load every
   // lead in the workspace, sort them in JavaScript and throw all but five away

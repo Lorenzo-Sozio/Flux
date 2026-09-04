@@ -922,11 +922,22 @@ Google OAuth è già configurato per il login. Estenderlo a calendario e posta s
 appuntamenti bidirezionali e conversazioni email agganciate alla scheda del contatto. Il
 doppio inserimento è la ragione principale per cui un CRM viene abbandonato.
 
-### S-11 — Una vista «oggi» che sostituisca la barra laterale
+### S-11 — Una vista «oggi» che sostituisca la barra laterale ✅
 
 Una sola schermata con appuntamenti della giornata, task in scadenza, ticket vicini
 all'SLA e le prossime azioni di S-02, tutti azionabili sul posto. Tredici moduli in barra
 laterale sono la struttura del prodotto, non il modo in cui si lavora.
+
+**✅ Risolto.** `/dashboard/today`, prima voce del menu, perché è da lì che comincia la
+giornata: la dashboard sotto risponde a «come stiamo andando», questa a «cosa sto
+facendo». Tre cose e nient'altro — l'agenda del giorno sulla griglia oraria, l'elenco di
+S-02 con ciò che aspetta una risposta, e la coda dei propri ticket ordinata per quando
+smettono di essere puntuali, con quanto tempo resta detto come lo direbbe una persona.
+
+Nessun dato nuovo. L'agenda era centotrenta righe dentro la pagina della dashboard: tre
+interrogazioni e la mappatura che le unisce. Ora sta in `getTodayView()` e la disegnano
+entrambe le pagine, perché due copie sarebbero divergute nel giro di un mese — e la
+dashboard smette di eseguire tre interrogazioni che ora fa il modulo condiviso.
 
 ---
 
