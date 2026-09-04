@@ -3,13 +3,13 @@
 import { revalidatePath } from "next/cache";
 
 import bcrypt from "bcryptjs";
-import { and, eq, gt, isNull } from "drizzle-orm";
+import { and, desc, eq, gt, isNull } from "drizzle-orm";
 
 import { auth, signIn, signOut } from "@/auth";
 import { createTenantDb, platformDb } from "@/db";
 import { notifications, passwordResetTokens, tenantMembers, tenants, userInvitations, users } from "@/db/schema";
 import { appUrl } from "@/lib/app-url";
-import { requireCapability } from "@/lib/auth-guard";
+import { requireActor, requireCapability } from "@/lib/auth-guard";
 import { sendInvitationEmail, sendPasswordResetEmail } from "@/lib/email";
 import { assignableRoles, normalizeTenantRole, outranks } from "@/lib/permissions";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
@@ -469,19 +469,45 @@ export async function getPendingInvitationsAction() {
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────
-export async function getNotificationsAction(userId: string) {
+//
+// ⚠️ All three of these took the user id from the caller, and a server action's
+// caller is the browser. Anyone with a session could read another person's
+// notifications by passing their id, or mark them all read. The id now comes from
+// the session, and the argument is gone.
+
+/** How many notifications the bell is ever given. */
+const NOTIFICATION_PAGE = 50;
+
+export async function getNotificationsAction() {
+  const actor = await requireActor();
   const db = await getDb();
-  return await db.select().from(notifications).where(eq(notifications.userId, userId)).orderBy(notifications.createdAt);
+  return (
+    db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, actor.userId))
+      // Newest first, and capped. Ascending and unbounded meant the bell was handed
+      // the whole history to draw ten rows (audit rilievo U-11).
+      .orderBy(desc(notifications.createdAt))
+      .limit(NOTIFICATION_PAGE)
+  );
 }
 
 export async function markNotificationReadAction(notificationId: string) {
+  const actor = await requireActor();
   const db = await getDb();
-  await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, notificationId));
+  // Scoped by owner in the WHERE rather than checked first: one statement, and no
+  // window between the check and the write.
+  await db
+    .update(notifications)
+    .set({ isRead: true })
+    .where(and(eq(notifications.id, notificationId), eq(notifications.userId, actor.userId)));
 }
 
-export async function markAllNotificationsReadAction(userId: string) {
+export async function markAllNotificationsReadAction() {
+  const actor = await requireActor();
   const db = await getDb();
-  await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, userId));
+  await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, actor.userId));
   revalidatePath("/dashboard");
 }
 

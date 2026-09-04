@@ -689,13 +689,35 @@ Ticket e ordini non sono tra le entità disponibili.
 **Rimedio.** Lettura aperta a chi ha accesso ai dati, scrittura agli amministratori.
 Relazioni predefinite, invio programmato, almeno un tipo di grafico.
 
-### U-11 — Notifiche e chat vivono di interrogazioni ripetute
+### U-11 — Notifiche e chat vivono di interrogazioni ripetute ◐
 
 Notifiche: 50 righe complete ogni minuto, senza cursore. Chat: una interrogazione ogni
 5 secondi più una ogni 10. Nessuna preferenza per tipo di notifica.
 
 **Rimedio.** Interrogazione incrementale con cursore, preferenze per tipo e canale, e un
 flusso di eventi per la chat.
+
+**◐ Parziale.** `useLivePoll` sostituisce tutti e quattro i timer fissi. Una scheda in
+secondo piano non interroga: non può vedere ciò che imparerebbe. Tornare in primo piano
+interroga subito, così rientrare non è un'attesa. E un giro che non trova nulla raddoppia
+l'attesa fino a un tetto, mentre uno che trova qualcosa torna al ritmo veloce.
+
+L'endpoint delle notifiche accetta `since` e restituisce solo ciò che è arrivato dopo,
+più il conteggio dei non letti — che è l'unico numero che la campanella disegna, ed è
+contato sul database invece che dedotto dalla pagina, altrimenti un non letto più vecchio
+dei cinquanta più recenti non veniva contato. La lista messaggi della chat scriveva
+`markConversationRead` a ogni giro: una scrittura sul database ogni cinque secondi per
+conversazione aperta, che diceva ogni volta la stessa cosa. Ora scrive solo quando
+arrivano messaggi nuovi.
+
+Tre falle di autorizzazione trovate strada facendo: `getNotificationsAction`,
+`markNotificationReadAction` e `markAllNotificationsReadAction` prendevano l'id utente
+dal chiamante, e il chiamante di una server action è il browser. Chiunque avesse una
+sessione poteva leggere le notifiche di un altro passando il suo id, o segnargliele tutte
+lette. L'id ora viene dalla sessione e l'argomento non esiste più.
+
+**Restano aperti** le preferenze per tipo e canale, e il flusso di eventi: entrambi
+aggiungono superficie, e il costo che li giustificava è già stato tolto.
 
 ### U-12 — Non esiste un primo avvio ◐
 

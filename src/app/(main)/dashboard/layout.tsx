@@ -93,7 +93,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
   });
 
   const cookieStore = await cookies();
-  const userNotifications = session?.user?.id ? await getNotificationsAction(session.user.id) : [];
+  const userNotifications = session?.user?.id ? await getNotificationsAction() : [];
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
   const [variant, collapsible] = await Promise.all([
     getPreference("sidebar_variant", SIDEBAR_VARIANT_VALUES, "inset"),

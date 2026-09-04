@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   BellOff,
   Check,
-  ChevronDown,
   Edit,
   LogOut,
   MessageCircle,
@@ -20,6 +19,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import {
   createGroupConversation,
@@ -48,6 +48,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLivePoll } from "@/hooks/use-live-poll";
 import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -143,7 +144,7 @@ function ConvItem({
   const other = !isGroup ? conv.members.find((m) => m.userId !== myId) : null;
 
   return (
-    <div className="group relative flex items-center gap-3 px-3 py-2.5 hover:bg-muted/50 transition-colors rounded-md mx-1">
+    <div className="group relative mx-1 flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted/50">
       {/* Clickable area */}
       <button type="button" onClick={onClick} className="absolute inset-0 rounded-md" aria-label={`Open ${name}`} />
 
@@ -151,7 +152,7 @@ function ConvItem({
       <Avatar className="h-9 w-9 shrink-0">
         <AvatarFallback
           className={cn(
-            "text-xs font-medium",
+            "font-medium text-xs",
             isGroup
               ? "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300"
               : "bg-primary/10 text-primary",
@@ -162,14 +163,14 @@ function ConvItem({
       </Avatar>
 
       {/* Content */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-1">
           <span className={cn("truncate text-sm", conv.unread > 0 ? "font-semibold" : "font-medium")}>{name}</span>
           <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
             {last ? formatTime(last.createdAt) : ""}
           </span>
         </div>
-        <div className="flex items-center justify-between gap-1 mt-0.5">
+        <div className="mt-0.5 flex items-center justify-between gap-1">
           <span
             className={cn("truncate text-xs leading-4", conv.unread > 0 ? "text-foreground" : "text-muted-foreground")}
           >
@@ -183,7 +184,7 @@ function ConvItem({
             )}
           </span>
           {conv.unread > 0 && (
-            <Badge className="h-4 min-w-4 shrink-0 rounded-full px-1 text-[10px] bg-primary leading-none">
+            <Badge className="h-4 min-w-4 shrink-0 rounded-full bg-primary px-1 text-[10px] leading-none">
               {conv.unread > 99 ? "99+" : conv.unread}
             </Badge>
           )}
@@ -191,7 +192,7 @@ function ConvItem({
 
         {/* Group members preview */}
         {isGroup && (
-          <p className="text-[10px] text-muted-foreground/70 mt-0.5 truncate">
+          <p className="mt-0.5 truncate text-[10px] text-muted-foreground/70">
             {conv.members
               .map((m) => m.user?.name ?? m.user?.email)
               .filter(Boolean)
@@ -203,7 +204,7 @@ function ConvItem({
       </div>
 
       {/* Quick actions — visible on hover */}
-      <div className="relative z-10 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="relative z-10 shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -216,23 +217,23 @@ function ConvItem({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
-            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground py-1">
+            <DropdownMenuLabel className="py-1 font-normal text-muted-foreground text-xs">
               {isGroup ? "Group" : "Direct message"}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onClick}>
-              <MessageCircle className="h-3.5 w-3.5 mr-2" />
+              <MessageCircle className="mr-2 h-3.5 w-3.5" />
               Open chat
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {conv.muted ? (
               <DropdownMenuItem onClick={() => onMute(conv.id, null)}>
-                <Volume2 className="h-3.5 w-3.5 mr-2" />
+                <Volume2 className="mr-2 h-3.5 w-3.5" />
                 Unmute
               </DropdownMenuItem>
             ) : (
               <>
-                <DropdownMenuLabel className="text-[11px] text-muted-foreground px-2 pt-1 pb-0">
+                <DropdownMenuLabel className="px-2 pt-1 pb-0 text-[11px] text-muted-foreground">
                   Mute for…
                 </DropdownMenuLabel>
                 <DropdownMenuItem onClick={() => onMute(conv.id, 60)}>1 hour</DropdownMenuItem>
@@ -245,14 +246,14 @@ function ConvItem({
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => onLeave(conv.id)} className="text-destructive focus:text-destructive">
-                  <LogOut className="h-3.5 w-3.5 mr-2" />
+                  <LogOut className="mr-2 h-3.5 w-3.5" />
                   Leave group
                 </DropdownMenuItem>
               </>
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onDelete(conv.id)} className="text-destructive focus:text-destructive">
-              <Trash2 className="h-3.5 w-3.5 mr-2" />
+              <Trash2 className="mr-2 h-3.5 w-3.5" />
               Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -267,9 +268,9 @@ function ConvItem({
 function GroupHeader({ conv, myId }: { conv: Conversation; myId: string }) {
   const memberCount = conv.members.length;
   return (
-    <div className="flex items-center gap-2 min-w-0 flex-1">
+    <div className="flex min-w-0 flex-1 items-center gap-2">
       <Avatar className="h-7 w-7 shrink-0">
-        <AvatarFallback className="bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 text-[10px]">
+        <AvatarFallback className="bg-violet-100 text-[10px] text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
           <Users className="h-3.5 w-3.5" />
         </AvatarFallback>
       </Avatar>
@@ -303,56 +304,87 @@ export function ChatWidget({ userId }: { userId: string }) {
 
   // ── Loaders ───────────────────────────────────────────────────────────────
 
+  // Each loader reports whether anything actually changed. That is what lets the
+  // poll slow down when the workspace is quiet instead of asking at a fixed rate
+  // for ever (audit rilievo U-11).
+
   const loadConvs = useCallback(async () => {
-    try {
-      setConversations((await getConversations()) as Conversation[]);
-    } catch {}
+    const data = (await getConversations()) as Conversation[];
+    let changed = false;
+    setConversations((prev) => {
+      changed =
+        prev.length !== data.length || data.some((c, i) => c.id !== prev[i]?.id || c.unread !== prev[i]?.unread);
+      return changed ? data : prev;
+    });
+    return changed;
   }, []);
 
   const loadUnread = useCallback(async () => {
-    try {
-      setUnreadTotal(await getTotalUnreadCount());
-    } catch {}
+    const total = await getTotalUnreadCount();
+    let changed = false;
+    setUnreadTotal((prev) => {
+      changed = prev !== total;
+      return total;
+    });
+    return changed;
   }, []);
 
   const loadMessages = useCallback(async (convId: string) => {
-    try {
-      setMessages((await getMessages(convId)) as Message[]);
-    } catch {}
+    const data = (await getMessages(convId)) as Message[];
+    let arrived = false;
+    setMessages((prev) => {
+      arrived = prev.length !== data.length || data.at(-1)?.id !== prev.at(-1)?.id;
+      return arrived ? data : prev;
+    });
+    return arrived;
   }, []);
 
   // ── Polling ───────────────────────────────────────────────────────────────
+  //
+  // This widget is mounted on every dashboard page, so its timers ran wherever the
+  // user was and whether or not the tab was in front of anyone: the unread badge
+  // every 30 seconds always, the conversation list every 5 while open, and the
+  // open thread every 3. `useLivePoll` stops while the tab is hidden, answers
+  // immediately when it comes back, and backs off while nothing is happening.
+
+  const threadId = view.kind === "thread" ? view.conv.id : null;
 
   useEffect(() => {
-    loadUnread();
-    const t = setInterval(loadUnread, 30_000);
-    return () => clearInterval(t);
+    loadUnread().catch(() => undefined);
   }, [loadUnread]);
 
-  useEffect(() => {
-    if (!open) return;
-    loadConvs();
-    const t = setInterval(loadConvs, 5_000);
-    return () => clearInterval(t);
-  }, [open, loadConvs]);
+  // The badge only has to be roughly current: it is a dot on a button.
+  useLivePoll(loadUnread, { baseMs: 30_000, maxMs: 5 * 60_000, enabled: !open });
 
   useEffect(() => {
-    if (view.kind !== "thread") return;
-    const id = view.conv.id;
-    loadMessages(id);
-    const t = setInterval(() => loadMessages(id), 3_000);
-    return () => clearInterval(t);
-  }, [view, loadMessages]);
+    if (open) loadConvs().catch(() => undefined);
+  }, [open, loadConvs]);
+
+  useLivePoll(loadConvs, { baseMs: 10_000, maxMs: 90_000, enabled: open });
+
+  useEffect(() => {
+    if (threadId) loadMessages(threadId).catch(() => undefined);
+  }, [threadId, loadMessages]);
+
+  const pollThread = useCallback(async () => {
+    if (!threadId) return false;
+    return loadMessages(threadId);
+  }, [threadId, loadMessages]);
+
+  useLivePoll(pollThread, { baseMs: 4_000, maxMs: 45_000, enabled: threadId !== null });
 
   // ── Auto-scroll + mark read ───────────────────────────────────────────────
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, []);
 
   useEffect(() => {
     if (view.kind !== "thread") return;
-    markConversationRead(view.conv.id).catch(() => {});
+    markConversationRead(view.conv.id).catch(() => {
+      // Failing to mark a conversation read is not worth interrupting anyone
+      // for: the next poll writes it again.
+    });
     setUnreadTotal((n) => Math.max(0, n - (view.conv.unread ?? 0)));
   }, [view]);
 
@@ -362,7 +394,10 @@ export function ChatWidget({ userId }: { userId: string }) {
     if (view.kind === "new-dm" || view.kind === "new-group") {
       getChatUsers()
         .then((d) => setChatUsers(d as ChatUser[]))
-        .catch(() => {});
+        .catch(() => {
+          // An empty picker is the visible result; a toast on top of it says
+          // nothing the user cannot already see.
+        });
       setUserSearch("");
       setSelectedIds([]);
       setGroupName("");
@@ -394,12 +429,17 @@ export function ChatWidget({ userId }: { userId: string }) {
   const handleSend = async () => {
     if (!input.trim() || sending || view.kind !== "thread") return;
     setSending(true);
+    const text = input.trim();
     try {
-      await sendMessage(view.conv.id, input.trim());
+      await sendMessage(view.conv.id, text);
       setInput("");
       await loadMessages(view.conv.id);
       loadConvs();
     } catch {
+      // The message did not go. Putting the text back in the box is the only
+      // honest outcome: it used to vanish and look sent.
+      setInput(text);
+      toast.error("The message could not be sent.");
     } finally {
       setSending(false);
       inputRef.current?.focus();
@@ -414,7 +454,9 @@ export function ChatWidget({ userId }: { userId: string }) {
       const found = fresh.find((c) => c.id === conv.id);
       if (found) openThread(found);
       else setView({ kind: "list" });
-    } catch {}
+    } catch {
+      toast.error("The conversation could not be started.");
+    }
   };
 
   const handleCreateGroup = async () => {
@@ -427,7 +469,9 @@ export function ChatWidget({ userId }: { userId: string }) {
       setTab("groups");
       if (found) openThread(found);
       else setView({ kind: "list" });
-    } catch {}
+    } catch {
+      toast.error("The group could not be created.");
+    }
   };
 
   const handleMute = async (convId: string, minutes: number | null) => {
@@ -435,7 +479,9 @@ export function ChatWidget({ userId }: { userId: string }) {
       await muteConversation(convId, minutes);
       loadConvs();
       loadUnread();
-    } catch {}
+    } catch {
+      toast.error("The mute setting could not be saved.");
+    }
   };
 
   const handleLeave = async (convId: string) => {
@@ -444,7 +490,11 @@ export function ChatWidget({ userId }: { userId: string }) {
       await leaveConversation(convId);
       setConversations((prev) => prev.filter((c) => c.id !== convId));
       if (view.kind === "thread" && view.conv.id === convId) setView({ kind: "list" });
-    } catch {}
+    } catch {
+      // The row was already removed from the list, so say it did not stick.
+      toast.error("Could not leave the group.");
+      loadConvs();
+    }
   };
 
   const handleDelete = async (convId: string) => {
@@ -454,7 +504,10 @@ export function ChatWidget({ userId }: { userId: string }) {
       setConversations((prev) => prev.filter((c) => c.id !== convId));
       if (view.kind === "thread" && view.conv.id === convId) setView({ kind: "list" });
       loadUnread();
-    } catch {}
+    } catch {
+      toast.error("The conversation could not be deleted.");
+      loadConvs();
+    }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -473,11 +526,11 @@ export function ChatWidget({ userId }: { userId: string }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="fixed bottom-5 right-5 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:bg-primary/90 transition-all duration-200 hover:scale-105 active:scale-95"
+        className="fixed right-5 bottom-5 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all duration-200 hover:scale-105 hover:bg-primary/90 active:scale-95"
       >
         {open ? <X className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
         {!open && unreadTotal > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white leading-none">
+          <span className="-top-1 -right-1 absolute flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 font-bold text-[10px] text-white leading-none">
             {unreadTotal > 99 ? "99+" : unreadTotal}
           </span>
         )}
@@ -519,7 +572,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                 </>
               ) : view.kind === "thread" ? (
                 <>
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
                     <Button
                       size="icon"
                       variant="ghost"
@@ -531,9 +584,9 @@ export function ChatWidget({ userId }: { userId: string }) {
                     {view.conv.type === "group" ? (
                       <GroupHeader conv={view.conv} myId={userId} />
                     ) : (
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
                         <Avatar className="h-7 w-7 shrink-0">
-                          <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                          <AvatarFallback className="bg-primary/10 text-[10px] text-primary">
                             {initials(
                               view.conv.members.find((m) => m.userId !== userId)?.user?.name ?? null,
                               view.conv.members.find((m) => m.userId !== userId)?.user?.email ?? null,
@@ -554,7 +607,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                     <DropdownMenuContent align="end" className="w-44">
                       {view.conv.muted ? (
                         <DropdownMenuItem onClick={() => handleMute(view.conv.id, null)}>
-                          <Volume2 className="h-3.5 w-3.5 mr-2" /> Unmute
+                          <Volume2 className="mr-2 h-3.5 w-3.5" /> Unmute
                         </DropdownMenuItem>
                       ) : (
                         <>
@@ -576,7 +629,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                             onClick={() => handleLeave(view.conv.id)}
                             className="text-destructive focus:text-destructive"
                           >
-                            <LogOut className="h-3.5 w-3.5 mr-2" /> Leave group
+                            <LogOut className="mr-2 h-3.5 w-3.5" /> Leave group
                           </DropdownMenuItem>
                         </>
                       )}
@@ -605,24 +658,24 @@ export function ChatWidget({ userId }: { userId: string }) {
               <div className="px-3 pb-2">
                 <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
                   <TabsList className="h-8 w-full">
-                    <TabsTrigger value="all" className="flex-1 text-xs h-6 gap-1">
+                    <TabsTrigger value="all" className="h-6 flex-1 gap-1 text-xs">
                       All
                       {unreadTotal > 0 && (
-                        <span className="rounded-full bg-primary/20 text-primary px-1 text-[10px] leading-4 font-semibold">
+                        <span className="rounded-full bg-primary/20 px-1 font-semibold text-[10px] text-primary leading-4">
                           {unreadTotal}
                         </span>
                       )}
                     </TabsTrigger>
-                    <TabsTrigger value="direct" className="flex-1 text-xs h-6 gap-1">
+                    <TabsTrigger value="direct" className="h-6 flex-1 gap-1 text-xs">
                       <User className="h-3 w-3" /> Direct
                       {directCount > 0 && <span className="text-[10px] text-muted-foreground">({directCount})</span>}
                     </TabsTrigger>
-                    <TabsTrigger value="groups" className="flex-1 text-xs h-6 gap-1">
+                    <TabsTrigger value="groups" className="h-6 flex-1 gap-1 text-xs">
                       <Users className="h-3 w-3" /> Groups
                       {groupCount > 0 && (
                         <span
                           className={cn(
-                            "rounded-full px-1 text-[10px] leading-4 font-semibold",
+                            "rounded-full px-1 font-semibold text-[10px] leading-4",
                             groupUnread > 0 ? "bg-primary/20 text-primary" : "text-muted-foreground",
                           )}
                         >
@@ -642,20 +695,20 @@ export function ChatWidget({ userId }: { userId: string }) {
           {view.kind === "list" && (
             <ScrollArea className="flex-1">
               {filtered.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 px-6 text-center gap-3">
+                <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
                   {tab === "groups" ? (
                     <>
-                      <div className="w-12 h-12 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/30">
                         <Users className="h-6 w-6 text-violet-600 dark:text-violet-400" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">No groups yet</p>
-                        <p className="text-xs text-muted-foreground mt-1">Create a group to start collaborating</p>
+                        <p className="font-medium text-sm">No groups yet</p>
+                        <p className="mt-1 text-muted-foreground text-xs">Create a group to start collaborating</p>
                       </div>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="gap-1.5 h-8 text-xs"
+                        className="h-8 gap-1.5 text-xs"
                         onClick={() => setView({ kind: "new-group" })}
                       >
                         <Plus className="h-3.5 w-3.5" /> New Group
@@ -663,17 +716,17 @@ export function ChatWidget({ userId }: { userId: string }) {
                     </>
                   ) : tab === "direct" ? (
                     <>
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                         <MessageCircle className="h-6 w-6 text-primary" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">No direct messages</p>
-                        <p className="text-xs text-muted-foreground mt-1">Start a conversation with a colleague</p>
+                        <p className="font-medium text-sm">No direct messages</p>
+                        <p className="mt-1 text-muted-foreground text-xs">Start a conversation with a colleague</p>
                       </div>
                       <Button
                         size="sm"
                         variant="outline"
-                        className="gap-1.5 h-8 text-xs"
+                        className="h-8 gap-1.5 text-xs"
                         onClick={() => setView({ kind: "new-dm" })}
                       >
                         <Edit className="h-3.5 w-3.5" /> New Message
@@ -681,12 +734,12 @@ export function ChatWidget({ userId }: { userId: string }) {
                     </>
                   ) : (
                     <>
-                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                         <MessageCircle className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">No conversations</p>
-                        <p className="text-xs text-muted-foreground mt-1">Message a colleague or create a group</p>
+                        <p className="font-medium text-sm">No conversations</p>
+                        <p className="mt-1 text-muted-foreground text-xs">Message a colleague or create a group</p>
                       </div>
                     </>
                   )}
@@ -699,7 +752,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                     filtered.some((c) => c.type === "direct") && (
                       <>
                         {filtered[0]?.type !== "group" && (
-                          <p className="px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                          <p className="px-4 py-1.5 font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
                             Direct
                           </p>
                         )}
@@ -709,7 +762,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                           return (
                             <React.Fragment key={conv.id}>
                               {showGroupDivider && (
-                                <p className="px-4 pt-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                                <p className="px-4 pt-3 pb-1.5 font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
                                   Groups
                                 </p>
                               )}
@@ -751,7 +804,7 @@ export function ChatWidget({ userId }: { userId: string }) {
               <ScrollArea className="flex-1 px-3 py-3">
                 {messages.length === 0 && (
                   <div className="flex justify-center py-8">
-                    <p className="text-xs text-muted-foreground">No messages yet. Say hello!</p>
+                    <p className="text-muted-foreground text-xs">No messages yet. Say hello!</p>
                   </div>
                 )}
                 <div className="space-y-2">
@@ -763,30 +816,30 @@ export function ChatWidget({ userId }: { userId: string }) {
                     return (
                       <div key={msg.id} className={cn("flex gap-2", isMe && "flex-row-reverse", !sameAuthor && "mt-3")}>
                         {!isMe && (
-                          <Avatar className={cn("h-6 w-6 mt-0.5 shrink-0", sameAuthor && "invisible")}>
-                            <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
+                          <Avatar className={cn("mt-0.5 h-6 w-6 shrink-0", sameAuthor && "invisible")}>
+                            <AvatarFallback className="bg-primary/10 text-[9px] text-primary">
                               {initials(msg.sender?.name ?? null, msg.sender?.email ?? null)}
                             </AvatarFallback>
                           </Avatar>
                         )}
-                        <div className={cn("flex flex-col gap-0.5 max-w-[78%]", isMe && "items-end")}>
+                        <div className={cn("flex max-w-[78%] flex-col gap-0.5", isMe && "items-end")}>
                           {showName && (
-                            <span className="text-[10px] text-muted-foreground px-1 font-medium">
+                            <span className="px-1 font-medium text-[10px] text-muted-foreground">
                               {msg.sender?.name ?? msg.sender?.email}
                             </span>
                           )}
                           <div
                             className={cn(
-                              "rounded-2xl px-3 py-2 text-sm leading-relaxed break-words whitespace-pre-wrap",
+                              "whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm leading-relaxed",
                               isMe
-                                ? "bg-primary text-primary-foreground rounded-tr-sm"
-                                : "bg-muted text-foreground rounded-tl-sm",
+                                ? "rounded-tr-sm bg-primary text-primary-foreground"
+                                : "rounded-tl-sm bg-muted text-foreground",
                             )}
                           >
                             {msg.content}
                           </div>
                           {(!sameAuthor || i === messages.length - 1) && (
-                            <span className="text-[9px] text-muted-foreground px-1">{formatTime(msg.createdAt)}</span>
+                            <span className="px-1 text-[9px] text-muted-foreground">{formatTime(msg.createdAt)}</span>
                           )}
                         </div>
                       </div>
@@ -796,7 +849,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                 <div ref={messagesEndRef} />
               </ScrollArea>
 
-              <div className="shrink-0 border-t px-3 py-2 flex gap-2 items-center">
+              <div className="flex shrink-0 items-center gap-2 border-t px-3 py-2">
                 <Input
                   ref={inputRef}
                   value={input}
@@ -826,10 +879,10 @@ export function ChatWidget({ userId }: { userId: string }) {
 
           {/* New DM */}
           {view.kind === "new-dm" && (
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <div className="shrink-0 px-3 pt-2 pb-2 border-b">
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <div className="shrink-0 border-b px-3 pt-2 pb-2">
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Search className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
@@ -841,23 +894,23 @@ export function ChatWidget({ userId }: { userId: string }) {
               </div>
               <ScrollArea className="flex-1">
                 {filteredUsers.length === 0 ? (
-                  <p className="text-center text-xs text-muted-foreground py-10">No users found</p>
+                  <p className="py-10 text-center text-muted-foreground text-xs">No users found</p>
                 ) : (
                   filteredUsers.map((u) => (
                     <button
                       key={u.id}
                       type="button"
                       onClick={() => handleStartDM(u.id)}
-                      className="flex w-full items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/50"
                     >
                       <Avatar className="h-8 w-8 shrink-0">
-                        <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs">
                           {initials(u.name, u.email)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{u.name ?? u.email}</p>
-                        {u.name && <p className="text-xs text-muted-foreground truncate">{u.email}</p>}
+                        <p className="truncate font-medium text-sm">{u.name ?? u.email}</p>
+                        {u.name && <p className="truncate text-muted-foreground text-xs">{u.email}</p>}
                       </div>
                     </button>
                   ))
@@ -868,8 +921,8 @@ export function ChatWidget({ userId }: { userId: string }) {
 
           {/* New Group */}
           {view.kind === "new-group" && (
-            <div className="flex flex-col flex-1 overflow-hidden">
-              <div className="shrink-0 px-3 pt-2 pb-2 border-b space-y-2">
+            <div className="flex flex-1 flex-col overflow-hidden">
+              <div className="shrink-0 space-y-2 border-b px-3 pt-2 pb-2">
                 <Input
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
@@ -878,7 +931,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                   autoFocus
                 />
                 <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <Search className="-translate-y-1/2 pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
                   <Input
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
@@ -891,7 +944,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                     {selectedIds.map((id) => {
                       const u = chatUsers.find((x) => x.id === id);
                       return (
-                        <Badge key={id} variant="secondary" className="gap-1 text-xs h-5 pl-2 pr-1 rounded-full">
+                        <Badge key={id} variant="secondary" className="h-5 gap-1 rounded-full pr-1 pl-2 text-xs">
                           {u?.name ?? u?.email ?? id}
                           <button type="button" onClick={() => setSelectedIds((s) => s.filter((x) => x !== id))}>
                             <X className="h-2.5 w-2.5" />
@@ -910,7 +963,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                       key={u.id}
                       type="button"
                       onClick={() => setSelectedIds((s) => (sel ? s.filter((x) => x !== u.id) : [...s, u.id]))}
-                      className="flex w-full items-center gap-3 px-4 py-2.5 hover:bg-muted/50 transition-colors text-left"
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-muted/50"
                     >
                       <Avatar className="h-7 w-7 shrink-0">
                         <AvatarFallback
@@ -922,18 +975,18 @@ export function ChatWidget({ userId }: { userId: string }) {
                           {sel ? <Check className="h-3.5 w-3.5" /> : initials(u.name, u.email)}
                         </AvatarFallback>
                       </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{u.name ?? u.email}</p>
-                        {u.name && <p className="text-xs text-muted-foreground truncate">{u.email}</p>}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-sm">{u.name ?? u.email}</p>
+                        {u.name && <p className="truncate text-muted-foreground text-xs">{u.email}</p>}
                       </div>
-                      {sel && <Check className="h-4 w-4 text-primary shrink-0" />}
+                      {sel && <Check className="h-4 w-4 shrink-0 text-primary" />}
                     </button>
                   );
                 })}
               </ScrollArea>
               <div className="shrink-0 border-t px-3 py-2.5">
                 <Button
-                  className="w-full h-9 gap-2"
+                  className="h-9 w-full gap-2"
                   onClick={handleCreateGroup}
                   disabled={!groupName.trim() || selectedIds.length === 0}
                 >
