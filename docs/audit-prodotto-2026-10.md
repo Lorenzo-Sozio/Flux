@@ -630,6 +630,16 @@ e inglese, a volte nello stesso file.
 
 **Rimedio.** Una sola libreria e una sola lingua per il codice.
 
+**◐ Parziale.** La libreria è una sola. `@hello-pangea/dnd` regge tutte le superfici che
+si trascinano davvero — pipeline, task, kanban dei ticket, costruttore email — mentre
+`@dnd-kit` reggeva una tabella sola, in quattro pacchetti, che nessuna pagina disegnava:
+la pagina che la conteneva è un redirect da tempo e la riga era commentata. Tabella e
+quattro pacchetti rimossi, build di produzione riuscito.
+
+**Resta aperta la lingua**: 382 righe di commento in 28 file sono in italiano, quasi tutte
+le spiegazioni lunghe sul confine di importazione. Non è una pulizia, è una scelta su chi
+legge questo codice, e va fatta in un colpo solo o non serve a niente.
+
 ---
 
 ## 6. Attrito quotidiano
