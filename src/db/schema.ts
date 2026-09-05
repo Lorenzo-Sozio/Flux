@@ -930,6 +930,10 @@ export const tickets = pgTable("ticket", {
   contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
   companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
   leadId: text("lead_id").references(() => leads.id, { onDelete: "set null" }),
+  // Which order this is about, when it is about one. Support and sales did not
+  // touch anywhere: an agent reading "my order has not arrived" had no way to say
+  // which order, and the order had no way to know somebody had complained.
+  orderId: text("order_id").references(() => orders.id, { onDelete: "set null" }),
   assigneeId: text("assignee_id").references(() => users.id, { onDelete: "set null" }),
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   slaId: text("sla_id").references(() => slas.id, { onDelete: "set null" }),
@@ -1118,6 +1122,7 @@ export const ticketsRelations = relations(tickets, ({ one, many }) => ({
   contact: one(contacts, { fields: [tickets.contactId], references: [contacts.id] }),
   company: one(companies, { fields: [tickets.companyId], references: [companies.id] }),
   lead: one(leads, { fields: [tickets.leadId], references: [leads.id] }),
+  order: one(orders, { fields: [tickets.orderId], references: [orders.id] }),
   assignee: one(users, { fields: [tickets.assigneeId], references: [users.id] }),
   owner: one(users, { fields: [tickets.ownerId], references: [users.id] }),
   sla: one(slas, { fields: [tickets.slaId], references: [slas.id] }),

@@ -1651,7 +1651,8 @@
       "unitPriceCol": "Unit price",
       "totalCol": "Total",
       "closedHint": "Closed. Change the status to reopen it.",
-      "cancelledHint": "Cancelled."
+      "cancelledHint": "Cancelled.",
+      "openTickets": "Open tickets about this order"
     }
   },
   "pipeline": {
@@ -2759,7 +2760,13 @@
           "company": "Company",
           "lead": "Lead"
         }
-      }
+      },
+      "aboutOrder": "About order",
+      "chooseOrder": "Not linked to an order",
+      "noOrder": "Not about an order",
+      "loadingOrders": "Loading this customer's orders…",
+      "noOrdersForCustomer": "This customer has no orders.",
+      "orderLinkFailed": "Could not link that order."
     },
     "sla": {
       "title": "SLA Management",

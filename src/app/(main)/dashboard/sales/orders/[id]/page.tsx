@@ -36,6 +36,7 @@ import {
   updateOrderStatus,
 } from "@/actions/orders";
 import { getProducts } from "@/actions/products";
+import { getTicketsForOrder } from "@/actions/support";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -203,12 +204,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const [order, setOrder] = useState<OrderDetail>(null);
   const [products, setProducts] = useState<Product[]>([]);
+  // An order could be prepared, shipped and closed while a conversation about it
+  // ran in the support module, and nothing here said so.
+  const [ticketsAbout, setTicketsAbout] = useState<Awaited<ReturnType<typeof getTicketsForOrder>>>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getOrderById(id), getProducts()]).then(([o, p]) => {
+    Promise.all([getOrderById(id), getProducts(), getTicketsForOrder(id).catch(() => [])]).then(([o, p, tk]) => {
       setOrder(o);
       setProducts(p);
+      setTicketsAbout(tk);
       setLoading(false);
     });
   }, [id]);
@@ -489,6 +494,28 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </span>
                 <span className="font-bold tabular-nums">{formatAmount(Number(order.totalAmount))}</span>
               </div>
+
+              {/* What the customer has said about it, if anything. */}
+              {ticketsAbout.length > 0 && (
+                <div className="mb-4 space-y-1.5">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{t("openTickets")}</p>
+                  {ticketsAbout.map((tk) => (
+                    <Link
+                      key={tk.id}
+                      href={`/dashboard/support/tickets/${tk.id}`}
+                      className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 transition-colors hover:bg-muted/40"
+                    >
+                      <span className="truncate text-xs">{tk.subject}</span>
+                      <Badge
+                        variant="outline"
+                        className={cn("h-5 shrink-0 text-[10px]", tk.breachedAt && "border-rose-300 text-rose-700")}
+                      >
+                        {tk.status}
+                      </Badge>
+                    </Link>
+                  ))}
+                </div>
+              )}
 
               {/* Customer */}
               {customer && (

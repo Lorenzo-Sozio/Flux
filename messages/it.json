@@ -1651,7 +1651,8 @@
       "unitPriceCol": "Prezzo unit.",
       "totalCol": "Totale",
       "closedHint": "Chiuso. Cambia lo stato per riaprirlo.",
-      "cancelledHint": "Annullato."
+      "cancelledHint": "Annullato.",
+      "openTickets": "Ticket aperti su questo ordine"
     }
   },
   "pipeline": {
@@ -2764,7 +2765,13 @@
           "company": "Azienda",
           "lead": "Lead"
         }
-      }
+      },
+      "aboutOrder": "Riguarda l'ordine",
+      "chooseOrder": "Non collegato a un ordine",
+      "noOrder": "Non riguarda un ordine",
+      "loadingOrders": "Carico gli ordini del cliente…",
+      "noOrdersForCustomer": "Questo cliente non ha ordini.",
+      "orderLinkFailed": "Non è stato possibile collegare l'ordine."
     },
     "sla": {
       "title": "Gestione SLA",

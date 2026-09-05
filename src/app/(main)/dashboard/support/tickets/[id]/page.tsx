@@ -33,6 +33,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -41,7 +42,9 @@ import {
   deleteTicketAction,
   escalateTicketAction,
   getMacros,
+  getOrdersForTicket,
   getTicketById,
+  linkTicketToOrderAction,
   reassignTicketAction,
   updateTicketAction,
 } from "@/actions/support";
@@ -70,7 +73,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { ticketMacros } from "@/db/schema";
+import { useCurrency } from "@/hooks/use-currency";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
 
 // ─── Row shapes ───────────────────────────────────────────────────────────────
@@ -562,6 +567,95 @@ function MessageBubble({ msg, docs, isAgent }: { msg: TicketMessage; docs?: Tick
 }
 
 // ─── Sidebar cards ────────────────────────────────────────────────────────────
+
+/**
+ * Which order this conversation is about.
+ *
+ * Support and sales did not touch anywhere. An agent reading "my order has not
+ * arrived" had nowhere to record which one, so the answer stayed in the prose of
+ * the message where no query can reach it, and the order never learned that
+ * somebody had complained about it.
+ *
+ * The list is the customer's own orders, not the workspace's: "which of their
+ * orders" is the question, and offering all of them invites the wrong answer.
+ */
+function OrderCard({ ticket, onLinked }: { ticket: TicketRow; onLinked: () => void }) {
+  const t = useTranslations("support.tickets");
+  const { formatAmount } = useCurrency();
+  const [orders, setOrders] = useState<Awaited<ReturnType<typeof getOrdersForTicket>>>([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Asked for when the card is opened to, not on every ticket that is read.
+  function load() {
+    if (orders.length > 0 || loading) return;
+    setLoading(true);
+    getOrdersForTicket(ticket.id)
+      .then(setOrders)
+      .catch(() => setOrders([]))
+      .finally(() => setLoading(false));
+  }
+
+  async function choose(value: string) {
+    setSaving(true);
+    try {
+      await linkTicketToOrderAction(ticket.id, value === "__none__" ? null : value);
+      onLinked();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : t("orderLinkFailed"));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!ticket.companyId && !ticket.contactId) return null;
+
+  return (
+    <Card>
+      <CardHeader className="px-3 pt-3 pb-2">
+        <CardTitle className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wide">
+          {t("aboutOrder")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 px-3 pb-3">
+        {ticket.order && (
+          <Link
+            href={`/dashboard/sales/orders/${ticket.order.id}`}
+            className="flex items-center justify-between rounded-md border px-2 py-1.5 transition-colors hover:bg-muted/40"
+          >
+            <span className="truncate font-medium text-xs">{ticket.order.orderNumber}</span>
+            <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
+              {formatAmount(Number(ticket.order.totalAmount ?? 0))}
+            </span>
+          </Link>
+        )}
+
+        <Select
+          value={ticket.orderId ?? "__none__"}
+          onValueChange={choose}
+          disabled={saving}
+          onOpenChange={(open) => open && load()}
+        >
+          <SelectTrigger className="h-8 text-xs">
+            <SelectValue placeholder={t("chooseOrder")} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">{t("noOrder")}</SelectItem>
+            {orders.map((o) => (
+              <SelectItem key={o.id} value={o.id}>
+                {o.orderNumber} · {o.status}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {loading && <p className="text-[11px] text-muted-foreground">{t("loadingOrders")}</p>}
+        {!loading && orders.length === 0 && ticket.orderId === null && (
+          <p className="text-[11px] text-muted-foreground">{t("noOrdersForCustomer")}</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 function ContactCard({ ticket }: { ticket: TicketRow }) {
   const contact = ticket.contact;
@@ -1284,6 +1378,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
           {/* ── Right: Sidebar ──────────────────────────────────────────── */}
           <div className="space-y-3 overflow-y-auto p-4">
             <ContactCard ticket={ticket} />
+            <OrderCard ticket={ticket} onLinked={() => void loadTicket()} />
             <PropertiesCard
               ticket={ticket}
               onStatusChange={handleStatusChange}

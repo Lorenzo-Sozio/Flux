@@ -315,4 +315,13 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\n-- Separately and guarded: a constraint cannot be added twice, and this migration\n-- may be re-applied to a database that already carries it. ON DELETE SET NULL,\n-- because deleting a saved view should widen a campaign back to everybody rather\n-- than break the row.\nDO $$\nBEGIN\n  ALTER TABLE "marketing_campaign"\n    ADD CONSTRAINT "marketing_campaign_recipient_filter_id_custom_filter_id_fk"\n    FOREIGN KEY ("recipient_filter_id") REFERENCES "custom_filter"("id") ON DELETE SET NULL;\nEXCEPTION\n  WHEN duplicate_object THEN NULL;\n  WHEN undefined_table THEN NULL;\nEND $$;\n',
     ],
   },
+  {
+    tag: "0011_a_ticket_can_name_its_order",
+    folderMillis: 1788970000000,
+    hash: "4830a4c8d7db8a173fbb6304afbd767eb2703463e49b4f5ff3656c1b5f02f6fc",
+    sql: [
+      '-- A ticket can say which order it is about (support and sales stop being islands).\n--\n-- The two modules did not touch anywhere. An agent reading "my order has not\n-- arrived" had nowhere to record which order, so the answer lived in the prose of\n-- the message and nowhere a query could reach it; and the order had no way to\n-- know that the customer had complained about it. Both sides of that question\n-- were being answered by somebody remembering.\n--\n-- Nullable, and null on every ticket that exists: most tickets are not about an\n-- order and saying so is the honest default.\nALTER TABLE "ticket" ADD COLUMN IF NOT EXISTS "order_id" text;\n',
+      '\n-- Separately and guarded, and ON DELETE SET NULL: deleting an order should leave\n-- the conversation about it readable rather than take it down too.\nDO $$\nBEGIN\n  ALTER TABLE "ticket"\n    ADD CONSTRAINT "ticket_order_id_order_id_fk"\n    FOREIGN KEY ("order_id") REFERENCES "order"("id") ON DELETE SET NULL;\nEXCEPTION\n  WHEN duplicate_object THEN NULL;\n  WHEN undefined_table THEN NULL;\nEND $$;\n',
+    ],
+  },
 ];
