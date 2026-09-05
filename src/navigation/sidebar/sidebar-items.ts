@@ -27,7 +27,6 @@ import {
   Settings,
   Settings2,
   ShoppingCart,
-  Sunrise,
   Swords,
   Target,
   TrendingUp,
@@ -118,10 +117,11 @@ export const sidebarItems: NavGroup[] = [
     id: 1,
     labelKey: "work",
     items: [
-      // Where the day starts. Today answers what am I doing; the overview under
-      // Analysis answers how are we doing, and those are not one question
-      // (audit rilievo S-11).
-      { titleKey: "today", url: "/dashboard/today", icon: Sunrise },
+      // Where the day starts, and the page the dashboard opens on. A separate
+      // "Today" screen sat here for a while; it drew the same agenda, the same
+      // work list and the same ticket queue as this one, so it was a second copy
+      // of the first half of a page everybody already lands on.
+      { titleKey: "dashboard", url: "/dashboard/crm", icon: ChartBar },
       { titleKey: "calendar", url: "/dashboard/calendar", icon: Calendar },
       {
         titleKey: "tasks",
@@ -211,7 +211,6 @@ export const sidebarItems: NavGroup[] = [
     id: 6,
     labelKey: "analysis",
     items: [
-      { titleKey: "overview", url: "/dashboard/crm", icon: ChartBar },
       { titleKey: "salesTrend", url: "/dashboard/analytics", icon: Activity, module: "sales" },
       {
         titleKey: "reports",

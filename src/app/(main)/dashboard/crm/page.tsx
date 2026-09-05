@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { and, desc, eq, gte, notInArray, sum } from "drizzle-orm";
+import { and, eq, gte, sum } from "drizzle-orm";
 import {
   AlertCircle,
   ArrowRight,
@@ -30,9 +30,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { deals, salesTargets, tickets } from "@/db/schema";
+import { deals, salesTargets } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
-import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
 
 import { AgendaWidget } from "./_components/agenda-widget";
@@ -66,16 +65,28 @@ function timeAgo(date: Date | null, locale: string): string {
   return rtf.format(-Math.floor(hrs / 24), "day");
 }
 
-function formatDueTime(d: Date | null, locale: string) {
-  if (!d) return null;
-  return new Date(d).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
-}
-
 function formatToday(d: Date, locale: string) {
   return d.toLocaleDateString(locale, { weekday: "long", day: "numeric", month: "long" });
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
+
+/** How long is left before a ticket misses its promise, said the way a person would say it. */
+function timeLeft(
+  deadline: Date | null,
+  t: Awaited<ReturnType<typeof getTranslations<"crm">>>,
+): { text: string; late: boolean } | null {
+  if (!deadline) return null;
+  const ms = new Date(deadline).getTime() - Date.now();
+  const late = ms < 0;
+
+  const mins = Math.round(Math.abs(ms) / 60_000);
+  if (mins < 60) return { text: t(late ? "minutesLate" : "minutesLeft", { n: mins }), late };
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return { text: t(late ? "hoursLate" : "hoursLeft", { n: hours }), late };
+  const days = Math.round(hours / 24);
+  return { text: t(late ? "daysLate" : "daysLeft", { n: days }), late };
+}
 
 export default async function CRMPage() {
   const db = await getDb();
@@ -86,11 +97,6 @@ export default async function CRMPage() {
   const actor = await getActor();
   const userId = actor?.userId;
   const userName = actor?.name?.split(" ")[0] ?? tc("there");
-  // The workspace role. This read the platform staff field, which is "user" for
-  // every customer, so a workspace owner saw only their own tickets and activities
-  // on their own dashboard (audit rilievo P-01).
-  const isPrivileged = can(actor, "user:read");
-
   const now = new Date();
   const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -101,69 +107,48 @@ export default async function CRMPage() {
 
   // ── All fetches in parallel ──────────────────────────────────────────────────
 
-  const [stats, rawLeads, topDeals, recentActivities, myTickets, myTarget, wonThisMonth, nextActions, today] =
-    await Promise.all([
-      getDashboardStats(),
-      getRecentLeads(5),
-      getTopDeals(5),
-      getRecentActivities(10),
+  const [stats, rawLeads, topDeals, recentActivities, myTarget, wonThisMonth, nextActions, today] = await Promise.all([
+    getDashboardStats(),
+    getRecentLeads(5),
+    getTopDeals(5),
+    getRecentActivities(10),
 
-      // Open tickets assigned to me
-      userId
-        ? db
-            .select({
-              id: tickets.id,
-              ticketNumber: tickets.ticketNumber,
-              subject: tickets.subject,
-              status: tickets.status,
-              priority: tickets.priority,
-              updatedAt: tickets.updatedAt,
-              slaDeadlineAt: tickets.slaDeadlineAt,
-            })
-            .from(tickets)
-            .where(
-              // `and()` already accepts undefined among its arguments, so the
-              // cast was hiding nothing and asserting nothing.
-              and(
-                isPrivileged ? undefined : eq(tickets.assigneeId, userId),
-                notInArray(tickets.status, ["resolved", "closed"]),
-              ),
-            )
-            .orderBy(desc(tickets.updatedAt))
-            .limit(8)
-        : Promise.resolve([]),
+    // Current month target for this user
+    userId
+      ? db
+          .select({ targetAmount: salesTargets.targetAmount, currency: salesTargets.currency })
+          .from(salesTargets)
+          .where(and(eq(salesTargets.userId, userId), eq(salesTargets.period, currentPeriod)))
+          .limit(1)
+          .then((rows) => rows[0] ?? null)
+      : Promise.resolve(null),
 
-      // Current month target for this user
-      userId
-        ? db
-            .select({ targetAmount: salesTargets.targetAmount, currency: salesTargets.currency })
-            .from(salesTargets)
-            .where(and(eq(salesTargets.userId, userId), eq(salesTargets.period, currentPeriod)))
-            .limit(1)
-            .then((rows) => rows[0] ?? null)
-        : Promise.resolve(null),
+    // Won deals this month for this user
+    userId
+      ? db
+          .select({ total: sum(deals.amount) })
+          .from(deals)
+          .where(and(eq(deals.status, "won"), eq(deals.ownerId, userId), gte(deals.updatedAt, monthStart)))
+          .then((rows) => parseFloat(rows[0]?.total ?? "0"))
+      : Promise.resolve(0 as number),
 
-      // Won deals this month for this user
-      userId
-        ? db
-            .select({ total: sum(deals.amount) })
-            .from(deals)
-            .where(and(eq(deals.status, "won"), eq(deals.ownerId, userId), gte(deals.updatedAt, monthStart)))
-            .then((rows) => parseFloat(rows[0]?.total ?? "0"))
-        : Promise.resolve(0 as number),
+    // What needs doing, rather than what exists (audit rilievo S-02). Failing to
+    // build the work list must not take the whole dashboard down with it: an
+    // empty list reads as "nothing waiting", which is the safe way to be wrong.
+    getNextActions(8).catch(() => null),
 
-      // What needs doing, rather than what exists (audit rilievo S-02). Failing to
-      // build the work list must not take the whole dashboard down with it: an
-      // empty list reads as "nothing waiting", which is the safe way to be wrong.
-      getNextActions(8).catch(() => []),
-
-      // The day's agenda. This page used to assemble it from three queries of its
-      // own and a hundred and thirty lines of mapping; the "today" screen needs the
-      // same list, and two copies of it would have drifted apart within a month.
-      getTodayView(),
-    ]);
+    // The day's agenda. This page used to assemble it from three queries of its
+    // own and a hundred and thirty lines of mapping; the "today" screen needs the
+    // same list, and two copies of it would have drifted apart within a month.
+    getTodayView(),
+  ]);
 
   const agendaItems = today.agenda;
+
+  // The same list the page used to fetch for itself, ordered by when each ticket
+  // stops being on time rather than by when it was last touched — which is the
+  // order somebody works them in.
+  const myTickets = today.tickets;
 
   // ── Build agenda items ───────────────────────────────────────────────────────
 
@@ -205,7 +190,7 @@ export default async function CRMPage() {
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Headphones className="h-4 w-4 text-muted-foreground" />
-                Ticket assegnati
+                {t("assignedTickets")}
                 {myTickets.length > 0 && (
                   <span className="rounded-full bg-muted px-2 py-0.5 font-normal text-muted-foreground text-xs">
                     {myTickets.length}
@@ -214,7 +199,7 @@ export default async function CRMPage() {
               </CardTitle>
               <Button variant="ghost" size="sm" className="h-7 gap-1 text-xs" asChild>
                 <Link href="/dashboard/support/tickets">
-                  Tutti <ArrowRight className="h-3 w-3" />
+                  {tc("all")} <ArrowRight className="h-3 w-3" />
                 </Link>
               </Button>
             </div>
@@ -223,12 +208,14 @@ export default async function CRMPage() {
             {myTickets.length === 0 ? (
               <div className="flex flex-col items-center py-8 text-center">
                 <Headphones className="mb-2 h-8 w-8 text-muted-foreground/20" />
-                <p className="font-medium text-muted-foreground text-sm">Nessun ticket aperto</p>
+                <p className="font-medium text-muted-foreground text-sm">{t("noOpenTickets")}</p>
               </div>
             ) : (
               myTickets.map((ticket) => {
-                const slaUrgent =
-                  ticket.slaDeadlineAt && new Date(ticket.slaDeadlineAt).getTime() - Date.now() < 3_600_000;
+                // How long is left, said the way a person would say it. The card
+                // used to show this only inside the last hour, which is the point
+                // at which knowing is no longer much use.
+                const left = timeLeft(ticket.slaDeadlineAt, t);
                 return (
                   <Link
                     key={ticket.id}
@@ -240,7 +227,7 @@ export default async function CRMPage() {
                         <span className="shrink-0 font-mono text-muted-foreground text-xs">{ticket.ticketNumber}</span>
                         <TicketStatusBadge status={ticket.status} />
                         <TicketPriorityBadge priority={ticket.priority} />
-                        {slaUrgent && (
+                        {left?.late && (
                           <Badge variant="destructive" className="h-4 px-1.5 text-[10px]">
                             SLA
                           </Badge>
@@ -248,11 +235,9 @@ export default async function CRMPage() {
                       </div>
                       <p className="truncate font-medium text-sm group-hover:text-primary">{ticket.subject}</p>
                       <p className="mt-0.5 text-muted-foreground text-xs">
-                        aggiornato {timeAgo(ticket.updatedAt, locale)}
-                        {slaUrgent && ticket.slaDeadlineAt && (
-                          <span className="ml-2 font-medium text-red-500">
-                            · SLA scade {formatDueTime(ticket.slaDeadlineAt, locale)}
-                          </span>
+                        {t("updatedAgo", { time: timeAgo(ticket.updatedAt, locale) })}
+                        {left && (
+                          <span className={left.late ? "ml-2 font-medium text-red-500" : "ml-2"}>· {left.text}</span>
                         )}
                       </p>
                     </div>

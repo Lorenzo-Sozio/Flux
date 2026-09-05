@@ -13,9 +13,15 @@ import { getDb } from "@/lib/tenant-context";
  * The day's agenda, in one place.
  *
  * This was a hundred and thirty lines inside the CRM dashboard page: three
- * queries and the mapping that turns them into one ordered list. The "today"
- * screen needs exactly the same thing, and a second copy of it would drift from
- * the first within a month.
+ * queries and the mapping that turns them into one ordered list.
+ *
+ * It was extracted because a separate "Today" screen needed the same list, and a
+ * second copy would have drifted from the first within a month. That screen has
+ * since gone — it drew this agenda, the same work list and the same ticket queue
+ * as the dashboard, which is the page everybody lands on anyway — but the reason
+ * to keep the assembly in one place outlived it: the dashboard also ran its own
+ * near-identical ticket query, ordered by when a ticket was last touched rather
+ * than by when it stops being on time, and now reads `tickets` from here.
  */
 
 /** Whose name to put on a row, from whichever relation it happens to carry. */

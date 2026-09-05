@@ -115,12 +115,12 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
     icon: "CheckSquare",
   },
   {
-    id: "today",
-    label: "Go to today",
+    id: "dashboard",
+    label: "Go to dashboard",
     group: "Work",
-    href: "/dashboard/today",
-    keywords: ["today", "agenda", "day", "oggi", "giornata"],
-    icon: "Sunrise",
+    href: "/dashboard/crm",
+    keywords: ["dashboard", "home", "today", "agenda", "day", "oggi", "giornata"],
+    icon: "ChartBar",
   },
   {
     id: "win-loss",
