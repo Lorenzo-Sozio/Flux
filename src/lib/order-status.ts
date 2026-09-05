@@ -44,13 +44,16 @@ export function nextStatus(status: string): OrderStatus | null {
  * It names the destination rather than the movement. "Advance" tells the user
  * that something will change and not what to; "Start processing" is a sentence
  * they can agree or disagree with before they click.
+ *
+ * A key rather than the sentence itself: this module is pure and the sentence has
+ * to arrive in the reader's language, which only the page knows.
  */
-export function advanceLabel(status: string): string | null {
+export function advanceLabelKey(status: string): "startProcessing" | "markCompleted" | null {
   switch (nextStatus(status)) {
     case "processing":
-      return "Start processing";
+      return "startProcessing";
     case "completed":
-      return "Mark completed";
+      return "markCompleted";
     default:
       return null;
   }

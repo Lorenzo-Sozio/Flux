@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { ChevronLeft, Loader2, Package, Plus, ShoppingCart, StickyNote, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -70,13 +71,6 @@ const emptyLine = (): LineValues => ({
   taxPercent: 0,
 });
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: "Draft",
-  processing: "Processing",
-  completed: "Completed",
-  cancelled: "Cancelled",
-};
-
 /**
  * Writing an order by hand.
  *
@@ -96,6 +90,11 @@ const STATUS_LABEL: Record<string, string> = {
  */
 export default function NewOrderPage() {
   const router = useRouter();
+  const t = useTranslations("orders.form");
+  // The status names are the list's, not this page's: one order is "processing"
+  // in both places or the two screens disagree about the same row.
+  const tStatus = useTranslations("orders.statuses");
+  const tc = useTranslations("common");
   const { formatAmount } = useCurrency();
 
   const [data, setData] = useState<FormData | null>(null);
@@ -120,10 +119,13 @@ export default function NewOrderPage() {
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
+  // Once, on mount. The translator is read inside so the message follows the
+  // chosen language, but it is not a reason to fetch the customers again.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loaded once
   useEffect(() => {
     getOrderFormData()
       .then(setData)
-      .catch(() => toast.error("Could not load customers and products."))
+      .catch(() => toast.error(t("loadFailed")))
       .finally(() => setLoading(false));
   }, []);
 
@@ -200,7 +202,7 @@ export default function NewOrderPage() {
   async function onSubmit(values: OrderFormValues) {
     const usable = values.items.filter((l) => l.productId || l.description.trim());
     if (usable.length === 0) {
-      toast.error("Add at least one line: pick a product or describe what it is for.");
+      toast.error(t("needALine"));
       return;
     }
 
@@ -225,10 +227,10 @@ export default function NewOrderPage() {
           taxPercent: l.taxPercent,
         })),
       });
-      toast.success(`Order ${created.orderNumber} created.`);
+      toast.success(t("created", { number: created.orderNumber }));
       router.push(`/dashboard/sales/orders/${created.id}`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not create the order.");
+      toast.error(err instanceof Error ? err.message : t("createFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -244,7 +246,7 @@ export default function NewOrderPage() {
             variant="ghost"
             size="icon"
             className="h-9 w-9 shrink-0 text-muted-foreground"
-            aria-label="Back to orders"
+            aria-label={t("back")}
           >
             <Link href="/dashboard/sales/orders">
               <ChevronLeft className="h-4 w-4" />
@@ -254,25 +256,23 @@ export default function NewOrderPage() {
             <ShoppingCart className="h-5 w-5 text-primary" />
           </div>
           <div className="min-w-0">
-            <h1 className="truncate font-bold text-lg tracking-tight">New order</h1>
-            <p className="hidden truncate text-muted-foreground text-xs sm:block">
-              Everything the person preparing it needs to read.
-            </p>
+            <h1 className="truncate font-bold text-lg tracking-tight">{t("title")}</h1>
+            <p className="hidden truncate text-muted-foreground text-xs sm:block">{t("subtitle")}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           {/* The number the writer keeps glancing at, without scrolling back for it. */}
           <div className="mr-2 hidden items-baseline gap-2 sm:flex">
-            <span className="text-muted-foreground text-xs uppercase tracking-wide">Total</span>
+            <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("total")}</span>
             <span className="font-bold text-base tabular-nums">{formatAmount(totals.total)}</span>
           </div>
           <Button type="button" variant="ghost" onClick={() => router.push("/dashboard/sales/orders")}>
-            Cancel
+            {tc("cancel")}
           </Button>
           <Button type="submit" disabled={submitting || loading} className="gap-2">
             {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-            Create order
+            {t("createOrder")}
           </Button>
         </div>
       </div>
@@ -282,13 +282,13 @@ export default function NewOrderPage() {
         <Card className="md:col-span-5">
           <CardHeader>
             <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-              Customer
+              {t("customerTitle")}
             </CardTitle>
-            <CardDescription>Who the order is for.</CardDescription>
+            <CardDescription>{t("customerSubtitle")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label className="text-xs">Company</Label>
+              <Label className="text-xs">{t("company")}</Label>
               <SearchableSelect
                 disabled={loading}
                 options={(data?.companies ?? []).map((c) => ({ value: c.id, label: c.name }))}
@@ -298,23 +298,23 @@ export default function NewOrderPage() {
                   // A contact from the previous company is worse than none.
                   form.setValue("contactId", "");
                 }}
-                placeholder={loading ? "Loading…" : "Search company…"}
-                searchPlaceholder="Type to search…"
-                emptyText="No companies found."
+                placeholder={loading ? tc("loading") : t("companyPlaceholder")}
+                searchPlaceholder={t("searchPlaceholder")}
+                emptyText={t("companyEmpty")}
                 className="h-9"
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-xs">Contact</Label>
+              <Label className="text-xs">{t("contact")}</Label>
               <SearchableSelect
                 disabled={loading}
                 options={contactOptions}
                 value={form.watch("contactId")}
                 onChange={(v) => form.setValue("contactId", v)}
-                placeholder="Search contact…"
-                searchPlaceholder="Type to search…"
-                emptyText={companyId ? "No contacts at this company." : "No contacts found."}
+                placeholder={t("contactPlaceholder")}
+                searchPlaceholder={t("searchPlaceholder")}
+                emptyText={companyId ? t("contactEmptyAtCompany") : t("contactEmpty")}
                 className="h-9"
               />
             </div>
@@ -325,14 +325,14 @@ export default function NewOrderPage() {
         <Card className="md:col-span-7">
           <CardHeader>
             <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-              Order details
+              {t("detailsTitle")}
             </CardTitle>
-            <CardDescription>Its state, its date, and, optionally, where it came from.</CardDescription>
+            <CardDescription>{t("detailsSubtitle")}</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label className="text-xs">Status</Label>
+                <Label className="text-xs">{t("status")}</Label>
                 <Select
                   value={form.watch("status")}
                   onValueChange={(v) => form.setValue("status", v as OrderFormValues["status"])}
@@ -343,7 +343,7 @@ export default function NewOrderPage() {
                   <SelectContent>
                     {[...ORDER_FLOW, "cancelled"].map((v) => (
                       <SelectItem key={v} value={v}>
-                        {STATUS_LABEL[v]}
+                        {tStatus(v as "draft" | "processing" | "completed" | "cancelled")}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -351,34 +351,34 @@ export default function NewOrderPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs">Order date</Label>
+                <Label className="text-xs">{t("orderDate")}</Label>
                 <Input type="date" className="h-9" {...form.register("orderDate")} />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs">Accepted quote</Label>
+                <Label className="text-xs">{t("quote")}</Label>
                 <SearchableSelect
                   disabled={loading}
                   options={(data?.quotes ?? []).map((q) => ({ value: q.id, label: q.quoteNumber }))}
                   value={form.watch("quoteId")}
                   onChange={selectQuote}
-                  placeholder="None"
-                  searchPlaceholder="Type to search…"
-                  emptyText="No accepted quotes."
+                  placeholder={t("none")}
+                  searchPlaceholder={t("searchPlaceholder")}
+                  emptyText={t("quoteEmpty")}
                   className="h-9"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="text-xs">Deal</Label>
+                <Label className="text-xs">{t("deal")}</Label>
                 <SearchableSelect
                   disabled={loading}
                   options={(data?.deals ?? []).map((d) => ({ value: d.id, label: d.name }))}
                   value={form.watch("dealId")}
                   onChange={selectDeal}
-                  placeholder="None"
-                  searchPlaceholder="Type to search…"
-                  emptyText="No open deals."
+                  placeholder={t("none")}
+                  searchPlaceholder={t("searchPlaceholder")}
+                  emptyText={t("dealEmpty")}
                   className="h-9"
                 />
               </div>
@@ -391,11 +391,13 @@ export default function NewOrderPage() {
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
-            <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Lines</CardTitle>
-            <CardDescription>A catalogue product, or anything else written out by hand.</CardDescription>
+            <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+              {t("linesTitle")}
+            </CardTitle>
+            <CardDescription>{t("linesSubtitle")}</CardDescription>
           </div>
           <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => append(emptyLine())}>
-            <Plus className="h-3.5 w-3.5" /> Add line
+            <Plus className="h-3.5 w-3.5" /> {t("addLine")}
           </Button>
         </CardHeader>
 
@@ -408,13 +410,13 @@ export default function NewOrderPage() {
             )}
           >
             <span />
-            <span>Product</span>
-            <span>Description</span>
-            <span>Qty</span>
-            <span>Unit price</span>
-            <span>Disc %</span>
-            <span>Tax %</span>
-            <span className="text-right">Total</span>
+            <span>{t("product")}</span>
+            <span>{t("description")}</span>
+            <span>{t("qty")}</span>
+            <span>{t("unitPrice")}</span>
+            <span>{t("discountShort")}</span>
+            <span>{t("tax")}</span>
+            <span className="text-right">{t("lineTotal")}</span>
             <span />
           </div>
 
@@ -435,7 +437,7 @@ export default function NewOrderPage() {
                   size="icon"
                   className={cn("h-7 w-7 text-muted-foreground hover:text-foreground", noteOpen && "text-primary")}
                   onClick={() => setOpenNotes((prev) => ({ ...prev, [field.id]: !prev[field.id] }))}
-                  aria-label="Note on this line"
+                  aria-label={t("lineNote")}
                   aria-pressed={noteOpen}
                 >
                   <StickyNote className="h-3.5 w-3.5" />
@@ -450,7 +452,7 @@ export default function NewOrderPage() {
                   className="h-7 w-7 text-muted-foreground hover:text-destructive"
                   onClick={() => remove(index)}
                   disabled={fields.length === 1}
-                  aria-label="Remove line"
+                  aria-label={t("removeLine")}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
@@ -464,13 +466,15 @@ export default function NewOrderPage() {
                   {/* Narrow screens get the line's own header; wide ones read it off the row. */}
                   <div className="mb-3 flex items-center justify-between gap-2 xl:hidden">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-muted-foreground text-xs">Line {index + 1}</span>
+                      <span className="font-medium text-muted-foreground text-xs">
+                        {t("line", { number: index + 1 })}
+                      </span>
                       {isCustom && (
                         <Badge
                           variant="outline"
                           className="h-5 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
                         >
-                          Off catalogue
+                          {t("offCatalogue")}
                         </Badge>
                       )}
                     </div>
@@ -485,11 +489,11 @@ export default function NewOrderPage() {
                     <span className="hidden text-muted-foreground text-xs tabular-nums xl:block">{index + 1}</span>
 
                     <div className="col-span-2 space-y-1.5 xl:col-span-1 xl:space-y-0">
-                      <Label className="text-xs xl:hidden">Product</Label>
+                      <Label className="text-xs xl:hidden">{t("product")}</Label>
                       <SearchableSelect
                         disabled={loading}
                         options={[
-                          { value: CUSTOM, label: "Off catalogue" },
+                          { value: CUSTOM, label: t("offCatalogue") },
                           ...(data?.products ?? []).map((p) => ({
                             value: p.id,
                             label: p.sku ? `${p.name} · ${p.sku}` : p.name,
@@ -497,26 +501,26 @@ export default function NewOrderPage() {
                         ]}
                         value={line?.productId || CUSTOM}
                         onChange={(v) => selectProduct(index, v)}
-                        placeholder="Off catalogue"
-                        searchPlaceholder="Type to search products…"
-                        emptyText="No products found."
+                        placeholder={t("offCatalogue")}
+                        searchPlaceholder={t("productSearchPlaceholder")}
+                        emptyText={t("productEmpty")}
                         className="h-9"
                       />
                     </div>
 
                     <div className="col-span-2 space-y-1.5 xl:col-span-1 xl:space-y-0">
                       <Label className="text-xs xl:hidden">
-                        Description {isCustom && <span className="text-destructive">*</span>}
+                        {t("description")} {isCustom && <span className="text-destructive">*</span>}
                       </Label>
                       <Input
                         className="h-9"
-                        placeholder={isCustom ? "What is being sold" : "Defaults to the product name"}
+                        placeholder={isCustom ? t("descriptionCustomPlaceholder") : t("descriptionPlaceholder")}
                         {...form.register(`items.${index}.description`)}
                       />
                     </div>
 
                     <div className="space-y-1.5 xl:space-y-0">
-                      <Label className="text-xs xl:hidden">Qty</Label>
+                      <Label className="text-xs xl:hidden">{t("qty")}</Label>
                       <Input
                         type="number"
                         min="1"
@@ -527,7 +531,7 @@ export default function NewOrderPage() {
                     </div>
 
                     <div className="space-y-1.5 xl:space-y-0">
-                      <Label className="text-xs xl:hidden">Unit price</Label>
+                      <Label className="text-xs xl:hidden">{t("unitPrice")}</Label>
                       <Input
                         type="number"
                         min="0"
@@ -538,7 +542,7 @@ export default function NewOrderPage() {
                     </div>
 
                     <div className="space-y-1.5 xl:space-y-0">
-                      <Label className="text-xs xl:hidden">Discount %</Label>
+                      <Label className="text-xs xl:hidden">{t("discount")}</Label>
                       <Input
                         type="number"
                         min="0"
@@ -550,7 +554,7 @@ export default function NewOrderPage() {
                     </div>
 
                     <div className="space-y-1.5 xl:space-y-0">
-                      <Label className="text-xs xl:hidden">Tax %</Label>
+                      <Label className="text-xs xl:hidden">{t("tax")}</Label>
                       <Input
                         type="number"
                         min="0"
@@ -575,7 +579,7 @@ export default function NewOrderPage() {
                     <div className="mt-2 xl:pb-1 xl:pl-9">
                       <Input
                         className="h-8 bg-background text-xs"
-                        placeholder="Note on this line — “no onions”, “engraved”, “collect Friday”"
+                        placeholder={t("lineNotePlaceholder")}
                         {...form.register(`items.${index}.notes`)}
                       />
                     </div>
@@ -588,7 +592,7 @@ export default function NewOrderPage() {
           {fields.length === 0 && (
             <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
               <Package className="h-8 w-8 opacity-30" />
-              <p className="text-sm">No lines yet.</p>
+              <p className="text-sm">{t("noLines")}</p>
             </div>
           )}
 
@@ -599,7 +603,7 @@ export default function NewOrderPage() {
             className="mt-3 h-10 w-full gap-1.5 border border-dashed text-muted-foreground hover:text-foreground"
             onClick={() => append(emptyLine())}
           >
-            <Plus className="h-4 w-4" /> Add another line
+            <Plus className="h-4 w-4" /> {t("addAnotherLine")}
           </Button>
         </CardContent>
       </Card>
@@ -608,15 +612,15 @@ export default function NewOrderPage() {
       <div className="grid gap-6 lg:grid-cols-12">
         <Card className="lg:col-span-7 xl:col-span-8">
           <CardHeader>
-            <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Notes</CardTitle>
-            <CardDescription>
-              Delivery or collection, for when, to what address — anything the person preparing this has to read.
-            </CardDescription>
+            <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+              {t("notesTitle")}
+            </CardTitle>
+            <CardDescription>{t("notesSubtitle")}</CardDescription>
           </CardHeader>
           <CardContent className="flex-1">
             <Textarea
               className="h-full min-h-[168px] resize-y leading-relaxed"
-              placeholder="Write it as you would say it to whoever picks the order up."
+              placeholder={t("notesPlaceholder")}
               {...form.register("notes")}
             />
           </CardContent>
@@ -626,19 +630,19 @@ export default function NewOrderPage() {
         <Card className="lg:col-span-5 xl:col-span-4">
           <CardHeader>
             <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-              Summary
+              {t("summaryTitle")}
             </CardTitle>
-            <CardDescription>What this order comes to.</CardDescription>
+            <CardDescription>{t("summarySubtitle")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2.5 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Net</span>
+              <span className="text-muted-foreground">{t("net")}</span>
               <span className="tabular-nums">{formatAmount(totals.subtotal)}</span>
             </div>
 
             <div className="flex items-center justify-between gap-3">
               <Label htmlFor="header-discount" className="font-normal text-muted-foreground text-sm">
-                Discount on the whole order
+                {t("headerDiscount")}
               </Label>
               <div className="flex items-center gap-1">
                 <Input
@@ -656,20 +660,20 @@ export default function NewOrderPage() {
 
             {totals.discountAmount > 0 && (
               <div className="flex items-center justify-between text-muted-foreground">
-                <span>Discount</span>
+                <span>{t("discountAmount")}</span>
                 <span className="tabular-nums">−{formatAmount(totals.discountAmount)}</span>
               </div>
             )}
 
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Tax</span>
+              <span className="text-muted-foreground">{t("taxAmount")}</span>
               <span className="tabular-nums">{formatAmount(totals.taxAmount)}</span>
             </div>
 
             <Separator className="my-1" />
 
             <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2.5">
-              <span className="font-semibold">Total</span>
+              <span className="font-semibold">{t("total")}</span>
               <span className="font-bold text-lg tabular-nums">{formatAmount(totals.total)}</span>
             </div>
           </CardContent>

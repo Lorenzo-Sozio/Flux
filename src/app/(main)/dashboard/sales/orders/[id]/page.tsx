@@ -22,6 +22,7 @@ import {
   Trash2,
   User,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -44,7 +45,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCurrency } from "@/hooks/use-currency";
-import { advanceLabel, isTerminalStatus, nextStatus } from "@/lib/order-status";
+import { advanceLabelKey, isTerminalStatus, nextStatus } from "@/lib/order-status";
 import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -69,14 +70,13 @@ function formatDateTime(value: Date | string): string {
   });
 }
 
-const STATUS_CONFIG: Record<string, { label: string; class: string }> = {
-  draft: { label: "Draft", class: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  processing: { label: "Processing", class: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+const STATUS_CONFIG: Record<string, { class: string }> = {
+  draft: { class: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
+  processing: { class: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
   completed: {
-    label: "Completed",
     class: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
   },
-  cancelled: { label: "Cancelled", class: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
+  cancelled: { class: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
 };
 
 // ── Add item dialog ───────────────────────────────────────────────────────────
@@ -94,6 +94,8 @@ function AddItemDialog({
   products: Product[];
   onAdded: (item: { productId: string; quantity: number; unitPrice: number }) => void;
 }) {
+  const t = useTranslations("orders.detail");
+  const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const active = products.filter((p) => p.isActive);
@@ -123,7 +125,7 @@ function AddItemDialog({
   return (
     <>
       <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={() => setOpen(true)}>
-        <Plus className="h-3.5 w-3.5" /> Add Item
+        <Plus className="h-3.5 w-3.5" /> {t("addItem")}
       </Button>
       <Dialog
         open={open}
@@ -136,15 +138,15 @@ function AddItemDialog({
       >
         <DialogContent className="gap-0 p-0 sm:max-w-sm">
           <DialogHeader className="border-b px-5 pt-5 pb-4">
-            <DialogTitle>Add Line Item</DialogTitle>
+            <DialogTitle>{t("addLineItem")}</DialogTitle>
           </DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="space-y-3 px-5 py-4">
               <div className="space-y-1.5">
-                <Label>Product</Label>
+                <Label>{t("product")}</Label>
                 <Select value={form.watch("productId")} onValueChange={handleProductChange}>
                   <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select product…" />
+                    <SelectValue placeholder={t("selectProduct")} />
                   </SelectTrigger>
                   <SelectContent>
                     {active.map((p) => (
@@ -161,22 +163,22 @@ function AddItemDialog({
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Qty</Label>
+                  <Label>{t("qty")}</Label>
                   <Input type="number" min="1" {...form.register("quantity")} className="h-9" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Unit Price</Label>
+                  <Label>{t("unitPrice")}</Label>
                   <Input type="number" step="0.01" min="0" {...form.register("unitPrice")} className="h-9 font-mono" />
                 </div>
               </div>
             </div>
             <DialogFooter className="border-t bg-muted/10 px-5 py-4">
               <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
-                Cancel
+                {tc("cancel")}
               </Button>
               <Button type="submit" disabled={saving} className="gap-2">
                 {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                Add
+                {tc("add")}
               </Button>
             </DialogFooter>
           </form>
@@ -191,6 +193,8 @@ function AddItemDialog({
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = React.use(params);
   const router = useRouter();
+  const t = useTranslations("orders.detail");
+  const tStatus = useTranslations("orders.statuses");
   // The pending flag was discarded. The two status buttons need it: without it a
   // slow save invites a second click, and a second click on "Close order" is a
   // second write of the same thing.
@@ -213,7 +217,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     startTransition(async () => {
       await updateOrderStatus(id, status);
       setOrder((prev) => (prev ? { ...prev, status } : prev));
-      toast.success("Status updated.");
+      toast.success(t("statusUpdated"));
     });
   };
 
@@ -221,24 +225,24 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     await addOrderItem(id, item);
     const updated = await getOrderById(id);
     setOrder(updated);
-    toast.success("Item added.");
+    toast.success(t("itemAdded"));
   };
 
   const handleRemoveItem = (itemId: string) => {
-    if (!confirm("Remove this item?")) return;
+    if (!confirm(t("confirmRemoveItem"))) return;
     startTransition(async () => {
       await removeOrderItem(itemId, id);
       const updated = await getOrderById(id);
       setOrder(updated);
-      toast.success("Item removed.");
+      toast.success(t("itemRemoved"));
     });
   };
 
   const handleDelete = () => {
-    if (!confirm("Delete this order? This cannot be undone.")) return;
+    if (!confirm(t("confirmDelete"))) return;
     startTransition(async () => {
       await deleteOrder(id);
-      toast.success("Order deleted.");
+      toast.success(t("orderDeleted"));
       router.push("/dashboard/sales/orders");
     });
   };
@@ -260,15 +264,18 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     return (
       <div className="py-20 text-center">
         <ShoppingCart className="mx-auto mb-4 h-12 w-12 text-muted-foreground/30" />
-        <p className="mb-4 text-muted-foreground">Order not found</p>
+        <p className="mb-4 text-muted-foreground">{t("notFound")}</p>
         <Button asChild>
-          <Link href="/dashboard/sales/orders">Back to Orders</Link>
+          <Link href="/dashboard/sales/orders">{t("back")}</Link>
         </Button>
       </div>
     );
   }
 
   const statusCfg = STATUS_CONFIG[order.status] ?? STATUS_CONFIG.draft;
+  // The next step this order can take, named after where it goes rather than
+  // after the movement, and in the reader's language.
+  const advanceKey = advanceLabelKey(order.status);
   const customer = order.contactFirstName
     ? `${order.contactFirstName} ${order.contactLastName ?? ""}`.trim()
     : (order.companyName ?? null);
@@ -280,7 +287,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         href="/dashboard/sales/orders"
         className="inline-flex items-center gap-1.5 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground"
       >
-        <ArrowLeft className="h-4 w-4" /> All Orders
+        <ArrowLeft className="h-4 w-4" /> {t("allOrders")}
       </Link>
 
       {/* Header */}
@@ -290,7 +297,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           <h1 className="mt-0.5 font-bold text-2xl tracking-tight">{customer ?? "Order Details"}</h1>
           <div className="mt-2 flex items-center gap-2">
             <Badge variant="outline" className={cn("text-xs", statusCfg.class)}>
-              {statusCfg.label}
+              {tStatus(order.status as "draft" | "processing" | "completed" | "cancelled")}
             </Badge>
             <span className="flex items-center gap-1 text-muted-foreground text-xs">
               <Calendar className="h-3 w-3" />
@@ -306,7 +313,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             className="gap-1.5 text-destructive hover:text-destructive"
             onClick={handleDelete}
           >
-            <Trash2 className="h-3.5 w-3.5" /> Delete
+            <Trash2 className="h-3.5 w-3.5" /> {t("delete")}
           </Button>
         </div>
       </div>
@@ -319,7 +326,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
             <CardHeader className="flex flex-row items-center justify-between border-b pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Package className="h-4 w-4 text-muted-foreground" />
-                Line Items
+                {t("lineItems")}
               </CardTitle>
               <AddItemDialog products={products} onAdded={handleAddItem} />
             </CardHeader>
@@ -327,16 +334,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               {order.items.length === 0 ? (
                 <div className="py-10 text-center">
                   <Package className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
-                  <p className="text-muted-foreground text-sm">No items yet.</p>
+                  <p className="text-muted-foreground text-sm">{t("noItems")}</p>
                 </div>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/30 text-muted-foreground text-xs">
-                      <th className="px-4 py-2.5 text-left font-medium">Product</th>
-                      <th className="px-4 py-2.5 text-right font-medium">Qty</th>
-                      <th className="px-4 py-2.5 text-right font-medium">Unit Price</th>
-                      <th className="px-4 py-2.5 text-right font-medium">Total</th>
+                      <th className="px-4 py-2.5 text-left font-medium">{t("product")}</th>
+                      <th className="px-4 py-2.5 text-right font-medium">{t("qty")}</th>
+                      <th className="px-4 py-2.5 text-right font-medium">{t("unitPriceCol")}</th>
+                      <th className="px-4 py-2.5 text-right font-medium">{t("totalCol")}</th>
                       <th className="w-10 px-4 py-2.5" />
                     </tr>
                   </thead>
@@ -374,7 +381,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     ))}
                     <tr className="border-t bg-muted/20">
                       <td colSpan={3} className="px-4 py-3 text-right font-medium text-muted-foreground text-sm">
-                        Total
+                        {t("totalCol")}
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-base tabular-nums">
                         {formatAmount(Number(order.totalAmount))}
@@ -392,12 +399,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Order Details</CardTitle>
+              <CardTitle className="text-sm">{t("orderDetails")}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               {/* Status */}
               <div>
-                <p className="mb-1.5 text-muted-foreground text-xs">Status</p>
+                <p className="mb-1.5 text-muted-foreground text-xs">{t("status")}</p>
 
                 {/*
                   The dropdown and the two moves anyone actually makes, on one row.
@@ -412,9 +419,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(STATUS_CONFIG).map(([v, cfg]) => (
+                      {Object.keys(STATUS_CONFIG).map((v) => (
                         <SelectItem key={v} value={v} className="text-xs">
-                          {cfg.label}
+                          {tStatus(v as "draft" | "processing" | "completed" | "cancelled")}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -422,7 +429,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
                   {!isTerminalStatus(order.status) && (
                     <TooltipProvider delayDuration={200}>
-                      {advanceLabel(order.status) && (
+                      {advanceKey && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -430,7 +437,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                               variant="outline"
                               className="h-8 w-8 shrink-0"
                               disabled={isPending}
-                              aria-label={advanceLabel(order.status) ?? undefined}
+                              aria-label={t(advanceKey)}
                               onClick={() => {
                                 const next = nextStatus(order.status);
                                 if (next) handleStatusChange(next);
@@ -439,7 +446,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                               <ChevronRight className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>{advanceLabel(order.status)}</TooltipContent>
+                          <TooltipContent>{t(advanceKey)}</TooltipContent>
                         </Tooltip>
                       )}
 
@@ -455,13 +462,13 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                               size="icon"
                               className="h-8 w-8 shrink-0 bg-emerald-600 hover:bg-emerald-700"
                               disabled={isPending}
-                              aria-label="Close order"
+                              aria-label={t("closeOrder")}
                               onClick={() => handleStatusChange("completed")}
                             >
                               <Check className="h-4 w-4" />
                             </Button>
                           </TooltipTrigger>
-                          <TooltipContent>Close order</TooltipContent>
+                          <TooltipContent>{t("closeOrder")}</TooltipContent>
                         </Tooltip>
                       )}
                     </TooltipProvider>
@@ -470,7 +477,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
                 {isTerminalStatus(order.status) && (
                   <p className="mt-1.5 text-muted-foreground text-xs">
-                    {order.status === "completed" ? "Closed. Change the status to reopen it." : "Cancelled."}
+                    {order.status === "completed" ? t("closedHint") : t("cancelledHint")}
                   </p>
                 )}
               </div>
@@ -478,7 +485,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               {/* Amount */}
               <div className="flex items-center justify-between border-t pt-3">
                 <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                  <DollarSign className="h-3 w-3" /> Total Amount
+                  <DollarSign className="h-3 w-3" /> {t("totalAmount")}
                 </span>
                 <span className="font-bold tabular-nums">{formatAmount(Number(order.totalAmount))}</span>
               </div>
@@ -509,7 +516,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="flex items-center gap-2 border-t pt-3">
                   <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <div>
-                    <p className="text-[10px] text-muted-foreground">Owner</p>
+                    <p className="text-[10px] text-muted-foreground">{t("owner")}</p>
                     <p className="font-medium text-xs">{order.ownerName}</p>
                   </div>
                 </div>
@@ -519,7 +526,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   Written by whoever took the order — an assistant, or a person. */}
               {order.notes && (
                 <div className="border-t pt-3">
-                  <p className="mb-1 text-muted-foreground text-xs">Notes</p>
+                  <p className="mb-1 text-muted-foreground text-xs">{t("notes")}</p>
                   <p className="whitespace-pre-line text-xs">{order.notes}</p>
                 </div>
               )}
@@ -529,14 +536,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="flex items-center justify-between text-xs">
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <Clock className="h-3 w-3" />
-                    Order date
+                    {t("orderDate")}
                   </span>
                   <span className="tabular-nums">{formatDateTime(order.orderDate)}</span>
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="flex items-center gap-1 text-muted-foreground">
                     <CheckCircle2 className="h-3 w-3" />
-                    Created
+                    {t("created")}
                   </span>
                   <span className="tabular-nums">{formatDateTime(order.createdAt)}</span>
                 </div>
