@@ -5,7 +5,7 @@ import { after } from "next/server";
 
 import crypto from "node:crypto";
 
-import { and, asc, desc, eq, isNotNull, lt, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lt, ne, notInArray } from "drizzle-orm";
 import type { z } from "zod";
 
 import {
@@ -36,6 +36,7 @@ import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 import { logTicketChange } from "@/lib/ticket-audit";
 import { canTransition, isSLAPauseStatus } from "@/lib/ticket-state-machine";
+import { suggestMacros, triage } from "@/lib/ticket-triage";
 
 // --- HELPERS ---
 
@@ -1023,4 +1024,118 @@ export async function getTicketsForOrder(orderId: string) {
     .where(eq(tickets.orderId, orderId))
     .orderBy(desc(tickets.createdAt))
     .limit(10);
+}
+
+/**
+ * What else this customer has written about, and how much of it is still open.
+ *
+ * The other half of the context an agent works without. A first ticket and a
+ * fourth in a month are different conversations, and answering the second as if
+ * it were the first is how a customer decides nobody is listening. The sidebar
+ * said who they are; it never said whether they had been here before.
+ *
+ * Excludes the ticket being read, obviously, and counts across the customer
+ * rather than only over the five shown.
+ */
+export async function getCustomerTicketHistory(ticketId: string) {
+  await requireCapability("ticket:read");
+  await requirePlanModule("support");
+  const db = await getDb();
+
+  const [ticket] = await db
+    .select({ companyId: tickets.companyId, contactId: tickets.contactId })
+    .from(tickets)
+    .where(eq(tickets.id, ticketId));
+  if (!ticket || (!ticket.companyId && !ticket.contactId)) {
+    return { total: 0, open: 0, recent: [] as { id: string; ticketNumber: string; subject: string; status: string }[] };
+  }
+
+  const scope = ticket.companyId
+    ? eq(tickets.companyId, ticket.companyId)
+    : eq(tickets.contactId, ticket.contactId as string);
+
+  const rows = await db
+    .select({
+      id: tickets.id,
+      ticketNumber: tickets.ticketNumber,
+      subject: tickets.subject,
+      status: tickets.status,
+    })
+    .from(tickets)
+    .where(and(scope, ne(tickets.id, ticketId)))
+    .orderBy(desc(tickets.createdAt));
+
+  const OPEN = ["new", "open", "in_progress", "waiting", "on_hold"];
+  return {
+    total: rows.length,
+    open: rows.filter((r) => OPEN.includes(r.status)).length,
+    // Five is enough to see a pattern; the rest is what the count is for.
+    recent: rows.slice(0, 5),
+  };
+}
+
+// --- TRIAGE ---
+
+/**
+ * How far back triage looks.
+ *
+ * Two hundred resolved tickets is a few hundred kilobytes and a few milliseconds,
+ * and a support desk repeats itself inside far less than that. Raising it is the
+ * knob to reach for before reaching for an index.
+ */
+const TRIAGE_WINDOW = 200;
+
+/**
+ * What this ticket resembles, from the workspace's own answered history.
+ *
+ * ⚠️ Everything here is a **proposal with its evidence attached** and nothing is
+ * applied. The audit's rule for this section is "always proposed, always
+ * editable, never sent on its own" (rilievo S-05), and a triage that quietly set
+ * a priority would be the opposite of it.
+ *
+ * The comparison happens in memory over a bounded window rather than in SQL:
+ * Postgres full-text search would need an index per tenant database and a
+ * migration to add it, and two hundred recent tickets is a few hundred kilobytes
+ * and a few milliseconds. When a workspace outgrows that, the window is the thing
+ * to change, not the rule.
+ */
+export async function triageTicket(input: { subject: string; description?: string | null; excludeId?: string }) {
+  await requireCapability("ticket:read");
+  await requirePlanModule("support");
+  const db = await getDb();
+
+  const subject = input.subject?.trim() ?? "";
+  if (subject.length < 3) return { similar: [], type: null, component: null, priority: null, macros: [] };
+
+  const [history, macroRows] = await Promise.all([
+    db
+      .select({
+        id: tickets.id,
+        ticketNumber: tickets.ticketNumber,
+        subject: tickets.subject,
+        description: tickets.description,
+        type: tickets.type,
+        component: tickets.component,
+        priority: tickets.priority,
+        resolvedAt: tickets.resolvedAt,
+      })
+      .from(tickets)
+      // Only what somebody actually finished: an open ticket's priority is a guess
+      // nobody has confirmed, and proposing from guesses compounds them.
+      .where(and(isNotNull(tickets.resolvedAt), inArray(tickets.status, ["resolved", "closed"])))
+      .orderBy(desc(tickets.resolvedAt))
+      .limit(TRIAGE_WINDOW),
+    db
+      .select({
+        id: ticketMacros.id,
+        name: ticketMacros.name,
+        description: ticketMacros.description,
+        body: ticketMacros.body,
+      })
+      .from(ticketMacros),
+  ]);
+
+  const result = triage(subject, input.description ?? null, history, { excludeId: input.excludeId });
+
+  return { ...result, macros: suggestMacros(subject, input.description ?? null, macroRows) };
 }

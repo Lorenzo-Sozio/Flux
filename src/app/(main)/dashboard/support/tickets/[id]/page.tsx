@@ -41,6 +41,7 @@ import {
   addTicketMessageAction,
   deleteTicketAction,
   escalateTicketAction,
+  getCustomerTicketHistory,
   getMacros,
   getOrdersForTicket,
   getTicketById,
@@ -77,6 +78,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { ticketMacros } from "@/db/schema";
 import { useCurrency } from "@/hooks/use-currency";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
+
+import { TriageCard } from "../_components/triage-card";
 
 // ─── Row shapes ───────────────────────────────────────────────────────────────
 //
@@ -579,6 +582,65 @@ function MessageBubble({ msg, docs, isAgent }: { msg: TicketMessage; docs?: Tick
  * The list is the customer's own orders, not the workspace's: "which of their
  * orders" is the question, and offering all of them invites the wrong answer.
  */
+/**
+ * Whether this customer has been here before.
+ *
+ * A first ticket and a fourth in a month are different conversations, and
+ * answering the second as though it were the first is how somebody decides
+ * nobody is listening. The sidebar said who they are and never whether they had
+ * written before.
+ */
+function HistoryCard({ ticket }: { ticket: TicketRow }) {
+  const t = useTranslations("support.tickets");
+  const [history, setHistory] = useState<Awaited<ReturnType<typeof getCustomerTicketHistory>> | null>(null);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the ticket is the trigger
+  useEffect(() => {
+    let current = true;
+    getCustomerTicketHistory(ticket.id)
+      .then((h) => current && setHistory(h))
+      .catch(() => current && setHistory(null));
+    return () => {
+      current = false;
+    };
+  }, [ticket.id]);
+
+  // Nothing to say is said by saying nothing: a card reading "0 previous" on a
+  // first-time customer is noise on every new ticket.
+  if (!history || history.total === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader className="px-3 pt-3 pb-2">
+        <CardTitle className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wide">
+          {t("customerHistory")}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-2 px-3 pb-3">
+        <p className="text-muted-foreground text-xs">
+          {history.open > 0
+            ? t("historySummaryOpen", { total: history.total, open: history.open })
+            : t("historySummary", { total: history.total })}
+        </p>
+        <div className="space-y-1">
+          {history.recent.map((h) => (
+            <Link
+              key={h.id}
+              href={`/dashboard/support/tickets/${h.id}`}
+              className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 transition-colors hover:bg-muted/40"
+            >
+              <span className="truncate text-xs">{h.subject}</span>
+              <span className="shrink-0 text-[10px] text-muted-foreground capitalize">
+                {h.status.replace(/_/g, " ")}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function OrderCard({ ticket, onLinked }: { ticket: TicketRow; onLinked: () => void }) {
   const t = useTranslations("support.tickets");
   const { formatAmount } = useCurrency();
@@ -1378,7 +1440,15 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
           {/* ── Right: Sidebar ──────────────────────────────────────────── */}
           <div className="space-y-3 overflow-y-auto p-4">
             <ContactCard ticket={ticket} />
+            {/*
+              What this ticket resembles, from what the workspace has already
+              answered (audit rilievo S-05). Above the history because it is the
+              thing somebody picking the ticket up wants first, and it renders
+              nothing at all when there is nothing to say.
+            */}
+            <TriageCard subject={ticket.subject} description={ticket.description} excludeId={ticket.id} />
             <OrderCard ticket={ticket} onLinked={() => void loadTicket()} />
+            <HistoryCard ticket={ticket} />
             <PropertiesCard
               ticket={ticket}
               onStatusChange={handleStatusChange}

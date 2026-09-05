@@ -1,0 +1,38 @@
+[
+  {
+    "file": "src/lib/quote-followup.ts",
+    "description": "⚠️⚠️ si sollecita anche un preventivo gia' accettato o rifiutato: il messaggio che costa di piu' da mandare",
+    "find": "  if (![\"sent\", \"viewed\"].includes(quote.status)) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/quote-followup.ts",
+    "description": "⚠️ si sollecita il giorno dopo l'invio: il promemoria si legge come pressione, non come servizio",
+    "find": "  if (quiet < QUIET_AFTER_DAYS) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/quote-followup.ts",
+    "description": "⚠️ un preventivo mai inviato riceve comunque un sollecito",
+    "find": "  if (!quote.sentAt) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/quote-followup.ts",
+    "description": "la scadenza smette di avere la precedenza: un preventivo a due giorni dal decadere riceve il messaggio sbagliato",
+    "find": "    if (daysLeft <= EXPIRING_WITHIN_DAYS) return { kind: \"expiring\", days: daysLeft };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/quote-followup.ts",
+    "description": "una scadenza gia' passata viene annunciata come imminente",
+    "find": "    if (daysLeft <= 0) return { kind: \"expired\", days: Math.abs(daysLeft) };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/quote-followup.ts",
+    "description": "non si distingue piu' chi non ha aperto da chi non ha risposto: due situazioni diverse ricevono lo stesso messaggio",
+    "find": "  return { kind: quote.viewedAt ? \"no-answer\" : \"not-opened\", days: quiet };",
+    "replace": "  return { kind: \"no-answer\", days: quiet };"
+  }
+]

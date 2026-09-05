@@ -1653,6 +1653,30 @@
       "closedHint": "Closed. Change the status to reopen it.",
       "cancelledHint": "Cancelled.",
       "openTickets": "Open tickets about this order"
+    },
+    "payments": {
+      "title": "Payment",
+      "paid": "Paid",
+      "outstanding": "Outstanding",
+      "credit": "Overpaid by",
+      "addPayment": "Record a payment",
+      "amount": "Amount",
+      "date": "Date",
+      "method": "How",
+      "methodPlaceholder": "Bank transfer, card, cash…",
+      "record": "Record",
+      "cancel": "Cancel",
+      "removePayment": "Remove this payment",
+      "recordFailed": "Could not save that.",
+      "amountInvalid": "A payment has to be a positive amount.",
+      "loading": "Loading payments…",
+      "deliveredOn": "Delivered on",
+      "state": {
+        "unpaid": "Unpaid",
+        "partial": "Part paid",
+        "paid": "Paid",
+        "overpaid": "Overpaid"
+      }
     }
   },
   "pipeline": {
@@ -2766,7 +2790,10 @@
       "noOrder": "Not about an order",
       "loadingOrders": "Loading this customer's orders…",
       "noOrdersForCustomer": "This customer has no orders.",
-      "orderLinkFailed": "Could not link that order."
+      "orderLinkFailed": "Could not link that order.",
+      "customerHistory": "This customer before",
+      "historySummary": "{total} earlier tickets, all closed.",
+      "historySummaryOpen": "{total} earlier tickets, {open} still open."
     },
     "sla": {
       "title": "SLA Management",
@@ -3057,6 +3084,18 @@
     "hoursLeft": "{n}h left",
     "daysLate": "{n}d late",
     "daysLeft": "{n}d left"
+  },
+  "triage": {
+    "title": "What this resembles",
+    "subtitle": "Suggestions from tickets this workspace has already answered. Nothing is applied.",
+    "looking": "Looking for similar tickets…",
+    "priority": "Priority",
+    "type": "Type",
+    "component": "Component",
+    "basedOn": "from {tickets}",
+    "alreadySolved": "Already solved",
+    "match": "{pct}% match",
+    "macros": "Saved replies that may fit"
   },
   "users": {
     "title": "Users",

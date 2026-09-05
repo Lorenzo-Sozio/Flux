@@ -15,7 +15,7 @@
  * The original files are always restored, including when the run is interrupted.
  */
 import { execFileSync } from "node:child_process";
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const DEFAULT_DIR = "scripts/mutations";
@@ -36,12 +36,62 @@ const originals = new Map();
 
 function restore() {
   for (const [file, content] of originals) writeFileSync(file, content);
+  rmSync(IN_FLIGHT, { force: true });
 }
 
-process.on("SIGINT", () => {
+// ⚠️ SIGINT is not the only way this stops. A harness timeout sends SIGTERM, and
+// an unexpected throw before the `finally` would leave a file mutated with
+// nothing to notice it — which happened: a run killed at ten minutes left one
+// mutation in the source, and the next run reported "already red before any
+// mutation" without saying why.
+for (const signal of ["SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK"]) {
+  process.on(signal, () => {
+    restore();
+    process.exit(130);
+  });
+}
+process.on("uncaughtException", (err) => {
   restore();
-  process.exit(130);
+  console.error(err);
+  process.exit(1);
 });
+
+/**
+ * Where the originals are kept while a run is in flight.
+ *
+ * ⚠️ Restoring in a `finally` and on a signal covers most ways a run ends, and
+ * not all of them: a harness that kills the process, a machine that loses power,
+ * a `SIGKILL`. Any of those leaves a mutated file behind, and a mutated file is
+ * invisible — the next run reports "already red" and sends the reader looking at
+ * their own recent work, or worse stays green because nothing covers the line
+ * that is still broken.
+ *
+ * The originals are written here before the first mutation and deleted on a clean
+ * exit, so the file existing at startup *is* the evidence that a run was
+ * interrupted, and it carries everything needed to undo it.
+ */
+const IN_FLIGHT = "scripts/mutations/.in-flight.json";
+
+/** Puts back whatever an interrupted run left mutated, and says what it did. */
+function recoverFromInterruptedRun() {
+  if (!existsSync(IN_FLIGHT)) return;
+
+  let saved;
+  try {
+    saved = JSON.parse(readFileSync(IN_FLIGHT, "utf8"));
+  } catch {
+    console.error(`${IN_FLIGHT} is unreadable. Check your working tree against git before trusting a run.`);
+    process.exit(2);
+  }
+
+  const files = Object.keys(saved);
+  for (const file of files) writeFileSync(file, saved[file]);
+  rmSync(IN_FLIGHT, { force: true });
+
+  console.error("a previous run was interrupted and left files mutated. Restored:");
+  for (const file of files) console.error(`  ${file}`);
+  console.error("");
+}
 
 function suiteIsGreen() {
   try {
@@ -56,6 +106,11 @@ let survived = 0;
 let broken = 0;
 
 try {
+  // Before anything else: a file left mutated by an interrupted run is the
+  // likeliest reason the suite is red, and "already red" on its own sends the
+  // reader looking at their own work instead.
+  recoverFromInterruptedRun();
+
   if (!suiteIsGreen()) {
     console.error("the suite is already red before any mutation: fix that first");
     process.exit(2);
@@ -63,7 +118,11 @@ try {
 
   for (const m of spec) {
     const onDisk = readFileSync(m.file, "utf8");
-    if (!originals.has(m.file)) originals.set(m.file, onDisk);
+    if (!originals.has(m.file)) {
+      originals.set(m.file, onDisk);
+      // Written before the file is touched, so the record is never behind reality.
+      writeFileSync(IN_FLIGHT, JSON.stringify(Object.fromEntries(originals), null, 2));
+    }
 
     // Match against LF regardless of what git checked out.
     //

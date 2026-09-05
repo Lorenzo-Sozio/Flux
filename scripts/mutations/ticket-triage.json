@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/lib/ticket-triage.ts",
+    "description": "⚠️⚠️ la soglia di accordo sparisce: fra due vicini che dicono cose diverse ne vince uno a caso, e la proposta viene presa per buona",
+    "find": "  if (confidence < minimumConfidence) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ticket-triage.ts",
+    "description": "⚠️ la somiglianza diventa asimmetrica: un ticket lunghissimo che contiene per caso le parole di uno corto risulta identico",
+    "find": "  const union = a.size + b.size - shared;\n  return union === 0 ? 0 : shared / union;",
+    "replace": "  return shared / a.size;"
+  },
+  {
+    "file": "src/lib/ticket-triage.ts",
+    "description": "⚠️ la soglia minima di somiglianza sparisce: vengono proposti ticket che condividono una parola per caso",
+    "find": "    .filter((t) => t.score >= floor)",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ticket-triage.ts",
+    "description": "⚠️ il ticket stesso rientra fra i suoi simili: si propone a se stesso, sempre col punteggio piu' alto",
+    "find": "    .filter((t) => t.id !== excludeId)",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ticket-triage.ts",
+    "description": "le parole comuni non vengono piu' scartate: ogni ticket somiglia a ogni altro perche' contengono «per» e «che»",
+    "find": "  const words = folded.split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !STOP_WORDS.has(w));",
+    "replace": "  const words = folded.split(/[^a-z0-9]+/).filter((w) => w.length >= 3);"
+  },
+  {
+    "file": "src/lib/ticket-triage.ts",
+    "description": "gli accenti non vengono piu' ripiegati: «però» e «pero» diventano due parole diverse",
+    "find": "    .normalize(\"NFD\")\n    .replace(/[\u0300-\u036f]/g, \"\");",
+    "replace": "    .normalize(\"NFD\");"
+  },
+  {
+    "file": "src/lib/ticket-triage.ts",
+    "description": "un vicino senza valore da votare conta comunque nel totale: la fiducia si abbassa per chi non ha detto niente",
+    "find": "    if (!value) continue;",
+    "replace": "    if (!value) { total += n.score; continue; }"
+  },
+  {
+    "file": "src/lib/ticket-triage.ts",
+    "description": "le macro vengono confrontate con il proprio corpo invece che con il nome: la risposta non condivide vocabolario con la domanda",
+    "find": "      const theirs = keywords(`${m.name} ${m.description ?? \"\"}`);",
+    "replace": "      const theirs = keywords(m.body);"
+  }
+]

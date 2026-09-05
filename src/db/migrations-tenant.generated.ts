@@ -324,4 +324,16 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\n-- Separately and guarded, and ON DELETE SET NULL: deleting an order should leave\n-- the conversation about it readable rather than take it down too.\nDO $$\nBEGIN\n  ALTER TABLE "ticket"\n    ADD CONSTRAINT "ticket_order_id_order_id_fk"\n    FOREIGN KEY ("order_id") REFERENCES "order"("id") ON DELETE SET NULL;\nEXCEPTION\n  WHEN duplicate_object THEN NULL;\n  WHEN undefined_table THEN NULL;\nEND $$;\n',
     ],
   },
+  {
+    tag: "0012_money_that_arrived",
+    folderMillis: 1788980000000,
+    hash: "750137829bdfe40d4f4f0eef333fa75210c8a1d314c395d334323afae34e3eee",
+    sql: [
+      '-- What has been paid on an order, and when it was delivered.\n--\n-- An order carried a total and nothing about money actually arriving, so the\n-- question a business asks about an order more often than any other — has this\n-- been paid — was answered by somebody remembering, or by opening the bank. The\n-- translation files even carried the words for it, describing columns that had\n-- never existed.\n--\n-- ⚠️ Payments are rows, not a `paid_amount` column. A single field survives\n-- exactly one instalment: the second overwrites the first and who paid what, when,\n-- is gone. A deposit followed by a balance is the ordinary case, not the exotic\n-- one. The order keeps no cached sum either: a stored total and a set of rows\n-- disagree the first time one is written without the other, and the figure a\n-- person believes is whichever the screen happens to show.\nCREATE TABLE IF NOT EXISTS "order_payment" (\n  "id" text PRIMARY KEY NOT NULL,\n  "order_id" text NOT NULL,\n  "amount" numeric(12, 2) NOT NULL,\n  "paid_at" timestamp DEFAULT now() NOT NULL,\n  "method" text,\n  "note" text,\n  "recorded_by_id" text,\n  "created_at" timestamp DEFAULT now() NOT NULL\n);\n',
+      '\n-- ON DELETE CASCADE: payments against an order that no longer exists are not a\n-- record of anything, and only draft or cancelled orders can be deleted at all.\nDO $$\nBEGIN\n  ALTER TABLE "order_payment"\n    ADD CONSTRAINT "order_payment_order_id_order_id_fk"\n    FOREIGN KEY ("order_id") REFERENCES "order"("id") ON DELETE CASCADE;\nEXCEPTION\n  WHEN duplicate_object THEN NULL;\n  WHEN undefined_table THEN NULL;\nEND $$;\n',
+      '\n-- SET NULL: a person leaving the company does not unrecord the money.\nDO $$\nBEGIN\n  ALTER TABLE "order_payment"\n    ADD CONSTRAINT "order_payment_recorded_by_id_user_id_fk"\n    FOREIGN KEY ("recorded_by_id") REFERENCES "user"("id") ON DELETE SET NULL;\nEXCEPTION\n  WHEN duplicate_object THEN NULL;\n  WHEN undefined_table THEN NULL;\nEND $$;\n',
+      '\nCREATE INDEX IF NOT EXISTS "order_payment_order_id_idx" ON "order_payment" ("order_id");\n',
+      '\n-- The date it reached the customer, which the status cannot say: "completed" is a\n-- state somebody set, and support answering "it has not arrived" needs a when.\nALTER TABLE "order" ADD COLUMN IF NOT EXISTS "delivered_at" timestamp;\n',
+    ],
+  },
 ];

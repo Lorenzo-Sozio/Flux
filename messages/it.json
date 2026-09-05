@@ -1653,6 +1653,30 @@
       "closedHint": "Chiuso. Cambia lo stato per riaprirlo.",
       "cancelledHint": "Annullato.",
       "openTickets": "Ticket aperti su questo ordine"
+    },
+    "payments": {
+      "title": "Pagamento",
+      "paid": "Incassato",
+      "outstanding": "Da incassare",
+      "credit": "Eccedenza di",
+      "addPayment": "Registra un pagamento",
+      "amount": "Importo",
+      "date": "Data",
+      "method": "Come",
+      "methodPlaceholder": "Bonifico, carta, contanti…",
+      "record": "Registra",
+      "cancel": "Annulla",
+      "removePayment": "Rimuovi questo pagamento",
+      "recordFailed": "Non è stato possibile salvare.",
+      "amountInvalid": "Un pagamento deve essere un importo positivo.",
+      "loading": "Carico i pagamenti…",
+      "deliveredOn": "Consegnato il",
+      "state": {
+        "unpaid": "Non pagato",
+        "partial": "Pagato in parte",
+        "paid": "Pagato",
+        "overpaid": "Sovrapagato"
+      }
     }
   },
   "pipeline": {
@@ -2771,7 +2795,10 @@
       "noOrder": "Non riguarda un ordine",
       "loadingOrders": "Carico gli ordini del cliente…",
       "noOrdersForCustomer": "Questo cliente non ha ordini.",
-      "orderLinkFailed": "Non è stato possibile collegare l'ordine."
+      "orderLinkFailed": "Non è stato possibile collegare l'ordine.",
+      "customerHistory": "Questo cliente, prima",
+      "historySummary": "{total} ticket precedenti, tutti chiusi.",
+      "historySummaryOpen": "{total} ticket precedenti, {open} ancora aperti."
     },
     "sla": {
       "title": "Gestione SLA",
@@ -3062,6 +3089,18 @@
     "hoursLeft": "{n} h rimaste",
     "daysLate": "{n} g di ritardo",
     "daysLeft": "{n} g rimasti"
+  },
+  "triage": {
+    "title": "A cosa somiglia",
+    "subtitle": "Proposte dai ticket che questo workspace ha già risolto. Non viene applicato niente.",
+    "looking": "Cerco ticket simili…",
+    "priority": "Priorità",
+    "type": "Tipo",
+    "component": "Componente",
+    "basedOn": "da {tickets}",
+    "alreadySolved": "Già risolti",
+    "match": "{pct}% di somiglianza",
+    "macros": "Risposte salvate che potrebbero servire"
   },
   "users": {
     "title": "Utenti",
