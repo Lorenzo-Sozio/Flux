@@ -60,7 +60,7 @@ export default async function TodayPage() {
 
   const [{ agenda, tickets }, nextActions, t] = await Promise.all([
     getTodayView(),
-    getNextActions(10).catch(() => []),
+    getNextActions(10).catch(() => null),
     getTranslations("today"),
   ]);
 
@@ -92,7 +92,7 @@ export default async function TodayPage() {
         </div>
 
         <div className="flex flex-col gap-5">
-          <NextActionsCard actions={nextActions} />
+          <NextActionsCard actions={nextActions ?? []} failed={nextActions === null} />
 
           <Card>
             <CardHeader className="pb-3">

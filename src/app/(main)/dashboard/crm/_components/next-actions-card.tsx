@@ -2,7 +2,17 @@
 
 import Link from "next/link";
 
-import { AlarmClock, ArrowRight, CheckCircle2, Clock, FileWarning, Snowflake, TrendingDown, UserX } from "lucide-react";
+import {
+  AlarmClock,
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  FileWarning,
+  Snowflake,
+  TrendingDown,
+  UserX,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -65,7 +75,7 @@ const PRESENTATION: Record<NextActionKind, { key: string; icon: React.ReactNode;
  * (audit rilievo S-02), which is the question a person actually opens the CRM
  * with on a Monday morning.
  */
-export function NextActionsCard({ actions }: { actions: NextAction[] }) {
+export function NextActionsCard({ actions, failed = false }: { actions: NextAction[]; failed?: boolean }) {
   const t = useTranslations("nextActions");
 
   return (
@@ -76,7 +86,15 @@ export function NextActionsCard({ actions }: { actions: NextAction[] }) {
       </CardHeader>
 
       <CardContent className="pt-0">
-        {actions.length === 0 ? (
+        {failed ? (
+          // ⚠️ An empty list and a failed one look identical, and one of them says
+          // "you are up to date" when nobody knows whether you are. A work list
+          // that cannot be built has to say so, or it is worse than not being there.
+          <div className="flex items-center gap-2 py-6 text-amber-700 text-sm dark:text-amber-400">
+            <AlertTriangle className="h-4 w-4" />
+            <span>{t("failed")}</span>
+          </div>
+        ) : actions.length === 0 ? (
           <div className="flex items-center gap-2 py-6 text-muted-foreground text-sm">
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
             <span>{t("allOnTrack")}</span>

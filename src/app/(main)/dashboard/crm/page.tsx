@@ -191,7 +191,7 @@ export default async function CRMPage() {
         one says what to do about it, which is the question the screen is opened
         with (audit rilievo S-02).
       */}
-      <NextActionsCard actions={nextActions} />
+      <NextActionsCard actions={nextActions ?? []} failed={nextActions === null} />
 
       {/* ── Agenda + Tickets ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">

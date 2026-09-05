@@ -283,15 +283,3 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
 
   return buildWorkList(found, limit);
 }
-
-/**
- * How many items are waiting, for a badge.
- *
- * Runs the same rules rather than a separate set of counting queries, because two
- * implementations of "what counts as waiting" drift apart, and a badge that
- * disagrees with the list under it is worse than no badge.
- */
-export async function getNextActionCount(): Promise<number> {
-  const actions = await getNextActions(50);
-  return actions.length;
-}
