@@ -20,6 +20,7 @@ import {
   businessCalendar,
   businessHolidays,
   contacts,
+  orders,
   slas,
   ticketAuditLogs,
   ticketMacros,
@@ -63,37 +64,51 @@ async function resolveSla(priority: string, from: Date = new Date()) {
 
   // ⚠️⚠️ **Only the columns this needs, named.** `findFirst` selects every column
   // the schema declares, including ones a migration has not created yet — and a
-  // tenant database is migrated by hand, days after the deploy. Reading the whole
-  // row meant that creating a ticket failed outright on any workspace that had
-  // not pressed the button, which is the most ordinary thing anyone does here.
-  const [base] = await db
-    .select({
-      id: slas.id,
-      firstResponseTimeMinutes: slas.firstResponseTimeMinutes,
-      resolutionTimeMinutes: slas.resolutionTimeMinutes,
-    })
-    .from(slas)
-    .where(and(eq(slas.priority, priority), eq(slas.isActive, true)))
-    .limit(1);
+  // tenant database is migrated by hand, after the deploy. Reading the whole row
+  // meant that creating a ticket failed outright on a workspace that had not been
+  // migrated, which is the most ordinary thing anyone does here.
+  //
+  // The working-hours switch arrived with migration 0007, so it is asked for
+  // first and dropped on the one workspace-shaped error that means "not yet".
+  // Asking for it separately would have cost a second query on every ticket
+  // created, for ever, to survive a window that closes the first time the
+  // workspace is used.
+  const where = and(eq(slas.priority, priority), eq(slas.isActive, true));
 
-  if (!base) return { slaId: null, firstResponseDueAt: null, slaDeadlineAt: null };
-
-  // The working-hours switch arrived in migration 0007. Where it is not there
-  // yet the policy behaves as it always did, on the wall clock.
-  const useBusinessHours = await tolerateUnmigrated(
+  const row = await tolerateUnmigrated(
     "SLA working hours",
     async () => {
-      const [row] = await db
-        .select({ useBusinessHours: slas.useBusinessHours })
+      const [full] = await db
+        .select({
+          id: slas.id,
+          firstResponseTimeMinutes: slas.firstResponseTimeMinutes,
+          resolutionTimeMinutes: slas.resolutionTimeMinutes,
+          useBusinessHours: slas.useBusinessHours,
+        })
         .from(slas)
-        .where(eq(slas.id, base.id))
+        .where(where)
         .limit(1);
-      return row?.useBusinessHours ?? false;
+      return full ?? null;
     },
-    false,
+    null,
   );
 
-  const sla = { ...base, useBusinessHours };
+  const sla =
+    row ??
+    (await (async () => {
+      const [base] = await db
+        .select({
+          id: slas.id,
+          firstResponseTimeMinutes: slas.firstResponseTimeMinutes,
+          resolutionTimeMinutes: slas.resolutionTimeMinutes,
+        })
+        .from(slas)
+        .where(where)
+        .limit(1);
+      return base ? { ...base, useBusinessHours: false } : null;
+    })());
+
+  if (!sla) return { slaId: null, firstResponseDueAt: null, slaDeadlineAt: null };
 
   // A policy measured in working minutes needs the workspace's own week. Wall
   // clock stays the default on existing policies, so nothing already promised
@@ -185,6 +200,8 @@ export async function getTicketById(ticketId: string) {
     with: {
       contact: true,
       company: true,
+      // The order this ticket is about, when it is about one.
+      order: true,
       assignee: true,
       owner: true,
       sla: true,
@@ -920,4 +937,90 @@ export async function removeBusinessHolidayAction(id: string) {
   await db.delete(businessHolidays).where(eq(businessHolidays.id, id));
   revalidatePath("/dashboard/support/sla");
   return { success: true };
+}
+
+/**
+ * The orders this ticket's customer has, so one of them can be named.
+ *
+ * Scoped to the customer on the ticket rather than to the whole workspace: the
+ * question is "which of *their* orders is this about", and a picker listing every
+ * order in the business answers a different one and invites the wrong answer.
+ */
+export async function getOrdersForTicket(ticketId: string) {
+  await requireCapability("ticket:read");
+  await requirePlanModule("support");
+  const db = await getDb();
+
+  const [ticket] = await db
+    .select({ companyId: tickets.companyId, contactId: tickets.contactId })
+    .from(tickets)
+    .where(eq(tickets.id, ticketId));
+  if (!ticket) return [];
+  if (!ticket.companyId && !ticket.contactId) return [];
+
+  const scope = ticket.companyId
+    ? eq(orders.companyId, ticket.companyId)
+    : eq(orders.contactId, ticket.contactId as string);
+
+  return db
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      status: orders.status,
+      totalAmount: orders.totalAmount,
+      orderDate: orders.orderDate,
+    })
+    .from(orders)
+    .where(scope)
+    .orderBy(desc(orders.createdAt))
+    .limit(50);
+}
+
+/**
+ * Says which order a ticket is about, or takes the answer back.
+ *
+ * ⚠️ The order has to belong to the ticket's own customer. Without that check the
+ * id is a pointer at any order in the workspace, and a support agent could attach
+ * one customer's conversation to another customer's order — which is also how the
+ * order page would then show a complaint that is not about it.
+ */
+export async function linkTicketToOrderAction(ticketId: string, orderId: string | null) {
+  await requireCapability("ticket:write");
+  await requirePlanModule("support");
+  const db = await getDb();
+
+  if (orderId) {
+    const allowed = await getOrdersForTicket(ticketId);
+    if (!allowed.some((o) => o.id === orderId)) {
+      throw new Error("That order does not belong to this ticket's customer.");
+    }
+  }
+
+  await db.update(tickets).set({ orderId, updatedAt: new Date() }).where(eq(tickets.id, ticketId));
+  revalidatePath(`/dashboard/support/tickets/${ticketId}`);
+  return { success: true };
+}
+
+/**
+ * The tickets somebody opened about one order.
+ *
+ * The other half of the same link. An order could be prepared, shipped and closed
+ * while a conversation about it was running in another module, and nothing on the
+ * order said so.
+ */
+export async function getTicketsForOrder(orderId: string) {
+  await requireCapability("ticket:read");
+  const db = await getDb();
+  return db
+    .select({
+      id: tickets.id,
+      ticketNumber: tickets.ticketNumber,
+      subject: tickets.subject,
+      status: tickets.status,
+      breachedAt: tickets.slaBreachedAt,
+    })
+    .from(tickets)
+    .where(eq(tickets.orderId, orderId))
+    .orderBy(desc(tickets.createdAt))
+    .limit(10);
 }
