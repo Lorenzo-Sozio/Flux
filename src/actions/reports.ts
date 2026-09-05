@@ -4,7 +4,6 @@ import { and, count, desc, eq, gte, isNotNull, lte, sql } from "drizzle-orm";
 
 import {
   campaignLogs,
-  contacts,
   deals,
   leads,
   marketingCampaigns,
@@ -16,7 +15,7 @@ import {
   userActivityLogs,
   users,
 } from "@/db/schema";
-import { requireAdminAccess } from "@/lib/auth-guard";
+import { requireCapability } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,7 +53,7 @@ function taskDateRange(from?: string, to?: string) {
 // ─── KPI Overview ─────────────────────────────────────────────────────────────
 
 export async function getReportKPIs(filters: ReportFilters = {}) {
-  await requireAdminAccess();
+  await requireCapability("report:read");
   const db = await getDb();
   const { from, to, userId } = filters;
 
@@ -164,7 +163,7 @@ export async function getReportKPIs(filters: ReportFilters = {}) {
 // ─── Activity by user (leaderboard) ──────────────────────────────────────────
 
 export async function getActivityByUser(filters: ReportFilters = {}) {
-  await requireAdminAccess();
+  await requireCapability("report:read");
   const db = await getDb();
   const { from, to } = filters;
 
@@ -194,7 +193,7 @@ export async function getActivityByUser(filters: ReportFilters = {}) {
 // ─── Activity by action type ──────────────────────────────────────────────────
 
 export async function getActivityByAction(filters: ReportFilters = {}) {
-  await requireAdminAccess();
+  await requireCapability("report:read");
   const db = await getDb();
   const { from, to, userId } = filters;
 
@@ -213,7 +212,7 @@ export async function getActivityByAction(filters: ReportFilters = {}) {
 // ─── Daily activity trend (last N days) ──────────────────────────────────────
 
 export async function getDailyActivityTrend(filters: ReportFilters = {}) {
-  await requireAdminAccess();
+  await requireCapability("report:read");
   const db = await getDb();
   const { from, to, userId } = filters;
 
@@ -235,7 +234,7 @@ export async function getDailyActivityTrend(filters: ReportFilters = {}) {
 // ─── Tasks performance per user ───────────────────────────────────────────────
 
 export async function getTaskPerformanceByUser(filters: ReportFilters = {}) {
-  await requireAdminAccess();
+  await requireCapability("report:read");
   const db = await getDb();
   const { from, to, userId } = filters;
 
@@ -285,14 +284,14 @@ export async function getTaskPerformanceByUser(filters: ReportFilters = {}) {
 
   return results
     .filter(Boolean)
-    .filter((r) => r!.tasksTotal > 0)
-    .sort((a, b) => b!.completionRate - a!.completionRate) as NonNullable<(typeof results)[number]>[];
+    .filter((r) => r?.tasksTotal > 0)
+    .sort((a, b) => b?.completionRate - a?.completionRate) as NonNullable<(typeof results)[number]>[];
 }
 
 // ─── Recent activity log (paginated) ─────────────────────────────────────────
 
 export async function getRecentActivityLog(filters: ReportFilters & { limit?: number } = {}) {
-  await requireAdminAccess();
+  await requireCapability("report:read");
   const db = await getDb();
   const { from, to, userId, limit = 100 } = filters;
 
@@ -326,7 +325,7 @@ export async function getRecentActivityLog(filters: ReportFilters & { limit?: nu
 // ─── All users (for filter dropdown) ─────────────────────────────────────────
 
 export async function getReportUsers() {
-  await requireAdminAccess();
+  await requireCapability("report:read");
   const db = await getDb();
   return db
     .select({ id: users.id, name: users.name, email: users.email, role: users.role })
@@ -337,7 +336,7 @@ export async function getReportUsers() {
 // ─── Sales report ────────────────────────────────────────────────────────────
 
 export async function getSalesReport(filters: ReportFilters = {}) {
-  await requireAdminAccess();
+  await requireCapability("report:read");
   const db = await getDb();
   const { from, to } = filters;
 
@@ -452,7 +451,7 @@ export async function getSalesReport(filters: ReportFilters = {}) {
 // ─── Campaign performance summary ─────────────────────────────────────────────
 
 export async function getCampaignPerformanceSummary(filters: ReportFilters = {}) {
-  await requireAdminAccess();
+  await requireCapability("report:read");
   const db = await getDb();
   const { from, to } = filters;
 

@@ -17,14 +17,14 @@ import {
   orders,
   tickets,
 } from "@/db/schema";
-import { requireAdminAccess, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
+import { requireAdminAccess, requireCapability, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
 import { AUTOMATION_RECIPES, findRecipe, isPreviewable } from "@/lib/automation-recipes";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 export async function getAutomationRules() {
-  await requireWriteAccess();
+  await requireCapability("record:read");
   await requirePlanModule("automation");
   const db = await getDb();
   return db.select().from(automationRules).orderBy(desc(automationRules.createdAt));
@@ -54,7 +54,7 @@ export async function getAutomationLogs(ruleId: string, limit = 50) {
  * Fetch recent logs across all rules (for dashboard overview)
  */
 export async function getRecentAutomationLogs(limit = 50) {
-  await requireWriteAccess();
+  await requireCapability("record:read");
   await requirePlanModule("automation");
   const db = await getDb();
   return db.select().from(automationLogs).orderBy(desc(automationLogs.createdAt)).limit(limit);
@@ -64,7 +64,7 @@ export async function getRecentAutomationLogs(limit = 50) {
  * Automation email send log (campaignId IS NULL = sent by automation, not a campaign).
  */
 export async function getAutomationEmailLogs(limit = 100) {
-  await requireWriteAccess();
+  await requireCapability("record:read");
   await requirePlanModule("automation");
   const db = await getDb();
   const rows = await db

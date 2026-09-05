@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { and, asc, eq } from "drizzle-orm";
 
 import { dealComments, users } from "@/db/schema";
-import { requireWriteAccess } from "@/lib/auth-guard";
+import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
 
@@ -22,7 +22,9 @@ export type DealComment = {
 };
 
 export async function getDealComments(dealId: string): Promise<DealComment[]> {
-  await requireWriteAccess();
+  // Reading a discussion is not writing to it. Demanding write here meant a
+  // viewer opening any deal met a raw error, on a page the guard admits them to.
+  await requireCapability("record:read");
   const db = await getDb();
   const rows = await db
     .select({
