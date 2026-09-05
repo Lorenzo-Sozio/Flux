@@ -226,7 +226,9 @@ export default function EmailSettingsPage() {
             <div className="w-full space-y-4 pt-2">
               <h3 className="font-semibold text-sm">{t("smtpConfig")}</h3>
 
-              <div className="grid grid-cols-3 gap-3">
+              {/* Host and port share a line from sm up; on a phone a 100px
+                  port field beside a truncated host is worse than two rows. */}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div className="col-span-2 space-y-1.5">
                   <Label htmlFor="smtp-host">{t("serverHost")}</Label>
                   <Input

@@ -306,6 +306,79 @@ order-dependent statement is not.
 `npm test` fails when the generated file and the folder disagree, because shipping code
 whose columns were never created is exactly the failure that looks like a working deploy.
 
+### Mobile and the installable app (PWA)
+
+```bash
+npm run mobile:audit      # the mobile hazards that can be found by reading
+npm run generate:icons    # re-render the app icons from scripts/generate-pwa-icons.mjs
+```
+
+Flux installs to a phone's home screen: [src/app/manifest.ts](src/app/manifest.ts)
+(served at `/manifest.webmanifest`), icons under `public/icons/`, and a `viewport`
+export in the root layout that declares `viewport-fit=cover` — without which every
+`env(safe-area-inset-*)` is zero and the bottom bar sits on the home indicator.
+
+⚠️ **A maskable icon is different artwork, not the same PNG relabelled.** The
+launcher crops the outer 20% to whatever shape the device draws, so the mark has
+to sit well inside that. `scripts/generate-pwa-icons.mjs` renders both.
+
+#### ⚠️⚠️ The service worker caches the shell and never a customer's data
+
+[public/sw.js](public/sw.js) precaches exactly one page (`/offline`) and serves
+content-hashed `/_next/static/` and `/icons/` from disk. **Every navigation, every
+API call and every RSC payload goes to the network.** This is a decision, not an
+omission, and the reasoning is at the top of that file:
+
+- **Tenant.** One browser signs into two workspaces. Cache Storage knows nothing
+  about the `x-tenant-id` header that produced a page, so a cached
+  `/dashboard/crm` is one customer's figures shown to another — and it looks
+  exactly like a working page.
+- **Permissions.** What a page contains depends on who asked. A cached copy
+  outlives a role change and a revoked membership.
+- **Staleness.** A pipeline twenty minutes old is worse than absent, because
+  nothing on the screen says so and somebody quotes from it.
+
+⚠️ The worker never calls `skipWaiting()` on its own. A deploy that takes effect
+mid-sentence reloads the tab under whoever is typing a quote;
+[service-worker-registrar.tsx](src/components/pwa/service-worker-registrar.tsx)
+offers the reload instead. Registration is production-only.
+
+`VERSION` in sw.js purges every older `flux-*` cache on activate; bump it when the
+worker's own logic changes.
+
+#### Below `md` the layout is different, not narrower
+
+- **A bottom tab bar** ([mobile-tab-bar.tsx](src/app/(main)/dashboard/_components/sidebar/mobile-tab-bar.tsx)),
+  four destinations plus the menu. ⚠️ Its entries come from `pickMobileTabs`,
+  which orders the **already filtered** menu and adds no permission rule of its
+  own — a second copy of that rule is what would drift. `scripts/mutations/filter-nav.json`
+  holds that line.
+- **Lists are cards, not tables** ([record-cards.tsx](src/components/crm/record-cards.tsx)).
+  A nine-column table does not become usable by scrolling sideways. Contacts,
+  companies, leads, orders, quotes and tickets render cards below `md` and the
+  original table from `md` up.
+- **Dialogs fill the screen.** Nearly all of them are forms, and a full-screen
+  scroll container is also what makes the virtual keyboard behave: a sheet pinned
+  to `bottom-0` has the keyboard open underneath it on iOS.
+
+⚠️ **`vh` is wrong on iOS Safari** — it measures the window *without* the address
+bar, so `max-h-[90vh]` is taller than the screen and the buttons under it cannot
+be tapped. Use `dvh`. `npm run mobile:audit` fails on any `vh`.
+
+⚠️ **The dashboard layout wrapper is the only owner of page padding.** It used to
+add `p-4`/`p-6` on top of the `p-6` that 39 pages set on their own root. A new
+page sets none.
+
+⚠️ **`opacity-0 group-hover:opacity-100` is a missing feature on a phone**, not a
+subtle one: there is no hover, so the control never appears. A rule under
+`@media (hover: none)` in globals.css reveals all of them; a touchscreen laptop
+still has hover and keeps the reveal.
+
+Touch targets go to 44px under `(pointer: coarse)`; form controls go to 44px below
+`md` — scoped to *width* there rather than to pointer type, because the dense
+nine-column line editor on an order is a deliberate desktop layout a touchscreen
+laptop should keep.
+
 ## Architecture
 
 ### Project Identity

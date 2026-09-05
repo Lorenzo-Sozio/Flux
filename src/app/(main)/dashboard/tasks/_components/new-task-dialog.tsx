@@ -888,7 +888,9 @@ export function NewTaskDialog({
                               </div>
 
                               {/* Priority + Assignee + Hours */}
-                              <div className="grid grid-cols-3 gap-2">
+                              {/* Three selects at 110px each truncate every
+                                  label they hold; two rows on a phone. */}
+                              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                                 <div className="flex flex-col gap-1">
                                   <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                                     {t("dialog.priority")}

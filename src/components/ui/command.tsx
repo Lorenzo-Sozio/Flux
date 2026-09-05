@@ -58,7 +58,10 @@ function CommandDialog({
           // and a box floating a third of the way down would have had its
           // results behind it. From sm up it is the floating box it has always
           // been, sitting a third of the way down where the eye already is.
-          "overflow-hidden p-0",
+          // `p-0` drops the base padding, and with it the safe-area insets, so
+          // the palette gets them back explicitly — otherwise its input sits
+          // under the notch on a full-screen phone layout.
+          "overflow-hidden p-0 max-sm:pt-[var(--safe-top)] max-sm:pb-[var(--safe-bottom)]",
           "sm:top-1/3 sm:translate-y-0",
           className
         )}

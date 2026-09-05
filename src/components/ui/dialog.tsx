@@ -62,7 +62,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           // ── Shared ──────────────────────────────────────────────────────────
-          "fixed z-50 flex flex-col bg-background text-sm ring-1 ring-foreground/10 duration-100 outline-none",
+          "fixed z-50 flex flex-col gap-6 bg-background text-sm ring-1 ring-foreground/10 duration-100 outline-none",
           // ⚠️ The height cap is `dvh`, not `vh`. On iOS Safari `100vh` is the
           // window *without* the address bar, so a dialog capped at 90vh is
           // taller than the screen and its buttons sit under the toolbar, where
@@ -91,8 +91,12 @@ function DialogContent({
       >
         {/* ⚠️ The scroll lives here, not on the content box, so the close button
             outside it stays put instead of scrolling away from a long form.
-            `gap-6` moves in with the children it was spacing. */}
-        <div className="-mx-5 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-5 sm:-mx-6 sm:px-6">
+
+            It carries **no padding and no gap of its own**: seventeen dialogs
+            pass `p-0` and sixteen pass `gap-0` to DialogContent, and an inner
+            box with its own values would silently ignore all of them. `inherit`
+            takes whatever the content box ended up with, override included. */}
+        <div className="flex min-h-0 flex-1 flex-col gap-[inherit] overflow-y-auto overscroll-contain">
           {children}
         </div>
         {showCloseButton && (
