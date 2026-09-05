@@ -5,13 +5,13 @@ import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { createTenantDb } from "@/db";
 import { contacts, orderItems, orders } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
-import { doveAnnotare, leggiRecapito, trova } from "@/lib/contact-point";
+import { findByContactPoint, readContactPoint, whereToNote } from "@/lib/contact-point";
 import { computeDocument } from "@/lib/document-totals";
 import { getTenantById } from "@/lib/get-tenant";
 import { nextOrderNumber } from "@/lib/order-number";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
-const ORIGINE_API = { via: "api" as const, actor: null };
+const API_ORIGIN = { via: "api" as const, actor: null };
 
 /** One line each, so whoever prepares the order reads them one under the other. */
 const SEPARATORE = String.fromCharCode(10);
@@ -146,9 +146,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Validation failed", errors }, { status: 422 });
   }
 
-  let recapito: { email: string | null; digits: string | null };
+  // The raw string from the request, and the pair it parses into, are two
+  // different things and need two names.
+  let parsed: { email: string | null; digits: string | null };
   try {
-    recapito = leggiRecapito(contactPoint);
+    parsed = readContactPoint(contactPoint);
   } catch (_err) {
     return NextResponse.json(
       {
@@ -182,8 +184,8 @@ export async function POST(req: NextRequest) {
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
 
-  const persona = await trova(db, recapito.email, recapito.digits);
-  const dove = doveAnnotare(persona);
+  const person = await findByContactPoint(db, parsed.email, parsed.digits);
+  const dove = whereToNote(person);
   let contactId = dove?.contactId ?? null;
   let creato = false;
   if (!contactId) {
@@ -196,8 +198,10 @@ export async function POST(req: NextRequest) {
         // the same rule the lead import already follows.
         firstName: nome || contactPoint,
         lastName: "",
-        email: recapito.email ?? undefined,
-        phone: recapito.digits ? contactPoint : undefined,
+        email: parsed.email ?? undefined,
+        // The digits are what matching uses; the number as typed is what a person
+        // reads, so that is what gets stored.
+        phone: parsed.digits ? contactPoint : undefined,
         source: "assistant",
       })
       .returning({ id: contacts.id });
@@ -223,7 +227,7 @@ export async function POST(req: NextRequest) {
     .join(SEPARATORE);
 
   const numero = await nextOrderNumber(db);
-  const adesso = new Date();
+  const now = new Date();
   const [ordine] = await db
     .insert(orders)
     .values({
@@ -234,7 +238,7 @@ export async function POST(req: NextRequest) {
       totalAmount: String(totali.total),
       status: "draft",
       notes: note || null,
-      orderDate: adesso,
+      orderDate: now,
     })
     .returning({ id: orders.id, orderNumber: orders.orderNumber });
 
@@ -274,7 +278,7 @@ export async function POST(req: NextRequest) {
         newData: { id: contactId },
       });
     }
-    dispatchWebhook("order.created", { order: { ...ordine, contactId } }, ORIGINE_API);
+    dispatchWebhook("order.created", { order: { ...ordine, contactId } }, API_ORIGIN);
   });
 
   return NextResponse.json(

@@ -45,19 +45,17 @@ beforeEach(() => {
   vi.clearAllMocks();
   process.env.IMPORT_API_KEY = CHIAVE_PIATTAFORMA;
   auth.mockResolvedValue(null);
-  getTenantById.mockImplementation(async (id: string) =>
-    id === ACME.id ? ACME : id === ALTRO.id ? ALTRO : null,
-  );
+  getTenantById.mockImplementation(async (id: string) => (id === ACME.id ? ACME : id === ALTRO.id ? ALTRO : null));
   getTenantByApiKeyHash.mockImplementation(async (hash: string) => (hash === IMPRONTA ? ACME : null));
 });
 
 describe("a tenant's own key carries its tenant", () => {
   it("resolves the tenant from the key, with no header at all", async () => {
-    const esito = await authenticateApiRequest(conChiave(CHIAVE_TENANT));
+    const outcome = await authenticateApiRequest(conChiave(CHIAVE_TENANT));
 
-    expect(esito).not.toBeNull();
-    expect(esito?.via).toBe("apikey");
-    expect(esito?.tenantId).toBe(ACME.id);
+    expect(outcome).not.toBeNull();
+    expect(outcome?.via).toBe("apikey");
+    expect(outcome?.tenantId).toBe(ACME.id);
     // The caller sends nothing about the tenant, so there is nothing to forge.
     expect(getTenantByApiKeyHash).toHaveBeenCalledWith(IMPRONTA);
   });
@@ -76,19 +74,15 @@ describe("a tenant's own key carries its tenant", () => {
     // let a misconfigured integration write happily into its own tenant while its operator
     // believes it is writing into another one. Nobody finds out until the wrong customer
     // gets a message.
-    const esito = await authenticateApiRequest(
-      conChiave(CHIAVE_TENANT, { "x-tenant-id": ALTRO.id }),
-    );
+    const outcome = await authenticateApiRequest(conChiave(CHIAVE_TENANT, { "x-tenant-id": ALTRO.id }));
 
-    expect(esito).toBeNull();
+    expect(outcome).toBeNull();
   });
 
   it("accepts a header that agrees, so an explicit caller is not punished", async () => {
-    const esito = await authenticateApiRequest(
-      conChiave(CHIAVE_TENANT, { "x-tenant-id": ACME.id }),
-    );
+    const outcome = await authenticateApiRequest(conChiave(CHIAVE_TENANT, { "x-tenant-id": ACME.id }));
 
-    expect(esito?.tenantId).toBe(ACME.id);
+    expect(outcome?.tenantId).toBe(ACME.id);
   });
 
   it("rejects a key nobody minted", async () => {
@@ -98,12 +92,10 @@ describe("a tenant's own key carries its tenant", () => {
 
 describe("the platform key stays the platform key", () => {
   it("still works, and still takes its tenant from the header", async () => {
-    const esito = await authenticateApiRequest(
-      conChiave(CHIAVE_PIATTAFORMA, { "x-tenant-id": ALTRO.id }),
-    );
+    const outcome = await authenticateApiRequest(conChiave(CHIAVE_PIATTAFORMA, { "x-tenant-id": ALTRO.id }));
 
-    expect(esito?.via).toBe("apikey");
-    expect(esito?.tenantId).toBe(ALTRO.id);
+    expect(outcome?.via).toBe("apikey");
+    expect(outcome?.tenantId).toBe(ALTRO.id);
     // It is the one credential allowed to name a tenant — a deliberate choice, so that
     // integrations that already exist keep working. It must therefore never be handed to
     // a single customer's integration.
@@ -111,13 +103,11 @@ describe("the platform key stays the platform key", () => {
   });
 
   it("refuses a tenant id that is not in the registry", async () => {
-    const esito = await authenticateApiRequest(
-      conChiave(CHIAVE_PIATTAFORMA, { "x-tenant-id": "forged" }),
-    );
+    const outcome = await authenticateApiRequest(conChiave(CHIAVE_PIATTAFORMA, { "x-tenant-id": "forged" }));
 
     // Authentication succeeds — the key is genuine — but no tenant is resolved, and every
     // route treats a null tenantId as "tenant context required".
-    expect(esito?.tenantId).toBeNull();
+    expect(outcome?.tenantId).toBeNull();
   });
 
   it("is not a fallback: with IMPORT_API_KEY unset, nothing becomes the platform key", async () => {
@@ -141,9 +131,9 @@ describe("what is not a bearer token", () => {
   it("gives a session user the tenant the middleware injected", async () => {
     auth.mockResolvedValue({ user: { id: "u1", role: "editor" } });
 
-    const esito = await authenticateApiRequest(richiesta({ "x-tenant-id": ACME.id }));
+    const outcome = await authenticateApiRequest(richiesta({ "x-tenant-id": ACME.id }));
 
-    expect(esito).toEqual({ via: "session", userId: "u1", role: "editor", tenantId: ACME.id });
+    expect(outcome).toEqual({ via: "session", userId: "u1", role: "editor", tenantId: ACME.id });
   });
 
   it("never reaches the session path when a bearer token is present but wrong", async () => {

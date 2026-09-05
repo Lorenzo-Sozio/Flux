@@ -12,11 +12,11 @@ import { webhookLogs, webhooks } from "@/db/schema";
 /** A tenant database handle, for callers that resolve the workspace themselves. */
 export type WebhookDispatchDb = ReturnType<typeof createTenantDb>;
 
-import { ForbiddenError, requireAdminAccess } from "@/lib/auth-guard";
+import { ForbiddenError, requireAdminAccess, requireCapability } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 // ⚠️ La busta vive in una libreria **senza dipendenze**: chi la usa per
 // ritentare non deve importare l'autenticazione per leggere una costante.
-import { type BustaEvento, NON_FIRMABILE, type Origin } from "@/lib/webhook-envelope";
+import { type EventEnvelope, type Origin, UNSIGNABLE_PREFIX } from "@/lib/webhook-envelope";
 import { validateWebhookUrl } from "@/lib/webhook-validator";
 
 // ─── CRUD ────────────────────────────────────────────────────────────────────
@@ -90,6 +90,7 @@ export async function deleteWebhook(id: string) {
 }
 
 export async function getWebhookLogs(webhookId: string) {
+  await requireCapability("webhook:manage");
   const db = await getDb();
   return await db.select().from(webhookLogs).where(eq(webhookLogs.webhookId, webhookId)).limit(50);
 }
@@ -120,14 +121,14 @@ export async function dispatchWebhook(
 
   const eligible = activeWebhooks.filter((wh) => wh.events.includes(event) || wh.events.includes("*"));
 
-  const busta: BustaEvento = {
+  const envelope: EventEnvelope = {
     id: crypto.randomUUID(),
     event,
     payload,
     timestamp: new Date().toISOString(),
     origin,
   };
-  const body = JSON.stringify(busta);
+  const body = JSON.stringify(envelope);
 
   await Promise.allSettled(
     eligible.map(async (wh) => {
@@ -157,7 +158,7 @@ export async function dispatchWebhook(
           payload: body,
           statusCode: null,
           response:
-            `${NON_FIRMABILE}, so the event could not be signed. ` +
+            `${UNSIGNABLE_PREFIX}, so the event could not be signed. ` +
             "Add one — an unsigned event is indistinguishable from one sent by anybody.",
           success: false,
         });
@@ -173,7 +174,7 @@ export async function dispatchWebhook(
             "X-Webhook-Signature": signature,
             // The id travels in a header too, so a receiver that dedupes before parsing
             // does not have to parse the body to do it.
-            "X-Webhook-Id": busta.id,
+            "X-Webhook-Id": envelope.id,
           },
           body,
           signal: AbortSignal.timeout(10_000),

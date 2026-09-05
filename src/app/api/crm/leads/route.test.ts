@@ -35,11 +35,11 @@ vi.mock("@/db", () => ({
 
 const { POST } = await import("@/app/api/crm/leads/route");
 
-function richiesta(corpo: Record<string, unknown>) {
+function richiesta(body: Record<string, unknown>) {
   return new Request("https://x.test/api/crm/leads", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(corpo),
+    body: JSON.stringify(body),
     // biome-ignore lint/suspicious/noExplicitAny: NextRequest is a Request at runtime
   }) as any;
 }

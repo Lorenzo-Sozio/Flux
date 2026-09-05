@@ -14,32 +14,36 @@ import { digitsForMatching } from "@/lib/api-import-validators";
  * ⚠️ Phone numbers match on digits only: a number typed with spaces and one typed without
  * are the same person. That expression is the same the deduplication uses.
  */
-export interface Persona {
+export interface ReachablePerson {
   leadIds: string[];
   contactIds: string[];
   email: string | null;
   digits: string | null;
 }
 
-export function perRecapito(table: typeof leads | typeof contacts, email: string | null, digits: string | null) {
-  const clausole = [];
-  if (email) clausole.push(sql`lower(btrim(${table.email})) = ${email}`);
+export function matchesContactPoint(
+  table: typeof leads | typeof contacts,
+  email: string | null,
+  digits: string | null,
+) {
+  const clauses = [];
+  if (email) clauses.push(sql`lower(btrim(${table.email})) = ${email}`);
   if (digits) {
     // The same expression as the deduplication: a number typed with spaces and one typed
     // without are the same person, and an erasure that missed one of the two spellings
     // would leave them in the database while telling them they are gone.
-    clausole.push(
+    clauses.push(
       sql`regexp_replace(coalesce(${table.phone}, ''), '[^0-9]+', '', 'g') = ${digits}`,
       sql`regexp_replace(coalesce(${table.mobile}, ''), '[^0-9]+', '', 'g') = ${digits}`,
     );
   }
-  return clausole.length === 1 ? clausole[0] : or(...clausole);
+  return clauses.length === 1 ? clauses[0] : or(...clauses);
 }
 
-export function leggiRecapito(contactPoint: string): { email: string | null; digits: string | null } {
-  const grezzo = contactPoint.trim().toLowerCase();
-  if (!grezzo) throw new Error("no contact point to erase");
-  const email = grezzo.includes("@") ? grezzo : null;
+export function readContactPoint(contactPoint: string): { email: string | null; digits: string | null } {
+  const raw = contactPoint.trim().toLowerCase();
+  if (!raw) throw new Error("no contact point to erase");
+  const email = raw.includes("@") ? raw : null;
   const digits = digitsForMatching(contactPoint);
   if (!email && !digits) {
     throw new Error("a contact point must be an email address or a phone number");
@@ -53,16 +57,20 @@ export function leggiRecapito(contactPoint: string): { email: string | null; dig
  * ⚠️ This is the step whose absence made the earlier version unfinishable: after the
  * contact is anonymised these ids can no longer be obtained from a contact point.
  */
-// biome-ignore lint/suspicious/noExplicitAny: the tenant db handle is built per request
-export async function trova(db: any, email: string | null, digits: string | null): Promise<Persona> {
+export async function findByContactPoint(
+  // biome-ignore lint/suspicious/noExplicitAny: the tenant db handle is built per request
+  db: any,
+  email: string | null,
+  digits: string | null,
+): Promise<ReachablePerson> {
   const l = await db
     .select({ id: leads.id })
     .from(leads)
-    .where(perRecapito(leads, email, digits));
+    .where(matchesContactPoint(leads, email, digits));
   const c = await db
     .select({ id: contacts.id })
     .from(contacts)
-    .where(perRecapito(contacts, email, digits));
+    .where(matchesContactPoint(contacts, email, digits));
   return {
     leadIds: l.map((r: { id: string }) => r.id),
     contactIds: c.map((r: { id: string }) => r.id),
@@ -82,9 +90,9 @@ export async function trova(db: any, email: string | null, digits: string | null
  * orphan row. A note is the only trace of what happened, and a lost trace is invisible by
  * definition.
  */
-export function doveAnnotare(persona: Persona): { contactId: string | null; leadId: string | null } | null {
-  const contactId = persona.contactIds[0] ?? null;
+export function whereToNote(person: ReachablePerson): { contactId: string | null; leadId: string | null } | null {
+  const contactId = person.contactIds[0] ?? null;
   if (contactId) return { contactId, leadId: null };
-  const leadId = persona.leadIds[0] ?? null;
+  const leadId = person.leadIds[0] ?? null;
   return leadId ? { contactId: null, leadId } : null;
 }

@@ -3,13 +3,13 @@
     "file": "src/lib/erasure.ts",
     "description": "⚠️⚠️ il contatto viene anonimizzato PER PRIMO: brucia l'indice, e da quel momento nessuna traccia e' piu' raggiungibile dal recapito — il dato resta e la capacita' di finire il lavoro se ne va",
     "find": "  // ── 1. Il lead se ne va per intero",
-    "replace": "  if (persona.contactIds.length > 0) {\n    await db.update(contacts).set({ ...CAMPI_DELLA_PERSONA }).where(inArray(contacts.id, persona.contactIds)).returning({ id: contacts.id });\n  }\n  // ── 1. Il lead se ne va per intero"
+    "replace": "  if (person.contactIds.length > 0) {\n    await db.update(contacts).set({ ...CAMPI_DELLA_PERSONA }).where(inArray(contacts.id, person.contactIds)).returning({ id: contacts.id });\n  }\n  // ── 1. Il lead se ne va per intero"
   },
   {
     "file": "src/lib/erasure.ts",
     "description": "la persona si cerca DOPO aver cancellato: gli id dei contatti arrivano vuoti e nessuna traccia viene ripulita",
-    "find": "  const persona = await trova(db, email, digits);\n  const report: ErasureReport",
-    "replace": "  const persona: Persona = { leadIds: [], contactIds: [], email, digits };\n  const report: ErasureReport"
+    "find": "  const person = await findByContactPoint(db, email, digits);\n  const report: ErasureReport",
+    "replace": "  const person: ReachablePerson = { leadIds: [], contactIds: [], email, digits };\n  const report: ErasureReport"
   },
   {
     "file": "src/lib/erasure.ts",
@@ -68,7 +68,7 @@
   {
     "file": "src/lib/contact-point.ts",
     "description": "un recapito vuoto cancella tutti: la richiesta di una persona sola porta via l'anagrafica intera",
-    "find": "  if (!grezzo) throw new Error(\"no contact point to erase\");",
+    "find": "  if (!raw) throw new Error(\"no contact point to erase\");",
     "replace": ""
   },
   {

@@ -6,7 +6,7 @@ import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { createTenantDb } from "@/db";
 import { contacts, leads } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
-import { leggiRecapito, trova } from "@/lib/contact-point";
+import { findByContactPoint, readContactPoint } from "@/lib/contact-point";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
@@ -74,9 +74,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let recapito: { email: string | null; digits: string | null };
+  // The raw string from the request, and the pair it parses into, are two
+  // different things and need two names.
+  let parsed: { email: string | null; digits: string | null };
   try {
-    recapito = leggiRecapito(contactPoint);
+    parsed = readContactPoint(contactPoint);
   } catch (_err) {
     return NextResponse.json(
       {
@@ -95,22 +97,22 @@ export async function POST(req: NextRequest) {
   // it, so it picks the contact over the lead. A refusal is not a place to write: it is a
   // state every record of that person must be in. Silencing the contact and leaving the
   // lead subscribed would keep them in exactly the audience they asked to leave.
-  const persona = await trova(db, recapito.email, recapito.digits);
-  if (persona.leadIds.length === 0 && persona.contactIds.length === 0) {
+  const person = await findByContactPoint(db, parsed.email, parsed.digits);
+  if (person.leadIds.length === 0 && person.contactIds.length === 0) {
     return NextResponse.json({ error: "No person reachable at that contact point" }, { status: 404 });
   }
 
-  const suoiLead: { id: string; marketingConsent: boolean | null }[] = persona.leadIds.length
+  const suoiLead: { id: string; marketingConsent: boolean | null }[] = person.leadIds.length
     ? await db
         .select({ id: leads.id, marketingConsent: leads.marketingConsent })
         .from(leads)
-        .where(inArray(leads.id, persona.leadIds))
+        .where(inArray(leads.id, person.leadIds))
     : [];
-  const suoiContatti: { id: string; marketingConsent: boolean | null }[] = persona.contactIds.length
+  const suoiContatti: { id: string; marketingConsent: boolean | null }[] = person.contactIds.length
     ? await db
         .select({ id: contacts.id, marketingConsent: contacts.marketingConsent })
         .from(contacts)
-        .where(inArray(contacts.id, persona.contactIds))
+        .where(inArray(contacts.id, person.contactIds))
     : [];
 
   // ⚠️⚠️ **Only the records that were still subscribed, and the filter is here rather than
@@ -124,13 +126,13 @@ export async function POST(req: NextRequest) {
     ...suoiContatti.filter((r) => r.marketingConsent).map((r) => ({ ...r, entityType: "contact" as const })),
   ];
 
-  const adesso = new Date();
+  const now = new Date();
   const zittiti: string[] = [];
   for (const riga of daZittire) {
     if (riga.entityType === "lead") {
-      await db.update(leads).set({ marketingConsent: false, updatedAt: adesso }).where(eq(leads.id, riga.id));
+      await db.update(leads).set({ marketingConsent: false, updatedAt: now }).where(eq(leads.id, riga.id));
     } else {
-      await db.update(contacts).set({ marketingConsent: false, updatedAt: adesso }).where(eq(contacts.id, riga.id));
+      await db.update(contacts).set({ marketingConsent: false, updatedAt: now }).where(eq(contacts.id, riga.id));
     }
     zittiti.push(riga.id);
     // After the response, like every other write that runs rules: withdrawing consent is a

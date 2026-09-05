@@ -32,7 +32,7 @@
   {
     "file": "src/app/api/crm/orders/route.ts",
     "description": "nessuno viene avvisato che e' arrivato un ordine: chi sorvegliava quella coda non lo sa",
-    "find": "    dispatchWebhook(\"order.created\", { order: { ...ordine, contactId } }, ORIGINE_API);",
+    "find": "    dispatchWebhook(\"order.created\", { order: { ...ordine, contactId } }, API_ORIGIN);",
     "replace": ""
   },
   {

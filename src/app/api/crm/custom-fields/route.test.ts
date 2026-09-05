@@ -17,7 +17,7 @@ let definizioni: { id: string; slug: string; entityType: string }[] = [];
 /** I valori scritti, per `fieldId`. */
 let valori: { id: string; fieldId: string; value: string }[] = [];
 const creati: { name: string; slug: string; entityType: string; fieldType: string }[] = [];
-let persona: { leadIds: string[]; contactIds: string[] } = { leadIds: ["l1"], contactIds: [] };
+let person: { leadIds: string[]; contactIds: string[] } = { leadIds: ["l1"], contactIds: [] };
 
 vi.mock("@/components/crm/automation/rule-engine", () => ({
   runAutomations: async (ctx: { entityType: string; event: string; oldData: unknown; newData: unknown }) => {
@@ -37,7 +37,7 @@ vi.mock("@/lib/get-tenant", () => ({ getTenantById: async () => ({ id: "t1", dbU
 vi.mock("@/lib/tenant-db", () => ({ decryptDbUrl: () => "postgres://finto" }));
 vi.mock("@/lib/contact-point", async () => {
   const vero = await vi.importActual<typeof import("@/lib/contact-point")>("@/lib/contact-point");
-  return { ...vero, trova: async () => ({ ...persona, email: null, digits: null }) };
+  return { ...vero, findByContactPoint: async () => ({ ...person, email: null, digits: null }) };
 });
 
 /**
@@ -86,11 +86,11 @@ vi.mock("@/db", () => ({
 
 const { POST } = await import("@/app/api/crm/custom-fields/route");
 
-function richiesta(corpo: unknown) {
+function richiesta(body: unknown) {
   return new Request("https://x.test/api/crm/custom-fields", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(corpo),
+    body: JSON.stringify(body),
     // biome-ignore lint/suspicious/noExplicitAny: NextRequest is a Request at runtime
   }) as any;
 }
@@ -100,7 +100,7 @@ beforeEach(() => {
   creati.length = 0;
   definizioni = [];
   valori = [];
-  persona = { leadIds: ["l1"], contactIds: [] };
+  person = { leadIds: ["l1"], contactIds: [] };
 });
 
 describe("what happens to the collected values", () => {
@@ -138,7 +138,7 @@ describe("what happens to the collected values", () => {
     // riusare la prima su un contatto attaccherebbe il valore a un campo che le schermate
     // dei contatti non interrogano, e il titolare lo vedrebbe vuoto pur avendolo ricevuto.
     definizioni = [{ id: "def-dei-lead", slug: "budget", entityType: "lead" }];
-    persona = { leadIds: [], contactIds: ["c1"] };
+    person = { leadIds: [], contactIds: ["c1"] };
 
     await POST(richiesta({ contactPoint: "mario@example.it", fields: { budget: "8000" } }));
 
@@ -162,7 +162,7 @@ describe("what happens to the collected values", () => {
   });
 
   it("⚠️ the contact wins over the lead, like a note does", async () => {
-    persona = { leadIds: ["l1"], contactIds: ["c1"] };
+    person = { leadIds: ["l1"], contactIds: ["c1"] };
 
     await POST(richiesta({ contactPoint: "mario@example.it", fields: { budget: "8000" } }));
 
@@ -187,7 +187,7 @@ describe("what happens to the collected values", () => {
   it("⚠️ nobody reachable is a 404, and nothing is written", async () => {
     // Un assistente che crede di aver registrato quello che ha raccolto, su una riga che non
     // esiste, è peggio di uno che sa di non avercela fatta.
-    persona = { leadIds: [], contactIds: [] };
+    person = { leadIds: [], contactIds: [] };
 
     const risposta = await POST(richiesta({ contactPoint: "+39 333 111 2223", fields: { budget: "1" } }));
 
@@ -197,14 +197,14 @@ describe("what happens to the collected values", () => {
   });
 
   it("refuses a body without usable fields instead of touching anything", async () => {
-    for (const corpo of [
+    for (const body of [
       { contactPoint: "+39 333 111 2223" },
       { contactPoint: "+39 333 111 2223", fields: {} },
       { contactPoint: "+39 333 111 2223", fields: [] },
       { fields: { budget: "1" } },
       { contactPoint: "mario", fields: { budget: "1" } },
     ]) {
-      const risposta = await POST(richiesta(corpo));
+      const risposta = await POST(richiesta(body));
       expect(risposta.status).toBe(422);
     }
     expect(valori).toHaveLength(0);

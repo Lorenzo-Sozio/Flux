@@ -8,14 +8,14 @@
   {
     "file": "src/actions/webhooks.ts",
     "description": "il rifiuto per firma mancante viene registrato come una consegna riuscita: il webhook non consegna e il registro dice di si'",
-    "find": "          statusCode: null,\n          response:\n            `${NON_FIRMABILE}",
-    "replace": "          statusCode: 200,\n          response:\n            `${NON_FIRMABILE}"
+    "find": "          statusCode: null,\n          response:\n            `${UNSIGNABLE_PREFIX}",
+    "replace": "          statusCode: 200,\n          response:\n            `${UNSIGNABLE_PREFIX}"
   },
   {
     "file": "src/actions/webhooks.ts",
     "description": "la firma copre solo il carico e non la busta: chi riceve puo' cambiare l'origine o l'identificativo dell'evento senza invalidare la firma",
     "find": "crypto.createHmac(\"sha256\", wh.secret).update(body).digest(\"hex\")",
-    "replace": "crypto.createHmac(\"sha256\", wh.secret).update(JSON.stringify(busta.payload)).digest(\"hex\")"
+    "replace": "crypto.createHmac(\"sha256\", wh.secret).update(JSON.stringify(envelope.payload)).digest(\"hex\")"
   },
   {
     "file": "src/actions/webhooks.ts",
@@ -26,7 +26,7 @@
   {
     "file": "src/actions/webhooks.ts",
     "description": "l'identificativo non viaggia nell'intestazione: chi deduplica prima di leggere il corpo non ha su che cosa farlo",
-    "find": "            \"X-Webhook-Id\": busta.id,",
+    "find": "            \"X-Webhook-Id\": envelope.id,",
     "replace": ""
   },
   {
@@ -44,7 +44,7 @@
   {
     "file": "src/app/api/crm/leads/route.ts",
     "description": "la scrittura via API non si dichiara piu' di macchina: torna l'eco che P9 teme",
-    "find": "const ORIGINE_API = { via: \"api\" as const, actor: null };",
-    "replace": "const ORIGINE_API = { via: \"user\" as const, actor: null };"
+    "find": "const API_ORIGIN = { via: \"api\" as const, actor: null };",
+    "replace": "const API_ORIGIN = { via: \"user\" as const, actor: null };"
   }
 ]

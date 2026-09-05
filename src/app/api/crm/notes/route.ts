@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createTenantDb } from "@/db";
 import { activities } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
-import { doveAnnotare, leggiRecapito, trova } from "@/lib/contact-point";
+import { findByContactPoint, readContactPoint, whereToNote } from "@/lib/contact-point";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
@@ -63,9 +63,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let recapito: { email: string | null; digits: string | null };
+  // The raw string from the request, and the pair it parses into, are two
+  // different things and need two names.
+  let parsed: { email: string | null; digits: string | null };
   try {
-    recapito = leggiRecapito(contactPoint);
+    parsed = readContactPoint(contactPoint);
   } catch (_err) {
     return NextResponse.json(
       {
@@ -80,7 +82,7 @@ export async function POST(req: NextRequest) {
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
 
-  const dove = doveAnnotare(await trova(db, recapito.email, recapito.digits));
+  const dove = whereToNote(await findByContactPoint(db, parsed.email, parsed.digits));
   if (!dove) {
     return NextResponse.json({ error: "No person reachable at that contact point" }, { status: 404 });
   }

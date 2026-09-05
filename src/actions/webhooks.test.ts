@@ -15,8 +15,8 @@ const inviati: { url: string; headers: Record<string, string>; body: string }[] 
 let configurati: Record<string, unknown>[] = [];
 
 // ⚠️ Si sostituiscono i moduli che questo file importa **davvero**: `tenant-context` per
-// il database e `auth-guard` perché tira dentro next-auth, che in un test di nodo non ha un
-// runtime Next da cui prendere `next/server`. Mockare il modulo sbagliato non fallisce: fa
+// il database e `auth-guard` perché tira dentro prossimo-auth, che in un test di nodo non ha un
+// runtime Next da cui prendere `prossimo/server`. Mockare il modulo sbagliato non fallisce: fa
 // caricare quello vero, e l'errore che si legge parla di tutt'altro.
 vi.mock("@/lib/tenant-context", () => ({
   getDb: async () => ({
@@ -29,13 +29,15 @@ vi.mock("@/lib/auth-guard", () => ({
   requireAdminAccess: async () => undefined,
 }));
 vi.mock("@/db/schema", () => ({ webhooks: { isActive: "is_active" }, webhookLogs: {} }));
-vi.mock("next/cache", () => ({ revalidatePath: () => {} }));
-vi.mock("drizzle-orm", () => ({ desc: () => {}, eq: () => {} }));
+// Stubs that do nothing on purpose: the test is about what is sent, not about
+// revalidation or query building.
+vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
+vi.mock("drizzle-orm", () => ({ desc: () => undefined, eq: () => undefined }));
 vi.mock("@/lib/webhook-validator", () => ({ validateWebhookUrl: () => null }));
 
 const { dispatchWebhook } = await import("@/actions/webhooks");
 
-const SEGRETO = "un-segreto";
+const SEGRETO = "un-secret";
 
 function webhook(extra: Record<string, unknown> = {}) {
   return { id: "w1", url: "https://ricevente.example/hook", events: ["*"], secret: SEGRETO, ...extra };
@@ -135,10 +137,10 @@ describe("what the envelope carries", () => {
   it("keeps the event name and the payload where a receiver expects them", async () => {
     await dispatchWebhook("deal.won", { id: "d1", amount: 10 });
 
-    const busta = JSON.parse(inviati[0].body);
-    expect(busta.event).toBe("deal.won");
-    expect(busta.payload).toEqual({ id: "d1", amount: 10 });
-    expect(typeof busta.timestamp).toBe("string");
+    const envelope = JSON.parse(inviati[0].body);
+    expect(envelope.event).toBe("deal.won");
+    expect(envelope.payload).toEqual({ id: "d1", amount: 10 });
+    expect(typeof envelope.timestamp).toBe("string");
   });
 
   it("logs the delivery with the status the receiver returned", async () => {

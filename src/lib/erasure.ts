@@ -30,7 +30,7 @@
  *
  * Not «I removed the name from the card». **«From here, nobody can get back to them.»**
  */
-import { inArray, or, sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 
 import {
   activities,
@@ -44,7 +44,7 @@ import {
   ticketMessages,
   tickets,
 } from "@/db/schema";
-import { leggiRecapito, type Persona, perRecapito, trova } from "@/lib/contact-point";
+import { findByContactPoint, matchesContactPoint, readContactPoint } from "@/lib/contact-point";
 
 export interface ErasureReport {
   /** Rows removed outright, by table. */
@@ -110,8 +110,8 @@ export async function eraseByContactPoint(
   db: any,
   contactPoint: string,
 ): Promise<ErasureReport> {
-  const { email, digits } = leggiRecapito(contactPoint);
-  const persona = await trova(db, email, digits);
+  const { email, digits } = readContactPoint(contactPoint);
+  const person = await findByContactPoint(db, email, digits);
   const report: ErasureReport = { deleted: {}, anonymised: {}, kept: { ...CONSERVATI } };
 
   // biome-ignore lint/suspicious/noExplicitAny: drizzle query builders are not one type
@@ -121,11 +121,11 @@ export async function eraseByContactPoint(
   report.deleted.lead = quanti(
     await db
       .delete(leads)
-      .where(perRecapito(leads, email, digits))
+      .where(matchesContactPoint(leads, email, digits))
       .returning({ id: leads.id }),
   );
 
-  const { contactIds } = persona;
+  const { contactIds } = person;
   if (contactIds.length > 0) {
     // ── 2. Il diario di quella persona. È il diario *di lei*: senza di lei non significa
     // niente, e riscrivere un testo libero lascia sempre qualcosa dentro.
@@ -226,7 +226,7 @@ export async function countByContactPoint(
   db: any,
   contactPoint: string,
 ): Promise<{ lead: number; contact: number }> {
-  const { email, digits } = leggiRecapito(contactPoint);
-  const persona = await trova(db, email, digits);
-  return { lead: persona.leadIds.length, contact: persona.contactIds.length };
+  const { email, digits } = readContactPoint(contactPoint);
+  const person = await findByContactPoint(db, email, digits);
+  return { lead: person.leadIds.length, contact: person.contactIds.length };
 }

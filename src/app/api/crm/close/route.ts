@@ -6,7 +6,7 @@ import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { createTenantDb } from "@/db";
 import { deals } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
-import { leggiRecapito, trova } from "@/lib/contact-point";
+import { findByContactPoint, readContactPoint } from "@/lib/contact-point";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
@@ -83,9 +83,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let recapito: { email: string | null; digits: string | null };
+  // The raw string from the request, and the pair it parses into, are two
+  // different things and need two names.
+  let parsed: { email: string | null; digits: string | null };
   try {
-    recapito = leggiRecapito(contactPoint);
+    parsed = readContactPoint(contactPoint);
   } catch (_err) {
     return NextResponse.json(
       {
@@ -113,15 +115,15 @@ export async function POST(req: NextRequest) {
 
   // ⚠️ I deal pendono da un **contatto**: una persona ancora allo stadio di lead non ne ha
   // uno, e non è un guasto — è il caso normale di chi non è mai stato convertito.
-  const persona = await trova(db, recapito.email, recapito.digits);
-  if (persona.contactIds.length === 0) {
+  const person = await findByContactPoint(db, parsed.email, parsed.digits);
+  if (person.contactIds.length === 0) {
     return NextResponse.json({ error: "No deal to close for that contact point" }, { status: 404 });
   }
 
   const suoi: { id: string; status: string; name: string }[] = await db
     .select({ id: deals.id, status: deals.status, name: deals.name })
     .from(deals)
-    .where(inArray(deals.contactId, persona.contactIds));
+    .where(inArray(deals.contactId, person.contactIds));
 
   // ⚠️⚠️ **Solo quelle ancora aperte, e il filtro sta qui e non nella query.** Richiudere
   // una trattativa già chiusa sposterebbe la sua data di chiusura a oggi, e «vinte questo

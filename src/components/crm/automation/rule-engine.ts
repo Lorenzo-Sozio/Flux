@@ -230,7 +230,7 @@ async function executeRule(
     if (!loopCheck.allowed) {
       errorMessage = loopCheck.reason;
       console.warn(`[RuleEngine] Rule "${rule.name}" blocked - ${loopCheck.reason}`);
-      // Non eseguire ma registrare il tentativo bloccato
+      // Non eseguire ma registrare il attempt bloccato
       await db
         .insert(automationLogs)
         .values({

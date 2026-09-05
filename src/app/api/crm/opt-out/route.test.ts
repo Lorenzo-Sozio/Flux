@@ -19,7 +19,7 @@ const regole: { entityType: string; entityId: string }[] = [];
 const scritti: { tabella: string; valori: Record<string, unknown> }[] = [];
 let righeLead: { id: string; marketingConsent: boolean }[] = [];
 let righeContatti: { id: string; marketingConsent: boolean }[] = [];
-let persona: { leadIds: string[]; contactIds: string[] } = { leadIds: [], contactIds: [] };
+let person: { leadIds: string[]; contactIds: string[] } = { leadIds: [], contactIds: [] };
 
 vi.mock("@/components/crm/automation/rule-engine", () => ({
   runAutomations: async (ctx: { entityType: string; entityId: string }) => {
@@ -37,7 +37,7 @@ vi.mock("@/lib/get-tenant", () => ({ getTenantById: async () => ({ id: "t1", dbU
 vi.mock("@/lib/tenant-db", () => ({ decryptDbUrl: () => "postgres://finto" }));
 vi.mock("@/lib/contact-point", async () => {
   const vero = await vi.importActual<typeof import("@/lib/contact-point")>("@/lib/contact-point");
-  return { ...vero, trova: async () => ({ ...persona, email: null, digits: null }) };
+  return { ...vero, findByContactPoint: async () => ({ ...person, email: null, digits: null }) };
 });
 vi.mock("@/db", () => ({
   // ⚠️ Il doppio **dichiara la tabella** invece di restituire sempre le stesse righe: la
@@ -64,11 +64,11 @@ vi.mock("@/db", () => ({
 
 const { POST } = await import("@/app/api/crm/opt-out/route");
 
-function richiesta(corpo: unknown) {
+function richiesta(body: unknown) {
   return new Request("https://x.test/api/crm/opt-out", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(corpo),
+    body: JSON.stringify(body),
     // biome-ignore lint/suspicious/noExplicitAny: NextRequest is a Request at runtime
   }) as any;
 }
@@ -78,7 +78,7 @@ beforeEach(() => {
   scritti.length = 0;
   righeLead = [{ id: "l1", marketingConsent: true }];
   righeContatti = [{ id: "c1", marketingConsent: true }];
-  persona = { leadIds: ["l1"], contactIds: ["c1"] };
+  person = { leadIds: ["l1"], contactIds: ["c1"] };
 });
 
 describe("a refusal said to the assistant reaches the CRM", () => {
@@ -112,7 +112,7 @@ describe("a refusal said to the assistant reaches the CRM", () => {
   });
 
   it("⚠️ nobody at that contact point is a 404, so the caller can stop trying", async () => {
-    persona = { leadIds: [], contactIds: [] };
+    person = { leadIds: [], contactIds: [] };
 
     const risposta = await POST(richiesta({ contactPoint: "mario@example.it" }));
 

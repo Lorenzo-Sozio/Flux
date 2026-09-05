@@ -26,7 +26,7 @@
   {
     "file": "src/app/api/crm/opt-out/route.ts",
     "description": "una persona che questo CRM non conosce riceve un 200: chi chiama non distingue «non c'e'» da «l'ho zittita»",
-    "find": "  if (persona.leadIds.length === 0 && persona.contactIds.length === 0) {",
+    "find": "  if (person.leadIds.length === 0 && person.contactIds.length === 0) {",
     "replace": "  if (false) {"
   },
   {

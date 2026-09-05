@@ -41,7 +41,7 @@ vi.mock("@/lib/contact-point", async () => {
   const vero = await vi.importActual<typeof import("@/lib/contact-point")>("@/lib/contact-point");
   return {
     ...vero,
-    trova: async () => ({ leadIds: [], contactIds: contatti.map((c) => c.id), email: null, digits: null }),
+    findByContactPoint: async () => ({ leadIds: [], contactIds: contatti.map((c) => c.id), email: null, digits: null }),
   };
 });
 vi.mock("@/lib/order-number", () => ({ nextOrderNumber: async () => "ORD-2026-0007" }));
@@ -70,11 +70,11 @@ vi.mock("@/db", () => ({
 
 const { POST } = await import("@/app/api/crm/orders/route");
 
-function richiesta(corpo: unknown) {
+function richiesta(body: unknown) {
   return new Request("https://x.test/api/crm/orders", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(corpo),
+    body: JSON.stringify(body),
     // biome-ignore lint/suspicious/noExplicitAny: NextRequest is a Request at runtime
   }) as any;
 }

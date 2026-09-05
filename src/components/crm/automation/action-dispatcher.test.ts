@@ -67,7 +67,7 @@ beforeEach(() => {
 });
 
 describe("una regola che parla a un'integrazione", () => {
-  it("⚠️⚠️ passa dalla busta firmata, non da una POST grezza", async () => {
+  it("⚠️⚠️ passa dalla envelope firmata, non da una POST grezza", async () => {
     const d = new Dispatcher();
     await d.dispatch(azione({ event: "lead.escalate" }), CONTESTO, {});
 

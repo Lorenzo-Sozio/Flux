@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const regole: { entityType: string; entityId: string; event: string }[] = [];
 let aperti: { id: string; status: string; name: string }[] = [];
 const scritti: Record<string, unknown>[] = [];
-let persona: { leadIds: string[]; contactIds: string[] } = { leadIds: [], contactIds: ["c1"] };
+let person: { leadIds: string[]; contactIds: string[] } = { leadIds: [], contactIds: ["c1"] };
 
 vi.mock("@/components/crm/automation/rule-engine", () => ({
   runAutomations: async (ctx: { entityType: string; entityId: string; event: string }) => {
@@ -30,7 +30,7 @@ vi.mock("@/lib/get-tenant", () => ({ getTenantById: async () => ({ id: "t1", dbU
 vi.mock("@/lib/tenant-db", () => ({ decryptDbUrl: () => "postgres://finto" }));
 vi.mock("@/lib/contact-point", async () => {
   const vero = await vi.importActual<typeof import("@/lib/contact-point")>("@/lib/contact-point");
-  return { ...vero, trova: async () => ({ ...persona, email: null, digits: null }) };
+  return { ...vero, findByContactPoint: async () => ({ ...person, email: null, digits: null }) };
 });
 vi.mock("@/db", () => ({
   createTenantDb: () => ({
@@ -46,11 +46,11 @@ vi.mock("@/db", () => ({
 
 const { POST } = await import("@/app/api/crm/close/route");
 
-function richiesta(corpo: unknown) {
+function richiesta(body: unknown) {
   return new Request("https://x.test/api/crm/close", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify(corpo),
+    body: JSON.stringify(body),
     // biome-ignore lint/suspicious/noExplicitAny: NextRequest is a Request at runtime
   }) as any;
 }
@@ -59,7 +59,7 @@ beforeEach(() => {
   regole.length = 0;
   scritti.length = 0;
   aperti = [{ id: "d1", status: "open", name: "Bagno" }];
-  persona = { leadIds: [], contactIds: ["c1"] };
+  person = { leadIds: [], contactIds: ["c1"] };
 });
 
 describe("closing what the assistant stopped following", () => {
@@ -115,19 +115,19 @@ describe("closing what the assistant stopped following", () => {
     expect((await POST(richiesta({ contactPoint: "mario@example.it", outcome: "ABBANDONATO" }))).status).toBe(404);
 
     aperti = [{ id: "d1", status: "open", name: "Bagno" }];
-    persona = { leadIds: ["l1"], contactIds: [] };
+    person = { leadIds: ["l1"], contactIds: [] };
     expect((await POST(richiesta({ contactPoint: "mario@example.it", outcome: "ABBANDONATO" }))).status).toBe(404);
     expect(scritti).toHaveLength(0);
   });
 
   it("⚠️ an unknown outcome is refused instead of ignored", async () => {
     // Accettarlo senza chiudere niente farebbe credere a chi ha chiamato di aver chiuso.
-    for (const corpo of [
+    for (const body of [
       { contactPoint: "mario@example.it", outcome: "PERSA" },
       { contactPoint: "mario@example.it" },
       { outcome: "ABBANDONATO" },
     ]) {
-      expect((await POST(richiesta(corpo))).status).toBe(422);
+      expect((await POST(richiesta(body))).status).toBe(422);
     }
     expect(scritti).toHaveLength(0);
   });
