@@ -359,6 +359,23 @@
     "filterGroup": "My group",
     "noEventsThisDay": "No events scheduled for this day"
   },
+  "calendarFeed": {
+    "subscribe": "Subscribe",
+    "title": "Subscribe to your calendar",
+    "description": "Add these appointments to Google Calendar, Outlook or Apple Calendar. They keep themselves up to date.",
+    "loading": "Preparing your address…",
+    "copy": "Copy address",
+    "failed": "The address could not be prepared. Try again.",
+    "noAppUrl": "This workspace has no public address configured, so the link would point nowhere. Ask an administrator to set it.",
+    "secretTitle": "Treat this address like a password",
+    "secretBody": "A calendar cannot sign in, so the address itself is what says who you are. Anyone you send it to can read your appointments.",
+    "oneWayTitle": "It goes one way",
+    "oneWayBody": "Appointments booked here appear in your calendar. Appointments booked in your calendar do not appear here.",
+    "howTitle": "Where to paste it",
+    "howGoogle": "Google Calendar: Other calendars, then From URL.",
+    "howOutlook": "Outlook: Add calendar, then Subscribe from web.",
+    "howApple": "Apple Calendar: File, then New Calendar Subscription."
+  },
   "chat": {
     "title": "Chat",
     "newConversation": "New Conversation",
@@ -2033,6 +2050,29 @@
     "deleteSuccess": "Quote deleted.",
     "convertSuccess": "Order created from quote."
   },
+  "quoteFollowUp": {
+    "title": "Worth a follow-up",
+    "action": "Draft a follow-up",
+    "dialogTitle": "Follow up on this quote",
+    "dialogDescription": "A draft, not a message. Change anything, and nothing is sent until you send it.",
+    "submitLabel": "Send follow-up",
+    "notOpenedBadge": "Sent {days} days ago, never opened",
+    "notOpenedWhy": "The likeliest reason is that the email never arrived, so the draft asks that rather than asking for a decision.",
+    "notOpenedSubject": "Did quote {quoteNumber} reach you?",
+    "notOpenedBody": "Hello,\n\nI sent you quote {quoteNumber} {days} days ago and I am not sure it arrived — sometimes these end up filed away by the mail system.\n\nWould you let me know either way? I am happy to send it again.\n\nBest regards",
+    "noAnswerBadge": "Opened, no answer for {days} days",
+    "noAnswerWhy": "They have read it, so repeating the quote adds nothing. The draft offers to talk it through.",
+    "noAnswerSubject": "Quote {quoteNumber} — anything I can clarify?",
+    "noAnswerBody": "Hello,\n\nI wanted to check whether you had any questions about quote {quoteNumber}.\n\nIf something in it does not fit, tell me what and I will look at it with you — it is easier to talk through than to write.\n\nBest regards",
+    "expiringBadge": "Expires in {days} days",
+    "expiringWhy": "The deadline is the fact the customer cannot see and you can, so it comes before how long they have been quiet.",
+    "expiringSubject": "Quote {quoteNumber} expires in {days} days",
+    "expiringBody": "Hello,\n\nA quick note that quote {quoteNumber} is valid for another {days} days.\n\nIf you would like to go ahead, let me know and I will get it started. If you need more time, that is no problem — say so and I will extend it.\n\nBest regards",
+    "expiredBadge": "Expired {days} days ago",
+    "expiredWhy": "It has lapsed. Saying so, and offering a fresh one, is better than letting it go quiet.",
+    "expiredSubject": "Quote {quoteNumber} has expired — shall I renew it?",
+    "expiredBody": "Hello,\n\nQuote {quoteNumber} expired {days} days ago.\n\nIf it is still of interest I will happily issue an updated one — prices may have moved, so it is worth redoing properly rather than extending the old date.\n\nBest regards"
+  },
   "reports": {
     "title": "Reports",
     "builder": {
@@ -3175,5 +3215,31 @@
     "createSuccess": "User invited.",
     "updateSuccess": "User updated.",
     "deleteSuccess": "User removed."
+  },
+  "layoutControls": {
+    "title": "Preferences",
+    "subtitle": "Customize your dashboard layout preferences.",
+    "themePreset": "Theme preset",
+    "presetPlaceholder": "Preset",
+    "fonts": "Fonts",
+    "fontPlaceholder": "Select font",
+    "themeMode": "Theme mode",
+    "light": "Light",
+    "dark": "Dark",
+    "system": "System",
+    "pageLayout": "Page layout",
+    "centered": "Centered",
+    "fullWidth": "Full width",
+    "navbarBehavior": "Navbar behaviour",
+    "sticky": "Sticky",
+    "scroll": "Scroll",
+    "sidebarStyle": "Sidebar style",
+    "inset": "Inset",
+    "sidebar": "Sidebar",
+    "floating": "Floating",
+    "collapseMode": "Sidebar collapse mode",
+    "icon": "Icon",
+    "offcanvas": "Off canvas",
+    "restore": "Restore defaults"
   }
 }

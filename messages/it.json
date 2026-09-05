@@ -359,6 +359,23 @@
     "filterGroup": "Il mio gruppo",
     "noEventsThisDay": "Nessun evento programmato per questo giorno"
   },
+  "calendarFeed": {
+    "subscribe": "Iscriviti",
+    "title": "Iscrivi il tuo calendario",
+    "description": "Aggiungi questi appuntamenti a Google Calendar, Outlook o Calendario di Apple. Si tengono aggiornati da soli.",
+    "loading": "Preparazione dell'indirizzo…",
+    "copy": "Copia l'indirizzo",
+    "failed": "Non è stato possibile preparare l'indirizzo. Riprova.",
+    "noAppUrl": "Questo spazio di lavoro non ha un indirizzo pubblico configurato, quindi il collegamento non porterebbe da nessuna parte. Chiedi a un amministratore di impostarlo.",
+    "secretTitle": "Tratta questo indirizzo come una password",
+    "secretBody": "Un calendario non può accedere, quindi è l'indirizzo stesso a dire chi sei. Chiunque lo riceva può leggere i tuoi appuntamenti.",
+    "oneWayTitle": "Funziona in una direzione sola",
+    "oneWayBody": "Gli appuntamenti creati qui compaiono nel tuo calendario. Quelli creati nel calendario non compaiono qui.",
+    "howTitle": "Dove incollarlo",
+    "howGoogle": "Google Calendar: Altri calendari, poi Da URL.",
+    "howOutlook": "Outlook: Aggiungi calendario, poi Iscriviti dal web.",
+    "howApple": "Calendario di Apple: File, poi Nuova sottoscrizione calendario."
+  },
   "chat": {
     "title": "Chat",
     "newConversation": "Nuova Conversazione",
@@ -2033,6 +2050,29 @@
     "deleteSuccess": "Preventivo eliminato.",
     "convertSuccess": "Ordine creato dal preventivo."
   },
+  "quoteFollowUp": {
+    "title": "Da sollecitare",
+    "action": "Prepara un sollecito",
+    "dialogTitle": "Sollecita questo preventivo",
+    "dialogDescription": "È una bozza, non un messaggio. Cambia quello che vuoi: non parte finché non lo mandi tu.",
+    "submitLabel": "Invia il sollecito",
+    "notOpenedBadge": "Inviato {days} giorni fa, mai aperto",
+    "notOpenedWhy": "La spiegazione più probabile è che la mail non sia arrivata, quindi la bozza chiede quello e non una decisione.",
+    "notOpenedSubject": "Le è arrivato il preventivo {quoteNumber}?",
+    "notOpenedBody": "Buongiorno,\n\nle ho inviato il preventivo {quoteNumber} {days} giorni fa e non sono sicuro che le sia arrivato: a volte questi messaggi finiscono archiviati dal sistema di posta.\n\nMi fa sapere in ogni caso? Glielo rimando volentieri.\n\nCordiali saluti",
+    "noAnswerBadge": "Aperto, nessuna risposta da {days} giorni",
+    "noAnswerWhy": "L'ha letto, quindi ripetere il preventivo non aggiunge niente. La bozza propone di parlarne.",
+    "noAnswerSubject": "Preventivo {quoteNumber} — posso chiarire qualcosa?",
+    "noAnswerBody": "Buongiorno,\n\nvolevo sapere se ha domande sul preventivo {quoteNumber}.\n\nSe qualcosa non va, mi dica cosa e lo guardiamo insieme: è più facile parlarne che scriverlo.\n\nCordiali saluti",
+    "expiringBadge": "Scade fra {days} giorni",
+    "expiringWhy": "La scadenza è il fatto che il cliente non vede e lei sì, quindi viene prima di quanto tempo è passato.",
+    "expiringSubject": "Il preventivo {quoteNumber} scade fra {days} giorni",
+    "expiringBody": "Buongiorno,\n\nle segnalo che il preventivo {quoteNumber} è valido ancora per {days} giorni.\n\nSe vuole procedere me lo dica e lo avvio. Se le serve più tempo non c'è problema: me lo faccia sapere e lo proroghiamo.\n\nCordiali saluti",
+    "expiredBadge": "Scaduto {days} giorni fa",
+    "expiredWhy": "È decaduto. Dirlo, e proporne uno nuovo, è meglio che lasciarlo spegnere in silenzio.",
+    "expiredSubject": "Il preventivo {quoteNumber} è scaduto — glielo rinnovo?",
+    "expiredBody": "Buongiorno,\n\nil preventivo {quoteNumber} è scaduto {days} giorni fa.\n\nSe le interessa ancora gliene preparo volentieri uno aggiornato: i prezzi possono essere cambiati, quindi conviene rifarlo bene invece di spostare la vecchia data.\n\nCordiali saluti"
+  },
   "reports": {
     "title": "Rapporti",
     "builder": {
@@ -3180,5 +3220,31 @@
     "createSuccess": "Utente invitato.",
     "updateSuccess": "Utente aggiornato.",
     "deleteSuccess": "Utente rimosso."
+  },
+  "layoutControls": {
+    "title": "Preferenze",
+    "subtitle": "Personalizza l'aspetto della dashboard.",
+    "themePreset": "Tema",
+    "presetPlaceholder": "Tema",
+    "fonts": "Caratteri",
+    "fontPlaceholder": "Scegli il carattere",
+    "themeMode": "Modalità",
+    "light": "Chiara",
+    "dark": "Scura",
+    "system": "Di sistema",
+    "pageLayout": "Larghezza della pagina",
+    "centered": "Centrata",
+    "fullWidth": "Tutta la larghezza",
+    "navbarBehavior": "Barra in alto",
+    "sticky": "Fissa",
+    "scroll": "Scorre",
+    "sidebarStyle": "Stile della barra laterale",
+    "inset": "Incassata",
+    "sidebar": "Classica",
+    "floating": "Fluttuante",
+    "collapseMode": "Come si chiude la barra laterale",
+    "icon": "A icone",
+    "offcanvas": "Fuori schermo",
+    "restore": "Ripristina i valori iniziali"
   }
 }
