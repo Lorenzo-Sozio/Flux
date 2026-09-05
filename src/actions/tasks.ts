@@ -65,6 +65,12 @@ export async function createTask(data: {
   return result[0];
 }
 
+/**
+ * A task under another task.
+ *
+ * Guarded by `createTask`, which it delegates to entirely; the note is here so
+ * that reading this file is enough to know it.
+ */
 export async function createSubtask(
   parentId: string,
   data: {

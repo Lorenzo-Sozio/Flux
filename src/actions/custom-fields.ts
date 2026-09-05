@@ -114,6 +114,15 @@ export async function upsertCustomFieldValue(data: {
   }
 }
 
+/**
+ * Writes several custom fields at once.
+ *
+ * No guard of its own on purpose: every write goes through
+ * `upsertCustomFieldValue`, which asks for `record:write`. Adding a second check
+ * here could not change an answer, and a check that cannot fail is defence that
+ * has not earned its place — but a reader should not have to follow the call to
+ * know that, which is what this note is for.
+ */
 export async function bulkUpsertCustomFieldValues(
   entityType: EntityType,
   entityId: string,
