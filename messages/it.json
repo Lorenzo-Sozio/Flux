@@ -1048,7 +1048,12 @@
       "total": "Totale",
       "loadFailed": "Non è stato possibile caricare trattative, clienti e prodotti.",
       "created": "Preventivo {number} creato.",
-      "createFailed": "Non è stato possibile creare il preventivo."
+      "createFailed": "Non è stato possibile creare il preventivo.",
+      "editTitle": "Modifica preventivo",
+      "backToQuote": "Torna al preventivo",
+      "saveChanges": "Salva le modifiche",
+      "updated": "Preventivo aggiornato.",
+      "updateFailed": "Non è stato possibile aggiornare il preventivo."
     },
     "sendSuccess": "Preventivo inviato.",
     "acceptSuccess": "Preventivo accettato.",

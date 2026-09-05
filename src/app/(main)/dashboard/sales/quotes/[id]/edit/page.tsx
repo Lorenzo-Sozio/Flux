@@ -1,7 +1,4 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-
-import { ChevronLeft, FileEdit } from "lucide-react";
 
 import { getQuoteById, getQuoteFormData } from "@/actions/quotes";
 
@@ -11,6 +8,16 @@ interface Props {
   params: Promise<{ id: string }>;
 }
 
+/**
+ * Editing a quote.
+ *
+ * Only while it is a draft: a quote that has been sent is a promise somebody has
+ * already read, and changing it under them is not an edit.
+ *
+ * The heading lives in the form rather than here, because the form's is the bar
+ * that does not scroll away — it carries the quote number, the running total and
+ * the two ways out, and a second title above it would only repeat itself.
+ */
 export default async function QuoteEditPage({ params }: Props) {
   const { id } = await params;
 
@@ -27,28 +34,5 @@ export default async function QuoteEditPage({ params }: Props) {
 
   const formData = await getQuoteFormData();
 
-  return (
-    <div className="flex flex-col gap-6 p-6">
-      <div>
-        <Link
-          href={`/dashboard/sales/quotes/${id}`}
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          Back to Quote
-        </Link>
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
-            <FileEdit className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold tracking-tight">Edit Quote</h1>
-            <p className="text-sm text-muted-foreground font-mono">{quote.quoteNumber}</p>
-          </div>
-        </div>
-      </div>
-
-      <QuoteEditForm quote={quote} formData={formData} />
-    </div>
-  );
+  return <QuoteEditForm quote={quote} formData={formData} />;
 }

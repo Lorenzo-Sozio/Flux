@@ -1048,7 +1048,12 @@
       "total": "Total",
       "loadFailed": "Could not load deals, customers and products.",
       "created": "Quote {number} created.",
-      "createFailed": "Could not create the quote."
+      "createFailed": "Could not create the quote.",
+      "editTitle": "Edit quote",
+      "backToQuote": "Back to the quote",
+      "saveChanges": "Save changes",
+      "updated": "Quote updated.",
+      "updateFailed": "Could not update the quote."
     },
     "sendSuccess": "Quote sent.",
     "acceptSuccess": "Quote accepted.",
