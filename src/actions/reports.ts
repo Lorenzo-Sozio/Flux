@@ -282,10 +282,14 @@ export async function getTaskPerformanceByUser(filters: ReportFilters = {}) {
     }),
   );
 
+  // Narrowed by a type predicate rather than by `filter(Boolean)` and a cast: the
+  // cast told the compiler the nulls were gone while the optional chaining right
+  // after it said they were not, and one of the two had to be wrong.
+  type Row = NonNullable<(typeof results)[number]>;
   return results
-    .filter(Boolean)
-    .filter((r) => r?.tasksTotal > 0)
-    .sort((a, b) => b?.completionRate - a?.completionRate) as NonNullable<(typeof results)[number]>[];
+    .filter((r): r is Row => r !== null && r !== undefined)
+    .filter((r) => r.tasksTotal > 0)
+    .sort((a, b) => b.completionRate - a.completionRate);
 }
 
 // ─── Recent activity log (paginated) ─────────────────────────────────────────
