@@ -105,6 +105,11 @@ export async function POST(req: NextRequest) {
 
   const fromRaw = typeof eventData.from === "string" ? eventData.from : "";
   const subject = typeof eventData.subject === "string" ? eventData.subject.trim() : "";
+  // Resend hands `to` as an array of recipients. The workspace is whichever of
+  // them it sends from, and resolution tries them in order rather than assuming
+  // the first — a message can be addressed to a person and copied to support.
+  const toRaw = eventData.to;
+  const to = Array.isArray(toRaw) ? toRaw.filter((x) => typeof x === "string").join(", ") : (toRaw ?? "");
 
   if (!fromRaw || !subject) {
     return NextResponse.json({ error: "Missing from or subject" }, { status: 400 });
@@ -154,6 +159,7 @@ export async function POST(req: NextRequest) {
 
   const result = await processInboundEmail({
     fromRaw,
+    to: typeof to === "string" ? to : "",
     subject,
     htmlBody,
     textBody,

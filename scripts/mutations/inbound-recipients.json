@@ -1,0 +1,14 @@
+[
+  {
+    "file": "src/lib/email-parser.ts",
+    "description": "⚠️⚠️ si guarda solo il primo destinatario: chi scrive a una persona mettendo il supporto in copia non trova piu' il proprio spazio di lavoro e l'email viene scartata",
+    "find": "  for (const part of header.split(\",\")) {",
+    "replace": "  for (const part of [header]) {"
+  },
+  {
+    "file": "src/lib/email-parser.ts",
+    "description": "una sintassi di gruppo come «undisclosed-recipients:;» viene trattata come un indirizzo e si cerca uno spazio di lavoro che spedisca da li'",
+    "find": "    if (email?.includes(\"@\")) seen.add(email);",
+    "replace": "    if (email) seen.add(email);"
+  }
+]

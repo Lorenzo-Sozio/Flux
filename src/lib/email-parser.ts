@@ -91,3 +91,26 @@ export function extractTicketReference(subject: string): string | null {
   const match = subject.match(/\[?(TKT-\d{6}-[A-F0-9]{6})\]?/i);
   return match ? match[1].toUpperCase() : null;
 }
+
+/**
+ * Every address in a `To:` header, lowercased, display names discarded.
+ *
+ * ⚠️ This decides which customer's database an inbound email is filed in, so it
+ * returns all of them and not just the first: a customer writes to the person
+ * they know and copies the support address, and it is the support address that
+ * names the workspace.
+ */
+export function recipientAddresses(header: string): string[] {
+  const seen = new Set<string>();
+  for (const part of header.split(",")) {
+    // `parseFromHeader` has already trimmed and lowercased it: doing so again
+    // here is work no input can tell apart, which is untested code by definition.
+    const email = parseFromHeader(part.trim()).email;
+    // Must actually look like an address. A `To:` header legitimately carries
+    // group syntax such as `undisclosed-recipients:;`, and the header parser
+    // hands that back as though it were one — which then goes looking for a
+    // workspace configured to send from it.
+    if (email?.includes("@")) seen.add(email);
+  }
+  return [...seen];
+}

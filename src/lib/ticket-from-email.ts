@@ -12,16 +12,17 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 
 import { runAutomations } from "@/components/crm/automation/rule-engine";
-import { contacts, documents, ticketMessages, tickets } from "@/db/schema";
+import { contacts, documents, emailSettings, ticketMessages, tickets } from "@/db/schema";
 import {
   extractTicketReference,
   htmlToTextPreview,
   parseFromHeader,
+  recipientAddresses,
   stripHtmlQuotesAndSignature,
   stripPlainTextQuotes,
 } from "@/lib/email-parser";
 import { getStorage, newStorageKey } from "@/lib/storage";
-import { getDb } from "@/lib/tenant-context";
+import { resolveTenantByProbe, type TenantDb } from "@/lib/tenant-resolve";
 
 // ─── Attachment handling ──────────────────────────────────────────────────────
 
@@ -54,8 +55,7 @@ export interface InboundAttachment {
  * Persists a list of inbound attachments to disk and creates document records.
  * Returns the IDs of the saved documents.
  */
-async function saveAttachments(attachments: InboundAttachment[], ticketId: string): Promise<string[]> {
-  const db = await getDb();
+async function saveAttachments(db: TenantDb, attachments: InboundAttachment[], ticketId: string): Promise<string[]> {
   const docIds: string[] = [];
 
   for (const att of attachments) {
@@ -135,6 +135,13 @@ function generateTicketNumber(): string {
 
 export interface InboundEmailPayload {
   fromRaw: string;
+  /**
+   * The address it was sent to.
+   *
+   * Required, because it is how an email that mentions no ticket says which
+   * workspace it belongs to — this runs on a webhook, where nothing else does.
+   */
+  to: string;
   subject: string;
   htmlBody: string;
   textBody: string;
@@ -152,14 +159,82 @@ export interface InboundEmailResult {
   skipped?: string;
 }
 
+/**
+ * Which workspace an inbound email belongs to.
+ *
+ * Two questions, asked in order of certainty.
+ *
+ * A reply quotes the ticket reference in its subject, and a ticket number is
+ * unique to the workspace that issued it — so that answer is exact.
+ *
+ * A first email has no reference. All it carries is the address it was sent to,
+ * and the workspace that owns that address is the one configured to send from
+ * it: a customer writing to support@theirfirm.example is writing to whoever
+ * signs mail as support@theirfirm.example.
+ *
+ * ⚠️ When neither matches, this refuses. The tempting alternative — take the
+ * first workspace, or the only one — files a stranger's email in somebody's CRM,
+ * creates a contact record for them there, and looks like the feature working.
+ */
+async function resolveInboundTenant(ticketRef: string | null, to: string): Promise<TenantDb | null> {
+  if (ticketRef) {
+    const byTicket = await resolveTenantByProbe(`ticketNumber:${ticketRef}`, async (db) => {
+      const row = await db.query.tickets.findFirst({
+        where: eq(tickets.ticketNumber, ticketRef),
+        columns: { id: true },
+      });
+      return Boolean(row);
+    }).catch(() => null);
+    if (byTicket) return byTicket.db;
+  }
+
+  // `to` arrives as a header and may name several people: "Anna
+  // <anna@firm.example>, Support <support@firm.example>". Each is tried in turn,
+  // because a customer often writes to a person and copies the support address —
+  // and it is the support address that identifies the workspace.
+  for (const address of recipientAddresses(to)) {
+    const byAddress = await resolveTenantByProbe(`inboundAddress:${address}`, async (db) => {
+      const rows = await db.select({ fromEmail: emailSettings.fromEmail }).from(emailSettings);
+      return rows.some((r) => r.fromEmail?.toLowerCase() === address);
+    }).catch(() => null);
+    if (byAddress) return byAddress.db;
+  }
+
+  return null;
+}
+
 export async function processInboundEmail(payload: InboundEmailPayload): Promise<InboundEmailResult> {
-  const db = await getDb();
-  const { fromRaw, subject, htmlBody, textBody, inboundMessageId, inReplyTo, attachments = [] } = payload;
+  const { fromRaw, to, subject, htmlBody, textBody, inboundMessageId, inReplyTo, attachments = [] } = payload;
 
   if (!fromRaw || !subject) return { ok: false };
 
   const { name: senderName, email: senderEmail } = parseFromHeader(fromRaw);
   const ticketRef = extractTicketReference(subject);
+
+  // ⚠️⚠️ This runs on a webhook. `getDb()` reads the x-tenant-id header the proxy
+  // injects only for authenticated dashboard requests and throws when it is
+  // absent — which is every call that ever reached here, so **no inbound email
+  // has ever been recorded**: both routes answered 500 and the mail bridge
+  // dropped or retried the message for ever (audit rilievo B-01, in two entry
+  // points its fix did not reach).
+  //
+  // Outside the dashboard the workspace comes from the data. A reply carries the
+  // ticket reference in its subject, which names it exactly; a first email
+  // carries only the address it was sent to, which is the address that workspace
+  // sends from.
+  const resolved = await resolveInboundTenant(ticketRef, to);
+  if (!resolved) {
+    // ⚠️ Loudly. The bridge is answered 200 on purpose — retrying will not make
+    // the workspace recognisable — so this line is the only trace the message
+    // ever existed. The usual cause is a workspace that has not set its sending
+    // address, which is the address its customers reply to.
+    console.error(
+      `[inbound-email] no workspace matches. to=${JSON.stringify(to)} ticketRef=${ticketRef ?? "none"}. ` +
+        "Set the workspace's from address under Settings → Email, or make sure the subject keeps its [TKT-…] reference.",
+    );
+    return { ok: false, skipped: "unknown_workspace" };
+  }
+  const db = resolved;
 
   // Clean body: prefer HTML, fall back to plain text
   let messageContent: string;
@@ -202,7 +277,7 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
     });
 
     if (ticket && ticket.status !== "closed") {
-      const attachmentIds = await saveAttachments(attachments, ticket.id);
+      const attachmentIds = await saveAttachments(db, attachments, ticket.id);
 
       const [message] = await db
         .insert(ticketMessages)
@@ -213,7 +288,14 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
           isPublic: true,
           senderEmail,
           senderName: senderName ?? senderEmail,
-          senderId: contactRecord?.id ?? null,
+          // ⚠️⚠️ Null, and never the contact. `senderId` references `user` — one of
+          // *our* people — and the database enforces it, so writing a contact id
+          // here raises a foreign key violation and the customer's email is not
+          // recorded at all. Who sent it is carried by senderEmail and senderName,
+          // which is what those columns are for; which customer it belongs to is
+          // on the ticket. It also decides "whose move is it" on the handover
+          // panel: a message with a senderId is read as an answer from us.
+          senderId: null,
           emailMessageId: inboundMessageId,
           emailInReplyTo: inReplyTo,
           attachmentIds,
@@ -269,7 +351,7 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
     })
     .returning();
 
-  const attachmentIds = await saveAttachments(attachments, newTicket.id);
+  const attachmentIds = await saveAttachments(db, attachments, newTicket.id);
 
   await db.insert(ticketMessages).values({
     ticketId: newTicket.id,
@@ -278,7 +360,9 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
     isPublic: true,
     senderEmail,
     senderName: senderName ?? senderEmail,
-    senderId: contactRecord?.id ?? null,
+    // See the note above: this column means one of our staff, and the database
+    // enforces it. The sender is identified by senderEmail and senderName.
+    senderId: null,
     emailMessageId: inboundMessageId,
     emailInReplyTo: inReplyTo,
     attachmentIds,

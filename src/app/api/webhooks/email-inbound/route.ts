@@ -74,6 +74,10 @@ export async function POST(req: NextRequest) {
 
   const fromRaw: string = body.from ?? "";
   const subject: string = (body.subject ?? "").trim();
+  // Which of our addresses it was sent to. On a webhook this is how an email
+  // that mentions no ticket says which workspace it belongs to, so it is as
+  // required as the sender.
+  const to: string = body.to ?? body.recipient ?? body.envelope?.to ?? "";
 
   if (!fromRaw || !subject) {
     return NextResponse.json({ error: "Missing from or subject" }, { status: 400 });
@@ -81,6 +85,7 @@ export async function POST(req: NextRequest) {
 
   const result = await processInboundEmail({
     fromRaw,
+    to,
     subject,
     htmlBody: body.html ?? "",
     textBody: body.text ?? "",
