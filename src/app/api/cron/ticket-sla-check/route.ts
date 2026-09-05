@@ -4,6 +4,7 @@ import { createNotificationsBatch } from "@/actions/auth";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { slas, tickets, userGroupMembers } from "@/db/schema";
 import { runCronJob } from "@/lib/cron-runner";
+import { tolerateUnmigrated } from "@/lib/schema-ready";
 import type { getDb } from "@/lib/tenant-context";
 
 const OPEN_STATUSES = ["new", "open", "in_progress"];
@@ -37,10 +38,15 @@ async function escalationByPolicy(
   const ids = [...new Set(slaIds.filter((id): id is string => Boolean(id)))];
   if (ids.length === 0) return new Map();
 
-  const policies = await db
-    .select({ id: slas.id, groupId: slas.escalationGroupId })
-    .from(slas)
-    .where(inArray(slas.id, ids));
+  // The escalation group arrived in migration 0009, and a tenant database is
+  // migrated by hand days after the deploy. Until then nobody is escalated to,
+  // which is what every workspace had before this existed — rather than the job
+  // failing outright and no breach being flagged at all.
+  const policies = await tolerateUnmigrated(
+    "SLA escalation groups",
+    () => db.select({ id: slas.id, groupId: slas.escalationGroupId }).from(slas).where(inArray(slas.id, ids)),
+    [] as { id: string; groupId: string | null }[],
+  );
 
   const groupIds = [...new Set(policies.map((p) => p.groupId).filter((g): g is string => Boolean(g)))];
   if (groupIds.length === 0) return new Map();
@@ -74,9 +80,26 @@ export async function GET(req: Request) {
     const now = new Date();
 
     // ── Already past the deadline ────────────────────────────────────────────
-    const candidates = await db.query.tickets.findMany({
-      where: and(isNotNull(tickets.slaDeadlineAt), isNull(tickets.slaBreachedAt), lt(tickets.slaDeadlineAt, now)),
-    });
+    // ⚠️ Named columns, not `findMany`. The relational query selects everything
+    // the schema declares, which includes `sla_warn_level` from migration 0007 —
+    // so on a workspace that has not been migrated yet this whole job threw, and
+    // nothing was flagged or warned about. Flagging a breach never needed that
+    // column, so it no longer asks for it.
+    const candidates = await db
+      .select({
+        id: tickets.id,
+        ticketNumber: tickets.ticketNumber,
+        subject: tickets.subject,
+        status: tickets.status,
+        slaId: tickets.slaId,
+        assigneeId: tickets.assigneeId,
+        ownerId: tickets.ownerId,
+        slaPausedAt: tickets.slaPausedAt,
+        slaDeadlineAt: tickets.slaDeadlineAt,
+        createdAt: tickets.createdAt,
+      })
+      .from(tickets)
+      .where(and(isNotNull(tickets.slaDeadlineAt), isNull(tickets.slaBreachedAt), lt(tickets.slaDeadlineAt, now)));
 
     // Exclude tickets whose SLA clock is paused (waiting on the customer)
     const active = candidates.filter((t) => OPEN_STATUSES.includes(t.status) && !t.slaPausedAt);
@@ -131,9 +154,41 @@ export async function GET(req: Request) {
     // The fraction consumed is measured against the ticket's own window, from
     // when it arrived to when it was promised, so a four-hour policy and a
     // two-day one warn at the same point in their own terms.
-    const live = await db.query.tickets.findMany({
-      where: and(isNotNull(tickets.slaDeadlineAt), isNull(tickets.slaBreachedAt)),
-    });
+    // The warning pass is the one that genuinely needs migration 0007, so it is
+    // the only part that stands down when the column is absent.
+    const live = await tolerateUnmigrated(
+      "SLA warning thresholds",
+      () =>
+        db
+          .select({
+            id: tickets.id,
+            ticketNumber: tickets.ticketNumber,
+            subject: tickets.subject,
+            status: tickets.status,
+            slaId: tickets.slaId,
+            assigneeId: tickets.assigneeId,
+            ownerId: tickets.ownerId,
+            slaPausedAt: tickets.slaPausedAt,
+            slaDeadlineAt: tickets.slaDeadlineAt,
+            createdAt: tickets.createdAt,
+            slaWarnLevel: tickets.slaWarnLevel,
+          })
+          .from(tickets)
+          .where(and(isNotNull(tickets.slaDeadlineAt), isNull(tickets.slaBreachedAt))),
+      [] as {
+        id: string;
+        ticketNumber: string;
+        subject: string;
+        status: string;
+        slaId: string | null;
+        assigneeId: string | null;
+        ownerId: string | null;
+        slaPausedAt: Date | null;
+        slaDeadlineAt: Date | null;
+        createdAt: Date;
+        slaWarnLevel: number;
+      }[],
+    );
 
     const warnings: { ticket: (typeof live)[number]; level: number; label: string }[] = [];
 

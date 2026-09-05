@@ -31,6 +31,7 @@ import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { FALLBACK_CALENDAR, loadBusinessCalendar, parseWeek } from "@/lib/business-calendar";
 import { addBusinessMinutes } from "@/lib/business-hours";
 import { sendEmail } from "@/lib/email-provider";
+import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 import { logTicketChange } from "@/lib/ticket-audit";
 import { canTransition, isSLAPauseStatus } from "@/lib/ticket-state-machine";
@@ -60,11 +61,39 @@ function generateTicketNumber(): string {
 async function resolveSla(priority: string, from: Date = new Date()) {
   const db = await getDb();
 
-  const sla = await db.query.slas.findFirst({
-    where: and(eq(slas.priority, priority), eq(slas.isActive, true)),
-  });
+  // ⚠️⚠️ **Only the columns this needs, named.** `findFirst` selects every column
+  // the schema declares, including ones a migration has not created yet — and a
+  // tenant database is migrated by hand, days after the deploy. Reading the whole
+  // row meant that creating a ticket failed outright on any workspace that had
+  // not pressed the button, which is the most ordinary thing anyone does here.
+  const [base] = await db
+    .select({
+      id: slas.id,
+      firstResponseTimeMinutes: slas.firstResponseTimeMinutes,
+      resolutionTimeMinutes: slas.resolutionTimeMinutes,
+    })
+    .from(slas)
+    .where(and(eq(slas.priority, priority), eq(slas.isActive, true)))
+    .limit(1);
 
-  if (!sla) return { slaId: null, firstResponseDueAt: null, slaDeadlineAt: null };
+  if (!base) return { slaId: null, firstResponseDueAt: null, slaDeadlineAt: null };
+
+  // The working-hours switch arrived in migration 0007. Where it is not there
+  // yet the policy behaves as it always did, on the wall clock.
+  const useBusinessHours = await tolerateUnmigrated(
+    "SLA working hours",
+    async () => {
+      const [row] = await db
+        .select({ useBusinessHours: slas.useBusinessHours })
+        .from(slas)
+        .where(eq(slas.id, base.id))
+        .limit(1);
+      return row?.useBusinessHours ?? false;
+    },
+    false,
+  );
+
+  const sla = { ...base, useBusinessHours };
 
   // A policy measured in working minutes needs the workspace's own week. Wall
   // clock stays the default on existing policies, so nothing already promised
