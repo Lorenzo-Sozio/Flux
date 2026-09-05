@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { AlertTriangle, ChevronDown, Eye, MailWarning } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -27,6 +28,7 @@ import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
 export function PlaceholderHelp({ subject, body }: { subject: string; body: string }) {
   const [showList, setShowList] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const t = useTranslations("placeholders");
 
   const text = `${subject}\n${body}`;
   const unknown = findUnknownPlaceholders(text);
@@ -40,8 +42,7 @@ export function PlaceholderHelp({ subject, body }: { subject: string; body: stri
         <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 dark:border-amber-900 dark:bg-amber-950/40">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
           <p className="text-amber-900 text-sm dark:text-amber-200">
-            Nothing will fill in {unknown.map((u) => `{{${u}}}`).join(", ")}. It will reach the recipient exactly as
-            written.
+            {t("unknown", { list: unknown.map((u) => `{{${u}}}`).join(", ") })}
           </p>
         </div>
       )}
@@ -49,22 +50,18 @@ export function PlaceholderHelp({ subject, body }: { subject: string; body: stri
       {missingUnsubscribe && (
         <div className="flex items-start gap-2 rounded-md border border-sky-300 bg-sky-50 px-3 py-2 dark:border-sky-900 dark:bg-sky-950/40">
           <MailWarning className="mt-0.5 h-4 w-4 shrink-0 text-sky-600 dark:text-sky-400" />
-          <p className="text-sky-900 text-sm dark:text-sky-200">
-            No unsubscribe link. One will be added at the bottom when this is sent — place{" "}
-            <code className="rounded bg-sky-100 px-1 dark:bg-sky-900">{"{{unsubscribe}}"}</code> yourself to control
-            where it goes.
-          </p>
+          <p className="text-sky-900 text-sm dark:text-sky-200">{t("noUnsubscribe", { token: "{{unsubscribe}}" })}</p>
         </div>
       )}
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" size="sm" onClick={() => setShowList((v) => !v)}>
           <ChevronDown className={`mr-1.5 h-3.5 w-3.5 transition-transform ${showList ? "rotate-180" : ""}`} />
-          What can I put in?
+          {t("whatCanIPut")}
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={() => setShowPreview((v) => !v)}>
           <Eye className="mr-1.5 h-3.5 w-3.5" />
-          {showPreview ? "Hide" : "Preview"} with example values
+          {showPreview ? t("hidePreview") : t("preview")}
         </Button>
       </div>
 
@@ -81,9 +78,9 @@ export function PlaceholderHelp({ subject, body }: { subject: string; body: stri
 
       {showPreview && (
         <div className="space-y-2 rounded-md border bg-muted/40 p-3">
-          <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Subject</p>
-          <p className="text-sm">{renderPlaceholders(subject, samples) || <em>Empty</em>}</p>
-          <p className="pt-2 font-medium text-muted-foreground text-xs uppercase tracking-wide">Body</p>
+          <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("subject")}</p>
+          <p className="text-sm">{renderPlaceholders(subject, samples) || <em>{t("empty")}</em>}</p>
+          <p className="pt-2 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("body")}</p>
           {/* Sanitised even though a colleague wrote it: a template author and a
               template previewer are not always the same person, and this renders
               inside the previewer's session. */}

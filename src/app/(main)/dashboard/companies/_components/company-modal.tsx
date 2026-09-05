@@ -375,7 +375,7 @@ export function CompanyModal({
           <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <DuplicateHint
-                title="A company with this name may already be here"
+                titleKey="companyTitle"
                 matches={dupWatch.matches.map((d) => ({
                   id: d.id,
                   label: d.name,

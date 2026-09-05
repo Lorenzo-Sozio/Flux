@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { useTranslations } from "next-intl";
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -55,6 +57,7 @@ export function LostDealDialog({
   const [competitor, setCompetitor] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const t = useTranslations("lostDeal");
 
   // Cleared on each open, or the previous deal's answer is pre-filled for the
   // next one and gets confirmed without being read.
@@ -67,8 +70,12 @@ export function LostDealDialog({
     }
   }, [open]);
 
-  const selected = reasons.find((r) => r.id === reasonId);
-  const asksForCompetitor = /competitor/i.test(selected?.name ?? "");
+  // ⚠️ This used to appear only when the chosen reason's name contained the word
+  // "competitor", which is the English wording of a seeded row. A workspace that
+  // renames it — into Italian, or into anything of its own — lost the field, and
+  // the loss was recorded without the one fact the sales meeting asks for first.
+  // Behaviour must not hang off a string somebody is invited to edit, so the
+  // field is simply always there and always optional.
 
   const submit = async () => {
     if (!reasonId) return;
@@ -88,19 +95,16 @@ export function LostDealDialog({
     <Dialog open={open} onOpenChange={(v) => !v && onCancel()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Why was it lost?</DialogTitle>
-          <DialogDescription>
-            Closing “{dealName}”. This is the one moment the answer is still known, and it is what makes win/loss
-            analysis possible later.
-          </DialogDescription>
+          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogDescription>{t("description", { name: dealName })}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
-            <Label htmlFor="loss-reason">Reason</Label>
+            <Label htmlFor="loss-reason">{t("reason")}</Label>
             <Select value={reasonId} onValueChange={setReasonId}>
               <SelectTrigger id="loss-reason">
-                <SelectValue placeholder="Pick a reason" />
+                <SelectValue placeholder={t("reasonPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
                 {reasons.map((r) => (
@@ -112,25 +116,23 @@ export function LostDealDialog({
             </Select>
           </div>
 
-          {asksForCompetitor && (
-            <div className="space-y-1.5">
-              <Label htmlFor="loss-competitor">Who won it?</Label>
-              <Input
-                id="loss-competitor"
-                value={competitor}
-                onChange={(e) => setCompetitor(e.target.value)}
-                placeholder="Competitor name"
-              />
-            </div>
-          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="loss-competitor">{t("competitor")}</Label>
+            <Input
+              id="loss-competitor"
+              value={competitor}
+              onChange={(e) => setCompetitor(e.target.value)}
+              placeholder={t("competitorPlaceholder")}
+            />
+          </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="loss-note">Anything worth remembering?</Label>
+            <Label htmlFor="loss-note">{t("note")}</Label>
             <Textarea
               id="loss-note"
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              placeholder="Optional"
+              placeholder={t("notePlaceholder")}
               rows={3}
             />
           </div>
@@ -138,10 +140,10 @@ export function LostDealDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={onCancel} disabled={saving}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button onClick={submit} disabled={!reasonId || saving}>
-            {saving ? "Closing…" : "Close as lost"}
+            {saving ? t("closing") : t("confirm")}
           </Button>
         </DialogFooter>
       </DialogContent>

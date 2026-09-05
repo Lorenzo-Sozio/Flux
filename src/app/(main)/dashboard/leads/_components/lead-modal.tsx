@@ -381,7 +381,7 @@ export function LeadModal({
           <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
             <div className="flex-1 overflow-y-auto px-6 py-4">
               <DuplicateHint
-                title="This person may already be a lead"
+                titleKey="leadTitle"
                 matches={dupWatch.matches.map((d) => ({
                   id: d.id,
                   label: [d.firstName, d.lastName].filter(Boolean).join(" ") || d.email || d.id,
