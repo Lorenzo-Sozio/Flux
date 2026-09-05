@@ -23,6 +23,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteQuoteAction, getAllQuotes } from "@/actions/quotes";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,8 +49,94 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { quoteStatusConfig } from "@/lib/quote-status";
+import { cn } from "@/lib/utils";
 
 type Quote = Awaited<ReturnType<typeof getAllQuotes>>[number];
+
+/** A quote total, in the currency the quote itself was written in. */
+function quoteAmount(quote: Quote): string {
+  return parseFloat(quote.totalAmount ?? "0").toLocaleString(undefined, {
+    style: "currency",
+    currency: quote.currency || "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
+ * The actions on one quote.
+ *
+ * Lifted out of the table row so the card list can use the same menu. On the
+ * table it appears on hover, which is fine with a mouse and means "never" on a
+ * touchscreen — hence `alwaysVisible`, which the cards pass.
+ */
+function QuoteRowMenu({
+  quote,
+  onDelete,
+  alwaysVisible = false,
+  t,
+  tc,
+}: {
+  readonly quote: Quote;
+  readonly onDelete: (target: { id: string; quoteNumber: string }) => void;
+  readonly alwaysVisible?: boolean;
+  readonly t: ReturnType<typeof useTranslations<"quotes">>;
+  readonly tc: ReturnType<typeof useTranslations<"common">>;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={cn("h-7 w-7 p-0", !alwaysVisible && "opacity-0 transition-opacity group-hover:opacity-100")}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuItem asChild>
+          <Link href={`/dashboard/sales/quotes/${quote.id}`}>
+            <Eye className="mr-2 h-3.5 w-3.5" />
+            {tc("view")}
+          </Link>
+        </DropdownMenuItem>
+        {quote.status === "draft" && (
+          <>
+            <DropdownMenuItem asChild>
+              <Link href={`/dashboard/sales/quotes/${quote.id}/edit`}>
+                <Pencil className="mr-2 h-3.5 w-3.5" />
+                {tc("edit")}
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href={`/dashboard/sales/quotes/${quote.id}?send=1`}>
+                <Send className="mr-2 h-3.5 w-3.5" />
+                {t("sendQuote")}
+              </Link>
+            </DropdownMenuItem>
+          </>
+        )}
+        <DropdownMenuItem onClick={() => window.open(`/api/quotes/${quote.id}`, "_blank")}>
+          <Printer className="mr-2 h-3.5 w-3.5" />
+          Print / PDF
+        </DropdownMenuItem>
+        {quote.status === "draft" && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-destructive focus:text-destructive"
+              onClick={() => onDelete({ id: quote.id, quoteNumber: quote.quoteNumber })}
+            >
+              <Trash2 className="mr-2 h-3.5 w-3.5" />
+              {tc("delete")}
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export default function QuotesPage() {
   const t = useTranslations("quotes");
@@ -266,125 +353,116 @@ export default function QuotesPage() {
               )}
             </div>
           ) : (
-            <div className="overflow-hidden rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="font-semibold text-xs">{t("columns.number")}</TableHead>
-                    <TableHead className="font-semibold text-xs">{t("columns.customer")}</TableHead>
-                    <TableHead className="font-semibold text-xs">{t("columns.deal")}</TableHead>
-                    <TableHead className="font-semibold text-xs">{t("columns.status")}</TableHead>
-                    <TableHead className="text-right font-semibold text-xs">{tc("amount")}</TableHead>
-                    <TableHead className="font-semibold text-xs">{t("columns.issued")}</TableHead>
-                    <TableHead className="font-semibold text-xs">{t("columns.expires")}</TableHead>
-                    <TableHead className="w-10" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredQuotes.map((quote) => {
+            <ResponsiveRecordList
+              cards={
+                <RecordCards
+                  items={filteredQuotes.map((quote) => {
                     const statusCfg = quoteStatusConfig(quote.status);
                     const contactName = quote.contact
                       ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim()
                       : null;
-                    const isExpired =
+                    const expired =
                       quote.expiresAt && quote.status !== "accepted" && new Date(quote.expiresAt) < new Date();
 
-                    return (
-                      <TableRow key={quote.id} className="group transition-colors hover:bg-muted/30">
-                        <TableCell className="font-medium font-mono text-sm">
-                          <Link href={`/dashboard/sales/quotes/${quote.id}`} className="text-primary hover:underline">
-                            {quote.quoteNumber}
-                          </Link>
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium text-sm leading-tight">{quote.company?.name ?? "—"}</div>
-                          {contactName && <div className="mt-0.5 text-muted-foreground text-xs">{contactName}</div>}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">{quote.deal?.name ?? "—"}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={`font-medium text-xs ${statusCfg.className}`}>
-                            {t(`statuses.${statusCfg.labelKey}`)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-semibold text-sm tabular-nums">
-                          {parseFloat(quote.totalAmount ?? "0").toLocaleString(undefined, {
-                            style: "currency",
-                            currency: quote.currency || "EUR",
-                            minimumFractionDigits: 2,
-                            maximumFractionDigits: 2,
-                          })}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {format(new Date(quote.issuedAt), "MMM d, yyyy")}
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          {quote.expiresAt ? (
-                            <span className={isExpired ? "font-medium text-destructive" : "text-muted-foreground"}>
+                    return {
+                      id: quote.id,
+                      href: `/dashboard/sales/quotes/${quote.id}`,
+                      title: <span className="font-mono">{quote.quoteNumber}</span>,
+                      subtitle: [quote.company?.name, contactName].filter(Boolean).join(" · ") || undefined,
+                      badge: <span className="font-semibold text-sm tabular-nums">{quoteAmount(quote)}</span>,
+                      fields: [
+                        {
+                          label: t("columns.status"),
+                          value: (
+                            <Badge variant="outline" className={`font-medium text-xs ${statusCfg.className}`}>
+                              {t(`statuses.${statusCfg.labelKey}`)}
+                            </Badge>
+                          ),
+                        },
+                        {
+                          label: t("columns.expires"),
+                          value: quote.expiresAt ? (
+                            <span className={expired ? "font-medium text-destructive" : undefined}>
                               {format(new Date(quote.expiresAt), "MMM d, yyyy")}
                             </span>
-                          ) : (
-                            <span className="text-muted-foreground">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-44">
-                              <DropdownMenuItem asChild>
-                                <Link href={`/dashboard/sales/quotes/${quote.id}`}>
-                                  <Eye className="mr-2 h-3.5 w-3.5" />
-                                  {tc("view")}
-                                </Link>
-                              </DropdownMenuItem>
-                              {quote.status === "draft" && (
-                                <>
-                                  <DropdownMenuItem asChild>
-                                    <Link href={`/dashboard/sales/quotes/${quote.id}/edit`}>
-                                      <Pencil className="mr-2 h-3.5 w-3.5" />
-                                      {tc("edit")}
-                                    </Link>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem asChild>
-                                    <Link href={`/dashboard/sales/quotes/${quote.id}?send=1`}>
-                                      <Send className="mr-2 h-3.5 w-3.5" />
-                                      {t("sendQuote")}
-                                    </Link>
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                              <DropdownMenuItem onClick={() => window.open(`/api/quotes/${quote.id}`, "_blank")}>
-                                <Printer className="mr-2 h-3.5 w-3.5" />
-                                Print / PDF
-                              </DropdownMenuItem>
-                              {quote.status === "draft" && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-destructive focus:text-destructive"
-                                    onClick={() => setDeleteTarget({ id: quote.id, quoteNumber: quote.quoteNumber })}
-                                  >
-                                    <Trash2 className="mr-2 h-3.5 w-3.5" />
-                                    {tc("delete")}
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    );
+                          ) : null,
+                        },
+                      ],
+                      actions: <QuoteRowMenu quote={quote} onDelete={setDeleteTarget} alwaysVisible t={t} tc={tc} />,
+                    };
                   })}
-                </TableBody>
-              </Table>
-            </div>
+                />
+              }
+              table={
+                <div className="overflow-hidden rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/40 hover:bg-muted/40">
+                        <TableHead className="font-semibold text-xs">{t("columns.number")}</TableHead>
+                        <TableHead className="font-semibold text-xs">{t("columns.customer")}</TableHead>
+                        <TableHead className="font-semibold text-xs">{t("columns.deal")}</TableHead>
+                        <TableHead className="font-semibold text-xs">{t("columns.status")}</TableHead>
+                        <TableHead className="text-right font-semibold text-xs">{tc("amount")}</TableHead>
+                        <TableHead className="font-semibold text-xs">{t("columns.issued")}</TableHead>
+                        <TableHead className="font-semibold text-xs">{t("columns.expires")}</TableHead>
+                        <TableHead className="w-10" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredQuotes.map((quote) => {
+                        const statusCfg = quoteStatusConfig(quote.status);
+                        const contactName = quote.contact
+                          ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim()
+                          : null;
+                        const isExpired =
+                          quote.expiresAt && quote.status !== "accepted" && new Date(quote.expiresAt) < new Date();
+
+                        return (
+                          <TableRow key={quote.id} className="group transition-colors hover:bg-muted/30">
+                            <TableCell className="font-medium font-mono text-sm">
+                              <Link
+                                href={`/dashboard/sales/quotes/${quote.id}`}
+                                className="text-primary hover:underline"
+                              >
+                                {quote.quoteNumber}
+                              </Link>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium text-sm leading-tight">{quote.company?.name ?? "—"}</div>
+                              {contactName && <div className="mt-0.5 text-muted-foreground text-xs">{contactName}</div>}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">{quote.deal?.name ?? "—"}</TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={`font-medium text-xs ${statusCfg.className}`}>
+                                {t(`statuses.${statusCfg.labelKey}`)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-semibold text-sm tabular-nums">
+                              {quoteAmount(quote)}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {format(new Date(quote.issuedAt), "MMM d, yyyy")}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {quote.expiresAt ? (
+                                <span className={isExpired ? "font-medium text-destructive" : "text-muted-foreground"}>
+                                  {format(new Date(quote.expiresAt), "MMM d, yyyy")}
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">—</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <QuoteRowMenu quote={quote} onDelete={setDeleteTarget} t={t} tc={tc} />
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              }
+            />
           )}
         </CardContent>
       </Card>

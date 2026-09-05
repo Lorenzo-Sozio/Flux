@@ -62,7 +62,11 @@ export async function upsertSalesTarget(data: z.infer<typeof upsertSchema>) {
       },
     });
 
-  revalidatePath("/dashboard/settings/targets");
+  // ⚠️ La pagina degli obiettivi sta sotto /dashboard/pipeline, non sotto
+  // /dashboard/settings. Questo percorso indicava una pagina inesistente, quindi
+  // non invalidava niente: si salvava un obiettivo e la schermata continuava a
+  // mostrare il valore di prima fino a un ricaricamento forzato.
+  revalidatePath("/dashboard/pipeline/targets");
   revalidatePath("/dashboard/pipeline/forecast");
 }
 
@@ -70,6 +74,6 @@ export async function deleteSalesTarget(id: string) {
   await requireAdminAccess();
   const db = await getDb();
   await db.delete(salesTargets).where(eq(salesTargets.id, id));
-  revalidatePath("/dashboard/settings/targets");
+  revalidatePath("/dashboard/pipeline/targets");
   revalidatePath("/dashboard/pipeline/forecast");
 }

@@ -109,7 +109,7 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, tenan
   }
 
   useEffect(() => {
-    if (autoOpenSend && quote.status === "draft") {
+    if (autoOpenSend && (quote.status === "draft" || quote.status === "approved")) {
       setShowEmailDialog(true);
     }
   }, [autoOpenSend, quote.status]);
@@ -360,7 +360,17 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, tenan
               </div>
             )}
 
-            {quote.status === "draft" && (
+            {/*
+              ⚠️ Anche da approvato, e questa è la correzione che conta. Lo stato
+              `approved` non aveva NESSUN comando: chi passava dall'approvazione
+              interna si trovava un preventivo firmato e nessun modo di spedirlo,
+              e l'unica strada che funzionava era saltare del tutto
+              l'approvazione e inviare dalla bozza. La macchina a stati il
+              passaggio approved → sent lo prevede da sempre; era l'interfaccia a
+              non offrirlo. Un flusso che si interrompe alla fine non somiglia a
+              un errore: somiglia a un pulsante che qualcuno ha dimenticato dove.
+            */}
+            {(quote.status === "draft" || quote.status === "approved") && (
               <Button className="w-full justify-start" onClick={() => setShowEmailDialog(true)}>
                 <Mail className="mr-2 h-4 w-4" />
                 Send Quote

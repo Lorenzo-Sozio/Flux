@@ -86,7 +86,7 @@ export function ForecastKPI({ totalWeighted, bestCase, committed, currentMonthTa
           <CardContent>
             <p className="text-xs text-muted-foreground">
               {t("noTarget")}{" "}
-              <Link href="/dashboard/settings/targets" className="underline hover:text-foreground">
+              <Link href="/dashboard/pipeline/targets" className="underline hover:text-foreground">
                 {t("setTargets")}
               </Link>
             </p>

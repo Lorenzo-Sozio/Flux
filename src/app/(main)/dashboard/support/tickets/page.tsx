@@ -22,6 +22,7 @@ import { useTranslations } from "next-intl";
 import { getTickets } from "@/actions/support";
 import { CreateTicketButton } from "@/components/crm/create-ticket-button";
 import { EmptyState } from "@/components/crm/empty-state";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import { TicketKanbanBoard } from "@/components/crm/ticket-kanban-board";
 import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
 import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
@@ -123,8 +124,15 @@ export default function TicketsListPage() {
     }
   };
 
+  /** "Today", or how many days ago — the way somebody talks about a ticket. */
+  function ticketDateLabel(createdAt: Date | string): string {
+    const created = new Date(createdAt);
+    if (created.toDateString() === new Date().toDateString()) return t("dateToday");
+    return t("daysAgo", { count: Math.floor((Date.now() - created.getTime()) / 86_400_000) });
+  }
+
   return (
-    <div className={view === "kanban" ? "flex h-full flex-col gap-6 p-6" : "space-y-6 p-6"}>
+    <div className={view === "kanban" ? "flex h-full flex-col gap-6" : "space-y-6"}>
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between">
         <Link
@@ -275,92 +283,120 @@ export default function TicketsListPage() {
                   />
                 )
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="hover:bg-transparent">
-                        <TableHead className="w-36 cursor-pointer select-none" onClick={() => toggleSort("createdAt")}>
-                          <div className="flex items-center gap-1.5">
-                            {t("colTicketNum")}
-                            <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
-                          </div>
-                        </TableHead>
-                        <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("subject")}>
-                          <div className="flex items-center gap-1.5">
-                            {t("subject")}
-                            <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
-                          </div>
-                        </TableHead>
-                        <TableHead>{t("colCustomer")}</TableHead>
-                        <TableHead className="w-32 cursor-pointer select-none" onClick={() => toggleSort("status")}>
-                          <div className="flex items-center gap-1.5">
-                            {t("columns.status")}
-                            <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
-                          </div>
-                        </TableHead>
-                        <TableHead className="w-28 cursor-pointer select-none" onClick={() => toggleSort("priority")}>
-                          <div className="flex items-center gap-1.5">
-                            {t("priority")}
-                            <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
-                          </div>
-                        </TableHead>
-                        <TableHead className="w-20">{t("colChannel")}</TableHead>
-                        <TableHead className="w-20">{t("colMsgs")}</TableHead>
-                        <TableHead className="w-28">{t("columns.created")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredTickets.map((ticket) => {
-                        const createdDate = new Date(ticket.createdAt);
-                        const isToday = createdDate.toDateString() === new Date().toDateString();
-                        const daysAgo = Math.floor((Date.now() - createdDate.getTime()) / 86_400_000);
-                        const dateLabel = isToday ? t("dateToday") : t("daysAgo", { count: daysAgo });
-                        const msgCount = ticket.messages?.length ?? 0;
-
-                        return (
-                          <TableRow
-                            key={ticket.id}
-                            className="cursor-pointer hover:bg-muted/50"
-                            onClick={() => router.push(`/dashboard/support/tickets/${ticket.id}`)}
-                          >
-                            <TableCell className="font-mono font-semibold text-muted-foreground text-xs">
-                              {ticket.ticketNumber}
-                            </TableCell>
-                            <TableCell className="max-w-xs">
-                              <span className="line-clamp-1 font-medium">{ticket.subject}</span>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground text-sm">
-                              {ticket.contact?.name ?? "—"}
-                            </TableCell>
-                            <TableCell>
-                              <TicketStatusBadge status={ticket.status} />
-                            </TableCell>
-                            <TableCell>
-                              <TicketPriorityBadge priority={ticket.priority} />
-                            </TableCell>
-                            <TableCell>
-                              <span className="flex items-center gap-1 text-muted-foreground text-xs capitalize">
-                                {CHANNEL_ICONS[ticket.channel]}
-                                {ticket.channel}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              {msgCount > 0 ? (
-                                <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                                  <MessageSquare className="h-3.5 w-3.5" />
-                                  {msgCount}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground/40 text-xs">—</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground text-xs">{dateLabel}</TableCell>
+                <ResponsiveRecordList
+                  cards={
+                    <RecordCards
+                      className="p-2"
+                      items={filteredTickets.map((ticket) => ({
+                        id: ticket.id,
+                        href: `/dashboard/support/tickets/${ticket.id}`,
+                        title: ticket.subject,
+                        subtitle: (
+                          <span className="font-mono">
+                            {ticket.ticketNumber}
+                            {ticket.contact?.name ? ` · ${ticket.contact.name}` : ""}
+                          </span>
+                        ),
+                        badge: <TicketPriorityBadge priority={ticket.priority} />,
+                        fields: [
+                          { label: t("status"), value: <TicketStatusBadge status={ticket.status} /> },
+                          { label: t("columns.created"), value: ticketDateLabel(ticket.createdAt) },
+                        ],
+                      }))}
+                    />
+                  }
+                  table={
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="hover:bg-transparent">
+                            <TableHead
+                              className="w-36 cursor-pointer select-none"
+                              onClick={() => toggleSort("createdAt")}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                {t("colTicketNum")}
+                                <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+                              </div>
+                            </TableHead>
+                            <TableHead className="cursor-pointer select-none" onClick={() => toggleSort("subject")}>
+                              <div className="flex items-center gap-1.5">
+                                {t("subject")}
+                                <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+                              </div>
+                            </TableHead>
+                            <TableHead>{t("colCustomer")}</TableHead>
+                            <TableHead className="w-32 cursor-pointer select-none" onClick={() => toggleSort("status")}>
+                              <div className="flex items-center gap-1.5">
+                                {t("columns.status")}
+                                <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+                              </div>
+                            </TableHead>
+                            <TableHead
+                              className="w-28 cursor-pointer select-none"
+                              onClick={() => toggleSort("priority")}
+                            >
+                              <div className="flex items-center gap-1.5">
+                                {t("priority")}
+                                <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+                              </div>
+                            </TableHead>
+                            <TableHead className="w-20">{t("colChannel")}</TableHead>
+                            <TableHead className="w-20">{t("colMsgs")}</TableHead>
+                            <TableHead className="w-28">{t("columns.created")}</TableHead>
                           </TableRow>
-                        );
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredTickets.map((ticket) => {
+                            const dateLabel = ticketDateLabel(ticket.createdAt);
+                            const msgCount = ticket.messages?.length ?? 0;
+
+                            return (
+                              <TableRow
+                                key={ticket.id}
+                                className="cursor-pointer hover:bg-muted/50"
+                                onClick={() => router.push(`/dashboard/support/tickets/${ticket.id}`)}
+                              >
+                                <TableCell className="font-mono font-semibold text-muted-foreground text-xs">
+                                  {ticket.ticketNumber}
+                                </TableCell>
+                                <TableCell className="max-w-xs">
+                                  <span className="line-clamp-1 font-medium">{ticket.subject}</span>
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-sm">
+                                  {ticket.contact?.name ?? "—"}
+                                </TableCell>
+                                <TableCell>
+                                  <TicketStatusBadge status={ticket.status} />
+                                </TableCell>
+                                <TableCell>
+                                  <TicketPriorityBadge priority={ticket.priority} />
+                                </TableCell>
+                                <TableCell>
+                                  <span className="flex items-center gap-1 text-muted-foreground text-xs capitalize">
+                                    {CHANNEL_ICONS[ticket.channel]}
+                                    {ticket.channel}
+                                  </span>
+                                </TableCell>
+                                <TableCell>
+                                  {msgCount > 0 ? (
+                                    <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                                      <MessageSquare className="h-3.5 w-3.5" />
+                                      {msgCount}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted-foreground/40 text-xs">—</span>
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-muted-foreground text-xs">{dateLabel}</TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  }
+                />
               )}
             </CardContent>
           </Card>

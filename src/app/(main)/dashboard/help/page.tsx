@@ -280,11 +280,11 @@ const sections = [
       },
       {
         q: "Cos'è il workflow di approvazione?",
-        a: "Prima di inviare il preventivo al cliente, puoi sottoporlo all'approvazione interna: clicca 'Richiedi Approvazione' e il preventivo passa in stato 'In approvazione'. Un admin/owner riceverà la notifica, può approvare con una nota o rimandarlo con richiesta di modifiche. Solo i preventivi approvati possono essere inviati al cliente.",
+        a: "È un passaggio facoltativo, non un blocco. Da una bozza puoi cliccare 'Richiedi Approvazione' e il preventivo passa in 'In approvazione': lo vede chi ha il ruolo di amministratore o proprietario del workspace, che può approvarlo o rifiutarlo con una nota. Una volta approvato compare il pulsante di invio. Chi ha il permesso di scrivere preventivi può però inviare direttamente dalla bozza senza passare di qui: l'approvazione serve a chi vuole una revisione interna, non impedisce l'invio a chi non la usa.",
       },
       {
-        q: "Come invia il preventivo al cliente?",
-        a: "Una volta approvato, clicca 'Invia al Cliente': il sistema genera automaticamente un'email con un link univoco e sicuro al preventivo. Il cliente può aprire il link senza fare login e visualizzare il documento formattato.",
+        q: "Come invio il preventivo al cliente?",
+        a: "Il pulsante di invio compare su una bozza e su un preventivo approvato. Il sistema prepara un'email con un link univoco al preventivo: il cliente lo apre senza fare login e vede il documento formattato. Oggetto e testo sono modificabili prima di partire, e niente parte finché non lo mandi tu.",
       },
       {
         q: "Come vede il preventivo il cliente?",
@@ -293,6 +293,10 @@ const sections = [
       {
         q: "Come so se il cliente ha aperto il preventivo?",
         a: "Non appena il cliente apre il link, lo stato del preventivo cambia automaticamente da 'Inviato' a 'Visualizzato' e viene registrato l'orario esatto di apertura. Vedrai questa informazione nella timeline del preventivo e nel dettaglio.",
+      },
+      {
+        q: "Come sollecito un preventivo senza risposta?",
+        a: "Sul dettaglio del preventivo compare da solo un riquadro quando c'è motivo di sollecitare, e dice quale: mai aperto, aperto ma senza risposta, in scadenza, oppure già scaduto. Sono quattro situazioni diverse e propongono quattro messaggi diversi — a chi non ha aperto si chiede se la mail è arrivata, non una decisione. Il riquadro non compare su un preventivo già accettato o rifiutato, né su uno spedito ieri. Il testo è una bozza: modificala come vuoi, e parte solo quando premi tu.",
       },
       {
         q: "Posso esportare il preventivo in PDF?",
@@ -330,7 +334,7 @@ const sections = [
     border: "border-cyan-200 dark:border-cyan-800",
     title: "Sales Targets e Funnel",
     subtitle: "Obiettivi e analisi del processo commerciale",
-    href: "/dashboard/settings/targets",
+    href: "/dashboard/pipeline/targets",
     description:
       "Strumenti di pianificazione e analisi: i Sales Target ti permettono di fissare obiettivi di vendita per ogni commerciale e monitorare il raggiungimento in tempo reale. Il Funnel analizza l'efficacia del processo di conversione.",
     topics: [

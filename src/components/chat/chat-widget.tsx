@@ -515,7 +515,7 @@ export function ChatWidget({ userId }: { userId: string }) {
   const panelClass = cn(
     "fixed z-50 flex flex-col overflow-hidden border bg-background shadow-2xl transition-all duration-200",
     // Mobile: full screen overlay
-    "max-sm:inset-0 max-sm:rounded-none",
+    "max-sm:inset-0 max-sm:rounded-none max-sm:pt-[var(--safe-top)] max-sm:pb-[var(--safe-bottom)]",
     // Desktop: floating panel bottom-right
     "sm:bottom-20 sm:right-5 sm:w-[400px] sm:h-[580px] sm:rounded-2xl",
   );
@@ -526,7 +526,9 @@ export function ChatWidget({ userId }: { userId: string }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="fixed right-5 bottom-5 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all duration-200 hover:scale-105 hover:bg-primary/90 active:scale-95"
+        // Below md the tab bar owns the bottom of the screen; the button sits
+        // above it rather than on top of the last two tabs.
+        className="fixed right-4 bottom-[calc(var(--mobile-nav-height)+var(--safe-bottom)+0.75rem)] z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all duration-200 hover:scale-105 hover:bg-primary/90 active:scale-95 md:right-5 md:bottom-5 md:z-50"
       >
         {open ? <X className="h-5 w-5" /> : <MessageCircle className="h-5 w-5" />}
         {!open && unreadTotal > 0 && (

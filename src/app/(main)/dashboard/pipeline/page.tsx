@@ -21,7 +21,7 @@ export default async function PipelinePage() {
   ]);
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 h-full bg-muted/10">
+    <div className="h-full bg-muted/10">
       <PipelineBoard
         initialStages={data.stages}
         initialDeals={data.deals}
