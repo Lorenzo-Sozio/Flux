@@ -9,7 +9,7 @@ import type { z } from "zod";
 
 import { createNotificationAction, createNotificationsBatch } from "@/actions/auth";
 import { CreateQuoteSchema, UpdateQuoteSchema } from "@/actions/quotes-validation";
-import { companies, deals, products, quoteActivities, quoteItems, quotes, users } from "@/db/schema";
+import { companies, contacts, deals, products, quoteActivities, quoteItems, quotes, users } from "@/db/schema";
 import { appUrl } from "@/lib/app-url";
 import { ForbiddenError, requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { computeDocument } from "@/lib/document-totals";
@@ -646,18 +646,34 @@ export async function rejectQuoteAction(quoteId: string, note: string) {
   revalidatePath(`/dashboard/sales/quotes/${quoteId}`);
 }
 
-/** Lightweight list of deals + companies + products for the quote creation form. */
+/**
+ * Lightweight list of deals, companies, contacts and products for the quote form.
+ *
+ * The contacts are new. `contactId` has always been part of the quote and there
+ * was no field to set it, so every quote written here had nobody to send it to —
+ * and a quote is a document whose whole purpose is being sent to a person.
+ */
 export async function getQuoteFormData() {
   const db = await getDb();
   await requireCapability("record:read");
   await requirePlanModule("sales");
 
-  const [dealList, companyList, productList] = await Promise.all([
+  const [dealList, companyList, contactList, productList] = await Promise.all([
     db
       .select({ id: deals.id, name: deals.name, companyId: deals.companyId, contactId: deals.contactId })
       .from(deals)
       .orderBy(desc(deals.createdAt)),
     db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(companies.name),
+    db
+      .select({
+        id: contacts.id,
+        firstName: contacts.firstName,
+        lastName: contacts.lastName,
+        email: contacts.email,
+        companyId: contacts.companyId,
+      })
+      .from(contacts)
+      .orderBy(contacts.firstName),
     db
       .select({
         id: products.id,
@@ -672,5 +688,5 @@ export async function getQuoteFormData() {
       .orderBy(products.name),
   ]);
 
-  return { deals: dealList, companies: companyList, products: productList };
+  return { deals: dealList, companies: companyList, contacts: contactList, products: productList };
 }
