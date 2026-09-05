@@ -21,8 +21,6 @@ import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import {
   activities,
-  appointments,
-  campaignLogs,
   companies,
   companyCategories,
   companyTypes,
@@ -31,7 +29,6 @@ import {
   deals,
   leads,
   pipelineStages,
-  quotes,
   tasks,
   tickets,
   users,
@@ -49,12 +46,13 @@ import {
 import { decodeFilter } from "@/lib/filter-types";
 import { computeLeadScore } from "@/lib/lead-score";
 import { COMPANY_CHILDREN, CONTACT_CHILDREN, childColumn, LEAD_CHILDREN, type MergeChild } from "@/lib/merge-children";
-import { type ListParams, offsetOf, type Page, toPage } from "@/lib/pagination";
+import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { getDb } from "@/lib/tenant-context";
 
 // ── Company lookup tables ──────────────────────────────────────────────────────
 
 export async function getCompanyCategories() {
+  await requireCapability("record:read");
   const db = await getDb();
   return db
     .select({ id: companyCategories.id, name: companyCategories.name })
@@ -63,6 +61,7 @@ export async function getCompanyCategories() {
 }
 
 export async function getCompanyTypes() {
+  await requireCapability("record:read");
   const db = await getDb();
   return db.select({ id: companyTypes.id, name: companyTypes.name }).from(companyTypes).orderBy(companyTypes.name);
 }
@@ -109,6 +108,7 @@ async function getTotalRecordCount(db: Awaited<ReturnType<typeof getDb>>): Promi
 
 // LEADS
 export async function getLeads(encodedFilter?: string | null) {
+  await requireCapability("record:read");
   const db = await getDb();
   const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
   const base = db
@@ -132,6 +132,7 @@ export async function getLeads(encodedFilter?: string | null) {
  * in JavaScript and keep five (audit rilievo B-08).
  */
 export async function getRecentLeads(limit = 5) {
+  await requireCapability("record:read");
   const db = await getDb();
   return db
     .select({
@@ -153,6 +154,7 @@ export async function getRecentLeads(limit = 5) {
 
 // CONTACTS
 export async function getContacts(encodedFilter?: string | null) {
+  await requireCapability("record:read");
   const db = await getDb();
   const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
   const base = db
@@ -549,6 +551,7 @@ export async function deleteContact(id: string) {
 
 // COMPANIES
 export async function getCompanies(encodedFilter?: string | null) {
+  await requireCapability("record:read");
   const db = await getDb();
   const tree = encodedFilter ? decodeFilter(encodedFilter) : null;
   const base = db
@@ -662,6 +665,7 @@ export async function deleteCompany(id: string) {
 // ── Lightweight lists for FK select dropdowns ─────────────────────────────────
 
 export async function getContactsForSelect() {
+  await requireCapability("record:read");
   const db = await getDb();
   return db
     .select({ id: contacts.id, firstName: contacts.firstName, lastName: contacts.lastName, email: contacts.email })
@@ -670,11 +674,13 @@ export async function getContactsForSelect() {
 }
 
 export async function getCompaniesForSelect() {
+  await requireCapability("record:read");
   const db = await getDb();
   return db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(companies.name);
 }
 
 export async function getLeadsForSelect() {
+  await requireCapability("record:read");
   const db = await getDb();
   return db
     .select({ id: leads.id, firstName: leads.firstName, lastName: leads.lastName, email: leads.email })
@@ -1052,6 +1058,7 @@ function orderFor(sorts: Record<string, AnyPgColumn>, params: ListParams, fallba
 
 /** One page of leads, with the total that matches the query. */
 export async function listLeads(params: ListParams) {
+  await requireCapability("record:read");
   const db = await getDb();
   const term = params.search;
 
@@ -1101,6 +1108,7 @@ export async function listLeads(params: ListParams) {
 
 /** One page of contacts. */
 export async function listContacts(params: ListParams) {
+  await requireCapability("record:read");
   const db = await getDb();
   const term = params.search;
 
@@ -1147,6 +1155,7 @@ export async function listContacts(params: ListParams) {
 
 /** One page of companies. */
 export async function listCompanies(params: ListParams) {
+  await requireCapability("record:read");
   const db = await getDb();
   const term = params.search;
 

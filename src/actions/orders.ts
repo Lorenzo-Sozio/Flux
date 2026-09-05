@@ -113,6 +113,7 @@ async function recordOrderActivity(
 }
 
 export async function getOrders(search?: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   const rows = await db
     .select({
@@ -142,6 +143,7 @@ export async function getOrders(search?: string) {
 }
 
 export async function getOrderById(id: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   const [order] = await db
     .select({
@@ -202,6 +204,7 @@ export async function getOrderById(id: string) {
 // ── Stats for dashboard ───────────────────────────────────────────────────────
 
 export async function getOrderStats() {
+  await requireCapability("report:read");
   const db = await getDb();
   const [counts] = await db
     .select({

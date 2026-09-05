@@ -1,6 +1,6 @@
 "use server";
 
-import { and, desc, eq, gte, isNotNull, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 
 import {
   activities,
@@ -14,9 +14,11 @@ import {
   tickets,
   users,
 } from "@/db/schema";
+import { requireCapability } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 
 export async function getDashboardStats() {
+  await requireCapability("record:read");
   const db = await getDb();
   // 1. Total Deal Value
   const dealValueResult = await db
@@ -134,6 +136,7 @@ export async function getDashboardStats() {
 }
 
 export async function getTopDeals(limit = 5) {
+  await requireCapability("record:read");
   const db = await getDb();
   const rows = await db
     .select({
@@ -162,6 +165,7 @@ export async function getTopDeals(limit = 5) {
 }
 
 export async function getRecentActivities(limit = 10) {
+  await requireCapability("record:read");
   const db = await getDb();
   const rows = await db
     .select({

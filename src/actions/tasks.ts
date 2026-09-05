@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, desc, eq, gte, isNotNull, isNull, lte, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { createNotificationAction } from "@/actions/auth";
@@ -21,6 +21,7 @@ import {
 } from "@/db/schema";
 import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
+import { selectTasksDueToday } from "@/lib/tasks-due";
 import { getDb } from "@/lib/tenant-context";
 
 export async function createTask(data: {
@@ -91,6 +92,7 @@ export async function recalcParentProgress(taskId: string): Promise<void> {
 }
 
 export async function getSubtasks(parentId: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   const creator = alias(users, "creator");
   const assignee = alias(users, "assignee");
@@ -141,6 +143,7 @@ export async function removeTaskAssignee(taskId: string, userId: string) {
 }
 
 export async function getTaskAssignees(taskId: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   return await db
     .select({
@@ -155,18 +158,22 @@ export async function getTaskAssignees(taskId: string) {
 }
 
 export async function getTasksByLead(leadId: string) {
+  await requireCapability("record:read");
   return await getTasksGeneric({ leadId });
 }
 
 export async function getTasksByContact(contactId: string) {
+  await requireCapability("record:read");
   return await getTasksGeneric({ contactId });
 }
 
 export async function getTasksByCompany(companyId: string) {
+  await requireCapability("record:read");
   return await getTasksGeneric({ companyId });
 }
 
 export async function getTasksByDeal(dealId: string) {
+  await requireCapability("record:read");
   return await getTasksGeneric({ dealId });
 }
 
@@ -293,11 +300,13 @@ export async function deleteTask(id: string, revalidatePathStr?: string) {
 }
 
 export async function getAllUsers() {
+  await requireCapability("record:read");
   const db = await getDb();
   return await db.select({ id: users.id, name: users.name }).from(users);
 }
 
 export async function getCalendarTasks() {
+  await requireCapability("record:read");
   const db = await getDb();
   return await db
     .select({
@@ -407,6 +416,7 @@ export async function getAllTasks() {
 }
 
 export async function getTasksByTicketId(ticketId: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   const ownerAlias = alias(users, "owner");
   const assigneeAlias = alias(users, "assignee");
@@ -443,29 +453,23 @@ export async function getTasksByTicketId(ticketId: string) {
     .orderBy(desc(tasks.createdAt));
 }
 
+/**
+ * Tasks due today, for the screens.
+ *
+ * ⚠️ The reminder job needs the same rows and runs with no session at all, so it
+ * calls `selectTasksDueToday` in `src/lib/tasks-due.ts` directly with the tenant
+ * database `runCronJob` hands it. Guarding this one would have broken that job;
+ * leaving it unguarded left an endpoint anyone could call. Splitting the query
+ * out is what lets both be true.
+ */
 export async function getTasksDueToday() {
+  await requireCapability("record:read");
   const db = await getDb();
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date();
-  end.setHours(23, 59, 59, 999);
-  return await db
-    .select({
-      id: tasks.id,
-      title: tasks.title,
-      dueDate: tasks.dueDate,
-      status: tasks.status,
-      ownerId: tasks.ownerId,
-      assigneeId: tasks.assigneeId,
-      leadId: tasks.leadId,
-      contactId: tasks.contactId,
-      companyId: tasks.companyId,
-    })
-    .from(tasks)
-    .where(and(eq(tasks.status, "todo"), gte(tasks.dueDate, start), lte(tasks.dueDate, end)));
+  return selectTasksDueToday(db);
 }
 
 export async function getTaskActualHours(taskId: string): Promise<string | null> {
+  await requireCapability("record:read");
   const db = await getDb();
   const [row] = await db.select({ actualHours: tasks.actualHours }).from(tasks).where(eq(tasks.id, taskId));
   return row?.actualHours ?? null;
@@ -574,6 +578,7 @@ export async function logHoursManual(taskId: string, _userId: string | undefined
 }
 
 export async function getTimeLogs(taskId: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   return await db
     .select({
@@ -667,6 +672,7 @@ export async function removeDependency(dependencyId: string) {
 }
 
 export async function getDependencies(taskId: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   const predecessor = alias(tasks, "predecessor");
   const successor = alias(tasks, "successor");
@@ -701,6 +707,7 @@ export async function getDependencies(taskId: string) {
 }
 
 export async function checkDependencyViolation(taskId: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   const predecessor = alias(tasks, "predecessor");
   const blocking = await db
@@ -766,6 +773,7 @@ export async function propagateSuccessors(taskId: string, deltaDays: number): Pr
 }
 
 export async function getTaskById(id: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   const ownerAlias = alias(users, "owner");
   const assigneeAlias = alias(users, "assignee");
@@ -798,6 +806,7 @@ export async function getTaskById(id: string) {
 }
 
 export async function getAllTasksForGantt() {
+  await requireCapability("record:read");
   const db = await getDb();
   const rows = await db
     .select({

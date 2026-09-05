@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { getAllUsersAction } from "@/actions/auth";
 import { salesTargets } from "@/db/schema";
-import { requireAdminAccess } from "@/lib/auth-guard";
+import { requireAdminAccess, requireCapability } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 
 export { getAllUsersAction as getAllUsers };
@@ -26,6 +26,7 @@ const upsertSchema = z.object({
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export async function getSalesTargets(period?: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   return db.query.salesTargets.findMany({
     where: period ? eq(salesTargets.period, period) : undefined,

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { and, desc, eq, gte, isNotNull, lte, or } from "drizzle-orm";
 
 import { activities, contacts, leads, users } from "@/db/schema";
-import { requireWriteAccess } from "@/lib/auth-guard";
+import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
 import { sendCallInviteEmail } from "@/lib/email";
 import { getDb } from "@/lib/tenant-context";
 
@@ -36,7 +36,10 @@ export async function createActivity(data: {
         .where(eq(contacts.id, data.contactId));
       if (contact?.email) {
         const name = [contact.firstName, contact.lastName].filter(Boolean).join(" ") || "there";
-        sendCallInviteEmail(contact.email, name, data.content, data.date).catch(() => {});
+        sendCallInviteEmail(contact.email, name, data.content, data.date).catch(() => {
+          // The activity is recorded either way; a failed courtesy email is not
+          // a reason to fail the thing the user asked for.
+        });
       }
     } else if (data.leadId) {
       const [lead] = await db
@@ -45,7 +48,9 @@ export async function createActivity(data: {
         .where(eq(leads.id, data.leadId));
       if (lead?.email) {
         const name = [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "there";
-        sendCallInviteEmail(lead.email, name, data.content, data.date).catch(() => {});
+        sendCallInviteEmail(lead.email, name, data.content, data.date).catch(() => {
+          // See above: the invitation is a courtesy, the record is the point.
+        });
       }
     }
   }
@@ -54,6 +59,7 @@ export async function createActivity(data: {
 }
 
 export async function getActivitiesByLead(leadId: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   return await db
     .select({
@@ -71,6 +77,7 @@ export async function getActivitiesByLead(leadId: string) {
 }
 
 export async function getActivitiesByContact(contactId: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   return await db
     .select({
@@ -88,6 +95,7 @@ export async function getActivitiesByContact(contactId: string) {
 }
 
 export async function getActivitiesByDeal(dealId: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   return await db
     .select({
@@ -105,6 +113,7 @@ export async function getActivitiesByDeal(dealId: string) {
 }
 
 export async function getActivitiesByCompany(companyId: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   return await db
     .select({

@@ -6,7 +6,7 @@ import { desc, eq, ilike, or } from "drizzle-orm";
 import { z } from "zod";
 
 import { products } from "@/db/schema";
-import { requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
+import { requireCapability, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -25,6 +25,7 @@ const productSchema = z.object({
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 export async function getProducts(search?: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   const rows = await db
     .select()

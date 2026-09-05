@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 
 import { customFieldDefinitions, customFieldValues } from "@/db/schema";
-import { requireAdminAccess, requireWriteAccess } from "@/lib/auth-guard";
+import { requireAdminAccess, requireCapability, requireWriteAccess } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 
 export type FieldType = "text" | "number" | "date" | "select" | "multiselect" | "boolean" | "url";
@@ -14,6 +14,7 @@ export type EntityType = "contact" | "lead" | "company" | "deal";
 // ─── Field Definitions ───────────────────────────────────────────────────────
 
 export async function getCustomFieldDefinitions(entityType?: EntityType) {
+  await requireCapability("record:read");
   const db = await getDb();
   const query = db.select().from(customFieldDefinitions);
   if (entityType) {
@@ -79,6 +80,7 @@ export async function deleteCustomFieldDefinition(id: string) {
 // ─── Field Values ────────────────────────────────────────────────────────────
 
 export async function getCustomFieldValues(entityType: EntityType, entityId: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   return await db
     .select()

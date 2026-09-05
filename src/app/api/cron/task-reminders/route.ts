@@ -14,10 +14,10 @@ import { eq } from "drizzle-orm";
 
 import { getActivitiesDueToday } from "@/actions/activities";
 import { createNotificationAction } from "@/actions/auth";
-import { getTasksDueToday } from "@/actions/tasks";
 import { users } from "@/db/schema";
 import { runCronJob } from "@/lib/cron-runner";
 import { sendActivityReminderEmail, sendTaskDueEmail } from "@/lib/email";
+import { selectTasksDueToday } from "@/lib/tasks-due";
 import type { TenantDb } from "@/lib/tenant-resolve";
 
 // Runs once per workspace, with the active tenant set around the call so the
@@ -27,7 +27,9 @@ export async function GET(req: Request) {
 }
 
 async function runForTenant(db: TenantDb) {
-  const dueTasks = await getTasksDueToday();
+  // The shared query, not the server action: this runs with no session, and the
+  // action is guarded so the screens cannot be read by a stranger.
+  const dueTasks = await selectTasksDueToday(db);
   let notified = 0;
 
   for (const task of dueTasks) {

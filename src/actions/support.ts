@@ -467,9 +467,10 @@ export async function addTicketMessageAction(ticketId: string, data: z.infer<typ
   // Includes In-Reply-To + References for native email client thread grouping
   if (validated.isPublic && ticket.contactId) {
     after(async () => {
-      const contact = await db.query.contacts.findFirst({
-        where: eq(contacts.id, ticket.contactId!),
-      });
+      // Guarded by the branch above, but the compiler cannot see across the
+      // `after` boundary, so it is narrowed rather than asserted.
+      const contactId = ticket.contactId;
+      const contact = contactId ? await db.query.contacts.findFirst({ where: eq(contacts.id, contactId) }) : null;
       const customerEmail = contact?.email ?? null;
       if (!customerEmail) return;
 
@@ -768,6 +769,7 @@ export async function deleteMacroAction(macroId: string) {
 // --- SELECT HELPERS ---
 
 export async function getTicketsForSelect() {
+  await requireCapability("ticket:read");
   const db = await getDb();
   return db
     .select({ id: tickets.id, ticketNumber: tickets.ticketNumber, subject: tickets.subject })
@@ -786,7 +788,9 @@ export async function autoCloseResolvedTickets() {
   const closed = await db
     .update(tickets)
     .set({ status: "closed", closedAt: now, updatedAt: now })
-    .where(and(eq(tickets.status, "resolved"), lt(tickets.resolvedAt!, cutoff)))
+    // `resolvedAt` is nullable in the schema; a resolved ticket always has one,
+    // and `isNotNull` says so to the reader and to the query planner.
+    .where(and(eq(tickets.status, "resolved"), isNotNull(tickets.resolvedAt), lt(tickets.resolvedAt, cutoff)))
     .returning({ id: tickets.id });
 
   return closed.length;

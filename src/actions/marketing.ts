@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { campaignLogs, contacts, emailSuppressions, emailTemplates, leads, marketingCampaigns } from "@/db/schema";
-import { requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
+import { requireCapability, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
 import { executeCampaignSend } from "@/lib/campaign-send";
 import { getDb } from "@/lib/tenant-context";
 
@@ -54,6 +54,7 @@ const MarketingCampaignUpdateSchema = MarketingCampaignCreateSchema.partial();
 // ─── Email Templates ──────────────────────────────────────────────────────────
 
 export async function getEmailTemplates() {
+  await requireCapability("record:read");
   const db = await getDb();
   return db.select().from(emailTemplates).orderBy(emailTemplates.createdAt);
 }
@@ -93,6 +94,7 @@ export async function deleteEmailTemplate(id: string) {
 // ─── Marketing Campaigns ──────────────────────────────────────────────────────
 
 export async function getMarketingCampaigns() {
+  await requireCapability("record:read");
   const db = await getDb();
   return db.select().from(marketingCampaigns).orderBy(marketingCampaigns.createdAt);
 }
@@ -138,13 +140,14 @@ export async function sendCampaignAction(data: {
 }) {
   await requireWriteAccess();
   await requirePlanModule("marketing");
-  const db = await getDb();
+  // The database handle opened here was never used: the send resolves its own.
   return executeCampaignSend(data);
 }
 
 // ─── Campaign Report ──────────────────────────────────────────────────────────
 
 export async function getCampaignReport(campaignId: string) {
+  await requireCapability("report:read");
   const db = await getDb();
   const [campaign] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, campaignId));
   if (!campaign) return null;
@@ -219,6 +222,7 @@ export async function getCampaignReport(campaignId: string) {
 // ─── Batch stats for campaign list ───────────────────────────────────────────
 
 export async function getCampaignsWithStats() {
+  await requireCapability("report:read");
   const db = await getDb();
   const campaigns = await db.select().from(marketingCampaigns).orderBy(marketingCampaigns.createdAt);
 
@@ -248,6 +252,7 @@ export async function getCampaignsWithStats() {
 // ─── Eligible recipient counts ────────────────────────────────────────────────
 
 export async function getEligibleRecipientCounts() {
+  await requireCapability("record:read");
   const db = await getDb();
   const suppressions = await db.select({ email: emailSuppressions.email }).from(emailSuppressions);
   const suppressedEmails = new Set(suppressions.map((s) => s.email.toLowerCase()));

@@ -25,6 +25,7 @@ import { convertToEur, getExchangeRates } from "@/lib/exchange-rates";
 import { getDb } from "@/lib/tenant-context";
 
 export async function getPipelineData() {
+  await requireCapability("record:read");
   const db = await getDb();
   let stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
 
@@ -305,6 +306,7 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
 // ─── Deal Detail ─────────────────────────────────────────────────────────────
 
 export async function getDealById(dealId: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   const [row] = await db
     .select({
@@ -328,6 +330,7 @@ export async function getDealById(dealId: string) {
 
 // ─── Pipeline Report ──────────────────────────────────────────────────────────
 export async function getPipelineReport() {
+  await requireCapability("report:read");
   const db = await getDb();
   const stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
   const allDeals = await db.select().from(deals);
@@ -381,6 +384,7 @@ export async function getPipelineReport() {
 // ── Pipeline Stage Management ────────────────────────────────────────────────
 
 export async function getPipelineStages() {
+  await requireCapability("record:read");
   const db = await getDb();
   return db.select().from(pipelineStages).orderBy(pipelineStages.order);
 }
@@ -431,6 +435,7 @@ export async function deletePipelineStage(id: string) {
 }
 
 export async function getDealsForSelect() {
+  await requireCapability("record:read");
   const db = await getDb();
   return db.select({ id: deals.id, name: deals.name }).from(deals).orderBy(deals.name);
 }
@@ -495,6 +500,7 @@ async function refreshDealHealthScore(dealId: string) {
 // ── Forecast ──────────────────────────────────────────────────────────────────
 
 export async function getForecastData() {
+  await requireCapability("report:read");
   const db = await getDb();
   const openDeals = await db
     .select({

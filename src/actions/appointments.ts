@@ -7,7 +7,7 @@ import { and, eq, gte, inArray, isNotNull, lte, ne, or } from "drizzle-orm";
 import { auth } from "@/auth";
 import { appointmentAttendees, appointments, companies, contacts, deals, leads, users } from "@/db/schema";
 import { getAppUrl } from "@/lib/app-url";
-import { requireWriteAccess } from "@/lib/auth-guard";
+import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
 import { type AppointmentEmailData, sendAppointmentInviteEmail } from "@/lib/email";
 import { getEmailConfig } from "@/lib/email-provider";
 import { generateICS, type ICSAttendee } from "@/lib/ical";
@@ -438,6 +438,7 @@ export async function updateAttendeeRsvp(token: string, response: "accept" | "de
 // ─── Queries ──────────────────────────────────────────────────────────────────
 
 export async function getAppointments(filterUserIds?: string[] | null, range?: { start: Date; end: Date }) {
+  await requireCapability("record:read");
   const db = await getDb();
   let userFilter: ReturnType<typeof or> | undefined;
 
@@ -494,6 +495,7 @@ export async function getAppointments(filterUserIds?: string[] | null, range?: {
 }
 
 export async function getAppointmentById(id: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   const [appt] = await db.select().from(appointments).where(eq(appointments.id, id));
 
@@ -506,6 +508,7 @@ export async function getAppointmentById(id: string) {
 
 // Returns appointments that overlap with [start, end] for conflict detection
 export async function getOverlappingAppointments(startAt: Date, endAt: Date, excludeId?: string) {
+  await requireCapability("record:read");
   const db = await getDb();
   const rows = await db
     .select({
@@ -531,6 +534,7 @@ export async function getAppointmentCalendarEvents(
   filterUserIds?: string[] | null,
   range?: { start: Date; end: Date },
 ) {
+  await requireCapability("record:read");
   const rows = await getAppointments(filterUserIds, range);
 
   return rows
@@ -555,6 +559,7 @@ export async function getAppointmentCalendarEvents(
 
 // Lists all users for participant picker (only those with a verified email)
 export async function getInternalUsers() {
+  await requireCapability("record:read");
   const db = await getDb();
   return await db
     .select({ id: users.id, name: users.name, email: users.email })
@@ -564,6 +569,7 @@ export async function getInternalUsers() {
 
 // Lists contacts for participant picker
 export async function getContactsForPicker() {
+  await requireCapability("record:read");
   const db = await getDb();
   return await db
     .select({
@@ -582,6 +588,7 @@ export async function getContactsForPicker() {
 export type BusySlot = { startAt: Date; endAt: Date; title: string };
 
 export async function getColleagueAvailability(userIds: string[], date: Date): Promise<Record<string, BusySlot[]>> {
+  await requireCapability("record:read");
   if (userIds.length === 0) return {};
   const db = await getDb();
 

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 
 import { taskAssignees, taskDependencies, tasks, users } from "@/db/schema";
+import { requireCapability } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,6 +54,7 @@ function toDateStr(d: Date) {
 // ─── Actions ──────────────────────────────────────────────────────────────────
 
 export async function getWorkloadMatrix(startDate: Date, endDate: Date): Promise<WorkloadRow[]> {
+  await requireCapability("report:read");
   const db = await getDb();
   const taskList = await db
     .select({
@@ -168,6 +170,7 @@ export type WorkloadConflict = {
 };
 
 export async function getWorkloadConflicts(startDate: Date, endDate: Date): Promise<WorkloadConflict[]> {
+  await requireCapability("report:read");
   const matrix = await getWorkloadMatrix(startDate, endDate);
   const conflicts: WorkloadConflict[] = [];
   for (const row of matrix) {

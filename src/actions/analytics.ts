@@ -3,9 +3,11 @@
 import { and, count, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 
 import { contacts, deals, leads, quotes } from "@/db/schema";
+import { requireCapability } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 
 export async function getFunnelData(periodDays = 90) {
+  await requireCapability("report:read");
   const db = await getDb();
   const since = new Date(Date.now() - periodDays * 86_400_000);
 
