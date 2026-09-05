@@ -805,7 +805,11 @@
     "seeAllDeals": "See all deals",
     "seeAllQuotes": "See all quotes",
     "seeAllOrders": "See all orders",
-    "seeAllTickets": "See all tickets"
+    "seeAllTickets": "See all tickets",
+    "newQuote": "New quote",
+    "newOrder": "New order",
+    "newTicket": "New ticket",
+    "start": "Start something here"
   },
   "duplicates": {
     "companyTitle": "A company with this name may already be here",
@@ -1510,7 +1514,8 @@
     "sentNeverOpened": "Sent {n}d ago, never opened",
     "shouldHaveClosed": "Should have closed {n}d ago",
     "noContactFor": "No contact for {n}d",
-    "arrivedNeverContacted": "Arrived {n}d ago, never contacted"
+    "arrivedNeverContacted": "Arrived {n}d ago, never contacted",
+    "failed": "This list could not be loaded. Everything else on the page is fine."
   },
   "orders": {
     "title": "Orders",
@@ -1522,11 +1527,6 @@
     "noOrders": "No orders found.",
     "orderNumber": "Order Number",
     "orderDate": "Order Date",
-    "deliveryDate": "Delivery Date",
-    "shippingAddress": "Shipping Address",
-    "billingAddress": "Billing Address",
-    "paymentStatus": "Payment Status",
-    "fulfillmentStatus": "Fulfillment Status",
     "stats": {
       "totalOrders": "Total Orders",
       "processing": "Processing",
@@ -1548,17 +1548,10 @@
       "completed": "Completed",
       "refunded": "Refunded"
     },
-    "paymentStatuses": {
-      "unpaid": "Unpaid",
-      "paid": "Paid",
-      "partiallyPaid": "Partially Paid",
-      "refunded": "Refunded"
-    },
     "columns": {
       "number": "Order #",
       "customer": "Customer",
       "status": "Status",
-      "payment": "Payment",
       "total": "Total",
       "date": "Date"
     },

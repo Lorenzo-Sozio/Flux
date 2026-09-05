@@ -375,7 +375,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
         <div className="flex flex-col gap-6 lg:col-span-2">
           {/* Above the notes on purpose: what happened commercially outranks what
               somebody wrote down about it. */}
-          <CustomerRecordPanel record={record} />
+          <CustomerRecordPanel record={record} contactId={contactId} />
 
           {/* Timeline */}
           <Card>

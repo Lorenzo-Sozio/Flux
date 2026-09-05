@@ -805,7 +805,11 @@
     "seeAllDeals": "Vedi tutte le trattative",
     "seeAllQuotes": "Vedi tutti i preventivi",
     "seeAllOrders": "Vedi tutti gli ordini",
-    "seeAllTickets": "Vedi tutti i ticket"
+    "seeAllTickets": "Vedi tutti i ticket",
+    "newQuote": "Nuovo preventivo",
+    "newOrder": "Nuovo ordine",
+    "newTicket": "Nuovo ticket",
+    "start": "Comincia qualcosa da qui"
   },
   "duplicates": {
     "companyTitle": "Un'azienda con questo nome potrebbe già esserci",
@@ -1510,7 +1514,8 @@
     "sentNeverOpened": "Inviato {n} g fa, mai aperto",
     "shouldHaveClosed": "Doveva chiudersi {n} g fa",
     "noContactFor": "Nessun contatto da {n} g",
-    "arrivedNeverContacted": "Arrivato {n} g fa, mai contattato"
+    "arrivedNeverContacted": "Arrivato {n} g fa, mai contattato",
+    "failed": "Non è stato possibile caricare questo elenco. Il resto della pagina è a posto."
   },
   "orders": {
     "title": "Ordini",
@@ -1522,11 +1527,6 @@
     "noOrders": "Nessun ordine trovato.",
     "orderNumber": "Numero Ordine",
     "orderDate": "Data Ordine",
-    "deliveryDate": "Data Consegna",
-    "shippingAddress": "Indirizzo Spedizione",
-    "billingAddress": "Indirizzo Fatturazione",
-    "paymentStatus": "Stato Pagamento",
-    "fulfillmentStatus": "Stato Evasione",
     "stats": {
       "totalOrders": "Totale Ordini",
       "processing": "In lavorazione",
@@ -1548,17 +1548,10 @@
       "completed": "Completato",
       "refunded": "Rimborsato"
     },
-    "paymentStatuses": {
-      "unpaid": "Non pagato",
-      "paid": "Pagato",
-      "partiallyPaid": "Pagato parzialmente",
-      "refunded": "Rimborsato"
-    },
     "columns": {
       "number": "Ordine #",
       "customer": "Cliente",
       "status": "Stato",
-      "payment": "Pagamento",
       "total": "Totale",
       "date": "Data"
     },

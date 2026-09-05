@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { ChevronLeft, Loader2, Package, Plus, ShoppingCart, StickyNote, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -90,6 +90,10 @@ const emptyLine = (): LineValues => ({
  */
 export default function NewOrderPage() {
   const router = useRouter();
+  // Opened from a customer's own page, the customer is already known. Retyping it
+  // is the kind of second answer to a question already asked that sends people
+  // back to a list to look up what they had on screen a moment ago.
+  const params = useSearchParams();
   const t = useTranslations("orders.form");
   // The status names are the list's, not this page's: one order is "processing"
   // in both places or the two screens disagree about the same row.
@@ -105,10 +109,10 @@ export default function NewOrderPage() {
 
   const form = useForm<OrderFormValues>({
     defaultValues: {
-      companyId: "",
-      contactId: "",
-      dealId: "",
-      quoteId: "",
+      companyId: params.get("companyId") ?? "",
+      contactId: params.get("contactId") ?? "",
+      dealId: params.get("dealId") ?? "",
+      quoteId: params.get("quoteId") ?? "",
       status: "draft",
       orderDate: new Date().toISOString().slice(0, 10),
       discountPercent: 0,

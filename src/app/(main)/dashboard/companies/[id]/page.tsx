@@ -349,7 +349,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
         <div className="flex flex-col gap-6 lg:col-span-2">
           {/* Above the notes on purpose: what happened commercially outranks what
               somebody wrote down about it. */}
-          <CustomerRecordPanel record={record} />
+          <CustomerRecordPanel record={record} companyId={companyId} />
 
           {/* Timeline */}
           <Card>

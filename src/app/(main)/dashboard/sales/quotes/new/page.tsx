@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ChevronLeft, FileText, Loader2, Package, Plus, Trash2 } from "lucide-react";
@@ -72,6 +72,8 @@ const emptyLine = () => ({
  */
 export default function NewQuotePage() {
   const router = useRouter();
+  // Opened from a customer or a deal, both are already known.
+  const params = useSearchParams();
   const t = useTranslations("quotes.form");
   const tc = useTranslations("common");
   const { formatAmount } = useCurrency();
@@ -83,9 +85,9 @@ export default function NewQuotePage() {
   const form = useForm<FormValues>({
     resolver: zodResolver(CreateQuoteSchema),
     defaultValues: {
-      dealId: "",
-      companyId: "",
-      contactId: "",
+      dealId: params.get("dealId") ?? "",
+      companyId: params.get("companyId") ?? "",
+      contactId: params.get("contactId") ?? "",
       expiresAt: "",
       items: [emptyLine()],
       notes: "",

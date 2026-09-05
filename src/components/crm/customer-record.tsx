@@ -7,6 +7,7 @@ import { useTranslations } from "next-intl";
 
 import type { CustomerRecord, CustomerRecordRow } from "@/actions/customer-record";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCurrency } from "@/hooks/use-currency";
 import { cn } from "@/lib/utils";
@@ -93,9 +94,25 @@ function Group({
   );
 }
 
-export function CustomerRecordPanel({ record }: { record: CustomerRecord }) {
+export function CustomerRecordPanel({
+  record,
+  companyId,
+  contactId,
+}: {
+  record: CustomerRecord;
+  companyId?: string;
+  contactId?: string;
+}) {
   const t = useTranslations("customerRecord");
   const { formatAmount } = useCurrency();
+
+  // Starting a quote, an order or a ticket from here carries the customer with
+  // it. Without this the path was: read the customer, go to the module, find the
+  // customer again in a picker, and hope it is the same one.
+  const scope = new URLSearchParams();
+  if (companyId) scope.set("companyId", companyId);
+  if (contactId) scope.set("contactId", contactId);
+  const query = scope.toString() ? `?${scope}` : "";
 
   const empty =
     record.deals.length === 0 &&
@@ -105,9 +122,21 @@ export function CustomerRecordPanel({ record }: { record: CustomerRecord }) {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>{t("title")}</CardTitle>
-        <CardDescription>{t("subtitle")}</CardDescription>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
+        <div>
+          <CardTitle>{t("title")}</CardTitle>
+          <CardDescription>{t("subtitle")}</CardDescription>
+        </div>
+        {record.modules.sales && (
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/dashboard/sales/quotes/new${query}`}>{t("newQuote")}</Link>
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href={`/dashboard/sales/orders/new${query}`}>{t("newOrder")}</Link>
+            </Button>
+          </div>
+        )}
       </CardHeader>
       <CardContent className="space-y-5">
         {empty ? (
