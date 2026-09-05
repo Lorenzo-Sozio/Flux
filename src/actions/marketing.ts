@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { campaignLogs, contacts, emailSuppressions, emailTemplates, leads, marketingCampaigns } from "@/db/schema";
 import { requireCapability, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
-import { listSegments, resolveSegmentIds } from "@/lib/campaign-segment";
+import { canUseSegment, listSegments, resolveSegmentIds } from "@/lib/campaign-segment";
 import { executeCampaignSend } from "@/lib/campaign-send";
 import { getDb } from "@/lib/tenant-context";
 
@@ -141,10 +141,15 @@ export async function sendCampaignAction(data: {
   /** A saved filter to aim at, instead of everybody eligible. */
   filterId?: string | null;
 }) {
-  await requireWriteAccess();
+  const session = await requireWriteAccess();
   await requirePlanModule("marketing");
   // The database handle opened here was never used: the send resolves its own.
-  return executeCampaignSend(data);
+  // The actor travels with the request so the segment is resolved under the
+  // authority of whoever asked. ⚠️ Not `?? null`: null is the scheduler's
+  // trusted path, and a missing id must not quietly become it.
+  const actorId = session.user?.id;
+  if (!actorId) throw new Error("No signed-in user.");
+  return executeCampaignSend({ ...data, actorId });
 }
 
 /**
@@ -157,7 +162,8 @@ export async function sendCampaignAction(data: {
 export async function getSegments() {
   await requireCapability("record:read");
   await requirePlanModule("marketing");
-  const segments = await listSegments();
+  const actor = await requireCapability("record:read");
+  const segments = await listSegments(actor.userId);
   return segments.map((s) => ({
     id: s.id,
     name: s.name,
@@ -173,7 +179,8 @@ export async function getSegmentCount(recipientType: "contacts" | "leads", filte
     const counts = await getEligibleRecipientCounts();
     return counts[recipientType];
   }
-  const ids = await resolveSegmentIds(recipientType, filterId);
+  const counter = await requireCapability("record:read");
+  const ids = await resolveSegmentIds(recipientType, filterId, counter.userId);
   return ids?.length ?? 0;
 }
 
@@ -316,11 +323,19 @@ export async function scheduleCampaignAction(data: {
   /** Kept on the campaign: the send happens later, when this dialog is gone. */
   filterId?: string | null;
 }) {
-  await requireWriteAccess();
+  const session = await requireWriteAccess();
   await requirePlanModule("marketing");
   const db = await getDb();
   const { campaignId, recipientType, scheduledAt } = data;
   if (scheduledAt <= new Date()) throw new Error("Scheduled time must be in the future");
+
+  // ⚠️ Checked here because from now on nobody checks it again: the scheduler
+  // resolves whatever is on the row with no session behind it.
+  const schedulerId = session.user?.id;
+  if (!schedulerId) throw new Error("No signed-in user.");
+  if (data.filterId && !(await canUseSegment(recipientType, data.filterId, schedulerId))) {
+    throw new Error("That segment is not available.");
+  }
   await db
     .update(marketingCampaigns)
     .set({

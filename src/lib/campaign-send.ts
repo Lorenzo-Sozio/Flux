@@ -49,6 +49,12 @@ export async function executeCampaignSend(data: {
   recipientIds?: string[];
   /** A saved filter to send to, instead of everyone eligible. */
   filterId?: string | null;
+  /**
+   * Whose authority the segment is resolved under: a user id when a person asked
+   * for this, null when the scheduler is sending a filter that was already
+   * checked and stored on the campaign.
+   */
+  actorId: string | null;
 }): Promise<{ success: true; queued: number; skipped: number; total: number } | { error: string }> {
   const db = await getDb();
   const { campaignId, recipientType } = data;
@@ -56,11 +62,13 @@ export async function executeCampaignSend(data: {
   // A segment resolves to a list of ids. Null means none was chosen and everybody
   // eligible is the audience; an empty list means one was chosen and it matches
   // nobody, which must not quietly become everybody.
-  const segmentIds = await resolveSegmentIds(recipientType, data.filterId);
+  const segmentIds = await resolveSegmentIds(recipientType, data.filterId, data.actorId);
   const recipientIds = segmentIds ?? data.recipientIds;
-  if (segmentIds !== null && segmentIds.length === 0) {
-    return { success: true, queued: 0, skipped: 0, total: 0 };
-  }
+  // ⚠️ Returning here would skip the status write at the end and leave a
+  // scheduled campaign saying "sending" for ever, which the scheduler never picks
+  // up again. The empty segment travels as an empty audience instead, through the
+  // same path, so the campaign finishes the way every other one does.
+  const segmentIsEmpty = segmentIds !== null && segmentIds.length === 0;
 
   const [campaign] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, campaignId));
 
@@ -75,7 +83,11 @@ export async function executeCampaignSend(data: {
 
   let recipients: Recipient[] = [];
 
-  if (recipientType === "contacts") {
+  if (segmentIsEmpty) {
+    // Chosen and matching nobody. Not the same as choosing nothing, and the
+    // difference has to survive all the way to the query.
+    recipients = [];
+  } else if (recipientType === "contacts") {
     const filter = recipientIds?.length
       ? and(eq(contacts.marketingConsent, true), inArray(contacts.id, recipientIds))
       : eq(contacts.marketingConsent, true);
@@ -183,6 +195,9 @@ export async function dispatchDueCampaigns(): Promise<Array<{ id: string; name: 
       recipientType,
       // The segment chosen when it was scheduled, not everybody eligible now.
       filterId: campaign.recipientFilterId,
+      // No session here, and none needed: this id was checked against its owner
+      // when the campaign was scheduled and has been on the row ever since.
+      actorId: null,
     });
     results.push({ id: campaign.id, name: campaign.name, result });
   }

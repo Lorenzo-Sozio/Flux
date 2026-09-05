@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 
 import { contacts, customFieldDefinitions, customFilters, leads } from "@/db/schema";
 import { buildWhereClause, CONTACT_FIELDS, customFieldsToRegistry, LEAD_FIELDS } from "@/lib/filter-engine";
@@ -33,15 +33,36 @@ export type RecipientType = "contacts" | "leads";
 export async function resolveSegmentIds(
   recipientType: RecipientType,
   filterId: string | null | undefined,
+  /**
+   * ⚠️ Who is asking, and it is not optional to decide.
+   *
+   * A user id scopes the filter to one they may use — their own, or one shared
+   * with the workspace — because the id arrives from a browser and passing a
+   * colleague's aims a campaign at a segment they defined and never shared, with
+   * the recipient count handing back its size.
+   *
+   * `null` is the scheduler, which has no session and is resolving a filter id
+   * that was checked when the campaign was scheduled and stored on the row.
+   * Required rather than defaulted, so every call site has to say which it is.
+   */
+  actorId: string | null,
 ): Promise<string[] | null> {
   if (!filterId) return null;
 
   const db = await getDb();
   const entityType = recipientType === "contacts" ? "contact" : "lead";
 
-  const [saved] = await db.select().from(customFilters).where(eq(customFilters.id, filterId)).limit(1);
-  // A filter that has been deleted, or that belongs to the other entity, is not
-  // an instruction to send to everyone.
+  const [saved] = await db
+    .select()
+    .from(customFilters)
+    .where(
+      actorId
+        ? and(eq(customFilters.id, filterId), or(eq(customFilters.ownerId, actorId), eq(customFilters.isPublic, true)))
+        : eq(customFilters.id, filterId),
+    )
+    .limit(1);
+  // A filter that has been deleted, that belongs to somebody else, or that
+  // belongs to the other entity, is not an instruction to send to everyone.
   if (!saved || saved.entityType !== `${entityType}s`) return [];
 
   let tree: FilterTree;
@@ -77,13 +98,50 @@ export async function resolveSegmentIds(
   return rows.map((r) => r.id);
 }
 
-/** The saved filters that can be used as a segment, per entity. */
-export async function listSegments(): Promise<{ id: string; name: string; entityType: string }[]> {
+/**
+ * Whether this person may aim a campaign at this filter.
+ *
+ * Asked before a segment is written onto a campaign, because from then on the
+ * scheduler resolves it with nobody's authority: what is stored has to have been
+ * checked when it was stored. Distinguishing "not yours" from "matches nobody"
+ * is the whole point — the second is a legitimate segment, the first is not.
+ */
+export async function canUseSegment(recipientType: RecipientType, filterId: string, actorId: string): Promise<boolean> {
   const db = await getDb();
-  const rows = await db
+  const entityType = recipientType === "contacts" ? "contacts" : "leads";
+  const [saved] = await db
+    .select({ id: customFilters.id })
+    .from(customFilters)
+    .where(
+      and(
+        eq(customFilters.id, filterId),
+        eq(customFilters.entityType, entityType),
+        or(eq(customFilters.ownerId, actorId), eq(customFilters.isPublic, true)),
+      ),
+    )
+    .limit(1);
+  return Boolean(saved);
+}
+
+/**
+ * The saved filters this person may aim a campaign at.
+ *
+ * Their own and the ones shared with the workspace. A saved view is private
+ * unless its owner said otherwise, and its **name** is already a statement about
+ * the customers in it — "churn risk", "unpaid over 90 days" — so listing
+ * everybody's would leak the shape of somebody else's thinking before a single
+ * email is sent.
+ */
+export async function listSegments(actorId: string): Promise<{ id: string; name: string; entityType: string }[]> {
+  const db = await getDb();
+  return db
     .select({ id: customFilters.id, name: customFilters.name, entityType: customFilters.entityType })
     .from(customFilters)
-    .where(inArray(customFilters.entityType, ["contacts", "leads"]))
+    .where(
+      and(
+        inArray(customFilters.entityType, ["contacts", "leads"]),
+        or(eq(customFilters.ownerId, actorId), eq(customFilters.isPublic, true)),
+      ),
+    )
     .orderBy(customFilters.name);
-  return rows;
 }
