@@ -110,36 +110,32 @@ const CHANNEL_ICONS: Record<string, React.ReactNode> = {
 };
 
 const STATUS_OPTIONS = [
-  { value: "new", label: "Nuovo", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
-  { value: "open", label: "Aperto", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
+  { value: "new", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300" },
+  { value: "open", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300" },
   {
     value: "in_progress",
-    label: "In corso",
     color: "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
   },
   {
     value: "waiting",
-    label: "In attesa",
     color: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
   },
   {
     value: "on_hold",
-    label: "Sospeso",
     color: "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
   },
   {
     value: "resolved",
-    label: "Risolto",
     color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
   },
-  { value: "closed", label: "Chiuso", color: "bg-muted text-muted-foreground" },
+  { value: "closed", color: "bg-muted text-muted-foreground" },
 ];
 
 const PRIORITY_OPTIONS = [
-  { value: "urgent", label: "Urgente", color: "text-red-600 dark:text-red-400" },
-  { value: "high", label: "Alta", color: "text-orange-600 dark:text-orange-400" },
-  { value: "normal", label: "Normale", color: "text-blue-600 dark:text-blue-400" },
-  { value: "low", label: "Bassa", color: "text-slate-500" },
+  { value: "urgent", color: "text-red-600 dark:text-red-400" },
+  { value: "high", color: "text-orange-600 dark:text-orange-400" },
+  { value: "normal", color: "text-blue-600 dark:text-blue-400" },
+  { value: "low", color: "text-slate-500" },
 ];
 
 const PRIORITY_DOT: Record<string, string> = {
@@ -150,13 +146,8 @@ const PRIORITY_DOT: Record<string, string> = {
   low: "bg-slate-400",
 };
 
-const TASK_PRIORITY_OPTIONS = [
-  { value: "normal", label: "Normale" },
-  { value: "high", label: "Alta" },
-  { value: "critical", label: "Critica" },
-  { value: "blocker", label: "Bloccante" },
-  { value: "low", label: "Bassa" },
-];
+// Values only: the words come from the message files, like every other list here.
+const TASK_PRIORITY_OPTIONS = ["normal", "high", "critical", "blocker", "low"] as const;
 
 const AUDIT_LABELS: Record<string, string> = {
   created: "Ticket creato",
@@ -218,6 +209,7 @@ function formatStamp(date: Date) {
 // ─── LinkedTasksCard ──────────────────────────────────────────────────────────
 
 function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; currentUserId?: string }) {
+  const t = useTranslations("support.tickets");
   const [tasks, setTasks] = useState<LinkedTask[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string | null }[]>([]);
   const [adding, setAdding] = useState(false);
@@ -247,7 +239,7 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
       setAdding(false);
       load();
     } catch {
-      toast.error("Errore nella creazione dell'attività");
+      toast.error(t("taskCreateFailed"));
     } finally {
       setSaving(false);
     }
@@ -271,7 +263,7 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
             onClick={() => setAdding((v) => !v)}
             className="flex items-center gap-0.5 font-medium text-xs normal-case tracking-normal transition-colors hover:text-foreground"
           >
-            <Plus className="h-3.5 w-3.5" /> Nuova
+            <Plus className="h-3.5 w-3.5" /> {t("newLabel")}
           </button>
         </CardTitle>
       </CardHeader>
@@ -285,8 +277,8 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
                 className="h-8 flex-1 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 {TASK_PRIORITY_OPTIONS.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
+                  <option key={o} value={o}>
+                    {t(`taskPriority.${o}`)}
                   </option>
                 ))}
               </select>
@@ -305,7 +297,7 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
                 }}
                 className="rounded px-2 py-1 text-muted-foreground text-xs hover:text-foreground"
               >
-                Annulla
+                {t("cancel")}
               </button>
               <button
                 type="submit"
@@ -317,7 +309,7 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
             </div>
           </form>
         )}
-        {tasks.length === 0 && !adding && <p className="py-1 text-muted-foreground text-sm italic">Nessuna attività</p>}
+        {tasks.length === 0 && !adding && <p className="py-1 text-muted-foreground text-sm italic">{t("noTasks")}</p>}
         {tasks.map((task) => {
           const done = task.status === "done";
           return (
@@ -456,6 +448,7 @@ function AttachmentChips({ docs }: { docs: TicketDocument[] }) {
 }
 
 function MessageBubble({ msg, docs, isAgent }: { msg: TicketMessage; docs?: TicketDocument[]; isAgent: boolean }) {
+  const t = useTranslations("support.tickets");
   const senderName = msg.sender?.name ?? msg.senderName ?? msg.senderEmail?.split("@")[0] ?? "Sconosciuto";
   const isInternal = !msg.isPublic;
   const stamp = formatStamp(new Date(msg.createdAt));
@@ -474,7 +467,7 @@ function MessageBubble({ msg, docs, isAgent }: { msg: TicketMessage; docs?: Tick
             variant="secondary"
             className="h-4 gap-0.5 bg-amber-100 px-1.5 text-[10px] text-amber-700 dark:bg-amber-900/40 dark:text-amber-300"
           >
-            <Lock className="h-2.5 w-2.5" /> Nota interna
+            <Lock className="h-2.5 w-2.5" /> {t("internalNote")}
           </Badge>
           <span className="ml-auto text-amber-600/70 text-xs dark:text-amber-500/60">{stamp}</span>
         </div>
@@ -720,12 +713,13 @@ function OrderCard({ ticket, onLinked }: { ticket: TicketRow; onLinked: () => vo
 }
 
 function ContactCard({ ticket }: { ticket: TicketRow }) {
+  const t = useTranslations("support.tickets");
   const contact = ticket.contact;
   if (!contact) {
     return (
       <Card>
         <CardContent className="px-3 py-3">
-          <p className="text-muted-foreground text-xs italic">Nessun contatto collegato</p>
+          <p className="text-muted-foreground text-xs italic">{t("noContactLinked")}</p>
         </CardContent>
       </Card>
     );
@@ -735,7 +729,7 @@ function ContactCard({ ticket }: { ticket: TicketRow }) {
     <Card>
       <CardHeader className="px-3 pt-3 pb-2">
         <CardTitle className="flex items-center gap-1.5 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
-          <User className="h-3.5 w-3.5" /> Cliente
+          <User className="h-3.5 w-3.5" /> {t("customer")}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2.5 px-3 pb-3">
@@ -778,15 +772,18 @@ function PropertiesCard({
   onPriorityChange: (p: TicketPriority) => void;
   onReassign: () => void;
 }) {
+  const t = useTranslations("support.tickets");
   return (
     <Card>
       <CardHeader className="px-3 pt-3 pb-2">
-        <CardTitle className="font-semibold text-muted-foreground text-xs uppercase tracking-wide">Proprietà</CardTitle>
+        <CardTitle className="font-semibold text-muted-foreground text-xs uppercase tracking-wide">
+          {t("properties")}
+        </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 px-3 pb-3">
         {/* Status pills */}
         <div>
-          <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">Stato</p>
+          <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("statusLabel")}</p>
           <div className="flex flex-wrap gap-1">
             {STATUS_OPTIONS.map((opt) => (
               <button
@@ -799,7 +796,9 @@ function PropertiesCard({
                     : "bg-muted/50 text-muted-foreground hover:bg-muted"
                 }`}
               >
-                {opt.label}
+                {t(
+                  `statuses.${opt.value as "new" | "open" | "in_progress" | "waiting" | "on_hold" | "resolved" | "closed"}`,
+                )}
               </button>
             ))}
           </div>
@@ -807,7 +806,9 @@ function PropertiesCard({
 
         {/* Priority */}
         <div>
-          <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">Priorità</p>
+          <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+            {t("priorityLabel")}
+          </p>
           <div className="flex gap-1">
             {PRIORITY_OPTIONS.map((opt) => (
               <button
@@ -820,7 +821,7 @@ function PropertiesCard({
                     : "bg-muted/50 text-muted-foreground hover:bg-muted"
                 }`}
               >
-                {opt.label}
+                {t(`priorities.${opt.value as "low" | "normal" | "high" | "urgent"}`)}
               </button>
             ))}
           </div>
@@ -828,7 +829,7 @@ function PropertiesCard({
 
         {/* Assignee */}
         <div>
-          <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">Assegnato a</p>
+          <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("assignedTo")}</p>
           <button
             type="button"
             onClick={onReassign}
@@ -871,6 +872,7 @@ function SLACard({
   slaFirstTarget: Date | null;
   slaResTarget: Date | null;
 }) {
+  const t = useTranslations("support.tickets");
   if (!ticket.sla && !ticket.firstResponseAt && !ticket.resolvedAt) return null;
   return (
     <Card>
@@ -881,7 +883,7 @@ function SLACard({
       </CardHeader>
       <CardContent className="space-y-2 px-3 pb-3">
         <div className="flex items-center justify-between">
-          <span className="text-muted-foreground text-sm">Prima risposta</span>
+          <span className="text-muted-foreground text-sm">{t("firstResponse")}</span>
           {ticket.firstResponseAt ? (
             <span className="font-semibold text-emerald-600 text-sm dark:text-emerald-400">
               ✓ {new Date(ticket.firstResponseAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
@@ -891,7 +893,7 @@ function SLACard({
           )}
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-muted-foreground text-sm">Risoluzione</span>
+          <span className="text-muted-foreground text-sm">{t("resolution")}</span>
           {ticket.resolvedAt ? (
             <span className="font-semibold text-emerald-600 text-sm dark:text-emerald-400">
               ✓ {new Date(ticket.resolvedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
@@ -902,7 +904,7 @@ function SLACard({
         </div>
         {ticket.closedAt && (
           <div className="flex items-center justify-between border-t pt-2">
-            <span className="text-muted-foreground text-sm">Chiuso</span>
+            <span className="text-muted-foreground text-sm">{t("closedLabel")}</span>
             <span className="font-mono text-sm">
               {new Date(ticket.closedAt).toLocaleDateString(undefined, {
                 day: "numeric",
@@ -919,6 +921,7 @@ function SLACard({
 }
 
 function AttachmentsCard({ docs }: { docs: TicketDocument[] }) {
+  const t = useTranslations("support.tickets");
   return (
     <Card>
       <CardHeader className="px-3 pt-3 pb-2">
@@ -934,7 +937,7 @@ function AttachmentsCard({ docs }: { docs: TicketDocument[] }) {
       </CardHeader>
       <CardContent className="space-y-1 px-3 pb-3">
         {docs.length === 0 ? (
-          <p className="py-0.5 text-muted-foreground text-sm italic">Nessun allegato</p>
+          <p className="py-0.5 text-muted-foreground text-sm italic">{t("noAttachments")}</p>
         ) : (
           docs.map((doc) => {
             const isPdf = doc.mimeType === "application/pdf";
@@ -965,6 +968,7 @@ function AttachmentsCard({ docs }: { docs: TicketDocument[] }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const t = useTranslations("support.tickets");
   const { id } = React.use(params);
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1080,12 +1084,12 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       try {
         await updateTicketAction(id, { status });
         setTicket((p) => (p ? { ...p, status } : p));
-        toast.success("Stato aggiornato");
+        toast.success(t("statusUpdated"));
       } catch (err) {
         toast.error(messageOf(err));
       }
     },
-    [id],
+    [id, t],
   );
 
   const handlePriorityChange = useCallback(
@@ -1093,19 +1097,19 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       try {
         await updateTicketAction(id, { priority });
         setTicket((p) => (p ? { ...p, priority } : p));
-        toast.success("Priorità aggiornata");
+        toast.success(t("priorityUpdated"));
       } catch (err) {
         toast.error(messageOf(err));
       }
     },
-    [id],
+    [id, t],
   );
 
   const handleEscalate = useCallback(async () => {
     try {
       const result = await escalateTicketAction(id);
       if (result.alreadyMaxPriority) {
-        toast.info("Priorità già al massimo (Urgente)");
+        toast.info(t("priorityAlreadyMax"));
         return;
       }
       setTicket((p) => (p && result.newPriority ? { ...p, priority: result.newPriority } : p));
@@ -1113,7 +1117,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     } catch (err) {
       toast.error(messageOf(err));
     }
-  }, [id]);
+  }, [id, t]);
 
   const handleReassign = useCallback(async () => {
     setReassigning(true);
@@ -1134,14 +1138,14 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     setDeleting(true);
     try {
       await deleteTicketAction(id);
-      toast.success("Ticket eliminato");
+      toast.success(t("deleted"));
       router.push("/dashboard/support/tickets");
     } catch (err) {
       toast.error(messageOf(err));
       setDeleting(false);
       setDeleteOpen(false);
     }
-  }, [id, router]);
+  }, [id, router, t]);
 
   const slaFirstTarget =
     ticket?.sla && !ticket.firstResponseAt
@@ -1184,7 +1188,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     return (
       <div className="py-24 text-center">
         <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
-        <p className="mb-4 text-muted-foreground">Ticket non trovato</p>
+        <p className="mb-4 text-muted-foreground">{t("notFound")}</p>
         <Button asChild variant="outline">
           <Link href="/dashboard/support/tickets">← Torna ai ticket</Link>
         </Button>
@@ -1206,29 +1210,29 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               href="/dashboard/support/tickets"
               className="inline-flex items-center gap-1.5 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground"
             >
-              <ArrowLeft className="h-3.5 w-3.5" /> Tutti i ticket
+              <ArrowLeft className="h-3.5 w-3.5" /> {t("allTickets")}
             </Link>
             <div className="flex items-center gap-2">
               <span className="font-mono font-semibold text-muted-foreground text-xs">{ticket.ticketNumber}</span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="sm" className="h-8 gap-1">
-                    Azioni <ChevronDown className="h-3.5 w-3.5" />
+                    {t("actions")} <ChevronDown className="h-3.5 w-3.5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
                   <DropdownMenuItem onClick={handleEscalate} className="gap-2">
-                    <TrendingUp className="h-4 w-4 text-orange-500" /> Escala priorità
+                    <TrendingUp className="h-4 w-4 text-orange-500" /> {t("escalatePriority")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setReassignOpen(true)} className="gap-2">
-                    <UserCheck className="h-4 w-4 text-blue-500" /> Riassegna
+                    <UserCheck className="h-4 w-4 text-blue-500" /> {t("reassign")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={() => setDeleteOpen(true)}
                     className="gap-2 text-destructive focus:text-destructive"
                   >
-                    <Trash2 className="h-4 w-4" /> Elimina ticket
+                    <Trash2 className="h-4 w-4" /> {t("deleteTicket")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -1294,8 +1298,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               {timeline.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <MessageSquare className="mb-3 h-10 w-10 text-muted-foreground/20" />
-                  <p className="text-muted-foreground text-sm">Nessun messaggio ancora.</p>
-                  <p className="mt-1 text-muted-foreground/60 text-xs">Invia la prima risposta qui sotto.</p>
+                  <p className="text-muted-foreground text-sm">{t("noMessages")}</p>
+                  <p className="mt-1 text-muted-foreground/60 text-xs">{t("sendFirstReply")}</p>
                 </div>
               ) : (
                 timeline.map((item, i) => {
@@ -1318,7 +1322,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               <div className="flex w-fit items-center gap-1 rounded-lg border bg-muted/40 p-0.5">
                 {[
                   { val: false, icon: Send, label: "Risposta pubblica" },
-                  { val: true, icon: Lock, label: "Nota interna" },
+                  { val: true, icon: Lock, label: t("internalNote") },
                 ].map(({ val, icon: Icon, label }) => (
                   <button
                     key={String(val)}
@@ -1376,7 +1380,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                 <p className="flex items-center gap-1 text-muted-foreground text-xs">
                   {isInternal ? (
                     <>
-                      <Shield className="h-3 w-3" /> Visibile solo agli agenti
+                      <Shield className="h-3 w-3" /> {t("agentsOnly")}
                     </>
                   ) : (
                     <>Ctrl+Enter per inviare</>
@@ -1387,7 +1391,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="outline" size="sm" className="h-8 gap-1.5">
-                          <Zap className="h-3.5 w-3.5" /> Macro
+                          <Zap className="h-3.5 w-3.5" /> {t("macro")}
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="max-h-60 w-52 overflow-y-auto">
@@ -1421,7 +1425,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                     onClick={() => setReplyContent("<p></p>")}
                     disabled={isReplyEmpty}
                   >
-                    Pulisci
+                    {t("clear")}
                   </Button>
                   <Button
                     size="sm"
@@ -1467,17 +1471,17 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <UserCheck className="h-5 w-5 text-blue-500" /> Riassegna ticket
+              <UserCheck className="h-5 w-5 text-blue-500" /> {t("reassignTitle")}
             </DialogTitle>
-            <DialogDescription>Seleziona un agente per gestire questo ticket.</DialogDescription>
+            <DialogDescription>{t("reassignDescription")}</DialogDescription>
           </DialogHeader>
           <AssigneeSelect value={selectedAssignee} onChange={setSelectedAssignee} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setReassignOpen(false)}>
-              Annulla
+              {t("cancel")}
             </Button>
             <Button onClick={handleReassign} disabled={reassigning}>
-              {reassigning ? "Riassegno…" : "Riassegna"}
+              {reassigning ? "Riassegno…" : t("reassign")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1488,16 +1492,16 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
-              <Trash2 className="h-5 w-5" /> Elimina ticket
+              <Trash2 className="h-5 w-5" /> {t("deleteTicket")}
             </DialogTitle>
             <DialogDescription>
-              Sei sicuro di voler eliminare <span className="font-semibold text-foreground">{ticket.ticketNumber}</span>
-              ? Questa azione rimuoverà permanentemente il ticket e tutti i suoi messaggi.
+              {t("deleteConfirm")} <span className="font-semibold text-foreground">{ticket.ticketNumber}</span>? Questa
+              azione rimuoverà permanentemente il ticket e tutti i suoi messaggi.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteOpen(false)} disabled={deleting}>
-              Annulla
+              {t("cancel")}
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
               {deleting ? "Eliminazione…" : "Elimina"}
