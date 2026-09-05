@@ -719,3 +719,27 @@ export async function getOrderFormData() {
 
   return { companies: companyList, contacts: contactList, products: productList, deals: dealList, quotes: quoteList };
 }
+
+/**
+ * The orders a deal produced.
+ *
+ * The deal page listed the quotes and stopped there, so the last question anybody
+ * asks about a closed deal — did it actually turn into an order — had no answer
+ * on the page where the deal lives. The link has existed in the data since the
+ * conversion was wired up; nothing showed it.
+ */
+export async function getOrdersByDeal(dealId: string) {
+  await requireCapability("record:read");
+  const db = await getDb();
+  return db
+    .select({
+      id: orders.id,
+      orderNumber: orders.orderNumber,
+      status: orders.status,
+      totalAmount: orders.totalAmount,
+      orderDate: orders.orderDate,
+    })
+    .from(orders)
+    .where(eq(orders.dealId, dealId))
+    .orderBy(desc(orders.createdAt));
+}

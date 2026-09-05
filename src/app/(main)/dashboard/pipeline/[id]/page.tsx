@@ -20,7 +20,8 @@ import { createActivity, getActivitiesByDeal } from "@/actions/activities";
 import { getCompanies, getContacts } from "@/actions/crm";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { getDealComments } from "@/actions/deal-comments";
-import { getDealById, getPipelineData, updateDeal } from "@/actions/pipeline";
+import { getOrdersByDeal } from "@/actions/orders";
+import { getDealById, getPipelineData } from "@/actions/pipeline";
 import { getQuotesByDeal } from "@/actions/quotes";
 import { createTask, deleteTask, getAllUsers, getTasksByDeal, updateTaskStatus } from "@/actions/tasks";
 import { auth } from "@/auth";
@@ -37,7 +38,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { products } from "@/db/schema";
 import { getDb } from "@/lib/tenant-context";
 
 import { CommentsThread } from "./_components/comments-thread";
@@ -57,6 +57,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     tasksList,
     allUsers,
     quotesList,
+    ordersList,
     productsList,
     companiesList,
     contactsList,
@@ -72,6 +73,9 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     getTasksByDeal(dealId),
     getAllUsers(),
     getQuotesByDeal(dealId),
+    // Did this deal actually become an order. The link has been in the data since
+    // the conversion was wired up and nothing on the page showed it.
+    getOrdersByDeal(dealId),
     db.query.products.findMany(),
     getCompanies(),
     getContacts(),
@@ -139,16 +143,16 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 p-6">
+    <div className="flex flex-col gap-6 p-6 md:flex-row">
       <RecordVisit type="deal" name={deal.name} href={`/dashboard/pipeline/${dealId}`} />
 
       {/* ── Left sidebar ──────────────────────────────────────────────────── */}
-      <div className="w-full md:w-1/3 flex flex-col gap-5">
+      <div className="flex w-full flex-col gap-5 md:w-1/3">
         {/* Back + title */}
         <div>
           <Link
             href="/dashboard/pipeline"
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-3"
+            className="mb-3 flex items-center gap-1 text-muted-foreground text-sm hover:text-foreground"
           >
             <ChevronLeftIcon className="h-4 w-4" />
             {t("backToPipeline")}
@@ -157,7 +161,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between gap-2">
                 <CardTitle className="text-xl leading-snug">{deal.name}</CardTitle>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex shrink-0 items-center gap-2">
                   <Badge className={statusColors[deal.status] ?? ""} variant="outline">
                     {deal.status}
                   </Badge>
@@ -168,17 +172,17 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             <CardContent className="space-y-3 text-sm">
               {/* Stage */}
               <div className="flex items-center gap-2">
-                <KanbanIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                <KanbanIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="text-muted-foreground">{t("fieldStage")}</span>
                 <span className="flex items-center gap-1.5 font-medium">
-                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: stageColor ?? "#94a3b8" }} />
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: stageColor ?? "#94a3b8" }} />
                   {stageName ?? "—"}
                 </span>
               </div>
 
               {/* Amount */}
               <div className="flex items-center gap-2">
-                <TrendingUpIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                <TrendingUpIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="text-muted-foreground">{t("fieldValue")}</span>
                 <span className="font-semibold text-base">
                   <DealAmount amount={deal.amount} probability={deal.probability} />
@@ -188,7 +192,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               {/* Company */}
               {companyName && (
                 <div className="flex items-center gap-2">
-                  <BuildingIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <BuildingIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="text-muted-foreground">{t("fieldCompany")}</span>
                   {deal.companyId ? (
                     <Link href={`/dashboard/companies/${deal.companyId}`} className="font-medium hover:underline">
@@ -203,7 +207,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               {/* Contact */}
               {(contactFirstName || contactLastName) && (
                 <div className="flex items-center gap-2">
-                  <UserIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <UserIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="text-muted-foreground">{t("fieldContact")}</span>
                   {deal.contactId ? (
                     <Link href={`/dashboard/contacts/${deal.contactId}`} className="font-medium hover:underline">
@@ -219,7 +223,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
 
               {/* Close date */}
               <div className="flex items-center gap-2">
-                <CalendarIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                <CalendarIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="text-muted-foreground">{t("fieldExpectedClose")}</span>
                 <span className="font-medium">
                   {deal.expectedCloseDate
@@ -235,7 +239,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               {/* Owner */}
               {ownerName && (
                 <div className="flex items-center gap-2">
-                  <UserIcon className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <UserIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   <span className="text-muted-foreground">{t("fieldOwner")}</span>
                   <span className="font-medium">{ownerName}</span>
                 </div>
@@ -243,13 +247,13 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
 
               {/* Notes */}
               {deal.notes && (
-                <div className="pt-2 border-t">
-                  <p className="text-xs text-muted-foreground mb-1">{t("fieldNotes")}</p>
-                  <p className="text-sm whitespace-pre-wrap">{deal.notes}</p>
+                <div className="border-t pt-2">
+                  <p className="mb-1 text-muted-foreground text-xs">{t("fieldNotes")}</p>
+                  <p className="whitespace-pre-wrap text-sm">{deal.notes}</p>
                 </div>
               )}
 
-              <div className="pt-2 border-t text-xs text-muted-foreground">
+              <div className="border-t pt-2 text-muted-foreground text-xs">
                 {t("createdOn")} <FormattedDate date={deal.createdAt} />
               </div>
             </CardContent>
@@ -274,15 +278,15 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           </CardHeader>
           <CardContent>
             {quotesList.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">{t("noQuotesYet")}</p>
+              <p className="py-4 text-center text-muted-foreground text-sm">{t("noQuotesYet")}</p>
             ) : (
               <div className="space-y-2">
                 {quotesList.map((quote) => (
                   <Link key={quote.id} href={`/dashboard/sales/quotes/${quote.id}`}>
-                    <div className="flex items-center justify-between p-3 rounded-md border hover:bg-accent cursor-pointer transition-colors">
+                    <div className="flex cursor-pointer items-center justify-between rounded-md border p-3 transition-colors hover:bg-accent">
                       <div>
                         <p className="font-medium text-sm">{quote.quoteNumber}</p>
-                        <p className="text-xs text-muted-foreground">{new Date(quote.issuedAt).toLocaleDateString()}</p>
+                        <p className="text-muted-foreground text-xs">{new Date(quote.issuedAt).toLocaleDateString()}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <Badge variant="outline">{quote.status}</Badge>
@@ -297,10 +301,38 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             )}
           </CardContent>
         </Card>
+
+        {/* Orders */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">{t("ordersFromDeal")}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {ordersList.length === 0 ? (
+              <p className="py-4 text-center text-muted-foreground text-sm">{t("noOrdersFromDeal")}</p>
+            ) : (
+              <div className="space-y-2">
+                {ordersList.map((order) => (
+                  <Link key={order.id} href={`/dashboard/sales/orders/${order.id}`}>
+                    <div className="flex cursor-pointer items-center justify-between rounded-md border p-3 transition-colors hover:bg-accent">
+                      <div>
+                        <p className="font-medium text-sm">{order.orderNumber}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {new Date(order.orderDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{order.status}</Badge>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* ── Main content ──────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col gap-5">
+      <div className="flex flex-1 flex-col gap-5">
         {/* Activities */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -315,7 +347,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
           </CardHeader>
           <CardContent className="space-y-1">
             {/* Quick log form */}
-            <form action={handleAddActivity} className="flex gap-2 pb-4 border-b">
+            <form action={handleAddActivity} className="flex gap-2 border-b pb-4">
               <select name="type" className="h-9 rounded-md border border-input bg-background px-2 text-sm">
                 <option value="note">{tD("activityTypes.note")}</option>
                 <option value="call">{tD("activityTypes.call")}</option>
@@ -324,7 +356,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               <Textarea
                 name="content"
                 placeholder={t("logActivityPlaceholder")}
-                className="min-h-[36px] h-9 resize-none py-1.5 text-sm flex-1"
+                className="h-9 min-h-[36px] flex-1 resize-none py-1.5 text-sm"
               />
               <Button type="submit" size="sm" variant="outline">
                 {t("logBtn")}
@@ -343,17 +375,17 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-base">{tD("tasksNextStepsTitle")}</CardTitle>
-            <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground text-xs">
               {t("openTasksCount", { count: tasksList.filter((tk) => tk.status !== "done").length })}
             </span>
           </CardHeader>
           <CardContent className="space-y-1">
             {/* Quick add task */}
-            <form action={handleAddTask} className="flex gap-2 pb-4 border-b">
+            <form action={handleAddTask} className="flex gap-2 border-b pb-4">
               <input
                 name="title"
                 placeholder={t("newTaskPlaceholder")}
-                className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
+                className="h-9 flex-1 rounded-md border border-input bg-background px-3 text-sm"
               />
               <select name="priority" className="h-9 rounded-md border border-input bg-background px-2 text-sm">
                 <option value="normal">{tD("priorityNormal")}</option>
@@ -371,11 +403,11 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
             </form>
 
             {tasksList.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">{t("noTasksYet")}</p>
+              <p className="py-4 text-center text-muted-foreground text-sm">{t("noTasksYet")}</p>
             ) : (
               <div className="space-y-2 pt-1">
                 {tasksList.map((task) => (
-                  <div key={task.id} className="flex items-center gap-3 text-sm group">
+                  <div key={task.id} className="group flex items-center gap-3 text-sm">
                     <form action={handleToggleTask}>
                       <input type="hidden" name="taskId" value={task.id} />
                       <input type="hidden" name="status" value={task.status} />
@@ -387,16 +419,16 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                         )}
                       </button>
                     </form>
-                    <div className="flex-1 min-w-0">
-                      <p className={task.status === "done" ? "line-through text-muted-foreground" : ""}>{task.title}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className={task.status === "done" ? "text-muted-foreground line-through" : ""}>{task.title}</p>
                       {task.dueDate && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <p className="flex items-center gap-1 text-muted-foreground text-xs">
                           <ClockIcon className="h-3 w-3" />
                           <FormattedDate date={task.dueDate} />
                         </p>
                       )}
                     </div>
-                    <span className={`text-xs shrink-0 ${priorityColors[task.priority] ?? ""}`}>{task.priority}</span>
+                    <span className={`shrink-0 text-xs ${priorityColors[task.priority] ?? ""}`}>{task.priority}</span>
                     <TaskModal task={task} users={allUsers} revalidatePathStr={revalidatePath_} />
                     <form
                       action={async () => {
@@ -406,10 +438,10 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                     >
                       <button
                         type="submit"
-                        className="p-1 text-muted-foreground hover:text-destructive transition-colors shrink-0"
+                        className="shrink-0 p-1 text-muted-foreground transition-colors hover:text-destructive"
                         title="Delete"
                       >
-                        <Trash2Icon className="w-3.5 h-3.5" />
+                        <Trash2Icon className="h-3.5 w-3.5" />
                       </button>
                     </form>
                   </div>
