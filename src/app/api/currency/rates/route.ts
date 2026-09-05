@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
+import { auth } from "@/auth";
 import { convertFromEur, getExchangeRates } from "@/lib/exchange-rates";
 
 export const revalidate = 0;
@@ -17,6 +18,14 @@ export const revalidate = 0;
  *   { rates, baseCurrency, fetchedAt }
  */
 export async function GET(req: NextRequest) {
+  // ⚠️ La sessione serve, e non per pudore: la cache dei tassi sta nel database
+  // del workspace, quindi senza sessione non c'è nessun database da leggere.
+  // Questa rotta era esclusa dall'iniezione del tenant come se fosse un dato
+  // condiviso, e rispondeva 500 a ogni chiamata — compresa quella che il
+  // contesto valute della dashboard fa a ogni caricamento di pagina.
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const { rates, fetchedAt } = await getExchangeRates();
 
@@ -57,6 +66,14 @@ export async function GET(req: NextRequest) {
  * Returns the converted amount using current rates.
  */
 export async function POST(req: NextRequest) {
+  // ⚠️ La sessione serve, e non per pudore: la cache dei tassi sta nel database
+  // del workspace, quindi senza sessione non c'è nessun database da leggere.
+  // Questa rotta era esclusa dall'iniezione del tenant come se fosse un dato
+  // condiviso, e rispondeva 500 a ogni chiamata — compresa quella che il
+  // contesto valute della dashboard fa a ogni caricamento di pagina.
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   try {
     const body = await req.json();
     const { amount, from, to } = body as { amount: number; from: string; to: string };

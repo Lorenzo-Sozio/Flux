@@ -22,6 +22,7 @@ import {
   stripPlainTextQuotes,
 } from "@/lib/email-parser";
 import { getStorage, newStorageKey } from "@/lib/storage";
+import { runWithTenant } from "@/lib/tenant-context";
 import { resolveTenantByProbe, type TenantDb } from "@/lib/tenant-resolve";
 
 // ─── Attachment handling ──────────────────────────────────────────────────────
@@ -176,7 +177,10 @@ export interface InboundEmailResult {
  * first workspace, or the only one — files a stranger's email in somebody's CRM,
  * creates a contact record for them there, and looks like the feature working.
  */
-async function resolveInboundTenant(ticketRef: string | null, to: string): Promise<TenantDb | null> {
+async function resolveInboundTenant(
+  ticketRef: string | null,
+  to: string,
+): Promise<{ db: TenantDb; tenantId: string } | null> {
   if (ticketRef) {
     const byTicket = await resolveTenantByProbe(`ticketNumber:${ticketRef}`, async (db) => {
       const row = await db.query.tickets.findFirst({
@@ -185,7 +189,7 @@ async function resolveInboundTenant(ticketRef: string | null, to: string): Promi
       });
       return Boolean(row);
     }).catch(() => null);
-    if (byTicket) return byTicket.db;
+    if (byTicket) return { db: byTicket.db, tenantId: byTicket.tenant.id };
   }
 
   // `to` arrives as a header and may name several people: "Anna
@@ -197,7 +201,7 @@ async function resolveInboundTenant(ticketRef: string | null, to: string): Promi
       const rows = await db.select({ fromEmail: emailSettings.fromEmail }).from(emailSettings);
       return rows.some((r) => r.fromEmail?.toLowerCase() === address);
     }).catch(() => null);
-    if (byAddress) return byAddress.db;
+    if (byAddress) return { db: byAddress.db, tenantId: byAddress.tenant.id };
   }
 
   return null;
@@ -234,7 +238,7 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
     );
     return { ok: false, skipped: "unknown_workspace" };
   }
-  const db = resolved;
+  const { db, tenantId } = resolved;
 
   // Clean body: prefer HTML, fall back to plain text
   let messageContent: string;
@@ -309,17 +313,25 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
         await db.update(tickets).set({ updatedAt: new Date() }).where(eq(tickets.id, ticket.id));
       }
 
+      // ⚠️ Dentro `runWithTenant`. Le regole leggono il database con `getDb()`,
+      // che su un webhook non ha nessun workspace da cui partire: senza questo
+      // fallivano tutte, in silenzio, perché girano dopo la risposta e l'errore
+      // viene ingoiato. Un workspace con una regola «quando arriva un ticket,
+      // avvisa il gruppo assistenza» non riceveva niente per i ticket nati da
+      // email, e non c'era modo di accorgersene.
       after(() =>
-        runAutomations({
-          entityType: "ticket",
-          entityId: ticket.id,
-          event: "onUpdate",
-          oldData: ticket as Record<string, unknown>,
-          newData: {
-            ...ticket,
-            status: ticket.status === "waiting" ? "open" : ticket.status,
-          } as Record<string, unknown>,
-        }).catch(() => {
+        runWithTenant(tenantId, () =>
+          runAutomations({
+            entityType: "ticket",
+            entityId: ticket.id,
+            event: "onUpdate",
+            oldData: ticket as Record<string, unknown>,
+            newData: {
+              ...ticket,
+              status: ticket.status === "waiting" ? "open" : ticket.status,
+            } as Record<string, unknown>,
+          }),
+        ).catch(() => {
           /* best-effort */
         }),
       );
@@ -368,14 +380,17 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
     attachmentIds,
   });
 
+  // Come sopra: le regole hanno bisogno del workspace, e qui non c'è intestazione.
   after(() =>
-    runAutomations({
-      entityType: "ticket",
-      entityId: newTicket.id,
-      event: "onCreate",
-      oldData: {},
-      newData: newTicket as Record<string, unknown>,
-    }).catch(() => {
+    runWithTenant(tenantId, () =>
+      runAutomations({
+        entityType: "ticket",
+        entityId: newTicket.id,
+        event: "onCreate",
+        oldData: {},
+        newData: newTicket as Record<string, unknown>,
+      }),
+    ).catch(() => {
       /* best-effort */
     }),
   );

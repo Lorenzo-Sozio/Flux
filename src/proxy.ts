@@ -202,7 +202,7 @@ export const proxy = auth((req) => {
   // For session-authenticated requests, inject the active tenant from the JWT so
   // getDb() resolves to the correct per-tenant database instead of platformDb.
   // Routes that operate across all tenants (cron, webhooks) or are truly public
-  // (geo, currency, public quotes) are intentionally excluded.
+  // (public quotes, tracking, webhooks) are intentionally excluded.
   if (pathname.startsWith("/api/") && !isPublicApiPath(pathname)) {
     if (isLoggedIn && activeTenantId) {
       return passThrough({ "x-tenant-id": activeTenantId });
@@ -223,8 +223,14 @@ export const proxy = auth((req) => {
  * - /api/webhooks/*  Stripe / Resend webhooks identify the tenant from payload
  * - /api/track/*     Email open/click tracking — no user session
  * - /api/unsubscribe Email unsubscribe — no user session
- * - /api/geo/*       Static reference data, no tenant concept
- * - /api/currency/*  Exchange rate cache, no tenant concept
+ *
+ * ⚠️ /api/geo/* and /api/currency/* used to be on this list, described as data
+ * with no tenant concept. Both read tables that live in the *tenant* database,
+ * so the exclusion meant they never got a tenant and `getDb()` threw on every
+ * call: the geo endpoints and the exchange-rate endpoint answered 500 always.
+ * The currency one is fetched by the dashboard's own currency context on every
+ * page load, so multi-currency display silently fell back to the base currency
+ * and only a line in a console said why.
  * - /api/quotes/public  Public quote preview, no auth required
  * - /api/appointments/rsvp  External RSVP link — no session
  * - /api/calendar/*  Calendar subscription feed — fetched by Google Calendar,
@@ -239,8 +245,6 @@ function isPublicApiPath(pathname: string): boolean {
     "/api/webhooks/",
     "/api/track/",
     "/api/unsubscribe",
-    "/api/geo/",
-    "/api/currency/",
     "/api/quotes/public",
     "/api/appointments/rsvp",
     "/api/calendar/",
@@ -254,7 +258,12 @@ export const config = {
   matcher: [
     // Rate-limit the credentials login endpoint
     "/api/auth/callback/credentials",
-    // Exclude static assets, images, and the public Postman collection
-    "/((?!api/auth|_next/static|_next/image|favicon.ico|.*\\.png$|admin/api-docs/postman-collection\\.json).*)",
+    // Exclude static assets, images, and the public Postman collection.
+    //
+    // ⚠️ `sw.js` is excluded too. It is a static file, and running it through
+    // here attaches the app's CSP — including `strict-dynamic`, which is about
+    // a document's script loading and has nothing to say to a worker — to a
+    // response whose only job is to be registered.
+    "/((?!api/auth|_next/static|_next/image|favicon.ico|sw.js|.*\\.png$|admin/api-docs/postman-collection\\.json).*)",
   ],
 };
