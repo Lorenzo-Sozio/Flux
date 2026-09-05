@@ -70,7 +70,11 @@ const sections = [
       },
       {
         q: "Come funziona la navigazione?",
-        a: "La barra laterale sinistra raggruppa le funzionalità in sezioni: CRM (lead, contatti, aziende, task, calendario), Vendite (finance, preventivi, ordini, pipeline, target), Supporto (ticket), Marketing (template, campagne) e Amministrazione (utenti, report, impostazioni).",
+        a: "La barra laterale raggruppa tutto in sette sezioni: Lavoro (dashboard, calendario, task, chat), Clienti (contatti, aziende, lead), Vendite (pipeline con obiettivi, funnel, win/loss, previsioni e report, poi preventivi, ordini, prodotti e finance), Assistenza (panoramica, ticket, SLA, macro), Marketing e automazioni, Analisi, e Amministrazione (utenti, ruoli, impostazioni). Alcune voci compaiono solo se il piano include il modulo corrispondente. Su telefono la barra lascia il posto a una barra di schede in basso con le sezioni più usate.",
+      },
+      {
+        q: "Posso installare Flux sul telefono?",
+        a: "Sì. Aprendo Flux dal browser del telefono puoi aggiungerlo alla schermata iniziale: da lì si apre a schermo intero, con la sua icona e senza la barra del browser. Su Android il browser propone da solo 'Installa'; su iPhone si usa Condividi → Aggiungi a Home. Senza rete compare una schermata che lo dice, invece di una pagina di errore del browser.",
       },
       {
         q: "Posso personalizzare la vista?",
@@ -203,6 +207,10 @@ const sections = [
       {
         q: "Come uso i commenti su una deal?",
         a: "Apri il dettaglio della deal → vai alla sezione 'Commenti'. Puoi lasciare messaggi per il team, menzionare colleghi e rispondere ai commenti esistenti. È uno spazio collaborativo interno sulla singola opportunità, separato dalla timeline delle attività.",
+      },
+      {
+        q: "Posso tirare fuori un verbale della riunione?",
+        a: "Sì, dal pulsante 'Verbale' sopra la cronologia della trattativa, se su quella trattativa è stata registrata almeno una riunione o una chiamata. Il verbale raccoglie quello che è stato scritto: data e durata di ogni incontro, chi c'era, le note così come le hai scritte, e come cose concordate i task nati in quella finestra. Non inventa niente — questo prodotto non registra cosa viene detto, quindi ogni frase del verbale l'ha scritta una persona. Se non è stato creato nessun task lo dice, invece di far sembrare che la riunione non abbia deciso niente. C'è un pulsante per copiarlo.",
       },
       {
         q: "Posso configurare i miei stage personalizzati?",
@@ -441,6 +449,10 @@ const sections = [
         a: "Nella form dell'appuntamento trovi la sezione 'Partecipanti'. Aggiungi colleghi interni o contatti esterni con il loro ruolo (Obbligatorio, Opzionale). Ogni partecipante riceverà una notifica e potrà rispondere Accetto / Rifiuto / Forse direttamente dall'email di invito, senza dover fare login.",
       },
       {
+        q: "Posso vedere questi appuntamenti nel mio calendario personale?",
+        a: "Sì, con il pulsante 'Iscriviti' in alto nella pagina Calendario. Ti dà un indirizzo da incollare in Google Calendar, Outlook o Calendario di Apple: da quel momento gli appuntamenti fissati qui compaiono nel tuo calendario e restano aggiornati da soli, senza doverli reinserire. Due avvertenze, entrambe scritte nella finestra: quell'indirizzo vale come una password, perché un programma di calendario non sa fare login e chiunque lo riceva può leggere i tuoi appuntamenti; e funziona in una direzione sola, quindi un appuntamento creato su Google non compare qui.",
+      },
+      {
         q: "La Dashboard mostra anche gli appuntamenti di oggi?",
         a: "Sì. Il widget Agenda nella CRM Dashboard mostra in tempo reale tutti i tuoi impegni di oggi: task in scadenza, attività pianificate (chiamate, meeting) e appuntamenti. Gli eventi sono ordinati cronologicamente.",
       },
@@ -490,11 +502,19 @@ const sections = [
       },
       {
         q: "Cosa sono le SLA?",
-        a: "Le SLA (Service Level Agreement) definiscono i tempi massimi di risposta e risoluzione per ogni livello di priorità. Ad esempio: ticket urgente → prima risposta entro 1 ora, risoluzione entro 4 ore. Se il ticket non viene gestito in tempo, il sistema lo marca come 'SLA violata' e mostra un avviso rosso.",
+        a: "Le SLA definiscono i tempi massimi di prima risposta e di risoluzione per ogni priorità. Ad esempio: ticket urgente → prima risposta entro 1 ora, risoluzione entro 4 ore. Non aspettano la violazione per dirtelo: avvisano al 50% e all'80% del tempo rimasto, misurati sulla finestra del singolo ticket, così una politica da quattro ore e una da due giorni avvisano allo stesso punto nei propri termini. Alla violazione, se la politica nomina un gruppo, l'avviso va a tutte le persone di quel gruppo oltre che a chi ha il ticket in carico.",
+      },
+      {
+        q: "Le SLA contano anche di notte e nel fine settimana?",
+        a: "Dipende dalla singola politica. Di base contano sull'orologio da parete: una promessa di quattro ore su un ticket arrivato venerdì alle 17:00 scade alle 21:00 di venerdì, quando non c'è nessuno. Attivando 'Orari lavorativi' su quella politica il conteggio si ferma fuori orario, nei giorni di chiusura e nelle festività, e riprende all'apertura. L'impostazione è per politica e parte spenta: cambiare di nascosto il significato di una promessa già presa sarebbe una sorpresa, non una correzione. La settimana lavorativa, il fuso orario e i giorni di chiusura si impostano nella pagina SLA.",
+      },
+      {
+        q: "Il ticket mi dice a che punto sta e a cosa somiglia?",
+        a: "Sì, e sono due riquadri diversi in cima alla colonna di destra. Il primo dice di chi è la mossa — se aspetta noi o il cliente — e da quanto lo è, misurato dall'ultimo messaggio e non dall'apertura, poi cita la domanda iniziale con le parole del cliente e l'ultima nota interna, cioè cosa è già stato provato. Se nessuno ha ancora risposto lo dice apertamente: una nota interna non conta come risposta. Il secondo mostra a cosa somiglia il ticket fra quelli che questo workspace ha già risolto, con categoria e priorità proposte e i ticket da cui vengono, cliccabili: così puoi vedere perché ed essere in disaccordo. Niente di tutto questo viene applicato da solo, e quando i ticket simili non vanno d'accordo il riquadro preferisce non proporre niente.",
       },
       {
         q: "Cosa sono le Macro?",
-        a: "Le Macro sono risposte predefinite per le domande più frequenti. Invece di riscrivere ogni volta la stessa risposta, selezioni la macro appropriata e il testo viene inserito automaticamente nel messaggio. Le macro possono essere private o condivise con tutto il team.",
+        a: "Le Macro sono risposte predefinite per le domande più frequenti: invece di riscrivere la stessa cosa, ne scegli una e il testo entra nel riquadro di risposta, già pronto da modificare. I segnaposto come il numero del ticket, il nome del cliente e il tuo vengono sostituiti al momento dell'inserimento. Puoi sceglierle dal menu 'Macro' sopra il riquadro di risposta, oppure premere direttamente quelle che il riquadro dei suggerimenti propone per questo ticket.",
       },
       {
         q: "Come funziona il Kanban dei ticket?",
@@ -580,7 +600,11 @@ const sections = [
       },
       {
         q: "Come configuro il mittente delle email?",
-        a: "Impostazioni → Email. Scegli il provider: Resend (inserisci solo la tua API key) o SMTP (inserisci host, porta, credenziali e flag TLS). Imposta nome mittente e indirizzo email da cui partiranno tutte le comunicazioni della piattaforma (campagne, inviti, notifiche).",
+        a: "Impostazioni → Email. Scegli il provider: Resend (basta la tua API key) o SMTP (host, porta, credenziali e TLS). Poi imposta nome mittente e indirizzo da cui parte tutto: campagne, inviti, notifiche. ⚠️ Quell'indirizzo non serve solo a spedire: è anche quello a cui i clienti rispondono, e da cui il sistema riconosce che una mail in arrivo appartiene a questo workspace. Se resta vuoto, le email in entrata non diventano ticket.",
+      },
+      {
+        q: "Come collego un programma esterno a Flux?",
+        a: "Impostazioni → API, dove generi una chiave del workspace. Si passa come intestazione `Authorization: Bearer <chiave>` e vale solo per questo workspace: quale sia lo dice la chiave stessa, quindi chi integra non deve indicarlo da nessun'altra parte, e non può sbagliare workspace per errore. La chiave si vede una volta sola al momento della creazione: se la perdi ne generi un'altra e la vecchia smette di funzionare. Le rotte disponibili, con corpi e risposte, sono nella documentazione API del pannello di amministrazione.",
       },
       {
         q: "Come gestisco le risposte rapide per i ticket?",
