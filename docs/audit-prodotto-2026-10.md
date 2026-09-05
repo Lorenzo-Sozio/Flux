@@ -12,13 +12,13 @@ Aggiornato dopo il primo ciclo di correzioni.
 
 | | |
 |---|---|
-| ✅ Risolti | 61 |
-| ◐ Parziali | 4 |
+| ✅ Risolti | 63 |
+| ◐ Parziali | 2 |
 | ⊘ Non si fa | 1 |
 | Aperti | 0 |
 
 Verifiche dopo le correzioni: build di produzione riuscito, `tsc --noEmit` pulito,
-**413 test** superati (erano 91), zero errori Biome sui file toccati. Le nuove suite coprono il modello dei permessi,
+**466 test** superati (erano 91), zero errori Biome sui file toccati. Le nuove suite coprono il modello dei permessi,
 l'aritmetica dei documenti commerciali, l'allineamento delle traduzioni, le
 migrazioni dei tenant, il confine server/client della sidebar, la corrispondenza fra
 nomi di aziende e la paginazione — cioè le aree dove un guasto somiglia a un
@@ -29,26 +29,60 @@ erano registrati come bloccati su decisioni altrui: mettere o no un modello ling
 dentro il prodotto, e aspettare che Google verifichi gli ambiti di calendario e posta.
 Guardandoli da vicino, la parte bloccata era più piccola di quanto sembrasse.
 
-Di S-05 tre parti su quattro non sono una domanda per un modello, ma per lo storico del
-workspace, e rispondere da lì è meglio: la proposta arriva con i ticket da cui viene,
-quindi si può non essere d'accordo. Di S-06 la decisione che conta — se sollecitare, e a
-proposito di che cosa — la prendono due date. Di S-10 la metà che toglie il doppio
-inserimento è un abbonamento iCal, che ogni calendario sa già leggere e che non aspetta
-nessuno.
+Nessuna delle parti di S-05 era una domanda per un modello: sono domande per lo storico
+del workspace, e rispondere da lì è meglio, perché la proposta arriva con i ticket da cui
+viene e quindi si può non essere d'accordo. Anche il riassunto per chi subentra, che
+sembrava il caso più chiaro, è di chi è la mossa e da quanto lo è — non un paragrafo.
 
-Resta fuori ciò che serve davvero: il riassunto di un thread in prosa, il testo delle
-bozze, e il senso Google → CRM.
+Di S-06 la decisione che conta — se sollecitare, e a proposito di che cosa — la prendono
+due date. E il verbale è il caso in cui un modello farebbe danno: questo prodotto non
+registra cosa è stato detto, quindi non avendo niente da riassumere ne inventerebbe, in un
+documento che verrà archiviato e citato.
+
+Di S-10 la metà che toglie il doppio inserimento è un abbonamento iCal, che ogni
+calendario sa già leggere e che non aspetta nessuno.
+
+**Resta una cosa sola: il verso Google → CRM del calendario**, che dipende dalla verifica
+degli ambiti da parte di Google e non da questo progetto.
 
 Ciascun parziale dice, nella propria voce, che cosa gli manca. M-09 ha una sola
 libreria di trascinamento ormai, e sulla lingua dei commenti la regola sta nel
-`CLAUDE.md`, con i file esistenti che si allineano quando li si tocca. S-05, S-06 e
-S-10 lasciano fuori le tre cose elencate sopra.
+`CLAUDE.md`, con i file esistenti che si allineano quando li si tocca. S-10 ha
+l'abbonamento iCal e le conversazioni email; gli manca solo il verso Google → CRM.
 
 Due migrazioni tenant. `0002_odd_ulik.sql` aggiunge le colonne mancanti (data di
 chiusura e motivo di perdita sulle trattative, imponibile/imposta/valuta sugli ordini,
 fasi terminali sulla pipeline, scadenza di prima risposta sui ticket) e ripopola i dati
 esistenti. `0003_open_jackpot.sql` rimuove la tabella `opportunity`, verificata vuota su
 ogni tenant. **Vanno applicate a ogni database tenant prima del deploy.**
+
+⚠️⚠️ Trovato durante il lavoro e non presente in questa analisi: **l'acquisizione delle
+email in entrata non ha mai funzionato.** `processInboundEmail` chiama `getDb()` ed è
+invocata da due webhook — e `/api/webhooks/` è nell'elenco dei percorsi in cui il proxy
+deliberatamente *non* inietta `x-tenant-id`, perché un webhook non ha sessione. `getDb()`
+in assenza dell'intestazione lancia, apposta e rumorosamente. Quindi ogni email mai
+inviata a questo prodotto ha ricevuto un 500, e il ponte di posta l'ha scartata o
+ritentata all'infinito. È il rilievo B-01 in due punti d'ingresso che la sua correzione
+non aveva raggiunto, esattamente come i sette job, la pagina pubblica del preventivo e il
+link RSVP.
+
+Fuori dalla dashboard il workspace viene dai dati. Una risposta porta il riferimento del
+ticket nell'oggetto, e un numero di ticket appartiene a un workspace solo: quella risposta
+è certa. Una prima email porta solo l'indirizzo a cui è stata scritta, e il workspace
+proprietario di quell'indirizzo è quello configurato per spedire da lì.
+
+⚠️ Se non combacia niente, rifiuta e lo scrive nel registro. L'alternativa comoda —
+prendere l'unico workspace, o il primo — archivia l'email di uno sconosciuto nel CRM di
+qualcun altro e gli crea lì dentro una scheda contatto.
+
+**Sotto quello, un secondo difetto.** Entrambi i percorsi in entrata scrivevano l'id del
+*contatto* dentro `ticket_message.sender_id`, colonna la cui chiave esterna punta a `user`
+— il nostro personale — e i database dei tenant lo impongono davvero. Quindi anche
+arrivando all'inserimento il messaggio non sarebbe stato memorizzabile. Ora i messaggi in
+entrata la lasciano nulla e sono identificati da `senderEmail` e `senderName`, che è a
+cosa servono quelle colonne. È anche il campo che il pannello di presa in carico legge per
+decidere di chi è la mossa: il valore vecchio avrebbe segnalato ogni email del cliente
+come una risposta nostra.
 
 ⚠️ Trovato durante il lavoro e non presente in questa analisi: **due schermate
 chiedevano il ruolo sbagliato**, cioè di nuovo le due scale confuse — il difetto che
@@ -1090,7 +1124,7 @@ modificare leggendo `session.user.role`, che è il campo dello staff di piattafo
 «user» per ogni cliente. Un viewer del workspace vedeva tutti i pulsanti e il server glieli
 rifiutava uno per uno. Ora la domanda è la capacità, la stessa che fa l'azione.
 
-### S-05 ◐ — Triage assistito sul supporto
+### S-05 ✅ — Triage assistito sul supporto
 
 Categoria e priorità proposte, ticket simili già risolti mostrati di fianco, bozza di
 risposta dalle macro esistenti, riassunto del thread per chi subentra.
@@ -1116,9 +1150,26 @@ e quindi approvava una soglia che avrebbe dovuto bocciare.
 Niente viene applicato. La regola della sezione è «sempre proposta, sempre modificabile,
 mai spedita da sola», e un triage che imposta la priorità di nascosto ne è l'opposto.
 
-**Resta aperto** il riassunto del thread in prosa, che un modello lo richiede davvero.
+**✅ Chiusa anche la quarta parte**, il riassunto per chi subentra — e nemmeno quella
+voleva un modello. Quello che serve a chi prende in mano un ticket non è un paragrafo: è
+di chi è la mossa, da quanto lo è, che cosa era stato chiesto e che cosa è già stato
+provato. Quattro fatti, in quest'ordine, tutti e quattro esatti e già dentro i messaggi.
+Chi ha scritto l'ultimo messaggio pubblico non è quello che si sta aspettando: è tutto il
+calcolo, ed è l'unica parola che decide se questo ticket viene aperto o no.
 
-### S-06 ◐ — Composizione assistita dove il testo si scrive già
+⚠️ Una nota interna non è una risposta. Contarla come tale nasconde un ticket a cui
+nessuno ha risposto, quindi il pannello dice «nessuno di noi ha ancora risposto» invece di
+lasciarlo dedurre da un conteggio.
+
+L'attesa si misura dall'ultimo messaggio e non dall'apertura: un ticket aperto da tre
+settimane e risposto ieri non è stato ignorato per tre settimane, e quel numero manda
+qualcuno nella coda sbagliata.
+
+Un modello a cui si chiedesse un paragrafo seppellirebbe il primo di quei fatti dentro
+l'ultimo, costerebbe una chiamata e ogni tanto inventerebbe un dettaglio — e questo si
+legge in quindici secondi da chi sta decidendo cosa fare.
+
+### S-06 ✅ — Composizione assistita dove il testo si scrive già
 
 Bozza del sollecito su un preventivo, risposta al ticket, verbale della riunione
 dall'attività registrata. Sempre proposta, sempre modificabile, mai spedita da sola.
@@ -1135,6 +1186,29 @@ La scadenza batte il silenzio: un preventivo a due giorni dal decadere merita un
 comunque, perché la scadenza è il fatto che il cliente non vede e chi invia sì. Non
 sollecita mai un preventivo già accettato o rifiutato — il messaggio che costa di più da
 mandare — né uno spedito ieri, che si legge come pressione e non come servizio.
+
+**✅ Chiuse anche le altre due.** La risposta al ticket c'era già a metà: le macro erano
+inseribili e il triage sapeva già quale serviva, ma la mostrava come un'etichetta non
+premibile, così l'operatore andava a ricercare la stessa macro in un elenco di tutte
+quelle del workspace. Ora il suggerimento riempie il compositore.
+
+⚠️ Unendo i due punti di inserimento in uno: `{agent.name}` veniva sostituito con la
+stringa vuota, quindi una macro firmata dall'operatore arrivava al cliente con un buco
+dove va il nome. Nell'editor sembrava giusta, perché il segnaposto era già sparito.
+
+**Il verbale è il caso in cui un modello farebbe danno**, e vale la pena dirlo: **questo
+prodotto non registra cosa è stato detto.** Non c'è trascrizione. Un modello a cui si dà
+«riunione con Rossi, 45 minuti» e si chiede un verbale non ha niente da riassumere, quindi
+ne scrive uno plausibile: decisioni che nessuno ha preso, in un documento che verrà
+archiviato e citato. Sembrerebbe esattamente la funzione che funziona.
+
+Quindi il verbale assembla invece di comporre. Ogni frase l'ha scritta una persona. Ciò
+che è stato concordato viene dai compiti creati nella finestra, non dal ricordo di
+nessuno, e quando non ne è stato creato nessuno lo dice invece di omettere la sezione: un
+titolo vuoto si legge come una riunione senza esito, non come un invito a scrivere l'esito.
+
+⚠️ Si rifiuta di produrre un verbale se non c'è stata né una riunione né una chiamata. Un
+documento di intestazioni afferma che un incontro è avvenuto.
 
 ### S-07 ✅ — SLA con orari lavorativi e scala di escalation
 
@@ -1300,6 +1374,15 @@ questo il segreto è separato da `AUTH_SECRET`: ritirarle non deve buttare fuori
 Un token nomina una persona, e le persone se ne vanno: la rotta verifica che l'utente
 esista ancora, altrimenti l'iscrizione impostata sul telefono da chi ha lasciato l'azienda
 continuerebbe a consegnare il calendario per sempre.
+
+**✅ L'altra metà del rilievo — le conversazioni email sulla scheda del contatto — non
+aspettava Google affatto.** Le email in uscita erano già registrate come attività, quindi
+comparivano; quelle in entrata aprono un ticket legato al contatto, e la scheda del
+contatto mostra già i suoi ticket. Mancava solo che l'acquisizione funzionasse, e non
+funzionava: vedi il riquadro qui sotto.
+
+**Resta aperto solo il verso Google → CRM del calendario**, e quello sì dipende dalla
+verifica degli ambiti da parte di Google. Un appuntamento creato su Google non torna qui.
 
 ### S-11 — Una vista «oggi» che sostituisca la barra laterale ✅
 
