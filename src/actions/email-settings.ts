@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { emailSettings } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
 import { type EmailConfig, testEmailConfig } from "@/lib/email-provider";
+import { chooseTestTarget } from "@/lib/email-test-target";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Load current settings (secrets masked) ───────────────────────────────────
@@ -117,39 +118,48 @@ export async function testEmailConnection(data: {
   // connection to them carrying the workspace's real password — the same trick
   // reads back the Resend key. It was authenticated credential exfiltration, and
   // it looked like a button called "Send test email".
-  const usesStoredSecret = data.resendApiKey?.includes("•") || data.smtpPassword?.includes("•");
+  // Which configuration to test is a rule with three answers and one dangerous
+  // mistake, so it lives in a module that can be tested without a mail server.
+  const [row] = await db.select().from(emailSettings).limit(1);
+  const target = chooseTestTarget(
+    data,
+    row ? { provider: row.provider, smtpHost: row.smtpHost, smtpPort: row.smtpPort, smtpUser: row.smtpUser } : null,
+  );
 
-  let config: EmailConfig;
-
-  if (usesStoredSecret) {
-    const [row] = await db.select().from(emailSettings).limit(1);
-    if (!row) return { error: "There is no saved configuration to test." };
-
-    // Every field from the row. Testing a new host means typing its password.
-    config = {
-      provider: row.provider as EmailConfig["provider"],
-      resendApiKey: row.resendApiKey ?? undefined,
-      smtpHost: row.smtpHost ?? undefined,
-      smtpPort: row.smtpPort ?? 587,
-      smtpUser: row.smtpUser ?? undefined,
-      smtpPassword: row.smtpPassword ?? undefined,
-      smtpSecure: row.smtpSecure ?? false,
-      fromEmail: row.fromEmail,
-      fromName: row.fromName,
-    };
-  } else {
-    config = {
-      provider: data.provider,
-      resendApiKey: data.resendApiKey,
-      smtpHost: data.smtpHost,
-      smtpPort: data.smtpPort ?? 587,
-      smtpUser: data.smtpUser,
-      smtpPassword: data.smtpPassword,
-      smtpSecure: data.smtpSecure ?? false,
-      fromEmail: data.fromEmail,
-      fromName: data.fromName,
+  if (target.use === "refuse") {
+    return {
+      error:
+        target.reason === "no-stored-config"
+          ? "There is no saved configuration to test."
+          : "You have changed the server, so its password has to be typed in before it can be tested. " +
+            "The saved one belongs to the previous server.",
     };
   }
+
+  const config: EmailConfig =
+    target.use === "stored" && row
+      ? {
+          provider: row.provider as EmailConfig["provider"],
+          resendApiKey: row.resendApiKey ?? undefined,
+          smtpHost: row.smtpHost ?? undefined,
+          smtpPort: row.smtpPort ?? 587,
+          smtpUser: row.smtpUser ?? undefined,
+          smtpPassword: row.smtpPassword ?? undefined,
+          smtpSecure: row.smtpSecure ?? false,
+          fromEmail: row.fromEmail,
+          fromName: row.fromName,
+        }
+      : {
+          provider: data.provider,
+          resendApiKey: data.resendApiKey,
+          smtpHost: data.smtpHost,
+          smtpPort: data.smtpPort ?? 587,
+          smtpUser: data.smtpUser,
+          smtpPassword: data.smtpPassword,
+          smtpSecure: data.smtpSecure ?? false,
+          fromEmail: data.fromEmail,
+          fromName: data.fromName,
+        };
 
   // The test message goes to the person who asked for it, never to an address
   // supplied alongside someone else's credentials.

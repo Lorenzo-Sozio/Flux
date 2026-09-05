@@ -1,0 +1,38 @@
+[
+  {
+    "file": "src/lib/email-test-target.ts",
+    "description": "⚠️⚠️ il segreto salvato torna a essere spedito verso un server indicato nella richiesta: chiunque abbia una sessione se lo fa consegnare",
+    "find": "  return changed ? { use: \"refuse\", reason: \"changed-server\" } : { use: \"stored\" };",
+    "replace": "  return { use: \"stored\" };"
+  },
+  {
+    "file": "src/lib/email-test-target.ts",
+    "description": "⚠️ senza configurazione salvata non si rifiuta piu': si prova una configurazione mezza vuota e si riporta l'esito come se fosse quello vero",
+    "find": "  if (!stored) return { use: \"refuse\", reason: \"no-stored-config\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-test-target.ts",
+    "description": "⚠️ un segreto vero digitato dall'utente viene ignorato e si prova sempre quello salvato: chi cambia password non riesce a verificarla",
+    "find": "  if (!usesStoredSecret(input)) return { use: \"request\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-test-target.ts",
+    "description": "un host vuoto conta come cambiamento: il modulo si rifiuta di provare la configurazione che c'e' gia'",
+    "find": "    (Boolean(input.smtpHost?.trim()) && input.smtpHost?.trim() !== (stored.smtpHost ?? \"\")) ||",
+    "replace": "    input.smtpHost?.trim() !== (stored.smtpHost ?? \"\") ||"
+  },
+  {
+    "file": "src/lib/email-test-target.ts",
+    "description": "l'utente SMTP smette di contare: si prova con le credenziali salvate un'utenza diversa da quella a schermo",
+    "find": "    (Boolean(input.smtpUser?.trim()) && input.smtpUser?.trim() !== (stored.smtpUser ?? \"\")) ||",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/email-test-target.ts",
+    "description": "la maschera non viene piu' riconosciuta: la password mascherata viene spedita al server cosi' com'e'",
+    "find": "  return Boolean(input.resendApiKey?.includes(MASK) || input.smtpPassword?.includes(MASK));",
+    "replace": "  return false;"
+  }
+]
