@@ -19,7 +19,7 @@ import { describe, expect, it } from "vitest";
 import type { Actor } from "@/lib/permissions";
 
 import { applyNavAccess, computeNavAccess, type NavAccess } from "./filter-nav";
-import { type NavGroup, sidebarItems } from "./sidebar-items";
+import { accountPlacement, type NavGroup, sidebarItems, sidebarPlacement } from "./sidebar-items";
 
 const viewer: Actor = { userId: "u1", tenantRole: "viewer", isPlatformStaff: false };
 const editor: Actor = { userId: "u2", tenantRole: "editor", isPlatformStaff: false };
@@ -104,8 +104,12 @@ describe("role decides what is in the menu", () => {
 
   it("drops a group once nothing in it survives", () => {
     const labels = menuFor(viewer).map((g) => g.labelKey);
-    // Support is only SLA management plus tickets; tickets stay, so support stays.
-    expect(labels).toContain("crm");
+    expect(labels).toContain("work");
+
+    // Administration survives for a viewer, but only because the help centre is
+    // in it and open to everybody: the group is what is left, not what was there.
+    const administration = menuFor(viewer).find((g) => g.labelKey === "administration");
+    expect(administration?.items.map((i) => i.url)).toEqual(["/dashboard/help"]);
   });
 });
 
@@ -198,5 +202,60 @@ describe("applyNavAccess", () => {
     const menu = menuFor(admin);
     const withIcon = menu.flatMap((g) => g.items).filter((i) => i.icon);
     expect(withIcon.length).toBeGreaterThan(0);
+  });
+});
+
+describe("where a group is drawn", () => {
+  // Administration lives in the account menu rather than the list of
+  // destinations, and the split happens *after* filtering. Splitting first, or
+  // filtering the two surfaces separately, is how a menu ends up offering a
+  // viewer the settings it spent this whole file keeping away from them.
+  it("splits every group into exactly one of the two surfaces", () => {
+    const menu = menuFor(owner);
+    const drawn = [...sidebarPlacement(menu), ...accountPlacement(menu)];
+
+    expect(drawn).toHaveLength(menu.length);
+    expect(urlsOf(drawn).sort()).toEqual(urlsOf(menu).sort());
+  });
+
+  it("keeps administration out of the list of destinations", () => {
+    const urls = urlsOf(sidebarPlacement(menuFor(owner)));
+    expect(urls).not.toContain("/dashboard/users");
+    expect(urls).not.toContain("/dashboard/settings");
+  });
+
+  it("gives an admin administration in the account menu", () => {
+    const urls = urlsOf(accountPlacement(menuFor(admin)));
+    expect(urls).toContain("/dashboard/users");
+    expect(urls).toContain("/dashboard/settings/pipeline");
+    expect(urls).toContain("/dashboard/settings/api");
+  });
+
+  it("gives a viewer an account menu with nothing administrative in it", () => {
+    // Not merely hidden from the sidebar: absent from the surface it moved to.
+    const urls = urlsOf(accountPlacement(menuFor(viewer)));
+    expect(urls).not.toContain("/dashboard/users");
+    expect(urls).not.toContain("/dashboard/settings");
+    expect(urls).not.toContain("/dashboard/settings/api");
+  });
+
+  it("gives an editor the help centre but not the settings", () => {
+    const urls = urlsOf(accountPlacement(menuFor(editor)));
+    expect(urls).toContain("/dashboard/help");
+    expect(urls).not.toContain("/dashboard/settings/webhooks");
+  });
+});
+
+describe("the shape of the menu itself", () => {
+  it("has no heading over a single entry", () => {
+    // A group of one costs a line and says nothing; Automation used to be one.
+    for (const group of sidebarItems) {
+      expect(group.items.length, `group ${group.labelKey}`).toBeGreaterThan(1);
+    }
+  });
+
+  it("gives every entry a distinct url", () => {
+    const urls = urlsOf([...sidebarItems]);
+    expect(new Set(urls).size, `duplicates in ${urls.join(", ")}`).toBe(urls.length);
   });
 });

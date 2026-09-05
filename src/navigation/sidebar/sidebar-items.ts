@@ -1,10 +1,12 @@
 import {
+  Activity,
   Banknote,
   BarChart3,
   Building2,
   Calendar,
   ChartBar,
   CheckSquare,
+  ClipboardList,
   Clock,
   Contact,
   CreditCard,
@@ -13,6 +15,9 @@ import {
   GitMerge,
   HelpCircle,
   Kanban,
+  KeyRound,
+  LifeBuoy,
+  LineChart,
   type LucideIcon,
   Mail,
   MailOpen,
@@ -76,18 +81,47 @@ export interface NavMainItem {
 export interface NavGroup {
   id: number;
   labelKey?: string;
+  /**
+   * Where the group is drawn: the list of destinations, or the account menu at
+   * the foot of the sidebar.
+   *
+   * ⚠️ An account group is still part of `sidebarItems` on purpose. The
+   * capability and plan filtering runs once, over this whole structure, so the
+   * rules that keep a viewer out of Users and Settings cannot end up applying to
+   * one surface and not the other. A second, separately filtered menu is exactly
+   * how that guarantee gets lost.
+   */
+  placement?: "sidebar" | "account";
   items: NavMainItem[];
 }
 
+/**
+ * The menu, arranged by the question being asked rather than by which part of the
+ * codebase answers it.
+ *
+ * Three rules hold it together, each one here because breaking it is what made
+ * the previous version hard to read:
+ *
+ * 1. **A sub-view lives under its screen.** Targets, the funnel, win/loss, the
+ *    forecast and the pipeline report are five ways of looking at the pipeline,
+ *    not five destinations beside it. Flat, they made the sales group eight items
+ *    long and gave "Pipeline" and "Sales funnel" equal rank, which they have
+ *    never had.
+ * 2. **No group holds fewer than two items.** A heading over a single link costs
+ *    a line and says nothing; Automation was exactly that.
+ * 3. **Every page is either in here or deleted.** The support overview, the sales
+ *    analytics screen, the pipeline report and the API keys page all existed and
+ *    were reachable only by typing the path.
+ */
 export const sidebarItems: NavGroup[] = [
   {
     id: 1,
-    labelKey: "crm",
+    labelKey: "work",
     items: [
-      // First, because it is where the day starts. The dashboard below it answers
-      // "how are we doing"; this one answers "what am I doing" (audit rilievo S-11).
+      // Where the day starts. Today answers what am I doing; the overview under
+      // Analysis answers how are we doing, and those are not one question
+      // (audit rilievo S-11).
       { titleKey: "today", url: "/dashboard/today", icon: Sunrise },
-      { titleKey: "dashboard", url: "/dashboard/crm", icon: ChartBar },
       { titleKey: "calendar", url: "/dashboard/calendar", icon: Calendar },
       {
         titleKey: "tasks",
@@ -99,34 +133,48 @@ export const sidebarItems: NavGroup[] = [
         ],
       },
       { titleKey: "chat", url: "/dashboard/chat", icon: MessageCircle },
-      { titleKey: "leads", url: "/dashboard/leads", icon: Users },
-      { titleKey: "contacts", url: "/dashboard/contacts", icon: Contact },
-      { titleKey: "companies", url: "/dashboard/companies", icon: Building2 },
     ],
   },
   {
     id: 2,
-    labelKey: "sales",
+    labelKey: "customers",
     items: [
-      { titleKey: "finance", url: "/dashboard/sales/finance", icon: Banknote, module: "sales" },
-      { titleKey: "quotes", url: "/dashboard/sales/quotes", icon: FileText, module: "sales" },
-      { titleKey: "products", url: "/dashboard/sales/products", icon: Package, module: "sales" },
-      { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, module: "sales" },
-      { titleKey: "pipeline", url: "/dashboard/pipeline", icon: Kanban, module: "sales" },
-      { titleKey: "salesTargets", url: "/dashboard/pipeline/targets", icon: TrendingUp, module: "sales" },
-      { titleKey: "salesFunnel", url: "/dashboard/pipeline/funnel", icon: GitMerge, module: "sales" },
-      { titleKey: "winLoss", url: "/dashboard/pipeline/win-loss", icon: Swords, module: "sales" },
+      // People and companies before leads: a lead is what a contact is before it
+      // is one, and the old order put the pipeline's raw material above the
+      // records the rest of the product is built on.
+      { titleKey: "contacts", url: "/dashboard/contacts", icon: Contact },
+      { titleKey: "companies", url: "/dashboard/companies", icon: Building2 },
+      { titleKey: "leads", url: "/dashboard/leads", icon: Users },
     ],
   },
   {
     id: 3,
-    labelKey: "automation",
-    items: [{ titleKey: "rules", url: "/dashboard/automation", icon: Zap, module: "automation" }],
+    labelKey: "sales",
+    items: [
+      {
+        titleKey: "pipeline",
+        url: "/dashboard/pipeline",
+        icon: Kanban,
+        module: "sales",
+        subItems: [
+          { titleKey: "salesTargets", url: "/dashboard/pipeline/targets", icon: TrendingUp, module: "sales" },
+          { titleKey: "salesFunnel", url: "/dashboard/pipeline/funnel", icon: GitMerge, module: "sales" },
+          { titleKey: "winLoss", url: "/dashboard/pipeline/win-loss", icon: Swords, module: "sales" },
+          { titleKey: "forecast", url: "/dashboard/pipeline/forecast", icon: LineChart, module: "sales" },
+          { titleKey: "pipelineReport", url: "/dashboard/pipeline/report", icon: ClipboardList, module: "sales" },
+        ],
+      },
+      { titleKey: "quotes", url: "/dashboard/sales/quotes", icon: FileText, module: "sales" },
+      { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, module: "sales" },
+      { titleKey: "products", url: "/dashboard/sales/products", icon: Package, module: "sales" },
+      { titleKey: "finance", url: "/dashboard/sales/finance", icon: Banknote, module: "sales" },
+    ],
   },
   {
     id: 4,
     labelKey: "support",
     items: [
+      { titleKey: "supportOverview", url: "/dashboard/support", icon: LifeBuoy, module: "support" },
       { titleKey: "tickets", url: "/dashboard/support/tickets", icon: MessageSquare, module: "support" },
       {
         titleKey: "slaManagement",
@@ -135,21 +183,36 @@ export const sidebarItems: NavGroup[] = [
         module: "support",
         need: "sla:manage",
       },
+      // Macros are canned replies to a customer, so they sit beside the tickets
+      // they are typed into. The URL stays under /settings because that is where
+      // the page lives; the menu is about meaning, not paths.
+      {
+        titleKey: "macros",
+        url: "/dashboard/settings/macros",
+        icon: MessageCircle,
+        module: "support",
+        need: "macro:manage",
+      },
     ],
   },
   {
     id: 5,
-    labelKey: "marketing",
+    labelKey: "outreach",
     items: [
-      { titleKey: "templates", url: "/dashboard/marketing/templates", icon: Mail, module: "marketing" },
+      // Campaigns, the templates they send, and the rules that send things without
+      // anyone clicking. Automation was a group of one, which read as a product
+      // area of its own; it is not one, it is how the other areas do their work.
       { titleKey: "campaigns", url: "/dashboard/marketing/campaigns", icon: Target, module: "marketing" },
+      { titleKey: "templates", url: "/dashboard/marketing/templates", icon: Mail, module: "marketing" },
+      { titleKey: "automations", url: "/dashboard/automation", icon: Zap, module: "automation" },
     ],
   },
   {
     id: 6,
-    labelKey: "administration",
+    labelKey: "analysis",
     items: [
-      { titleKey: "users", url: "/dashboard/users", icon: Users, need: "user:read" },
+      { titleKey: "overview", url: "/dashboard/crm", icon: ChartBar },
+      { titleKey: "salesTrend", url: "/dashboard/analytics", icon: Activity, module: "sales" },
       {
         titleKey: "reports",
         url: "/dashboard/reports",
@@ -158,6 +221,14 @@ export const sidebarItems: NavGroup[] = [
         need: "report:read",
         subItems: [{ titleKey: "reportBuilder", url: "/dashboard/reports/builder", icon: Wand2, need: "report:read" }],
       },
+    ],
+  },
+  {
+    id: 7,
+    labelKey: "administration",
+    placement: "account",
+    items: [
+      { titleKey: "users", url: "/dashboard/users", icon: Users, need: "user:read" },
       {
         titleKey: "settings",
         url: "/dashboard/settings",
@@ -165,9 +236,9 @@ export const sidebarItems: NavGroup[] = [
         need: "settings:read",
         subItems: [
           { titleKey: "billing", url: "/dashboard/settings/billing", icon: CreditCard, need: "billing:read" },
-          // Pipeline stages and macros existed only at their URL: absent from the
-          // sidebar AND from the settings index, so configuring the pipeline — the
-          // first thing anyone does — meant typing the path (audit rilievo D-04).
+          // Pipeline stages existed only at its URL: absent from the sidebar AND
+          // from the settings index, so configuring the pipeline — the first thing
+          // anyone does — meant typing the path (audit rilievo D-04).
           { titleKey: "pipelineStages", url: "/dashboard/settings/pipeline", icon: GitMerge, need: "pipeline:manage" },
           {
             titleKey: "customFields",
@@ -176,11 +247,21 @@ export const sidebarItems: NavGroup[] = [
             need: "customField:manage",
           },
           { titleKey: "email", url: "/dashboard/settings/email", icon: MailOpen, need: "emailSettings:manage" },
-          { titleKey: "macros", url: "/dashboard/settings/macros", icon: MessageSquare, need: "macro:manage" },
           { titleKey: "webhooks", url: "/dashboard/settings/webhooks", icon: Webhook, need: "webhook:manage" },
+          { titleKey: "apiKeys", url: "/dashboard/settings/api", icon: KeyRound, need: "settings:manage" },
         ],
       },
       { titleKey: "help", url: "/dashboard/help", icon: HelpCircle },
     ],
   },
 ];
+
+/** The groups drawn in the sidebar itself. */
+export function sidebarPlacement(groups: readonly NavGroup[]): NavGroup[] {
+  return groups.filter((g) => g.placement !== "account");
+}
+
+/** The groups drawn in the account menu at the foot of the sidebar. */
+export function accountPlacement(groups: readonly NavGroup[]): NavGroup[] {
+  return groups.filter((g) => g.placement === "account");
+}
