@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/lib/order-payment.ts",
+    "description": "⚠️⚠️ the amounts are no longer rounded to the cent: an order paid to the last cent reads as still owing a fraction of one, and somebody chases a customer who owes nothing",
+    "find": "  const outstanding = round2(due - paid);",
+    "replace": "  const outstanding = due - paid;"
+  },
+  {
+    "file": "src/lib/order-payment.ts",
+    "description": "⚠️ an unreadable amount becomes NaN instead of nothing: one bad row makes every figure on the order unreadable from then on",
+    "find": "  return Number.isFinite(n) ? n : 0;",
+    "replace": "  return n;"
+  },
+  {
+    "file": "src/lib/order-payment.ts",
+    "description": "paid nothing and paid half become the same state: chasing a customer who has paid nothing and one who has paid half is the same conversation again",
+    "find": "  if (paid <= 0) return { paid, outstanding, state: due <= 0 ? \"paid\" : \"unpaid\" };",
+    "replace": "  if (paid <= 0) return { paid, outstanding, state: due <= 0 ? \"paid\" : \"partial\" };"
+  },
+  {
+    "file": "src/lib/order-payment.ts",
+    "description": "⚠️ a zero or negative amount can be recorded as a payment: a refund entered as a negative payment makes the total say something that never happened",
+    "find": "  return Number.isFinite(n) && n > 0;",
+    "replace": "  return Number.isFinite(n);"
+  }
+]

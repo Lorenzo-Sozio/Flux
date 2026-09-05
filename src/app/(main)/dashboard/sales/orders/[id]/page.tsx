@@ -49,6 +49,8 @@ import { useCurrency } from "@/hooks/use-currency";
 import { advanceLabelKey, isTerminalStatus, nextStatus } from "@/lib/order-status";
 import { cn } from "@/lib/utils";
 
+import { PaymentsCard } from "./_components/payments-card";
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type OrderDetail = Awaited<ReturnType<typeof getOrderById>>;
@@ -493,6 +495,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   <DollarSign className="h-3 w-3" /> {t("totalAmount")}
                 </span>
                 <span className="font-bold tabular-nums">{formatAmount(Number(order.totalAmount))}</span>
+              </div>
+
+              <div className="mb-4">
+                <PaymentsCard orderId={id} totalAmount={order.totalAmount} deliveredAt={order.deliveredAt ?? null} />
               </div>
 
               {/* What the customer has said about it, if anything. */}

@@ -288,9 +288,41 @@ export const orders = pgTable("order", {
   // showed little while orders only came from quotes, and shows now that one can arrive
   // from an assistant that took it in words.
   notes: text("notes"),
+  // When it actually reached the customer. `status` says completed, which is a
+  // state somebody set; support answering "my order has not arrived" needs a date.
+  deliveredAt: timestamp("delivered_at", { mode: "date" }),
   orderDate: timestamp("order_date", { mode: "date" }).defaultNow().notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/**
+ * Money that arrived against an order.
+ *
+ * ⚠️ Rows, not a `paid_amount` column on the order. A single field survives one
+ * instalment: the second overwrites the first and who paid what, when, is gone. A
+ * deposit followed by a balance is the ordinary case, and the question "has this
+ * been paid" is asked about an order more often than any other.
+ *
+ * The order keeps no cached total on purpose. A stored sum and a set of rows
+ * disagree the first time one of them is written without the other, and the one
+ * a person believes is whichever the screen happens to show.
+ */
+export const orderPayments = pgTable("order_payment", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  orderId: text("order_id")
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  paidAt: timestamp("paid_at", { mode: "date" }).defaultNow().notNull(),
+  // Free text rather than an enum: bank transfer, card, cash, "the usual", and
+  // whatever the next country calls it.
+  method: text("method"),
+  note: text("note"),
+  recordedById: text("recorded_by_id").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
 export const orderItems = pgTable("order_item", {

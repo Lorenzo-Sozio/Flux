@@ -85,6 +85,13 @@
       "when": 1788970000000,
       "tag": "0011_a_ticket_can_name_its_order",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788980000000,
+      "tag": "0012_money_that_arrived",
+      "breakpoints": true
     }
   ]
 }

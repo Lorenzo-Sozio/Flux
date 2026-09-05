@@ -14,6 +14,7 @@ import {
   contacts,
   deals,
   orderItems,
+  orderPayments,
   orders,
   products,
   quoteItems,
@@ -23,6 +24,7 @@ import {
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { computeDocument } from "@/lib/document-totals";
 import { nextOrderNumber } from "@/lib/order-number";
+import { isRecordablePayment } from "@/lib/order-payment";
 import type { OrderStatus } from "@/lib/order-status";
 import { getDb } from "@/lib/tenant-context";
 
@@ -153,6 +155,7 @@ export async function getOrderById(id: string) {
       totalAmount: orders.totalAmount,
       // What has to be known to prepare it: pickup or delivery, when, where.
       notes: orders.notes,
+      deliveredAt: orders.deliveredAt,
       orderDate: orders.orderDate,
       createdAt: orders.createdAt,
       updatedAt: orders.updatedAt,
@@ -742,4 +745,99 @@ export async function getOrdersByDeal(dealId: string) {
     .from(orders)
     .where(eq(orders.dealId, dealId))
     .orderBy(desc(orders.createdAt));
+}
+
+// ─── Money that arrived ───────────────────────────────────────────────────────
+
+/** Every payment recorded against an order, newest first. */
+export async function getOrderPayments(orderId: string) {
+  await requireCapability("record:read");
+  const db = await getDb();
+  return db
+    .select({
+      id: orderPayments.id,
+      amount: orderPayments.amount,
+      paidAt: orderPayments.paidAt,
+      method: orderPayments.method,
+      note: orderPayments.note,
+      recordedBy: users.name,
+    })
+    .from(orderPayments)
+    .leftJoin(users, eq(orderPayments.recordedById, users.id))
+    .where(eq(orderPayments.orderId, orderId))
+    .orderBy(desc(orderPayments.paidAt));
+}
+
+/**
+ * Records money arriving against an order.
+ *
+ * ⚠️ The amount is validated by the same pure function the screen validates with,
+ * so the form and the server cannot disagree about what a payment is: positive,
+ * finite, and not a refund wearing a minus sign.
+ *
+ * Larger than the total is allowed. Deposits, rounding and a customer paying the
+ * gross of something invoiced net all happen, and an order that says "overpaid" is
+ * more useful than a form that says no.
+ */
+export async function recordOrderPayment(
+  orderId: string,
+  data: { amount: number; paidAt?: string; method?: string; note?: string },
+) {
+  const actor = await requireCapability("order:write");
+  await requirePlanModule("sales");
+  if (!isRecordablePayment(data.amount)) throw new Error("A payment has to be a positive amount.");
+
+  const db = await getDb();
+  const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, orderId));
+  if (!order) throw new Error("Order not found");
+
+  await db.insert(orderPayments).values({
+    orderId,
+    amount: String(data.amount),
+    paidAt: data.paidAt ? new Date(data.paidAt) : new Date(),
+    method: data.method?.trim() || null,
+    note: data.note?.trim() || null,
+    recordedById: actor.userId,
+  });
+
+  revalidatePath(`/dashboard/sales/orders/${orderId}`);
+  revalidatePath("/dashboard/sales/orders");
+  return { success: true };
+}
+
+/**
+ * Removes one recorded payment.
+ *
+ * Money recorded by mistake has to be removable by whoever can write the order:
+ * the alternative is a second, negative payment, which makes the total say
+ * something that never happened.
+ */
+export async function deleteOrderPayment(paymentId: string) {
+  await requireCapability("order:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+
+  const [row] = await db
+    .select({ orderId: orderPayments.orderId })
+    .from(orderPayments)
+    .where(eq(orderPayments.id, paymentId));
+  if (!row) return { success: true };
+
+  await db.delete(orderPayments).where(eq(orderPayments.id, paymentId));
+  revalidatePath(`/dashboard/sales/orders/${row.orderId}`);
+  revalidatePath("/dashboard/sales/orders");
+  return { success: true };
+}
+
+/** Says when the order reached the customer, or takes the date back. */
+export async function setOrderDelivered(orderId: string, deliveredAt: string | null) {
+  await requireCapability("order:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  await db
+    .update(orders)
+    .set({ deliveredAt: deliveredAt ? new Date(deliveredAt) : null, updatedAt: new Date() })
+    .where(eq(orders.id, orderId));
+  revalidatePath(`/dashboard/sales/orders/${orderId}`);
+  return { success: true };
 }
