@@ -105,6 +105,10 @@ export async function getActivitiesByDeal(dealId: string) {
       date: activities.date,
       createdAt: activities.createdAt,
       ownerName: users.name,
+      // Carried for the minutes (rilievo S-06): how long it ran and who was in
+      // the room are the two things a meeting record has that a note does not.
+      durationMinutes: activities.durationMinutes,
+      participants: activities.participants,
     })
     .from(activities)
     .leftJoin(users, eq(activities.ownerId, users.id))

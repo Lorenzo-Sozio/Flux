@@ -1358,6 +1358,20 @@
       }
     }
   },
+  "minutes": {
+    "action": "Minutes",
+    "title": "Meeting minutes",
+    "description": "Assembled from what was recorded. Nothing here was written by the software.",
+    "attendees": "Present",
+    "meeting": "Meeting",
+    "call": "Call",
+    "forMinutes": "{minutes, plural, one {# minute} other {# minutes}}",
+    "nothingWritten": "No note was written for this one.",
+    "alsoLogged": "Also logged that day",
+    "agreed": "Agreed",
+    "nothingAgreed": "No task was raised, so nothing is recorded as agreed.",
+    "copy": "Copy"
+  },
   "merge": {
     "modal": {
       "keep": "Keep",

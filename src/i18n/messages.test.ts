@@ -108,6 +108,23 @@ describe("keys built at runtime", () => {
     expect(silent).toEqual([]);
   });
 
+  it("has every handover verdict, in both languages", () => {
+    // The panel picks its key from which side is being waited on, so a missing
+    // one renders "handover.waiting.us" to an agent triaging a queue.
+    const expected = ["us", "customer", "nobody"].map((side) => `handover.waiting.${side}`);
+    const missing = expected.filter((key) => !flatEn.has(key) || !flatIt.has(key));
+    expect(missing).toEqual([]);
+  });
+
+  it("has a word for each kind of session the minutes can contain", () => {
+    // The minutes label each session from its stored type, so a missing key
+    // prints "minutes.call" into a document somebody files.
+    const missing = ["meeting", "call"]
+      .map((kind) => `minutes.${kind}`)
+      .filter((key) => !flatEn.has(key) || !flatIt.has(key));
+    expect(missing).toEqual([]);
+  });
+
   it("names the quote in every drafted subject and body", () => {
     // A follow-up that does not say which quote it is about makes the customer
     // go and look, which is the opposite of what a chase is for. The bodies do

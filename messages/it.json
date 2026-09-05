@@ -1358,6 +1358,20 @@
       "viewStats": "Vedi statistiche"
     }
   },
+  "minutes": {
+    "action": "Verbale",
+    "title": "Verbale della riunione",
+    "description": "Composto da ciò che è stato registrato. Niente qui è stato scritto dal programma.",
+    "attendees": "Presenti",
+    "meeting": "Riunione",
+    "call": "Chiamata",
+    "forMinutes": "{minutes, plural, one {# minuto} other {# minuti}}",
+    "nothingWritten": "Per questa non è stata scritta nessuna nota.",
+    "alsoLogged": "Registrato anche quel giorno",
+    "agreed": "Concordato",
+    "nothingAgreed": "Non è stato creato nessun compito, quindi non risulta concordato niente.",
+    "copy": "Copia"
+  },
   "merge": {
     "modal": {
       "keep": "Mantieni",

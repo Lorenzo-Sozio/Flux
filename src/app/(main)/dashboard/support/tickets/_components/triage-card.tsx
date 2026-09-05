@@ -27,10 +27,20 @@ export function TriageCard({
   subject,
   description,
   excludeId,
+  onUseMacro,
 }: {
   subject: string;
   description?: string | null;
   excludeId?: string;
+  /**
+   * Puts the saved reply into the composer as an editable draft.
+   *
+   * ⚠️ Without this the suggested macros were inert text: the panel worked out
+   * which reply fits and then made the agent go and find it again in a dropdown
+   * of every macro in the workspace. The last part of rilievo S-06 is the draft
+   * arriving where the writing happens, not a second list to read.
+   */
+  onUseMacro?: (macroId: string) => void;
 }) {
   const t = useTranslations("triage");
   const [data, setData] = useState<Triage | null>(null);
@@ -141,11 +151,19 @@ export function TriageCard({
           <div>
             <p className="mb-1.5 font-medium text-muted-foreground text-xs uppercase tracking-wide">{t("macros")}</p>
             <div className="flex flex-wrap gap-1.5">
-              {data?.macros.map((m) => (
-                <Badge key={m.id} variant="secondary" className="font-normal">
-                  {m.name}
-                </Badge>
-              ))}
+              {data?.macros.map((m) =>
+                onUseMacro ? (
+                  <button key={m.id} type="button" onClick={() => onUseMacro(m.id)} className="cursor-pointer">
+                    <Badge variant="secondary" className="font-normal transition-colors hover:bg-secondary/70">
+                      {m.name}
+                    </Badge>
+                  </button>
+                ) : (
+                  <Badge key={m.id} variant="secondary" className="font-normal">
+                    {m.name}
+                  </Badge>
+                ),
+              )}
             </div>
           </div>
         )}

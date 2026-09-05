@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/lib/ticket-handover.ts",
+    "description": "⚠️⚠️ i lati si invertono: un ticket che aspetta noi risulta in attesa del cliente e nessuno lo apre",
+    "find": "  if (last) waiting = fromUs(last) ? \"customer\" : \"us\";",
+    "replace": "  if (last) waiting = fromUs(last) ? \"us\" : \"customer\";"
+  },
+  {
+    "file": "src/lib/ticket-handover.ts",
+    "description": "⚠️⚠️ una nota interna vale come risposta: un ticket a cui nessuno ha risposto risulta gia' evaso",
+    "find": "  const publics = ordered.filter((m) => m.isPublic);",
+    "replace": "  const publics = ordered;"
+  },
+  {
+    "file": "src/lib/ticket-handover.ts",
+    "description": "⚠️ l'attesa si misura dall'apertura invece che dall'ultimo messaggio: un ticket risposto ieri sembra ignorato da settimane",
+    "find": "    waitingHours: last ? Math.max(0, Math.floor((now - last.createdAt.getTime()) / HOUR_MS)) : null,",
+    "replace": "    waitingHours: first ? Math.max(0, Math.floor((now - first.createdAt.getTime()) / HOUR_MS)) : null,"
+  },
+  {
+    "file": "src/lib/ticket-handover.ts",
+    "description": "⚠️ chi ha scritto non viene piu' distinto: ogni messaggio risulta nostro",
+    "find": "  return message.senderId !== null;",
+    "replace": "  return true;"
+  },
+  {
+    "file": "src/lib/ticket-handover.ts",
+    "description": "⚠️ i messaggi non vengono piu' ordinati: la risposta dipende da come li ha restituiti la query",
+    "find": "  const ordered = [...messages].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());",
+    "replace": "  const ordered = messages;"
+  },
+  {
+    "file": "src/lib/ticket-handover.ts",
+    "description": "la domanda iniziale viene presa dal primo messaggio qualunque sia il lato: si cita la nostra frase di cortesia invece della richiesta",
+    "find": "  const first = publics.find((m) => !fromUs(m)) ?? publics[0] ?? null;",
+    "replace": "  const first = publics[0] ?? null;"
+  },
+  {
+    "file": "src/lib/ticket-handover.ts",
+    "description": "si contano come nostre risposte anche quelle del cliente: «mai risposto» non compare piu'",
+    "find": "  const replies = publics.filter(fromUs).length;",
+    "replace": "  const replies = publics.length;"
+  },
+  {
+    "file": "src/lib/ticket-handover.ts",
+    "description": "la citazione viene troncata a meta' parola e si legge come testo rovinato invece che come estratto",
+    "find": "  return `${(lastSpace > limit * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;",
+    "replace": "  return `${cut}…`;"
+  }
+]

@@ -42,6 +42,7 @@ import { getDb } from "@/lib/tenant-context";
 
 import { CommentsThread } from "./_components/comments-thread";
 import { DealAmount } from "./_components/deal-amount";
+import { MinutesDialog } from "./_components/minutes-dialog";
 
 export default async function DealDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: dealId } = await params;
@@ -366,6 +367,34 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 {t("logBtn")}
               </Button>
             </form>
+
+            {/*
+              Minutes for a meeting on this deal, assembled from what was logged
+              (audit rilievo S-06). Renders nothing when no meeting or call has
+              been recorded, so it does not offer a document it cannot produce.
+            */}
+            <div className="flex justify-end">
+              <MinutesDialog
+                dealName={deal.name}
+                activities={activitiesList.map((a) => ({
+                  id: a.id,
+                  type: a.type,
+                  content: a.content,
+                  date: a.date,
+                  durationMinutes: a.durationMinutes,
+                  participants: a.participants,
+                  ownerName: a.ownerName,
+                }))}
+                tasks={tasksList.map((t) => ({
+                  id: t.id,
+                  title: t.title,
+                  ownerName: t.ownerName,
+                  dueDate: t.dueDate,
+                  createdAt: t.createdAt,
+                  status: t.status,
+                }))}
+              />
+            </div>
 
             <ActivityTimeline
               activities={activitiesList}

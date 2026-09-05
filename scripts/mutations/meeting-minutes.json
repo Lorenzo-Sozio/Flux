@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/lib/meeting-minutes.ts",
+    "description": "⚠️⚠️ si produce un verbale anche quando nessuno si e' incontrato: un documento di intestazioni vuote che afferma una riunione mai avvenuta",
+    "find": "  if (sessions.length === 0) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/meeting-minutes.ts",
+    "description": "⚠️⚠️ fra le cose concordate finiscono attivita' di altre settimane: una fabbricazione che si legge come un verbale",
+    "find": "  const agreed = tasks.filter((t) => within(t.createdAt)).sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime());",
+    "replace": "  const agreed = [...tasks].sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime());"
+  },
+  {
+    "file": "src/lib/meeting-minutes.ts",
+    "description": "⚠️ una nota o una email contano come riunione: si verbalizza un incontro che non c'e' stato",
+    "find": "  return (activity.type === \"meeting\" || activity.type === \"call\") && activity.date !== null;",
+    "replace": "  return activity.date !== null;"
+  },
+  {
+    "file": "src/lib/meeting-minutes.ts",
+    "description": "⚠️ i partecipanti vengono ripetuti a ogni sessione: l'elenco presenti si gonfia di doppioni",
+    "find": "      if (!attendees.some((a) => a.toLowerCase() === person.toLowerCase())) attendees.push(person);",
+    "replace": "      attendees.push(person);"
+  },
+  {
+    "file": "src/lib/meeting-minutes.ts",
+    "description": "le sessioni non sono piu' in ordine cronologico e il verbale racconta la giornata al contrario",
+    "find": "    .sort((x, y) => x.at.getTime() - y.at.getTime());\n\n  if (sessions.length === 0) return null;",
+    "replace": "\n  if (sessions.length === 0) return null;"
+  },
+  {
+    "file": "src/lib/meeting-minutes.ts",
+    "description": "una nota vuota diventa una riga di verbale fatta di spazi",
+    "find": "      notes: a.content?.trim() ? a.content.trim() : null,",
+    "replace": "      notes: a.content,"
+  },
+  {
+    "file": "src/lib/meeting-minutes.ts",
+    "description": "⚠️ la finestra si chiude quando finisce la riunione: la nota e i compiti nati dopo restano fuori e il verbale non concorda niente",
+    "find": "  to.setDate(to.getDate() + daysAfter);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/meeting-minutes.ts",
+    "description": "i partecipanti non vengono piu' separati sul punto e virgola: due nomi diventano un nome solo",
+    "find": "    .split(/[,;]/)",
+    "replace": "    .split(/[,]/)"
+  }
+]

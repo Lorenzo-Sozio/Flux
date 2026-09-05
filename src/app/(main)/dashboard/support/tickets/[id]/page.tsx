@@ -33,6 +33,7 @@ import {
   Users,
   Zap,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -79,6 +80,7 @@ import type { ticketMacros } from "@/db/schema";
 import { useCurrency } from "@/hooks/use-currency";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
 
+import { HandoverCard } from "../_components/handover-card";
 import { TriageCard } from "../_components/triage-card";
 
 // ─── Row shapes ───────────────────────────────────────────────────────────────
@@ -983,6 +985,30 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
   const [replyContent, setReplyContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
+  const { data: session } = useSession();
+
+  /**
+   * Fills the composer from a saved reply.
+   *
+   * One function rather than two call sites, because the triage panel now offers
+   * the same macros the dropdown does and the two must substitute identically.
+   *
+   * ⚠️ `{agent.name}` used to be replaced with nothing at all, so a macro signed
+   * off by the agent went to the customer with a blank where the name belongs —
+   * and it looked fine in the editor, because the placeholder was already gone.
+   */
+  const applyMacro = useCallback(
+    (macro: TicketMacro) => {
+      setReplyContent(
+        macro.body
+          .replace(/\{ticket\.number\}/g, ticket?.ticketNumber ?? "")
+          .replace(/\{contact\.firstName\}/g, ticket?.contact?.firstName ?? "")
+          .replace(/\{agent\.name\}/g, session?.user?.name ?? ""),
+      );
+      setIsInternal(!macro.isPublic);
+    },
+    [ticket?.ticketNumber, ticket?.contact?.firstName, session?.user?.name],
+  );
   const [sending, setSending] = useState(false);
 
   const [reassignOpen, setReassignOpen] = useState(false);
@@ -1399,15 +1425,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
                           <DropdownMenuItem
                             key={macro.id}
                             className="flex flex-col items-start gap-0.5 py-2"
-                            onClick={() => {
-                              setReplyContent(
-                                macro.body
-                                  .replace(/\{ticket\.number\}/g, ticket?.ticketNumber ?? "")
-                                  .replace(/\{contact\.firstName\}/g, ticket?.contact?.firstName ?? "")
-                                  .replace(/\{agent\.name\}/g, ""),
-                              );
-                              setIsInternal(!macro.isPublic);
-                            }}
+                            onClick={() => applyMacro(macro)}
                           >
                             <span className="font-medium text-sm">{macro.name}</span>
                             {macro.description && (
@@ -1445,12 +1463,36 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
           <div className="space-y-3 overflow-y-auto p-4">
             <ContactCard ticket={ticket} />
             {/*
+              Where the ticket stands, for whoever is picking it up (audit rilievo
+              S-05, its fourth part). First in the column because "whose move is
+              it" decides whether this ticket gets opened at all, and it is read
+              before anything else on the page.
+            */}
+            <HandoverCard
+              messages={messages.map((m) => ({
+                id: m.id,
+                senderId: m.senderId ?? null,
+                senderName: m.sender?.name ?? m.senderName ?? null,
+                isPublic: m.isPublic,
+                content: m.content,
+                createdAt: new Date(m.createdAt),
+              }))}
+            />
+            {/*
               What this ticket resembles, from what the workspace has already
               answered (audit rilievo S-05). Above the history because it is the
               thing somebody picking the ticket up wants first, and it renders
               nothing at all when there is nothing to say.
             */}
-            <TriageCard subject={ticket.subject} description={ticket.description} excludeId={ticket.id} />
+            <TriageCard
+              subject={ticket.subject}
+              description={ticket.description}
+              excludeId={ticket.id}
+              onUseMacro={(macroId) => {
+                const macro = macros.find((m) => m.id === macroId);
+                if (macro) applyMacro(macro);
+              }}
+            />
             <OrderCard ticket={ticket} onLinked={() => void loadTicket()} />
             <HistoryCard ticket={ticket} />
             <PropertiesCard
