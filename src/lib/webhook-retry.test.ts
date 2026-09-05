@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 
 import { MAX_ATTEMPTS, UNSIGNABLE_PREFIX } from "@/lib/webhook-envelope";
-import { daRiprovare, identificativoDi } from "@/lib/webhook-retry";
+import { eventIdOf, isRetryable } from "@/lib/webhook-retry";
 
 const ADESSO = new Date("2026-09-02T12:00:00Z");
 
@@ -16,7 +16,7 @@ function body(id: string) {
   return JSON.stringify({ id, event: "lead.created", payload: {}, origin: { via: "user" } });
 }
 
-function attempt(extra: Partial<Parameters<typeof daRiprovare>[0][number]> = {}) {
+function attempt(extra: Partial<Parameters<typeof isRetryable>[0][number]> = {}) {
   return {
     id: crypto.randomUUID(),
     webhookId: "w1",
@@ -32,21 +32,21 @@ function attempt(extra: Partial<Parameters<typeof daRiprovare>[0][number]> = {})
 
 describe("l'identificativo, che è ciò da cui si ricava tutto il resto", () => {
   it("lo legge dal body spedito", () => {
-    expect(identificativoDi(body("abc"))).toBe("abc");
+    expect(eventIdOf(body("abc"))).toBe("abc");
   });
 
   it("non inventa niente quando il body non è leggibile", () => {
     // Un identificativo inventato raggrupperebbe tentativi di eventi diversi, e il
     // conteggio direbbe che si è già provato abbastanza su qualcosa mai spedito.
-    expect(identificativoDi("non-json")).toBe("");
-    expect(identificativoDi(null)).toBe("");
-    expect(identificativoDi(JSON.stringify({ event: "x" }))).toBe("");
+    expect(eventIdOf("non-json")).toBe("");
+    expect(eventIdOf(null)).toBe("");
+    expect(eventIdOf(JSON.stringify({ event: "x" }))).toBe("");
   });
 });
 
 describe("che cosa si riprova", () => {
   it("un evento il cui unico attempt è fallito", () => {
-    expect(daRiprovare([attempt()], ADESSO)).toHaveLength(1);
+    expect(isRetryable([attempt()], ADESSO)).toHaveLength(1);
   });
 
   it("⚠️ NON un evento che è arrivato, anche se prima era fallito dieci volte", () => {
@@ -54,7 +54,7 @@ describe("che cosa si riprova", () => {
     // secondo colpo verrebbe rispedito per sempre.
     const righe = [attempt(), attempt({ success: true })];
 
-    expect(daRiprovare(righe, ADESSO)).toHaveLength(0);
+    expect(isRetryable(righe, ADESSO)).toHaveLength(0);
   });
 
   it("⚠️⚠️ NON un attempt mai partito per mancanza di secret", () => {
@@ -63,25 +63,25 @@ describe("che cosa si riprova", () => {
     // il motivo.
     const righe = [attempt({ response: `${UNSIGNABLE_PREFIX}, so the event…` })];
 
-    expect(daRiprovare(righe, ADESSO)).toHaveLength(0);
+    expect(isRetryable(righe, ADESSO)).toHaveLength(0);
   });
 
   it("smette dopo i attempts previsti", () => {
     // Senza un limite, un indirizzo che non esiste più verrebbe chiamato per sempre.
     const righe = Array.from({ length: MAX_ATTEMPTS }, () => attempt());
 
-    expect(daRiprovare(righe, ADESSO)).toHaveLength(0);
-    expect(daRiprovare(righe.slice(1), ADESSO)).toHaveLength(1);
+    expect(isRetryable(righe, ADESSO)).toHaveLength(0);
+    expect(isRetryable(righe.slice(1), ADESSO)).toHaveLength(1);
   });
 
   it("tiene separati due eventi diversi", () => {
     const righe = [attempt(), attempt({ payload: body("evento-2") })];
 
-    expect(daRiprovare(righe, ADESSO)).toHaveLength(2);
+    expect(isRetryable(righe, ADESSO)).toHaveLength(2);
   });
 
   it("ignora una riga senza identificativo invece di trattarla come un evento", () => {
-    expect(daRiprovare([attempt({ payload: "non-json" })], ADESSO)).toHaveLength(0);
+    expect(isRetryable([attempt({ payload: "non-json" })], ADESSO)).toHaveLength(0);
   });
 });
 
@@ -91,7 +91,7 @@ describe("quando si riprova", () => {
     // un secondo fallimento che consuma un tentativo per niente.
     const appena = [attempt({ sentAt: new Date(ADESSO.getTime() - 1000) })];
 
-    expect(daRiprovare(appena, ADESSO)).toHaveLength(0);
+    expect(isRetryable(appena, ADESSO)).toHaveLength(0);
   });
 
   it("l'attesa cresce con i attempts", () => {
@@ -100,8 +100,8 @@ describe("quando si riprova", () => {
     const uno = [attempt({ sentAt: dueMinuti })];
     const due = [attempt({ sentAt: dueMinuti }), attempt({ sentAt: dueMinuti })];
 
-    expect(daRiprovare(uno, ADESSO), "il primo ritentativo doveva essere dovuto").toHaveLength(1);
-    expect(daRiprovare(due, ADESSO), "il secondo non doveva esserlo ancora").toHaveLength(0);
+    expect(isRetryable(uno, ADESSO), "il primo ritentativo doveva essere dovuto").toHaveLength(1);
+    expect(isRetryable(due, ADESSO), "il secondo non doveva esserlo ancora").toHaveLength(0);
   });
 
   it("misura l'attesa dall'ULTIMO attempt, non dal primo", () => {
@@ -110,6 +110,6 @@ describe("quando si riprova", () => {
     const vecchio = attempt({ sentAt: new Date(ADESSO.getTime() - 24 * 60 * 60 * 1000) });
     const recente = attempt({ sentAt: new Date(ADESSO.getTime() - 1000) });
 
-    expect(daRiprovare([vecchio, recente], ADESSO)).toHaveLength(0);
+    expect(isRetryable([vecchio, recente], ADESSO)).toHaveLength(0);
   });
 });

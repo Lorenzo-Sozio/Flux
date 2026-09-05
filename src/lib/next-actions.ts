@@ -80,12 +80,6 @@ export function daysBetween(from: Date | string | number, to: Date | number = Da
   return Math.max(0, Math.floor((b - a) / DAY_MS));
 }
 
-/** Hours until an instant. Negative once it has passed. */
-export function hoursUntil(when: Date | string, now: number = Date.now()): number {
-  const t = typeof when === "object" ? when.getTime() : new Date(when).getTime();
-  return (t - now) / 3_600_000;
-}
-
 /**
  * How much of an SLA window is left, as a fraction of the whole.
  *
@@ -135,7 +129,7 @@ export function urgencyOf(kind: NextActionKind, overBy = 0): number {
 }
 
 /** Most urgent first; ties broken by kind so the list does not shuffle. */
-export function sortActions(actions: NextAction[]): NextAction[] {
+function sortActions(actions: NextAction[]): NextAction[] {
   return [...actions].sort((a, b) => b.urgency - a.urgency || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
 }
 

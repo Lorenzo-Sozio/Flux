@@ -82,7 +82,7 @@ function formatterFor(timeZone: string): Intl.DateTimeFormat {
 const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
 
 /** The wall clock in a given zone, at a given instant. */
-export function zonedParts(instant: Date, timeZone: string): ZonedParts {
+function zonedParts(instant: Date, timeZone: string): ZonedParts {
   const parts = formatterFor(timeZone).formatToParts(instant);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   // "24" appears at midnight in some engines; both mean the same instant.

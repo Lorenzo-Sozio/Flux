@@ -134,7 +134,7 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
 ];
 
 /** Everything the palette can offer this person, in menu order. */
-export function availableCommands(allow: (capability?: Capability) => boolean): PaletteCommand[] {
+function availableCommands(allow: (capability?: Capability) => boolean): PaletteCommand[] {
   return PALETTE_COMMANDS.filter((c) => allow(c.capability));
 }
 

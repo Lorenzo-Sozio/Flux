@@ -55,7 +55,7 @@ interface Riga {
 }
 
 /** L'identificativo dell'evento, che vive dentro il corpo spedito. */
-export function identificativoDi(payload: string | null): string {
+export function eventIdOf(payload: string | null): string {
   if (!payload) return "";
   try {
     const envelope = JSON.parse(payload);
@@ -71,10 +71,10 @@ export function identificativoDi(payload: string | null): string {
  * Pura di proposito: è la parte che decide, e decidere non ha bisogno di un database. Il
  * worker si limita a leggere le righe e a spedire ciò che questa funzione indica.
  */
-export function daRiprovare(righe: Riga[], now = new Date()): Riga[] {
+export function isRetryable(righe: Riga[], now = new Date()): Riga[] {
   const perEvento = new Map<string, Riga[]>();
   for (const riga of righe) {
-    const id = identificativoDi(riga.payload);
+    const id = eventIdOf(riga.payload);
     if (!id) continue;
     const elenco = perEvento.get(id) ?? [];
     elenco.push(riga);
@@ -116,7 +116,7 @@ export async function riprova(
 ): Promise<RetryOutcome> {
   const righe: Riga[] = await db.select().from(webhookLogs).orderBy(desc(webhookLogs.sentAt)).limit(500);
 
-  const dovuti = daRiprovare(righe).slice(0, limite);
+  const dovuti = isRetryable(righe).slice(0, limite);
   const outcome: RetryOutcome = { delivered: 0, failed: 0, deferred: 0 };
 
   for (const riga of dovuti) {
@@ -136,7 +136,7 @@ export async function riprova(
         headers: {
           "Content-Type": "application/json",
           "X-Webhook-Signature": signature,
-          "X-Webhook-Id": identificativoDi(body),
+          "X-Webhook-Id": eventIdOf(body),
         },
         body: body,
         signal: AbortSignal.timeout(10_000),

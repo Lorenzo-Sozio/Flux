@@ -55,11 +55,3 @@ export function rememberRecord(record: Omit<RecentRecord, "at">): void {
     // palette simply has nothing to show at rest, which is where it started.
   }
 }
-
-export function clearRecentRecords(): void {
-  try {
-    window.localStorage.removeItem(KEY);
-  } catch {
-    // Nothing to clear if nothing could be stored.
-  }
-}
