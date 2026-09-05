@@ -84,6 +84,23 @@ export const proxy = auth((req) => {
    */
   function passThrough(extraRequestHeaders: Record<string, string> = {}): NextResponse {
     const requestHeaders = new Headers(req.headers);
+
+    // ⚠️⚠️ **Anything a client sent under these names is removed before we add our
+    // own.** These headers are how the application decides which customer's
+    // database it is talking to and which nonce a script may carry; a request
+    // arriving with them set is either confused or hostile.
+    //
+    // The authenticated path always overwrites `x-tenant-id`, so it was safe.
+    // The public paths — cron, webhooks, tracking, unsubscribe, the public quote,
+    // RSVP — pass through without setting it, and there a forged value used to
+    // survive into the request. Nothing on those paths reads it today, because
+    // they resolve the tenant from the data instead, but that is a property of
+    // every route that exists rather than a rule the next one has to obey.
+    // Stripping here makes it the rule.
+    for (const header of ["x-tenant-id", "x-nonce", "x-pathname"]) {
+      requestHeaders.delete(header);
+    }
+
     requestHeaders.set("x-nonce", nonce);
     for (const [k, v] of Object.entries(extraRequestHeaders)) {
       requestHeaders.set(k, v);

@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, ilike, or, sql } from "drizzle-orm";
+import { and, eq, ilike, sql } from "drizzle-orm";
 
 import { geoCities, geoCountries } from "@/db/schema";
 import { requireWriteAccess } from "@/lib/auth-guard";
@@ -98,6 +98,9 @@ export async function createCity(countryId: string, name: string, region?: strin
  * Adds a postal code to a city's postal_codes array if not already present.
  */
 export async function addPostalCodeToCity(cityId: string, postalCode: string): Promise<void> {
+  // Nothing calls this today, which is not the same as nothing being able to: an
+  // exported server action is an endpoint whether or not the product uses it.
+  await requireWriteAccess();
   const db = await getDb();
   const trimmed = postalCode.trim();
   if (!trimmed) return;
