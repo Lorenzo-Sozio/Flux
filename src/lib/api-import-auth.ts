@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 
 import { auth } from "@/auth";
 import { getTenantByApiKeyHash, getTenantById } from "@/lib/get-tenant";
+import { can, isPlatformStaffRole, normalizeTenantRole } from "@/lib/permissions";
 
 export interface ApiAuthResult {
   via: "session" | "apikey";
@@ -69,8 +70,26 @@ export async function authenticateApiRequest(req: Request): Promise<ApiAuthResul
   const session = await auth();
   if (!session?.user?.id) return null;
 
-  const role = (session.user as { role?: string }).role ?? "viewer";
-  if (role === "viewer") return null;
+  // ⚠️⚠️ The **workspace** role decides this, not `session.user.role`.
+  //
+  // `session.user.role` is Flux's own staff scale and reads "user" for every
+  // customer who has ever signed in — so `role === "viewer"` was never true for
+  // anybody outside Flux, and a workspace member marked read-only could create
+  // contacts, leads, companies, activities, notes and orders through this API,
+  // and trigger erasure and opt-out with them. `viewer` is read-only everywhere,
+  // and everywhere includes here. See the two role scales in CLAUDE.md.
+  //
+  // Asked as a capability rather than compared as a string, so it cannot drift
+  // from what the dashboard allows the same person to do.
+  const user = session.user as { role?: string | null; tenantRole?: string | null };
+  const actor = {
+    userId: session.user.id,
+    tenantRole: normalizeTenantRole(user.tenantRole),
+    isPlatformStaff: isPlatformStaffRole(user.role),
+  };
+  if (!can(actor, "record:write")) return null;
+
+  const role = actor.tenantRole;
 
   // For session-based calls, the middleware already injects x-tenant-id from the
   // JWT.  We read it from the request headers (which are Next.js's internal

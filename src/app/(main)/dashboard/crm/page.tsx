@@ -158,7 +158,7 @@ export default async function CRMPage() {
   const recentLeads = rawLeads;
 
   return (
-    <div className="space-y-8 p-6">
+    <div className="space-y-8">
       {/* ── Greeting + date ─────────────────────────────────────────── */}
       <div>
         <h1 className="font-bold text-3xl tracking-tight">

@@ -15,6 +15,7 @@ import { CurrencySwitcher } from "@/components/ui/currency-switcher";
 import { LocaleSwitcher } from "@/components/ui/locale-switcher";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { APP_CONFIG } from "@/config/app-config";
 import { CurrencyProvider } from "@/contexts/currency-context";
 import { platformDb } from "@/db";
 import { tenantMembers, tenants, users } from "@/db/schema";
@@ -28,6 +29,7 @@ import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { getPreference } from "@/server/server-actions";
 
 import { LayoutControls } from "./_components/sidebar/layout-controls";
+import { MobileTabBar } from "./_components/sidebar/mobile-tab-bar";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
 
@@ -118,27 +120,52 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
             )}
           >
             <div className="flex w-full items-center justify-between px-4 lg:px-6">
-              <div className="flex items-center gap-1 lg:gap-2">
-                <SidebarTrigger className="-ml-1" />
+              <div className="flex min-w-0 items-center gap-1 lg:gap-2">
+                {/* Below md the bottom bar opens the menu, and the trigger would
+                    be a second control for the same thing in the hardest corner
+                    of the screen to reach one-handed. */}
+                <SidebarTrigger className="-ml-1 hidden md:flex" />
                 <Separator
                   orientation="vertical"
-                  className="mx-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
+                  className="mx-2 hidden data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center md:block"
                 />
+                {/* Installed, there is no address bar and no tab title, so the
+                    app has to say what it is somewhere. */}
+                <span className="truncate font-semibold text-sm md:hidden">{APP_CONFIG.name}</span>
                 {/* The palette offers verbs now, so it needs to know which are allowed. */}
                 <SearchDialog tenantRole={normalizeTenantRole(member.role)} />
               </div>
-              <div className="flex items-center gap-2">
-                <RecentlyVisited />
+              <div className="flex shrink-0 items-center gap-1 md:gap-2">
+                {/* Desktop conveniences. Recently-visited duplicates the browser
+                    history a phone already has, and the layout controls configure
+                    a sidebar that does not exist below md. */}
+                <div className="hidden items-center gap-2 md:flex">
+                  <RecentlyVisited />
+                </div>
                 {session?.user?.id && <NotificationCenter notifications={userNotifications} userId={session.user.id} />}
-                <CurrencySwitcher />
-                <LocaleSwitcher />
-                <LayoutControls />
+                <div className="hidden items-center gap-2 md:flex">
+                  <CurrencySwitcher />
+                  <LocaleSwitcher />
+                  <LayoutControls />
+                </div>
                 <ThemeSwitcher />
               </div>
             </div>
           </header>
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6">{children}</div>
+          {/*
+            ⚠️ **This wrapper is the only owner of page padding.** It used to add
+            p-4/p-6 on top of the p-6 that most pages set on their own root, so a
+            375px phone spent 40px of its width on margins twice over. Pages
+            below no longer set their own; a new one should not either.
+
+            The bottom padding is the tab bar, which is fixed and would otherwise
+            cover the last row of every scrollable page.
+          */}
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-[calc(var(--mobile-nav-height)+var(--safe-bottom)+1rem)] md:p-6 md:pb-6">
+            {children}
+          </div>
         </SidebarInset>
+        <MobileTabBar navAccess={navAccess} />
         {session?.user?.id && <ChatWidget userId={session.user.id} />}
       </SidebarProvider>
     </CurrencyProvider>

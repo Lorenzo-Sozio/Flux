@@ -44,13 +44,13 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
   const fields = { ...toFieldMetaMap(CONTACT_FIELDS), ...customFieldsToMetaMap(customDefs) };
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center justify-between gap-4 flex-wrap">
+    <div className="">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h1 className="font-bold text-2xl">{t("title")}</h1>
           <Badge variant="secondary">{pageResult.total}</Badge>
           {activeCount > 0 && (
-            <Badge variant="outline" className="text-xs gap-1">
+            <Badge variant="outline" className="gap-1 text-xs">
               {tc("filtersActive", { count: activeCount })}
               <Link href="/dashboard/contacts" className="ml-1 hover:text-destructive">
                 ✕

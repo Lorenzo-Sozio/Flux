@@ -11,6 +11,7 @@ import { toast } from "sonner";
 
 import { deleteOrder, type OrderStatus, updateOrderStatus } from "@/actions/orders";
 import { EmptyState } from "@/components/crm/empty-state";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -128,8 +129,31 @@ export function OrdersClient({ orders: initial, stats: initialStats }: { orders:
 
   const STATUS_KEYS = ["draft", "processing", "completed", "cancelled"] as const;
 
+  const customerOf = (order: (typeof orders)[number]) =>
+    order.contactFirstName
+      ? `${order.contactFirstName} ${order.contactLastName ?? ""}`.trim()
+      : (order.companyName ?? "—");
+
+  const emptyState =
+    search || filterStatus !== "all" ? (
+      <EmptyState icon={ShoppingCart} title={te("filteredTitle")} description={te("filteredDescription")} />
+    ) : (
+      <EmptyState
+        icon={ShoppingCart}
+        title={te("orders.title")}
+        description={te("orders.description")}
+        action={
+          <Button asChild size="sm">
+            <Link href="/dashboard/sales/orders/new">
+              <Plus className="h-4 w-4" /> {t("newOrder")}
+            </Link>
+          </Button>
+        }
+      />
+    );
+
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -196,118 +220,144 @@ export function OrdersClient({ orders: initial, stats: initialStats }: { orders:
         </Select>
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-md border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b bg-muted/40 text-muted-foreground text-xs">
-              <th className="px-4 py-2.5 text-left font-medium">{t("columns.number")}</th>
-              <th className="hidden px-4 py-2.5 text-left font-medium md:table-cell">{t("columns.customer")}</th>
-              <th className="hidden px-4 py-2.5 text-left font-medium sm:table-cell">{t("columns.date")}</th>
-              <th className="px-4 py-2.5 text-left font-medium">{t("columns.status")}</th>
-              <th className="px-4 py-2.5 text-right font-medium">{tc("amount")}</th>
-              <th className="w-20 px-4 py-2.5" />
-            </tr>
-          </thead>
-          <tbody className="divide-y">
-            {filtered.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="p-0">
-                  {search || filterStatus !== "all" ? (
-                    <EmptyState
-                      icon={ShoppingCart}
-                      title={te("filteredTitle")}
-                      description={te("filteredDescription")}
-                    />
-                  ) : (
-                    <EmptyState
-                      icon={ShoppingCart}
-                      title={te("orders.title")}
-                      description={te("orders.description")}
-                      action={
-                        <Button asChild size="sm">
-                          <Link href="/dashboard/sales/orders/new">
-                            <Plus className="h-4 w-4" /> {t("newOrder")}
-                          </Link>
-                        </Button>
-                      }
-                    />
-                  )}
-                </td>
-              </tr>
-            ) : (
-              filtered.map((order) => {
-                const statusClass = STATUS_CLASS[order.status] ?? STATUS_CLASS.draft;
-                const statusLabel = t(`statuses.${order.status as "draft" | "processing" | "completed" | "cancelled"}`);
-                const customer = order.contactFirstName
-                  ? `${order.contactFirstName} ${order.contactLastName ?? ""}`.trim()
-                  : (order.companyName ?? "—");
-
-                return (
-                  <tr key={order.id} className="group transition-colors hover:bg-muted/30">
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/dashboard/sales/orders/${order.id}`}
-                        className="font-mono font-semibold text-xs transition-colors hover:text-primary"
-                      >
-                        {order.orderNumber}
-                      </Link>
-                    </td>
-                    <td className="hidden px-4 py-3 md:table-cell">
-                      <span className="text-sm">{customer}</span>
-                      {order.ownerName && (
-                        <span className="block text-muted-foreground text-xs">{order.ownerName}</span>
-                      )}
-                    </td>
-                    <td className="hidden px-4 py-3 sm:table-cell">
-                      <span className="text-muted-foreground text-xs">{formatDate(order.orderDate)}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Select
-                        value={order.status}
-                        onValueChange={(v) => handleStatusChange(order.id, v as OrderStatus)}
-                      >
-                        <SelectTrigger className="h-7 w-32 border-0 px-2 text-xs">
-                          <Badge variant="outline" className={cn("h-5 px-1.5 py-0 text-[10px]", statusClass)}>
-                            {statusLabel}
-                          </Badge>
-                        </SelectTrigger>
-                        <SelectContent>
-                          {STATUS_KEYS.map((v) => (
-                            <SelectItem key={v} value={v} className="text-xs">
-                              {t(`statuses.${v}` as Parameters<typeof t>[0])}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <span className="font-semibold tabular-nums">{formatAmount(Number(order.totalAmount))}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
-                          <Link href={`/dashboard/sales/orders/${order.id}`}>
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </Link>
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => handleDelete(order.id)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </td>
+      {filtered.length === 0 ? (
+        emptyState
+      ) : (
+        <ResponsiveRecordList
+          cards={
+            <RecordCards
+              items={filtered.map((order) => ({
+                id: order.id,
+                href: `/dashboard/sales/orders/${order.id}`,
+                title: <span className="font-mono">{order.orderNumber}</span>,
+                subtitle: customerOf(order),
+                badge: (
+                  <span className="font-semibold text-sm tabular-nums">{formatAmount(Number(order.totalAmount))}</span>
+                ),
+                fields: [
+                  { label: t("columns.date"), value: formatDate(order.orderDate) },
+                  { label: t("columns.owner"), value: order.ownerName },
+                ],
+                // The row actions on the desktop table appear on hover, which on
+                // a touchscreen means never. Here they are simply visible.
+                actions: (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => handleDelete(order.id)}
+                    aria-label={tc("delete")}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                ),
+                // Changing a status is the one thing this list is opened to do,
+                // and it cannot live inside the card's link.
+                footer: (
+                  <Select value={order.status} onValueChange={(v) => handleStatusChange(order.id, v as OrderStatus)}>
+                    <SelectTrigger className="h-9 w-full text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {STATUS_KEYS.map((v) => (
+                        <SelectItem key={v} value={v} className="text-xs">
+                          {t(`statuses.${v}` as Parameters<typeof t>[0])}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ),
+              }))}
+            />
+          }
+          table={
+            <div className="overflow-hidden rounded-md border">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/40 text-muted-foreground text-xs">
+                    <th className="px-4 py-2.5 text-left font-medium">{t("columns.number")}</th>
+                    <th className="hidden px-4 py-2.5 text-left font-medium md:table-cell">{t("columns.customer")}</th>
+                    <th className="hidden px-4 py-2.5 text-left font-medium sm:table-cell">{t("columns.date")}</th>
+                    <th className="px-4 py-2.5 text-left font-medium">{t("columns.status")}</th>
+                    <th className="px-4 py-2.5 text-right font-medium">{tc("amount")}</th>
+                    <th className="w-20 px-4 py-2.5" />
                   </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+                </thead>
+                <tbody className="divide-y">
+                  {filtered.map((order) => {
+                    const statusClass = STATUS_CLASS[order.status] ?? STATUS_CLASS.draft;
+                    const statusLabel = t(
+                      `statuses.${order.status as "draft" | "processing" | "completed" | "cancelled"}`,
+                    );
+                    const customer = customerOf(order);
+
+                    return (
+                      <tr key={order.id} className="group transition-colors hover:bg-muted/30">
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/dashboard/sales/orders/${order.id}`}
+                            className="font-mono font-semibold text-xs transition-colors hover:text-primary"
+                          >
+                            {order.orderNumber}
+                          </Link>
+                        </td>
+                        <td className="hidden px-4 py-3 md:table-cell">
+                          <span className="text-sm">{customer}</span>
+                          {order.ownerName && (
+                            <span className="block text-muted-foreground text-xs">{order.ownerName}</span>
+                          )}
+                        </td>
+                        <td className="hidden px-4 py-3 sm:table-cell">
+                          <span className="text-muted-foreground text-xs">{formatDate(order.orderDate)}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Select
+                            value={order.status}
+                            onValueChange={(v) => handleStatusChange(order.id, v as OrderStatus)}
+                          >
+                            <SelectTrigger className="h-7 w-32 border-0 px-2 text-xs">
+                              <Badge variant="outline" className={cn("h-5 px-1.5 py-0 text-[10px]", statusClass)}>
+                                {statusLabel}
+                              </Badge>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {STATUS_KEYS.map((v) => (
+                                <SelectItem key={v} value={v} className="text-xs">
+                                  {t(`statuses.${v}` as Parameters<typeof t>[0])}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <span className="font-semibold tabular-nums">{formatAmount(Number(order.totalAmount))}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <Button variant="ghost" size="icon" className="h-7 w-7" asChild>
+                              <Link href={`/dashboard/sales/orders/${order.id}`}>
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => handleDelete(order.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          }
+        />
+      )}
 
       {filtered.length > 0 && (
         <p className="text-right text-muted-foreground text-xs">

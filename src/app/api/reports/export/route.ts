@@ -5,6 +5,8 @@ import { and, desc, eq, gte, lte } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { userActivityLogs, users } from "@/db/schema";
+import { getActor } from "@/lib/auth-guard";
+import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
 
 function esc(value: string | null | undefined): string {
@@ -53,8 +55,14 @@ export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const role = (session.user as { role?: string }).role;
-  if (!["admin", "owner"].includes(role ?? "")) {
+  // ⚠️⚠️ Il ruolo del WORKSPACE, non quello di piattaforma. Questa riga leggeva
+  // `session.user.role`, che è la scala del personale di Flux e vale "user" per
+  // ogni cliente: la lista non conteneva mai il suo valore, quindi l'esportazione
+  // del registro attività era vietata a chiunque, proprietario del workspace
+  // compreso, mentre restava aperta al personale di Flux. Non somigliava a un
+  // errore: somigliava a una funzione che non c'è. Vedi le due scale nel CLAUDE.md.
+  const actor = await getActor();
+  if (!can(actor, "report:manage")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

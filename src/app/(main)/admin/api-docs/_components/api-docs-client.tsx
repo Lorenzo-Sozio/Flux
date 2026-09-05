@@ -71,6 +71,105 @@ interface ApiGroup {
   endpoints: ApiEndpoint[];
 }
 
+// ─── Errori comuni ─────────────────────────────────────────────────────────────
+
+/**
+ * Le risposte che **ogni** rotta sotto /api/crm può restituire.
+ *
+ * ⚠️ Unite al momento del rendering invece di essere ricopiate in ognuna delle
+ * diciotto voci, perché ricopiarle è esattamente come nasce la deriva: si
+ * aggiorna il testo di una e non delle altre, e chi legge quella sbagliata
+ * scopre il comportamento vero solo a runtime. Nessuna di queste era documentata
+ * da nessuna parte, quindi un 429 a metà di un'importazione arrivava senza
+ * preavviso.
+ */
+const CRM_COMMON_RESPONSES: ApiEndpoint["responses"] = [
+  {
+    status: 400,
+    description: "Manca il contesto del workspace, oppure il corpo non è JSON valido",
+    example: JSON.stringify(
+      { error: "Tenant context required. Supply X-Tenant-ID header with a valid tenant ID." },
+      null,
+      2,
+    ),
+  },
+  {
+    status: 401,
+    description: "Credenziale assente o non valida, o X-Tenant-ID in disaccordo con la chiave usata",
+    example: JSON.stringify({ error: "Unauthorized" }, null, 2),
+  },
+  {
+    status: 404,
+    description: "Il workspace indicato non esiste nel registro",
+    example: JSON.stringify({ error: "Tenant not found" }, null, 2),
+  },
+  {
+    status: 422,
+    description: "JSON valido ma dati rifiutati: `errors` elenca ogni campo che non va",
+    example: JSON.stringify(
+      { error: "Validation failed", errors: [{ field: "email", message: "Invalid email address" }] },
+      null,
+      2,
+    ),
+  },
+  {
+    status: 429,
+    description: "Superato il limite di chiamate del piano per questo mese",
+    example: JSON.stringify({ error: "Monthly API call limit reached for your plan." }, null, 2),
+  },
+];
+
+/**
+ * Le risposte comuni a ogni rotta protetta da `CRON_SECRET`.
+ *
+ * ⚠️ Il 500 non è teorico: se `CRON_SECRET` non è impostato sul server, ogni job
+ * risponde 500 per sempre e nessuno lo esegue. Vale la pena saperlo prima.
+ */
+const CRON_COMMON_RESPONSES: ApiEndpoint["responses"] = [
+  {
+    status: 401,
+    description: "Header Authorization assente o segreto sbagliato",
+    example: JSON.stringify({ error: "Unauthorized" }, null, 2),
+  },
+  {
+    status: 500,
+    description: "⚠️ `CRON_SECRET` non è configurato sul server: nessun job può girare finché non lo è",
+    example: JSON.stringify({ error: "CRON_SECRET is not configured on this server." }, null, 2),
+  },
+];
+
+/**
+ * Le risposte dichiarate da una voce, più quelle comuni che non ha già.
+ *
+ * ⚠️ Le varianti bulk non restituiscono 422. Una riga rifiutata non fa fallire la
+ * richiesta: si risponde 200 e l'errore sta dentro `results`, riga per riga.
+ * Documentare un 422 su di esse manderebbe chi integra a cercare un codice di
+ * stato che non arriva mai, invece che dentro il corpo dove sta davvero.
+ */
+function responsesFor(endpoint: ApiEndpoint): ApiEndpoint["responses"] {
+  const isCrm = endpoint.path.startsWith("/api/crm/");
+  const isCron = endpoint.path.startsWith("/api/cron/");
+  if (!isCrm && !isCron) return endpoint.responses;
+
+  // ⚠️ L'opposizione e la cancellazione non contano sul piano e quindi non
+  // rispondono mai 429. È una scelta: rifiutare un'opposizione perché il piano è
+  // esaurito significa continuare a contattare chi ha chiesto di smettere, e
+  // rifiutare una cancellazione significa mancare una scadenza che non è nostra
+  // da spostare. Nessuna delle due è una decisione di fatturazione.
+  const UNMETERED = ["/api/crm/opt-out", "/api/crm/erasure"];
+
+  const common = isCron
+    ? CRON_COMMON_RESPONSES
+    : CRM_COMMON_RESPONSES.filter(
+        (r) =>
+          !(endpoint.path.endsWith("/bulk") && r.status === 422) &&
+          !(UNMETERED.includes(endpoint.path) && r.status === 429),
+      );
+
+  const declared = new Set(endpoint.responses.map((r) => r.status));
+  return [...endpoint.responses, ...common.filter((r) => !declared.has(r.status))].sort((a, b) => a.status - b.status);
+}
+
 // ─── Data ──────────────────────────────────────────────────────────────────────
 
 const GROUPS: ApiGroup[] = [
@@ -82,7 +181,14 @@ const GROUPS: ApiGroup[] = [
     bg: "bg-amber-50",
     border: "border-amber-200",
     description:
-      "Flux CRM utilizza l'autenticazione basata su sessione tramite NextAuth v5. Dopo il login, un cookie HttpOnly `authjs.session-token` viene impostato automaticamente e inviato con ogni richiesta successiva. Le Server Actions e gli endpoint API verificano la sessione invocando `auth()` lato server — non sono necessarie API key o token Bearer per l'uso normale. Per i cron job è previsto un secret separato (`CRON_SECRET`) passato come `Authorization: Bearer <secret>`. Per i webhook di terze parti (Stripe, Resend) viene verificata la firma HMAC del payload.",
+      "Ci sono tre credenziali e non sono intercambiabili.\n\n" +
+      "1. CHIAVE DEL WORKSPACE — è così che si autentica un'integrazione, ed è la via normale per tutto ciò che sta sotto /api/crm. Si passa come `Authorization: Bearer <chiave>` e si genera dal workspace stesso, in Impostazioni → API.\n" +
+      "⚠️ Il workspace è una proprietà della chiave, non della richiesta: `X-Tenant-ID` non serve, e un `X-Tenant-ID` che ne indica un altro fa fallire la chiamata con 401 invece di essere ignorato. Ignorarlo lascerebbe un'integrazione mal configurata scrivere allegramente nel proprio workspace mentre chi l'ha configurata crede stia scrivendo in un altro, e non lo scoprirebbe nessuno finché un messaggio non arriva al cliente sbagliato.\n\n" +
+      "2. CHIAVE DI PIATTAFORMA (`IMPORT_API_KEY`) — la sola credenziale che può nominare un workspace qualsiasi, ed è di Flux, non del cliente. Anche questa come `Authorization: Bearer <chiave>`, ma richiede `X-Tenant-ID` con l'identificativo del workspace di destinazione, validato contro il registro. Senza quell'header si riceve 400 `Tenant context required`; con un identificativo che non esiste, 404.\n\n" +
+      "3. SESSIONE — il cookie HttpOnly `authjs.session-token` di NextAuth v5, cioè il modo in cui il prodotto chiama sé stesso dal browser. Il workspace viene dal JWT e il proxy inietta `x-tenant-id` internamente; lo stesso header inviato dal client non viene mai creduto.\n" +
+      "⚠️ Il diritto di scrivere lo decide il ruolo nel WORKSPACE, non quello di piattaforma: un membro `viewer` è in sola lettura anche qui e riceve 401, esattamente come nell'interfaccia.\n\n" +
+      "Un `Authorization: Bearer` presente ma non valido si ferma lì: non viene mai promosso a sessione dal cookie che casualmente accompagna la richiesta.\n\n" +
+      "Fuori da /api/crm: i cron usano `Authorization: Bearer <CRON_SECRET>`, un segreto a parte. I webhook di terze parti (Stripe, Resend) si verificano dalla firma del payload, non da una nostra chiave. Il feed calendario porta un token firmato dentro l'indirizzo, perché un programma di calendario non sa fare login.",
     isInfoOnly: true,
     endpoints: [],
   },
@@ -151,6 +257,11 @@ const GROUPS: ApiGroup[] = [
           example: `curl -X POST /api/contacts/import \\\n  -H "Cookie: authjs.session-token=..." \\\n  -F "file=@contacts.csv;type=text/csv"`,
         },
         responses: [
+          {
+            status: 429,
+            description: "Troppe importazioni ravvicinate dallo stesso indirizzo",
+            example: '{\n  "error": "Too many imports. Try again in 10 minutes."\n}',
+          },
           {
             status: 200,
             description: "Import completato",
@@ -223,6 +334,11 @@ const GROUPS: ApiGroup[] = [
           example: `curl -X POST /api/companies/import \\\n  -H "Cookie: authjs.session-token=..." \\\n  -F "file=@companies.csv;type=text/csv"`,
         },
         responses: [
+          {
+            status: 429,
+            description: "Troppe importazioni ravvicinate dallo stesso indirizzo",
+            example: '{\n  "error": "Too many imports. Try again later."\n}',
+          },
           {
             status: 200,
             description: "Import completato",
@@ -387,6 +503,22 @@ const GROUPS: ApiGroup[] = [
         },
         responses: [
           {
+            status: 401,
+            description: "Sessione assente",
+            example: '{\n  "error": "Unauthorized"\n}',
+          },
+          {
+            status: 402,
+            description:
+              "⚠️ Spazio del piano esaurito: il file non viene salvato finché non si libera spazio o si cambia piano",
+            example: '{\n  "error": "Storage limit reached for your plan."\n}',
+          },
+          {
+            status: 500,
+            description: "Il salvataggio nello store non è riuscito",
+            example: '{\n  "error": "Upload failed. Please try again."\n}',
+          },
+          {
             status: 200,
             description: "Upload completato",
             example: JSON.stringify(
@@ -443,6 +575,26 @@ const GROUPS: ApiGroup[] = [
           },
         ],
         responses: [
+          {
+            status: 400,
+            description: "`id` assente o non valido",
+            example: '{\n  "error": "Invalid document ID."\n}',
+          },
+          {
+            status: 401,
+            description: "Sessione assente",
+            example: '{\n  "error": "Unauthorized"\n}',
+          },
+          {
+            status: 403,
+            description: "Il documento appartiene a un altro workspace",
+            example: '{\n  "error": "Forbidden."\n}',
+          },
+          {
+            status: 404,
+            description: "Nessun documento con quell'id",
+            example: '{\n  "error": "Document not found."\n}',
+          },
           {
             status: 200,
             description: "Eliminazione completata",
@@ -619,6 +771,11 @@ const GROUPS: ApiGroup[] = [
         ],
         responses: [
           {
+            status: 429,
+            description: "Troppe richieste per lo stesso token",
+            example: '{\n  "error": "Too many requests"\n}',
+          },
+          {
             status: 200,
             description: "Preventivo con items, contatto e azienda",
             example: JSON.stringify(
@@ -698,6 +855,22 @@ const GROUPS: ApiGroup[] = [
           example: JSON.stringify({ token: "qt_pTkXz3mNR9aQv8", action: "accepted" }, null, 2),
         },
         responses: [
+          {
+            status: 404,
+            description: "Token sconosciuto, oppure il preventivo non esiste piu'",
+            example: '{\n  "error": "Not found"\n}',
+          },
+          {
+            status: 409,
+            description:
+              "Il preventivo non è più in uno stato che ammette una risposta: già accettato, rifiutato, o scaduto",
+            example: '{\n  "error": "Quote cannot be actioned in its current status"\n}',
+          },
+          {
+            status: 429,
+            description: "Troppe richieste per lo stesso token",
+            example: '{\n  "error": "Too many requests"\n}',
+          },
           {
             status: 200,
             description: "Azione registrata",
@@ -811,6 +984,11 @@ const GROUPS: ApiGroup[] = [
           example: JSON.stringify({ amount: 1000, from: "USD", to: "GBP" }, null, 2),
         },
         responses: [
+          {
+            status: 503,
+            description: "Il fornitore dei tassi di cambio non risponde",
+            example: '{\n  "error": "Failed to fetch exchange rates"\n}',
+          },
           {
             status: 200,
             description: "Importo convertito",
@@ -1036,8 +1214,9 @@ const GROUPS: ApiGroup[] = [
             example: `<!-- Content-Type: text/html -->\n<!DOCTYPE html>\n<html>\n  <body>\n    <h1>Disiscrizione completata</h1>\n    <p>Non riceverai più comunicazioni marketing.</p>\n  </body>\n</html>`,
           },
           {
-            status: 400,
-            description: "Token non valido o già utilizzato — HTML di errore",
+            status: 200,
+            description:
+              "⚠️ Anche con un token non valido o già usato. Questa rotta la apre una persona da un client di posta, non un programma: la pagina cambia, il codice di stato no. Non c'è nessun 4xx da intercettare.",
             example: `<!-- Content-Type: text/html -->\n<html>\n  <body>\n    <h1>Link non valido</h1>\n  </body>\n</html>`,
           },
         ],
@@ -1134,6 +1313,16 @@ const GROUPS: ApiGroup[] = [
         },
         responses: [
           {
+            status: 401,
+            description: "Firma del payload non valida",
+            example: '{\n  "error": "Invalid signature"\n}',
+          },
+          {
+            status: 500,
+            description: "`RESEND_WEBHOOK_SECRET` non configurato sul server",
+            example: '{\n  "error": "Webhook not configured"\n}',
+          },
+          {
             status: 200,
             description: "Evento elaborato",
             example: JSON.stringify({ ok: true }, null, 2),
@@ -1149,18 +1338,101 @@ const GROUPS: ApiGroup[] = [
         id: "webhooks-inbound",
         method: "POST",
         path: "/api/webhooks/email-inbound",
-        summary: "Email in entrata (inbound)",
+        summary: "Email in entrata — ponte generico",
         description:
-          "Riceve email in entrata inoltrate da Resend al CRM. Il sistema identifica il ticket dal campo `To` (es. `ticket-TKT0042@reply.flux.io`) e aggiunge il contenuto come commento al ticket.",
-        auth: "cron",
+          "Riceve un'email già normalizzata da un ponte SMTP→webhook: Cloudmailin, Mailgun, SendGrid Inbound Parse o qualunque altro. Resend ha una rotta propria, `/api/webhooks/resend-inbound`, perché firma diversamente.\n\n" +
+          "Due cose vengono decise qui, ed è utile non confonderle.\n\n" +
+          "IL TICKET si riconosce dall'OGGETTO, non dal destinatario: si cerca un riferimento della forma `[TKT-202604-E8CF49]`. Se c'è, il messaggio si accoda a quel ticket; se non c'è, ne nasce uno nuovo. Per questo un client di posta che riscrive l'oggetto spezza il thread.\n\n" +
+          "IL WORKSPACE si ricava dal riferimento del ticket quando c'è, altrimenti dal campo `to`: è il workspace configurato per spedire da quell'indirizzo (Impostazioni → Email). ⚠️ Per questo `to` è obbligatorio: senza, una prima email non appartiene a nessuno. Vengono provati tutti i destinatari, non solo il primo, perché il cliente spesso scrive a una persona e mette il supporto in copia.\n\n" +
+          "Il mittente viene cercato fra i contatti per email e, se non c'è, ne viene creato uno con `source: \"email_inbound\"`. Gli allegati vengono salvati solo se il tipo è fra quelli ammessi e sotto i 10 MB; l'estensione viene dal tipo MIME e mai dal nome del file.",
+        auth: "public",
+        parameters: [
+          {
+            name: "X-Webhook-Secret",
+            in: "header",
+            required: true,
+            type: "string",
+            description: "Deve valere esattamente `INBOUND_EMAIL_SECRET`. Non è il segreto dei cron.",
+            example: "9f2c8ab1d4e07b635c81af92",
+          },
+          {
+            name: "from",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Mittente, anche con nome visualizzato",
+            example: "Mario Rossi <mario@acme.it>",
+          },
+          {
+            name: "to",
+            in: "body",
+            required: true,
+            type: "string",
+            description:
+              "⚠️ A quale nostro indirizzo è stata scritta. È così che un'email senza riferimento ticket dice a quale workspace appartiene. Accetta anche `recipient` o `envelope.to`.",
+            example: "Supporto <supporto@acme.it>, mario@acme.it",
+          },
+          {
+            name: "subject",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Oggetto. Se contiene `[TKT-…]` il messaggio si accoda a quel ticket",
+            example: "Re: [TKT-202604-E8CF49] Stampante inceppata",
+          },
+          {
+            name: "html",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Corpo HTML. Preferito al testo; citazioni e firma vengono rimosse",
+            example: "<p>Ho provato, non si sblocca.</p>",
+          },
+          {
+            name: "text",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Corpo testuale, usato se manca l'HTML",
+            example: "Ho provato, non si sblocca.",
+          },
+          {
+            name: "messageId",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Message-ID del messaggio, per legare il thread",
+            example: "<abc@mail.acme.it>",
+          },
+          {
+            name: "inReplyTo",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "In-Reply-To del messaggio",
+            example: "<def@flux.app>",
+          },
+          {
+            name: "attachments",
+            in: "body",
+            required: false,
+            type: "array",
+            description:
+              "Allegati in base64. I nomi dei campi sono normalizzati fra i vari ponti (`filename`/`file_name`/`name`, `content_type`/`content-type`/`type`, `content`/`data`/`body`).",
+          },
+        ],
         requestBody: {
           contentType: "application/json",
           example: JSON.stringify(
             {
-              from: "cliente@example.com",
-              to: ["ticket-tkt0042@reply.flux.io"],
-              subject: "Re: Problema accesso",
-              text: "Ho seguito le istruzioni, il problema persiste.",
+              from: "Mario Rossi <mario@acme.it>",
+              to: "Supporto <supporto@acme.it>",
+              subject: "Re: [TKT-202604-E8CF49] Stampante inceppata",
+              html: "<p>Ho provato, non si sblocca.</p>",
+              text: "Ho provato, non si sblocca.",
+              messageId: "<abc@mail.acme.it>",
+              inReplyTo: "<def@flux.app>",
+              attachments: [{ filename: "foto.png", content_type: "image/png", content: "iVBORw0KGgo…" }],
             },
             null,
             2,
@@ -1169,13 +1441,106 @@ const GROUPS: ApiGroup[] = [
         responses: [
           {
             status: 200,
-            description: "Email processata e aggiunta al ticket",
-            example: JSON.stringify({ ok: true }, null, 2),
+            description: "Nuovo ticket aperto",
+            example: JSON.stringify(
+              { ok: true, action: "ticket_created", ticketId: "tkt_a1b2c3", ticketNumber: "TKT-202604-E8CF49" },
+              null,
+              2,
+            ),
           },
           {
             status: 200,
-            description: "Email ignorata (ticket non trovato dall'indirizzo reply)",
-            example: JSON.stringify({ ok: true, skipped: true, reason: "No ticket found for reply address" }, null, 2),
+            description: "Messaggio accodato a un ticket esistente",
+            example: JSON.stringify(
+              { ok: true, action: "message_appended", ticketId: "tkt_a1b2c3", messageId: "msg_7d8e9f" },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 200,
+            description:
+              "⚠️ Nulla da fare, e il motivo è in `skipped`. `unknown_workspace` significa che né l'oggetto né il destinatario hanno identificato un workspace: il messaggio è perso e la causa consueta è un workspace senza indirizzo di invio configurato. Il 200 è voluto — ritentare non lo renderebbe riconoscibile — e resta una riga nei log del server.",
+            example: JSON.stringify({ ok: true, skipped: "unknown_workspace" }, null, 2),
+          },
+          {
+            status: 400,
+            description: "`from` o `subject` mancanti, oppure corpo non JSON",
+            example: JSON.stringify({ error: "Missing from or subject" }, null, 2),
+          },
+          {
+            status: 401,
+            description: "`X-Webhook-Secret` assente o diverso, o `INBOUND_EMAIL_SECRET` non configurato sul server",
+            example: JSON.stringify({ error: "Unauthorized" }, null, 2),
+          },
+          {
+            status: 500,
+            description: "Elaborazione fallita",
+            example: JSON.stringify({ error: "Processing failed" }, null, 2),
+          },
+        ],
+      },
+      {
+        id: "webhooks-resend-inbound",
+        method: "POST",
+        path: "/api/webhooks/resend-inbound",
+        summary: "Email in entrata — adattatore Resend",
+        description:
+          "La stessa elaborazione della rotta generica, con l'involucro di Resend attorno: firma Svix da verificare e corpo grezzo da scaricare e analizzare. Da usare quando la posta in entrata passa da Resend; negli altri casi si usa `/api/webhooks/email-inbound`.\n\n" +
+          "Resend consegna i destinatari come array e vengono provati tutti, perché è quello di supporto a identificare il workspace e raramente è il primo.",
+        auth: "public",
+        parameters: [
+          {
+            name: "svix-id",
+            in: "header",
+            required: true,
+            type: "string",
+            description: "Identificativo dell'evento, parte della firma",
+          },
+          {
+            name: "svix-timestamp",
+            in: "header",
+            required: true,
+            type: "string",
+            description: "Momento dell'invio, parte della firma",
+          },
+          {
+            name: "svix-signature",
+            in: "header",
+            required: true,
+            type: "string",
+            description: "Firma HMAC verificata contro `RESEND_INBOUND_WEBHOOK_SECRET`",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "Come la rotta generica: `action` oppure `skipped`",
+            example: JSON.stringify(
+              { ok: true, action: "ticket_created", ticketId: "tkt_a1b2c3", ticketNumber: "TKT-202604-E8CF49" },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 400,
+            description: "Corpo non JSON, `email_id` assente, oppure `from`/`subject` mancanti nel messaggio",
+            example: JSON.stringify({ error: "Missing email_id" }, null, 2),
+          },
+          {
+            status: 401,
+            description: "Firma Svix non valida",
+            example: JSON.stringify({ error: "Invalid signature" }, null, 2),
+          },
+          {
+            status: 500,
+            description: "`RESEND_INBOUND_WEBHOOK_SECRET` o `RESEND_API_KEY` non configurati, o elaborazione fallita",
+            example: JSON.stringify({ error: "Webhook not configured" }, null, 2),
+          },
+          {
+            status: 502,
+            description: "Resend non ha restituito i metadati del messaggio",
+            example: JSON.stringify({ error: "Failed to fetch email metadata" }, null, 2),
           },
         ],
       },
@@ -1347,7 +1712,10 @@ const GROUPS: ApiGroup[] = [
     bg: "bg-teal-50",
     border: "border-teal-200",
     description:
-      "Endpoint REST dedicati all'import programmatico di Lead, Company, Contact e Activity. Tutte le richieste devono essere indirizzate al sottodominio del tenant (es. https://acme.fluxcrm.com/api/crm/leads): il server identifica il database corretto dall'header Host — non è necessario alcun parametro tenant nel body. Supportano sia l'autenticazione via sessione (cookie authjs.session-token) che tramite API key (Authorization: Bearer <IMPORT_API_KEY>). Con sessione, ownerId viene impostato all'ID utente corrente; con API key rimane null. Ogni endpoint dispone di una variante bulk (fino a 500 record per richiesta) con strategia di deduplicazione configurabile (onDuplicate: skip | update | error).",
+      "Endpoint REST per l'import programmatico di Lead, Company, Contact e Activity.\n\n" +
+      "⚠️ NON si usa un sottodominio per workspace. Il prodotto sta su un dominio solo e il workspace non viene mai dedotto dall'header Host: lo dice la credenziale. Con la chiave del workspace è la chiave stessa a dirlo; con la chiave di piattaforma serve l'header `X-Tenant-ID`; con la sessione viene dal JWT. Chiamare un sottodominio senza credenziale giusta risponde 400 `Tenant context required`, e non c'è nessun parametro nel corpo che possa rimediare.\n\n" +
+      "`ownerId` segue la credenziale: con la sessione il record nasce assegnato a chi ha chiamato, con una chiave API nasce senza proprietario, perché una chiave non è una persona.\n\n" +
+      "Ogni endpoint ha una variante bulk, fino a 500 record per richiesta, con `onDuplicate` a scelta fra `skip`, `update` ed `error`. Una richiesta bulk risponde sempre 200 e riporta l'esito riga per riga: le righe rifiutate stanno dentro il corpo, non nel codice di stato.",
     endpoints: [
       {
         id: "crm-leads-create",
@@ -1363,8 +1731,9 @@ const GROUPS: ApiGroup[] = [
             in: "header",
             required: false,
             type: "string",
-            description: "Bearer <IMPORT_API_KEY> — alternativa al cookie di sessione",
-            example: "Bearer sk_import_abc123",
+            description:
+              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
+            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
           },
           {
             name: "firstName",
@@ -1521,7 +1890,7 @@ const GROUPS: ApiGroup[] = [
         requestBody: {
           contentType: "application/json",
           example:
-            `# Il sottodominio nell'URL identifica il tenant (es. acme → database di Acme)\n# curl -X POST https://acme.fluxcrm.com/api/crm/leads \\\n#   -H "Authorization: Bearer <IMPORT_API_KEY>" \\\n#   -H "Content-Type: application/json" \\\n#   -d @body.json\n\n` +
+            `# Il workspace lo dice la credenziale, mai l'indirizzo: un dominio solo per tutti.\n#\n# Con la chiave del workspace — niente X-Tenant-ID, e uno diverso viene rifiutato:\n# curl -X POST https://app.fluxcrm.com/api/crm/leads \\\n#   -H "Authorization: Bearer flx_9f2c8ab1..." \\\n#   -H "Content-Type: application/json" \\\n#   -d @body.json\n#\n# Con la chiave di piattaforma — X-Tenant-ID e obbligatorio:\n# curl -X POST https://app.fluxcrm.com/api/crm/leads \\\n#   -H "Authorization: Bearer $IMPORT_API_KEY" \\\n#   -H "X-Tenant-ID: 0f3c1e5a-..." \\\n#   -H "Content-Type: application/json" \\\n#   -d @body.json\n\n` +
             JSON.stringify(
               {
                 firstName: "Anna",
@@ -1599,8 +1968,9 @@ const GROUPS: ApiGroup[] = [
             in: "header",
             required: false,
             type: "string",
-            description: "Bearer <IMPORT_API_KEY>",
-            example: "Bearer sk_import_abc123",
+            description:
+              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
+            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
           },
           {
             name: "records",
@@ -1672,8 +2042,9 @@ const GROUPS: ApiGroup[] = [
             in: "header",
             required: false,
             type: "string",
-            description: "Bearer <IMPORT_API_KEY>",
-            example: "Bearer sk_import_abc123",
+            description:
+              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
+            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
           },
           {
             name: "name",
@@ -1827,6 +2198,11 @@ const GROUPS: ApiGroup[] = [
         },
         responses: [
           {
+            status: 409,
+            description: "Conflitto — `onDuplicate=error` e un azienda corrispondente esiste già",
+            example: JSON.stringify({ error: "Conflict", reason: "duplicate_name", existingId: "cmp_77AB" }, null, 2),
+          },
+          {
             status: 201,
             description: "Azienda creata",
             example: JSON.stringify(
@@ -1869,8 +2245,9 @@ const GROUPS: ApiGroup[] = [
             in: "header",
             required: false,
             type: "string",
-            description: "Bearer <IMPORT_API_KEY>",
-            example: "Bearer sk_import_abc123",
+            description:
+              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
+            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
           },
           {
             name: "records",
@@ -1937,8 +2314,9 @@ const GROUPS: ApiGroup[] = [
             in: "header",
             required: false,
             type: "string",
-            description: "Bearer <IMPORT_API_KEY>",
-            example: "Bearer sk_import_abc123",
+            description:
+              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
+            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
           },
           { name: "firstName", in: "body", required: true, type: "string", description: "Nome", example: "Mario" },
           { name: "lastName", in: "body", required: true, type: "string", description: "Cognome", example: "Rossi" },
@@ -2072,6 +2450,11 @@ const GROUPS: ApiGroup[] = [
         },
         responses: [
           {
+            status: 409,
+            description: "Conflitto — `onDuplicate=error` e un contatto corrispondente esiste già",
+            example: JSON.stringify({ error: "Conflict", reason: "duplicate_email", existingId: "cnt_31KJ" }, null, 2),
+          },
+          {
             status: 201,
             description: "Contatto creato",
             example: JSON.stringify(
@@ -2114,8 +2497,9 @@ const GROUPS: ApiGroup[] = [
             in: "header",
             required: false,
             type: "string",
-            description: "Bearer <IMPORT_API_KEY>",
-            example: "Bearer sk_import_abc123",
+            description:
+              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
+            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
           },
           {
             name: "records",
@@ -2182,8 +2566,9 @@ const GROUPS: ApiGroup[] = [
             in: "header",
             required: false,
             type: "string",
-            description: "Bearer <IMPORT_API_KEY>",
-            example: "Bearer sk_import_abc123",
+            description:
+              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
+            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
           },
           {
             name: "type",
@@ -2320,8 +2705,9 @@ const GROUPS: ApiGroup[] = [
             in: "header",
             required: false,
             type: "string",
-            description: "Bearer <IMPORT_API_KEY>",
-            example: "Bearer sk_import_abc123",
+            description:
+              "Bearer <chiave del workspace>, oppure Bearer <IMPORT_API_KEY> con X-Tenant-ID. In alternativa il cookie di sessione.",
+            example: "Bearer flx_9f2c8ab1d4e07b635c81af9204e6b7d83a15c2e9f04b7681d3a5c9e2f8b06147",
           },
           {
             name: "records",
@@ -3010,6 +3396,335 @@ const GROUPS: ApiGroup[] = [
       },
     ],
   },
+  {
+    id: "crm-contact-point",
+    label: "Integration API (recapito)",
+    icon: Terminal,
+    color: "text-rose-600",
+    bg: "bg-rose-50",
+    border: "border-rose-200",
+    description:
+      "Rotte pensate per un'integrazione che parla con una persona — un assistente telefonico, un bot, un centralino — e che di quella persona conosce solo il modo per raggiungerla.\n\n" +
+      "⚠️ Partono da un RECAPITO, non da un id. `contactPoint` accetta un numero di telefono o un indirizzo email e viene risolto contro lead e contatti insieme: il numero si confronta a cifre, ignorando spazi, punti, trattini e prefisso internazionale, così `+39 333 111 2223` e `333.111.2223` trovano la stessa persona. Un id del chiamante qui non significherebbe niente, ed è la ragione per cui queste rotte esistono accanto a quelle di /api/crm che invece gli id li prendono.\n\n" +
+      "Se il recapito non trova nessuno la risposta è 404: nessuna di queste rotte crea la persona per poi scriverci sopra.\n\n" +
+      "Autenticazione come il resto di /api/crm: chiave del workspace, oppure chiave di piattaforma con `X-Tenant-ID`, oppure sessione.",
+    endpoints: [
+      {
+        id: "crm-notes",
+        method: "POST",
+        path: "/api/crm/notes",
+        summary: "Annota sulla scheda della persona",
+        description:
+          "Scrive un'attività sulla cronologia della persona raggiungibile a quel recapito: quello che l'integrazione ha fatto o detto, con le sue parole.\n\n" +
+          "Se `occurredAt` manca vale adesso. L'attività nasce senza proprietario quando si usa una chiave API, perché una chiave non è una persona.",
+        auth: "session",
+        parameters: [
+          {
+            name: "contactPoint",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Telefono o email della persona. Il telefono si confronta a cifre",
+            example: "+39 333 111 2223",
+          },
+          {
+            name: "text",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Cosa annotare, come lo si vuole leggere sulla scheda",
+            example: "Chiamata: conferma l'appuntamento di giovedì alle 15",
+          },
+          {
+            name: "occurredAt",
+            in: "body",
+            required: false,
+            type: "string (ISO 8601)",
+            description: "Quando è successo. Assente vale adesso",
+            example: "2026-09-05T14:30:00Z",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              contactPoint: "+39 333 111 2223",
+              text: "Chiamata: conferma l'appuntamento di giovedì alle 15",
+              occurredAt: "2026-09-05T14:30:00Z",
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 201,
+            description: "Annotazione scritta",
+            example: JSON.stringify({ status: "created", id: "act_7f21c9" }, null, 2),
+          },
+          {
+            status: 404,
+            description: "Nessuno è raggiungibile a quel recapito",
+            example: JSON.stringify({ error: "No person reachable at that contact point" }, null, 2),
+          },
+        ],
+      },
+      {
+        id: "crm-custom-fields",
+        method: "POST",
+        path: "/api/crm/custom-fields",
+        summary: "Registra i valori raccolti",
+        description:
+          "Scrive nei campi personalizzati che il workspace ha già definito, sulla scheda della persona.\n\n" +
+          "⚠️ Non è la rotta delle annotazioni con un altro nome. Un valore raccolto — un budget, una data di consegna, una taglia — deve finire nel campo che le schermate mostrano e su cui i filtri lavorano, non dentro il testo di una nota dove nessuna vista lo troverà. Le chiavi di `fields` sono gli slug delle definizioni esistenti.",
+        auth: "session",
+        parameters: [
+          {
+            name: "contactPoint",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Telefono o email della persona",
+            example: "+39 333 111 2223",
+          },
+          {
+            name: "fields",
+            in: "body",
+            required: true,
+            type: "object",
+            description:
+              "Slug del campo → valore. Gli slug sono quelli definiti in Impostazioni → Campi personalizzati",
+            example: '{ "budget": "8000", "consegna": "2026-10-15" }',
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            { contactPoint: "+39 333 111 2223", fields: { budget: "8000", consegna: "2026-10-15" } },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Valori scritti. `entity` dice se la persona è un lead o un contatto",
+            example: JSON.stringify(
+              { status: "updated", entity: "lead", id: "led_31ka9", fields: { budget: "8000" } },
+              null,
+              2,
+            ),
+          },
+          {
+            status: 404,
+            description: "Nessuno è raggiungibile a quel recapito",
+            example: JSON.stringify({ error: "No person reachable at that contact point" }, null, 2),
+          },
+        ],
+      },
+      {
+        id: "crm-orders",
+        method: "POST",
+        path: "/api/crm/orders",
+        summary: "Registra un ordine raccolto",
+        description:
+          "Crea un ordine per la persona a quel recapito, dalle righe che l'integrazione ha raccolto.\n\n" +
+          "⚠️ I totali NON si accettano dal chiamante: vengono ricalcolati qui dalle righe ricevute. Due sistemi che si accordano sull'aritmetica costano poco; un ordine con il totale sbagliato costa molto, e non si vede finché non lo si legge in fattura.",
+        auth: "session",
+        parameters: [
+          {
+            name: "contactPoint",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Telefono o email della persona",
+            example: "+39 333 111 2223",
+          },
+          {
+            name: "name",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Nome con cui la persona si è presentata, se non è già a sistema",
+            example: "Anna",
+          },
+          {
+            name: "lines",
+            in: "body",
+            required: true,
+            type: "array",
+            description: "Almeno una riga: `description`, `quantity`, `unitPrice`",
+            example: '[{ "description": "Margherita", "quantity": 2, "unitPrice": 6.5 }]',
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify(
+            {
+              contactPoint: "+39 333 111 2223",
+              name: "Anna",
+              lines: [
+                { description: "Margherita", quantity: 2, unitPrice: 6.5 },
+                { description: "Coperto", quantity: 2, unitPrice: 2 },
+              ],
+            },
+            null,
+            2,
+          ),
+        },
+        responses: [
+          {
+            status: 201,
+            description: "Ordine creato. I totali sono quelli ricalcolati qui",
+            example: JSON.stringify({ status: "created", id: "ord_9c14be", total: "17.00" }, null, 2),
+          },
+          {
+            status: 409,
+            description:
+              "⚠️ Hai mandato un totale e non corrisponde a quello calcolato dalle righe. La risposta riporta entrambi, così si vede dove sta la differenza senza rifare i conti a mano. L'ordine non viene creato.",
+            example: JSON.stringify({ error: "Total mismatch", declared: "16.00", computed: "17.00" }, null, 2),
+          },
+        ],
+      },
+      {
+        id: "crm-close",
+        method: "POST",
+        path: "/api/crm/close",
+        summary: "Chiudi le trattative dopo il processo",
+        description:
+          "Chiude le trattative aperte della persona quando l'integrazione ha finito.\n\n" +
+          "⚠️ I tre esiti descrivono IL PROCESSO DELL'INTEGRAZIONE, non la vendita. `RAGGIUNTO` significa che la persona ha risposto: la trattativa resta APERTA, perché ci penserà un umano. `ABBANDONATO` e `NON_RAGGIUNTO` chiudono come persa, e il motivo resta scritto per esteso sulla trattativa — «persa» è quanto di più vicino la pipeline sappia dire quando in realtà non si sa come sia finita.",
+        auth: "session",
+        parameters: [
+          {
+            name: "contactPoint",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Telefono o email della persona",
+            example: "+39 333 111 2223",
+          },
+          {
+            name: "outcome",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Esito del processo. Un valore diverso da questi tre viene rifiutato",
+            enum: ["RAGGIUNTO", "ABBANDONATO", "NON_RAGGIUNTO"],
+            example: "ABBANDONATO",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify({ contactPoint: "+39 333 111 2223", outcome: "ABBANDONATO" }, null, 2),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Trattative chiuse. Con `RAGGIUNTO` la lista è vuota perché non si chiude niente",
+            example: JSON.stringify({ status: "closed", ids: ["dea_18f2c0"] }, null, 2),
+          },
+          {
+            status: 404,
+            description: "Nessuna trattativa da chiudere per quel recapito",
+            example: JSON.stringify({ error: "No deal to close for that contact point" }, null, 2),
+          },
+        ],
+      },
+      {
+        id: "crm-opt-out",
+        method: "POST",
+        path: "/api/crm/opt-out",
+        summary: "Registra che non vuole più essere contattata",
+        description:
+          "La persona ha detto all'integrazione di non essere più contattata.\n\n" +
+          "⚠️ Vale su ENTRAMBI i consensi. Marketing e trattative erano due elenchi che non si parlavano: chi si toglieva da uno restava nell'altro, e continuava a ricevere. Questa rotta li tocca insieme, che è ciò che la persona intendeva dicendolo una volta sola.",
+        auth: "session",
+        parameters: [
+          {
+            name: "contactPoint",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Telefono o email della persona",
+            example: "+39 333 111 2223",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify({ contactPoint: "+39 333 111 2223" }, null, 2),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Registrato. `ids` elenca i record messi a tacere",
+            example: JSON.stringify({ status: "opted_out", ids: ["led_31ka9", "cnt_77bb1"] }, null, 2),
+          },
+          {
+            status: 404,
+            description: "Nessuno è raggiungibile a quel recapito",
+            example: JSON.stringify({ error: "No person reachable at that contact point" }, null, 2),
+          },
+        ],
+      },
+      {
+        id: "crm-erasure",
+        method: "POST",
+        path: "/api/crm/erasure",
+        summary: "Cancellazione GDPR art. 17",
+        description:
+          "Cancella la persona raggiungibile a quel recapito.\n\n" +
+          "⚠️ La risposta è un REPORT, non una conferma: dice cosa è stato cancellato, cosa è stato conservato con la persona tolta da dentro, e cosa è stato deliberatamente lasciato stare. Chi risponde all'interessato deve poter dire quale delle tre cose è successa a ciascun dato, e una conferma generica non glielo permette.\n\n" +
+          "Con `preview: true` conta soltanto e non cancella niente: è come si guarda prima di premere.",
+        auth: "session",
+        parameters: [
+          {
+            name: "contactPoint",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Telefono o email della persona",
+            example: "mario@acme.it",
+          },
+          {
+            name: "preview",
+            in: "body",
+            required: false,
+            type: "boolean",
+            description: "Conta e non cancella. Assente vale `false`",
+            example: "true",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify({ contactPoint: "mario@acme.it", preview: true }, null, 2),
+        },
+        responses: [
+          {
+            status: 200,
+            description: "Conteggio, senza aver cancellato niente (`preview: true`)",
+            example: JSON.stringify({ status: "preview", found: { leads: 1, contacts: 0, activities: 12 } }, null, 2),
+          },
+          {
+            status: 200,
+            description: "Cancellazione eseguita, con il report di cosa è successo a ciascuna cosa",
+            example: JSON.stringify(
+              {
+                status: "erased",
+                report: {
+                  deleted: { lead: 1, activity: 12, task: 3 },
+                  anonymised: { ticket: 2 },
+                  kept: { order: "obbligo fiscale" },
+                },
+              },
+              null,
+              2,
+            ),
+          },
+        ],
+      },
+    ],
+  },
 ];
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
@@ -3235,7 +3950,7 @@ function EndpointSection({
           {/* Right: responses */}
           <div className="space-y-4">
             <h4 className="font-semibold text-gray-400 text-xs uppercase tracking-wide">Risposte</h4>
-            {endpoint.responses.map((r) => (
+            {responsesFor(endpoint).map((r) => (
               <div key={`${r.status}-${r.description}`}>
                 <div className="mb-1.5 flex items-center gap-2">
                   <StatusBadge status={r.status} />
@@ -3271,7 +3986,12 @@ function GroupSection({
         </div>
         <div>
           <h2 className="font-bold text-gray-900 text-lg">{group.label}</h2>
-          <p className="mt-1 text-gray-500 text-sm leading-relaxed">{group.description}</p>
+          {/*
+            `whitespace-pre-line` so a section that needs paragraphs can have
+            them. Descriptions written as one block are unaffected: they contain
+            no newlines to honour.
+          */}
+          <p className="mt-1 whitespace-pre-line text-gray-500 text-sm leading-relaxed">{group.description}</p>
         </div>
       </div>
 
@@ -3327,7 +4047,7 @@ function ErrorCodesSection() {
       status: 500,
       name: "Internal Server Error",
       description:
-        "Errore imprevisto lato server. Cause comuni: sottodominio non associato a nessun tenant (TENANT_NOT_FOUND — verifica che l'URL contenga il sottodominio corretto), oppure errore DB/runtime. I webhook restituiscono 500 per segnalare a Stripe di ritentare l'invio. Controlla i log dell'applicazione.",
+        "Errore imprevisto lato server, o database del workspace irraggiungibile. I webhook rispondono 500 apposta, per far ritentare il mittente. Controlla i log. ⚠️ Un workspace sbagliato NON arriva qui: una credenziale senza workspace risponde 400, uno inesistente 404.",
     },
     {
       status: 503,
@@ -3672,8 +4392,11 @@ export function ApiDocsClient() {
 
               <div className="mt-4 flex flex-wrap gap-4">
                 {[
-                  { dot: "bg-cyan-400", text: "Multi-tenant: database isolato per sottodominio (Host header)" },
-                  { dot: "bg-amber-400", text: "Session-based auth (NextAuth v5) o API key Bearer" },
+                  { dot: "bg-cyan-400", text: "Multi-tenant su un dominio solo: il workspace lo dice la credenziale" },
+                  {
+                    dot: "bg-amber-400",
+                    text: "Chiave del workspace, chiave di piattaforma con X-Tenant-ID, o sessione",
+                  },
                   { dot: "bg-blue-400", text: "Risposte JSON (salvo CSV / HTML / GIF)" },
                   { dot: "bg-purple-400", text: "Webhook firmati (Stripe HMAC, Resend)" },
                   { dot: "bg-yellow-400", text: "Cron protetti da Authorization: Bearer $CRON_SECRET" },

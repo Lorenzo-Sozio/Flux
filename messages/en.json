@@ -1527,7 +1527,8 @@
       "notifications": "Notifications",
       "logout": "Log out",
       "unknownUser": "Unknown User"
-    }
+    },
+    "more": "More"
   },
   "nextActions": {
     "title": "Needs you",
@@ -1588,7 +1589,8 @@
       "customer": "Customer",
       "status": "Status",
       "total": "Total",
-      "date": "Date"
+      "date": "Date",
+      "owner": "Owner"
     },
     "createSuccess": "Order created.",
     "updateSuccess": "Order updated.",
@@ -2286,7 +2288,12 @@
       "viewer": "Viewer"
     },
     "rolePerms": {
-      "owner": ["All admin permissions", "Transfer workspace ownership", "Delete workspace", "Manage billing"],
+      "owner": [
+        "All admin permissions",
+        "Transfer workspace ownership",
+        "Delete workspace",
+        "Manage billing"
+      ],
       "admin": [
         "All user permissions",
         "Invite and manage users",
@@ -3298,5 +3305,16 @@
     "alreadyTried": "Already tried",
     "exchanges": "{count, plural, one {# message} other {# messages}}",
     "notes": "{count, plural, one {# internal note} other {# internal notes}}"
+  },
+  "pwa": {
+    "updateTitle": "A new version is ready",
+    "updateBody": "Reload to use it. Anything you are in the middle of will be lost.",
+    "updateAction": "Reload",
+    "installTitle": "Install Flux",
+    "installBody": "Add it to the home screen and open it like an app.",
+    "installAction": "Install",
+    "installDismiss": "Not now",
+    "iosInstallBody": "Tap Share, then Add to Home Screen.",
+    "offlineBanner": "No connection. Changes cannot be saved."
   }
 }

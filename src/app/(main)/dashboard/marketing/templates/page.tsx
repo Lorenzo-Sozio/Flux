@@ -21,7 +21,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 export default async function TemplatesPage() {
   const t = await getTranslations("marketing.templates");
   const tc = await getTranslations("common");
-  let templates: any[] = [];
+  let templates: Awaited<ReturnType<typeof getEmailTemplates>> = [];
   try {
     templates = await getEmailTemplates();
   } catch (e) {
@@ -29,24 +29,24 @@ export default async function TemplatesPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <MailIcon className="w-6 h-6 text-primary" />
+          <h1 className="flex items-center gap-2 font-bold text-2xl">
+            <MailIcon className="h-6 w-6 text-primary" />
             {t("title")}
           </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{t("subtitle")}</p>
+          <p className="mt-0.5 text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
         <Button asChild>
           <Link href="/dashboard/marketing/templates/editor">
-            <Plus className="h-4 w-4 mr-1" />
+            <Plus className="mr-1 h-4 w-4" />
             {t("newTemplate")}
           </Link>
         </Button>
       </div>
 
-      <div className="rounded-lg border bg-card overflow-hidden">
+      <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -67,29 +67,29 @@ export default async function TemplatesPage() {
                     <TableCell>
                       <div>
                         <p className="font-semibold">{tmpl.name}</p>
-                        {tmpl.description && <p className="text-xs text-muted-foreground mt-0.5">{tmpl.description}</p>}
+                        {tmpl.description && <p className="mt-0.5 text-muted-foreground text-xs">{tmpl.description}</p>}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{tmpl.subject}</TableCell>
+                    <TableCell className="max-w-xs truncate text-muted-foreground text-sm">{tmpl.subject}</TableCell>
                     <TableCell>
                       <span
-                        className={`text-xs px-2 py-1 rounded capitalize font-medium ${CATEGORY_COLORS[tmpl.category] ?? CATEGORY_COLORS.general}`}
+                        className={`rounded px-2 py-1 font-medium text-xs capitalize ${CATEGORY_COLORS[tmpl.category] ?? CATEGORY_COLORS.general}`}
                       >
                         {tmpl.category ?? "general"}
                       </span>
                     </TableCell>
                     <TableCell>
                       {bodyKb > 0 && (
-                        <Badge variant={bodyKb > 80 ? "destructive" : "secondary"} className="text-[10px] font-mono">
+                        <Badge variant={bodyKb > 80 ? "destructive" : "secondary"} className="font-mono text-[10px]">
                           {bodyKb} KB
                         </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
+                    <TableCell className="text-muted-foreground text-xs">
                       {new Date(tmpl.createdAt).toLocaleDateString()}
                     </TableCell>
                     <TableCell className="text-right">
-                      <div className="flex justify-end items-center gap-2">
+                      <div className="flex items-center justify-end gap-2">
                         <Button variant="outline" size="sm" asChild className="h-7 gap-1 text-xs">
                           <Link href={`/dashboard/marketing/templates/editor?id=${tmpl.id}`}>
                             <PenSquare className="h-3 w-3" />
@@ -104,13 +104,13 @@ export default async function TemplatesPage() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-16 text-muted-foreground">
-                  <MailIcon className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                <TableCell colSpan={6} className="py-16 text-center text-muted-foreground">
+                  <MailIcon className="mx-auto mb-3 h-10 w-10 opacity-20" />
                   <p className="font-medium">{t("noTemplates")}</p>
-                  <p className="text-sm mt-1">{t("noTemplatesDescription")}</p>
+                  <p className="mt-1 text-sm">{t("noTemplatesDescription")}</p>
                   <Button asChild className="mt-4" size="sm">
                     <Link href="/dashboard/marketing/templates/editor">
-                      <Plus className="h-4 w-4 mr-1" /> {t("newTemplate")}
+                      <Plus className="mr-1 h-4 w-4" /> {t("newTemplate")}
                     </Link>
                   </Button>
                 </TableCell>

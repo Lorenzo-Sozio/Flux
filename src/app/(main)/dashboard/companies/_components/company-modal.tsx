@@ -108,6 +108,7 @@ export function CompanyModal({
   categories = [],
   companyTypes = [],
 }: {
+  // biome-ignore lint/suspicious/noExplicitAny: typing this as the schema row surfaces three real mismatches — annualRevenue and employeeCount come back from the numeric columns as strings while the form expects numbers, and CompaniesTable passes a narrower row. That is a change to the form, not to this signature.
   company?: any;
   children: React.ReactNode;
   categories?: LookupItem[];
@@ -350,7 +351,7 @@ export function CompanyModal({
         }}
       >
         <DialogTrigger asChild>{children}</DialogTrigger>
-        <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-[700px]">
+        <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[700px]">
           <DialogHeader className="border-b px-6 pt-6 pb-4">
             <div className="flex items-center justify-between gap-2">
               <DialogTitle className="text-lg">
@@ -710,6 +711,7 @@ export function CompanyActions({
   categories = [],
   companyTypes = [],
 }: {
+  // biome-ignore lint/suspicious/noExplicitAny: typing this as the schema row surfaces three real mismatches — annualRevenue and employeeCount come back from the numeric columns as strings while the form expects numbers, and CompaniesTable passes a narrower row. That is a change to the form, not to this signature.
   company: any;
   categories?: LookupItem[];
   companyTypes?: LookupItem[];

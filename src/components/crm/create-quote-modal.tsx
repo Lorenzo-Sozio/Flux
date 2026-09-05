@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus, Trash2 } from "lucide-react";
@@ -99,7 +99,7 @@ export function CreateQuoteModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Quote</DialogTitle>
           <DialogDescription>Add line items and configure pricing</DialogDescription>
@@ -114,7 +114,7 @@ export function CreateQuoteModal({
             {/* Items Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Line Items</h3>
+                <h3 className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Line Items</h3>
                 <Button
                   type="button"
                   variant="outline"
@@ -136,9 +136,9 @@ export function CreateQuoteModal({
               </div>
 
               {fields.map((field, index) => (
-                <div key={field.id} className="border rounded-lg p-4 space-y-3 bg-muted/20">
+                <div key={field.id} className="space-y-3 rounded-lg border bg-muted/20 p-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                       Item {index + 1}
                     </span>
                     {fields.length > 1 && (
@@ -304,7 +304,7 @@ export function CreateQuoteModal({
 
             {/* Quote-level adjustments */}
             <div className="space-y-3 border-t pt-4">
-              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Quote Adjustments</h3>
+              <h3 className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Quote Adjustments</h3>
               <div className="grid grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
@@ -379,7 +379,7 @@ export function CreateQuoteModal({
                     <FormControl>
                       <Textarea
                         placeholder="Additional notes for the customer..."
-                        className="text-sm resize-none"
+                        className="resize-none text-sm"
                         rows={3}
                         {...field}
                       />
@@ -391,7 +391,7 @@ export function CreateQuoteModal({
             </div>
 
             {/* Actions */}
-            <div className="flex gap-2 justify-end pt-2 border-t">
+            <div className="flex justify-end gap-2 border-t pt-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>

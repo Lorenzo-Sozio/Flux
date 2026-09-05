@@ -12,7 +12,7 @@ import { AnalyticsOverview } from "./_components/analytics-overview";
 
 export default function Page() {
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6">
       {/* The funnel lives under the pipeline; this button pointed at
           /dashboard/analytics/funnel, which has never existed (audit rilievo D-05). */}
       <div className="flex items-center justify-between">

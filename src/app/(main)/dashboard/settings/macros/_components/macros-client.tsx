@@ -106,7 +106,7 @@ export function MacrosClient({ macros: initial }: { macros: Macro[] }) {
       .replace(/<[^>]+>/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-    return plain.length > max ? plain.slice(0, max) + "…" : plain;
+    return plain.length > max ? `${plain.slice(0, max)}…` : plain;
   };
 
   return (
@@ -128,11 +128,11 @@ export function MacrosClient({ macros: initial }: { macros: Macro[] }) {
         <div className="space-y-3">
           {macros.map((macro) => (
             <Card key={macro.id}>
-              <CardContent className="p-4 flex items-start gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
+              <CardContent className="flex items-start gap-4 p-4">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-sm">{macro.name}</span>
-                    <Badge variant="outline" className="text-[10px] h-4 gap-1 px-1.5">
+                    <Badge variant="outline" className="h-4 gap-1 px-1.5 text-[10px]">
                       {macro.isPublic ? (
                         <>
                           <Globe className="h-2.5 w-2.5" /> {t("publicBadge")}
@@ -144,10 +144,10 @@ export function MacrosClient({ macros: initial }: { macros: Macro[] }) {
                       )}
                     </Badge>
                   </div>
-                  {macro.description && <p className="text-xs text-muted-foreground mb-2">{macro.description}</p>}
-                  <p className="text-xs bg-muted/50 rounded p-2 text-muted-foreground">{plainPreview(macro.body)}</p>
+                  {macro.description && <p className="mb-2 text-muted-foreground text-xs">{macro.description}</p>}
+                  <p className="rounded bg-muted/50 p-2 text-muted-foreground text-xs">{plainPreview(macro.body)}</p>
                 </div>
-                <div className="flex gap-1 flex-shrink-0">
+                <div className="flex flex-shrink-0 gap-1">
                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(macro)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
@@ -168,7 +168,7 @@ export function MacrosClient({ macros: initial }: { macros: Macro[] }) {
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editing ? t("editMacro") : t("newMacro")}</DialogTitle>
           </DialogHeader>
@@ -195,7 +195,7 @@ export function MacrosClient({ macros: initial }: { macros: Macro[] }) {
             </div>
             <div>
               <Label>
-                {t("bodyLabel")} <span className="text-muted-foreground font-normal text-xs">— {t("bodyHint")}</span>
+                {t("bodyLabel")} <span className="font-normal text-muted-foreground text-xs">— {t("bodyHint")}</span>
               </Label>
               <div className="mt-1.5">
                 <RichTextEditor

@@ -179,11 +179,11 @@ export function SendEmailModal({
       </DialogTrigger>
 
       {/*
-        Fixed-height dialog: h-[88vh].
+        Fixed-height dialog: h-[88dvh].
         Internal structure is a flex column where only the body area grows.
         No magic-number calc() — every section uses flex sizing.
       */}
-      <DialogContent className="flex h-[88vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[820px]">
+      <DialogContent className="flex h-[88dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[820px]">
         {/* ── Header ───────────────────────────────────────────────────────── */}
         <DialogHeader className="shrink-0 border-b px-6 pt-6 pb-4">
           <DialogTitle className="text-lg">{recipientName ? `New Email — ${recipientName}` : "New Email"}</DialogTitle>

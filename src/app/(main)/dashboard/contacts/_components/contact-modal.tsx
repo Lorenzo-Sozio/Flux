@@ -104,6 +104,7 @@ function _Section({ title }: { title: string }) {
   );
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: the callers pass three differently shaped contact rows (list, detail and lookup), so narrowing this is a change to them rather than to this line.
 export function ContactModal({ contact, children }: { contact?: any; children: React.ReactNode }) {
   const t = useTranslations("contacts");
   const tc = useTranslations("common");
@@ -325,7 +326,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
         }}
       >
         <DialogTrigger asChild>{children}</DialogTrigger>
-        <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-[700px]">
+        <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[700px]">
           <DialogHeader className="border-b px-6 pt-6 pb-4">
             <div className="flex items-center justify-between gap-2">
               <DialogTitle className="text-lg">
@@ -646,6 +647,7 @@ export function DeleteContactButton({ id }: { id: string }) {
   );
 }
 
+// biome-ignore lint/suspicious/noExplicitAny: see ContactModal above.
 export function ContactActions({ contact }: { contact: any }) {
   return (
     <div className="flex items-center justify-end gap-2">

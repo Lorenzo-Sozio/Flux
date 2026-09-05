@@ -25,8 +25,14 @@
   },
   {
     "file": "src/lib/api-import-auth.ts",
-    "description": "a viewer session is accepted for writes",
-    "find": "  if (role === \"viewer\") return null;",
-    "replace": "  if (false) return null;"
+    "description": "⚠️⚠️ la guardia torna a leggere il ruolo di piattaforma: un membro in sola lettura scrive attraverso le API",
+    "find": "  if (!can(actor, \"record:write\")) return null;",
+    "replace": "  if (user.role === \"viewer\") return null;"
+  },
+  {
+    "file": "src/lib/api-import-auth.ts",
+    "description": "⚠️ chi non appartiene a nessuno spazio di lavoro non ricade piu' su viewer e passa comunque",
+    "find": "    tenantRole: normalizeTenantRole(user.tenantRole),",
+    "replace": "    tenantRole: (user.tenantRole ?? \"editor\") as \"editor\","
   }
 ]

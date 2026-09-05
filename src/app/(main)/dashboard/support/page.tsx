@@ -34,7 +34,7 @@ const PRIORITY_BORDER: Record<string, string> = {
 export default function SupportDashboard() {
   const t = useTranslations("support.dashboard");
   const [tickets, setTickets] = useState<any[]>([]);
-  const [slas, setSLAs] = useState<any[]>([]);
+  const [_slas, setSLAs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -117,18 +117,18 @@ export default function SupportDashboard() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>
-          <p className="text-muted-foreground mt-1">{t("subtitle")}</p>
+          <h1 className="font-bold text-3xl tracking-tight">{t("title")}</h1>
+          <p className="mt-1 text-muted-foreground">{t("subtitle")}</p>
         </div>
         <CreateTicketButton />
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           icon={AlertCircle}
           label={t("openTickets")}
@@ -158,15 +158,15 @@ export default function SupportDashboard() {
       </div>
 
       {/* Main grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* ── Left: ticket lists ─────────────────────────────────── */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="space-y-5 lg:col-span-2">
           {/* Open Tickets */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <div>
                 <CardTitle className="text-base">{t("openTicketsList")}</CardTitle>
-                <CardDescription className="text-xs mt-0.5">{t("openTicketsListDesc")}</CardDescription>
+                <CardDescription className="mt-0.5 text-xs">{t("openTicketsListDesc")}</CardDescription>
               </div>
               <Button variant="outline" size="sm" className="h-8 text-xs" asChild>
                 <Link href="/dashboard/support/tickets">{t("viewAll")}</Link>
@@ -181,11 +181,11 @@ export default function SupportDashboard() {
                 </div>
               ) : openTickets.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 py-10 text-center">
-                  <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/20">
                     <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
                   </div>
                   <p className="font-medium text-sm">{t("allCaughtUp")}</p>
-                  <p className="text-xs text-muted-foreground">{t("noOpenTickets")}</p>
+                  <p className="text-muted-foreground text-xs">{t("noOpenTickets")}</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -199,33 +199,33 @@ export default function SupportDashboard() {
                       <Link
                         key={ticket.id}
                         href={`/dashboard/support/tickets/${ticket.id}`}
-                        className={`flex items-start gap-3 p-3 rounded-lg border border-l-4 hover:bg-muted/40 transition-colors group ${borderClass}`}
+                        className={`group flex items-start gap-3 rounded-lg border border-l-4 p-3 transition-colors hover:bg-muted/40 ${borderClass}`}
                       >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
+                        <div className="min-w-0 flex-1">
+                          <div className="mb-0.5 flex items-center gap-2">
                             <span className="font-mono text-[11px] text-muted-foreground">{ticket.ticketNumber}</span>
                             <TicketPriorityBadge
                               priority={ticket.priority}
                               showIcon={false}
-                              className="text-[10px] h-4 px-1.5"
+                              className="h-4 px-1.5 text-[10px]"
                             />
                           </div>
-                          <p className="font-medium text-sm line-clamp-1 group-hover:text-primary transition-colors">
+                          <p className="line-clamp-1 font-medium text-sm transition-colors group-hover:text-primary">
                             {ticket.subject}
                           </p>
-                          <div className="flex items-center gap-3 mt-1">
-                            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <div className="mt-1 flex items-center gap-3">
+                            <span className="flex items-center gap-1 text-muted-foreground text-xs">
                               <ChannelIcon className="h-3 w-3" />
                               {ticket.contact?.name ?? t("noContact")}
                             </span>
                           </div>
                         </div>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap mt-0.5">{dateLabel}</span>
+                        <span className="mt-0.5 whitespace-nowrap text-muted-foreground text-xs">{dateLabel}</span>
                       </Link>
                     );
                   })}
                   {openTickets.length > 5 && (
-                    <p className="text-xs text-center text-muted-foreground pt-1">
+                    <p className="pt-1 text-center text-muted-foreground text-xs">
                       {t("moreOpenTickets", { count: openTickets.length - 5 })}
                     </p>
                   )}
@@ -250,25 +250,25 @@ export default function SupportDashboard() {
                   ))}
                 </div>
               ) : resolvedTickets.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">{t("noResolvedYet")}</p>
+                <p className="py-6 text-center text-muted-foreground text-sm">{t("noResolvedYet")}</p>
               ) : (
                 <div className="divide-y">
                   {resolvedTickets.slice(0, 4).map((ticket) => (
                     <Link
                       key={ticket.id}
                       href={`/dashboard/support/tickets/${ticket.id}`}
-                      className="flex items-center justify-between py-3 hover:bg-muted/30 px-1 rounded transition-colors group"
+                      className="group flex items-center justify-between rounded px-1 py-3 transition-colors hover:bg-muted/30"
                     >
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
                         <TicketStatusBadge status="resolved" dotOnly />
-                        <span className="font-mono text-[11px] text-muted-foreground shrink-0">
+                        <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
                           {ticket.ticketNumber}
                         </span>
-                        <span className="text-sm font-medium line-clamp-1 group-hover:text-primary transition-colors">
+                        <span className="line-clamp-1 font-medium text-sm transition-colors group-hover:text-primary">
                           {ticket.subject}
                         </span>
                       </div>
-                      <span className="text-xs text-muted-foreground shrink-0 ml-3">
+                      <span className="ml-3 shrink-0 text-muted-foreground text-xs">
                         {ticket.resolvedAt
                           ? new Date(ticket.resolvedAt).toLocaleDateString(undefined, {
                               month: "short",
@@ -321,16 +321,16 @@ export default function SupportDashboard() {
                   return (
                     <div key={key} className="space-y-1.5">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                        <span className="flex items-center gap-1.5 font-medium text-muted-foreground">
                           <Icon className="h-3.5 w-3.5" />
                           {t(`channelLabels.${key as "email" | "chat" | "phone" | "social"}`)}
                         </span>
-                        <span className="tabular-nums font-semibold">
+                        <span className="font-semibold tabular-nums">
                           {count}
-                          <span className="text-muted-foreground font-normal ml-1">({pct}%)</span>
+                          <span className="ml-1 font-normal text-muted-foreground">({pct}%)</span>
                         </span>
                       </div>
-                      <div className="h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                         <div
                           className={`h-full rounded-full transition-all ${meta.barClass}`}
                           style={{ width: `${pct}%` }}

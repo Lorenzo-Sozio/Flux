@@ -124,7 +124,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6">
       <RecordVisit type="contact" name={fullName || "Contact"} href={`/dashboard/contacts/${contactId}`} />
 
       {/* ── Hero ── */}

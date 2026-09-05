@@ -102,7 +102,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6">
       <RecordVisit type="company" name={company.name || "Company"} href={`/dashboard/companies/${companyId}`} />
 
       {/* ── Hero ── */}

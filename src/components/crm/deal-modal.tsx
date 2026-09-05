@@ -193,7 +193,7 @@ export function DealModal({
         )}
       </DialogTrigger>
 
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-[640px]">
+      <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[640px]">
         <DialogHeader className="border-b px-6 pt-6 pb-4">
           <div className="flex items-center justify-between gap-2">
             <DialogTitle className="text-lg">

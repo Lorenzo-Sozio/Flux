@@ -78,7 +78,7 @@ export function MergeEntityModal<T extends object>({
       })
       .catch(() => toast.error(t("failedToLoad")))
       .finally(() => setFetching(false));
-  }, [open, keepId, mergeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, keepId, mergeId, fetchEntity, fields, t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleMerge() {
     if (!keepEntity || !mergeEntity) return;
@@ -113,7 +113,7 @@ export function MergeEntityModal<T extends object>({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <GitMerge className="h-5 w-5" />
@@ -127,24 +127,24 @@ export function MergeEntityModal<T extends object>({
           </div>
         ) : keepEntity && mergeEntity ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-[140px_1fr_1fr] gap-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground pb-1 border-b">
+            <div className="grid grid-cols-[140px_1fr_1fr] gap-3 border-b pb-1 font-semibold text-muted-foreground text-xs uppercase tracking-wider">
               <div />
               <div className="text-center">
                 {t("keep")}
-                <div className="font-normal normal-case text-foreground mt-0.5">{getDisplayName(keepEntity)}</div>
+                <div className="mt-0.5 font-normal text-foreground normal-case">{getDisplayName(keepEntity)}</div>
               </div>
               <div className="text-center">
                 {t("mergeWillBeDeleted")}
-                <div className="font-normal normal-case text-foreground mt-0.5">{getDisplayName(mergeEntity)}</div>
+                <div className="mt-0.5 font-normal text-foreground normal-case">{getDisplayName(mergeEntity)}</div>
               </div>
             </div>
 
             {diffFields.length > 0 && (
               <div className="space-y-1">
-                <p className="text-xs font-medium text-muted-foreground mb-2">{t("clickToSelect")}</p>
+                <p className="mb-2 font-medium text-muted-foreground text-xs">{t("clickToSelect")}</p>
                 {diffFields.map((field) => (
-                  <div key={field.key} className="grid grid-cols-[140px_1fr_1fr] gap-3 items-start py-1.5">
-                    <span className="text-xs text-muted-foreground pt-1">{field.label}</span>
+                  <div key={field.key} className="grid grid-cols-[140px_1fr_1fr] items-start gap-3 py-1.5">
+                    <span className="pt-1 text-muted-foreground text-xs">{field.label}</span>
                     {(["keep", "merge"] as const).map((side) => {
                       const entity = side === "keep" ? keepEntity : mergeEntity;
                       const selected = (choices[field.key] ?? "keep") === side;
@@ -153,16 +153,16 @@ export function MergeEntityModal<T extends object>({
                           key={side}
                           type="button"
                           onClick={() => setChoices((c) => ({ ...c, [field.key]: side }))}
-                          className={`text-left text-sm px-2 py-1.5 rounded border transition-colors ${
+                          className={`rounded border px-2 py-1.5 text-left text-sm transition-colors ${
                             selected
                               ? "border-primary bg-primary/5 font-medium"
-                              : "border-transparent hover:border-muted-foreground/30 text-muted-foreground"
+                              : "border-transparent text-muted-foreground hover:border-muted-foreground/30"
                           }`}
                         >
                           {getHasValue(entity, field) ? (
                             getDisplayValue(entity, field)
                           ) : (
-                            <span className="text-xs italic text-muted-foreground/50">{t("empty")}</span>
+                            <span className="text-muted-foreground/50 text-xs italic">{t("empty")}</span>
                           )}
                         </button>
                       );
@@ -173,7 +173,7 @@ export function MergeEntityModal<T extends object>({
             )}
 
             {identicalWithValue.length > 0 && (
-              <details className="text-xs text-muted-foreground">
+              <details className="text-muted-foreground text-xs">
                 <summary className="cursor-pointer hover:text-foreground">
                   {t("identicalFields", { count: identicalWithValue.length })}
                 </summary>
@@ -187,12 +187,12 @@ export function MergeEntityModal<T extends object>({
               </details>
             )}
 
-            <p className="text-xs text-muted-foreground border-t pt-3">
+            <p className="border-t pt-3 text-muted-foreground text-xs">
               {reassignedDescription(keepEntity, mergeEntity)}
             </p>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground py-4">{t("couldNotLoad")}</p>
+          <p className="py-4 text-muted-foreground text-sm">{t("couldNotLoad")}</p>
         )}
 
         <DialogFooter>

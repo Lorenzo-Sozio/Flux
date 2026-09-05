@@ -183,7 +183,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6">
       <RecordVisit type="lead" name={fullName || "Lead"} href={`/dashboard/leads/${leadId}`} />
 
       {/* ── Hero ── */}

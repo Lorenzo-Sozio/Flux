@@ -264,3 +264,88 @@ html {
 .disable-transitions * {
   transition: none !important;
 }
+
+/* ─── Mobile and installed-app behaviour ──────────────────────────────────────
+ *
+ * Everything below exists because a phone is not a small desktop. The rules are
+ * grouped by the problem they solve rather than by selector, because each one
+ * is unobvious on its own.
+ */
+
+/* The safe area, as variables, so components can reason about it without every
+ * one of them repeating an `env()` call with its own fallback. `viewportFit:
+ * "cover"` in the root layout is what makes these non-zero on a notched phone;
+ * without it they are always 0 and the bottom bar sits on the home indicator. */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  /* Height of the mobile tab bar, referenced by anything that must not sit
+   * underneath it — the chat button, sticky form footers, toasts. */
+  --mobile-nav-height: 3.75rem;
+}
+
+/* iOS Safari's `100vh` is the height of the window *without* the address bar,
+ * so a full-height element is always taller than what is actually visible and
+ * the page scrolls by the height of the toolbar. `dvh` is the fix, and is used
+ * directly in the components; this covers the html/body pair underneath them. */
+html,
+body {
+  min-height: 100dvh;
+}
+
+/* An installed app that rubber-bands at the top edge looks like a web page in a
+ * costume. Only in standalone: in a browser tab the bounce is expected, and
+ * removing it there breaks pull-to-refresh, which people use. */
+@media (display-mode: standalone) {
+  html {
+    overscroll-behavior-y: none;
+  }
+}
+
+/* Touch devices get larger hit areas on the controls that are otherwise sized
+ * for a mouse. 36px is comfortable with a cursor and small under a fingertip;
+ * the guidance from both platforms is 44px.
+ *
+ * ⚠️ Scoped to `(pointer: coarse)` rather than to a width breakpoint on purpose.
+ * A touchscreen laptop needs this and a narrow desktop window does not, and
+ * width cannot tell them apart. */
+@media (pointer: coarse) {
+  button:not([data-slot="sidebar-menu-button"]):not([data-no-touch-target]),
+  [role="button"]:not([data-no-touch-target]),
+  a[data-slot="button"] {
+    min-height: 2.75rem;
+  }
+
+  /* Icon-only controls need the width too, or they stay 36px wide and 44px tall,
+   * which is harder to hit than either. */
+  button[data-slot="button"][class*="size-9"],
+  button[data-slot="button"][class*="size-8"] {
+    min-width: 2.75rem;
+  }
+
+  /* Rows in a list are the primary target on a phone. */
+  [data-slot="select-item"],
+  [data-slot="dropdown-menu-item"],
+  [data-slot="command-item"] {
+    min-height: 2.75rem;
+  }
+}
+
+/* A native `<select>` under 16px makes iOS zoom the whole page on focus, and it
+ * does not zoom back out. The Input and Textarea primitives already handle this
+ * with `text-base md:text-sm`; the native select did not. */
+@media (max-width: 767px) {
+  select {
+    font-size: 1rem;
+  }
+}
+
+/* Long tables are the one place horizontal scrolling is right rather than a
+ * failure, and momentum makes it feel deliberate. */
+@media (pointer: coarse) {
+  [data-slot="table-container"] {
+    -webkit-overflow-scrolling: touch;
+  }
+}

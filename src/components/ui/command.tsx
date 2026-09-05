@@ -54,7 +54,12 @@ function CommandDialog({
       </DialogHeader>
       <DialogContent
         className={cn(
-          "top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0",
+          // The palette fills a phone: the keyboard opens over the lower half,
+          // and a box floating a third of the way down would have had its
+          // results behind it. From sm up it is the floating box it has always
+          // been, sitting a third of the way down where the eye already is.
+          "overflow-hidden p-0",
+          "sm:top-1/3 sm:translate-y-0",
           className
         )}
         showCloseButton={showCloseButton}
@@ -97,6 +102,9 @@ function CommandList({
       data-slot="command-list"
       className={cn(
         "no-scrollbar max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none",
+        // Inside the full-screen palette on a phone there is no reason to stop
+        // at 18rem: the list takes what is left after the input.
+        "max-sm:in-data-[slot=dialog-content]:max-h-none max-sm:in-data-[slot=dialog-content]:flex-1",
         className
       )}
       {...props}

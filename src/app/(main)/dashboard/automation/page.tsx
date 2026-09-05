@@ -22,7 +22,7 @@ export default async function AutomationPage() {
   ]);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <AutomationOverview rules={rules} logs={logs} />
       <AutomationClient rules={rules} canEdit={canEdit} />
       <AutomationLogs logs={logs} rules={rules} limit={20} />

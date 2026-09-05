@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { bulkAssignCompanies, bulkDeleteCompanies, bulkUpdateCompanyStatus } from "@/actions/bulk";
 import { BulkActionBar } from "@/components/crm/bulk-action-bar";
 import { EmptyState } from "@/components/crm/empty-state";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -129,6 +130,23 @@ export function CompaniesTable({ companies, users, canEdit, narrowed, categories
     });
   }
 
+  const emptyState = narrowed ? (
+    <EmptyState icon={Building2Icon} title={te("filteredTitle")} description={te("filteredDescription")} />
+  ) : (
+    <EmptyState
+      icon={Building2Icon}
+      title={te("companies.title")}
+      description={te("companies.description")}
+      action={
+        canEdit ? (
+          <CompanyModal categories={categories} companyTypes={companyTypes}>
+            <Button size="sm">{t("newCompany")}</Button>
+          </CompanyModal>
+        ) : undefined
+      }
+    />
+  );
+
   return (
     <div className="space-y-3">
       {canEdit && selected.size > 0 && (
@@ -143,107 +161,118 @@ export function CompaniesTable({ companies, users, canEdit, narrowed, categories
         />
       )}
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {canEdit && (
-              <TableHead className="w-10">
-                <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
-              </TableHead>
-            )}
-            <TableHead>{t("columns.name")}</TableHead>
-            <TableHead>{t("columns.industry")}</TableHead>
-            <TableHead>{t("columns.city")}</TableHead>
-            <TableHead>{t("columns.type")}</TableHead>
-            <TableHead>{t("columns.status")}</TableHead>
-            <TableHead>{t("columns.employees")}</TableHead>
-            <TableHead>{t("columns.assignedTo")}</TableHead>
-            {canEdit && <TableHead className="w-[100px] text-right">{t("columns.actions")}</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {companies.map((company) => (
-            <TableRow
-              key={company.id}
-              className={`hover:bg-muted/40 ${selected.has(company.id) ? "bg-primary/5" : ""}`}
-            >
-              {canEdit && (
-                <TableCell>
-                  <Checkbox
-                    checked={selected.has(company.id)}
-                    onCheckedChange={() => toggle(company.id)}
-                    aria-label={`Select ${company.name}`}
-                  />
-                </TableCell>
-              )}
-              <TableCell>
-                <Link href={`/dashboard/companies/${company.id}`} className="font-medium hover:underline">
-                  {company.name}
-                </Link>
-                {company.website && (
-                  <p className="max-w-[180px] truncate text-muted-foreground text-xs">{company.website}</p>
-                )}
-              </TableCell>
-              <TableCell>{company.industry}</TableCell>
-              <TableCell>{company.city}</TableCell>
-              <TableCell>
-                {company.type && (
+      {companies.length === 0 ? (
+        emptyState
+      ) : (
+        <ResponsiveRecordList
+          cards={
+            <RecordCards
+              items={companies.map((company) => ({
+                id: company.id,
+                href: `/dashboard/companies/${company.id}`,
+                title: company.name,
+                subtitle: company.website,
+                badge: company.type ? (
                   <span
                     className={`rounded px-1.5 py-0.5 font-medium text-xs capitalize ${TYPE_COLORS[company.type] ?? ""}`}
                   >
                     {t(`types.${company.type as "customer" | "prospect" | "partner" | "vendor"}`)}
                   </span>
-                )}
-              </TableCell>
-              <TableCell className="capitalize">{company.status}</TableCell>
-              <TableCell>{company.employeeCount}</TableCell>
-              <TableCell>
-                {company.ownerName ? (
-                  <div className="flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-[10px] text-primary">
-                      {company.ownerName.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="text-sm">{company.ownerName}</span>
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground text-xs">—</span>
-                )}
-              </TableCell>
-              {canEdit && (
-                <TableCell className="text-right">
+                ) : undefined,
+                fields: [
+                  { label: t("columns.industry"), value: company.industry },
+                  { label: t("columns.city"), value: company.city },
+                  { label: t("columns.status"), value: <span className="capitalize">{company.status}</span> },
+                  { label: t("columns.assignedTo"), value: company.ownerName },
+                ],
+                actions: canEdit ? (
                   <CompanyActions company={company} categories={categories} companyTypes={companyTypes} />
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
-          {companies.length === 0 && (
-            <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={canEdit ? 9 : 8} className="p-0">
-                {narrowed ? (
-                  <EmptyState
-                    icon={Building2Icon}
-                    title={te("filteredTitle")}
-                    description={te("filteredDescription")}
-                  />
-                ) : (
-                  <EmptyState
-                    icon={Building2Icon}
-                    title={te("companies.title")}
-                    description={te("companies.description")}
-                    action={
-                      canEdit ? (
-                        <CompanyModal categories={categories} companyTypes={companyTypes}>
-                          <Button size="sm">{t("newCompany")}</Button>
-                        </CompanyModal>
-                      ) : undefined
-                    }
-                  />
-                )}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+                ) : undefined,
+                selected: selected.has(company.id),
+                onToggle: canEdit ? () => toggle(company.id) : undefined,
+                selectLabel: company.name,
+              }))}
+            />
+          }
+          table={
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {canEdit && (
+                    <TableHead className="w-10">
+                      <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
+                    </TableHead>
+                  )}
+                  <TableHead>{t("columns.name")}</TableHead>
+                  <TableHead>{t("columns.industry")}</TableHead>
+                  <TableHead>{t("columns.city")}</TableHead>
+                  <TableHead>{t("columns.type")}</TableHead>
+                  <TableHead>{t("columns.status")}</TableHead>
+                  <TableHead>{t("columns.employees")}</TableHead>
+                  <TableHead>{t("columns.assignedTo")}</TableHead>
+                  {canEdit && <TableHead className="w-[100px] text-right">{t("columns.actions")}</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {companies.map((company) => (
+                  <TableRow
+                    key={company.id}
+                    className={`hover:bg-muted/40 ${selected.has(company.id) ? "bg-primary/5" : ""}`}
+                  >
+                    {canEdit && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selected.has(company.id)}
+                          onCheckedChange={() => toggle(company.id)}
+                          aria-label={`Select ${company.name}`}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <Link href={`/dashboard/companies/${company.id}`} className="font-medium hover:underline">
+                        {company.name}
+                      </Link>
+                      {company.website && (
+                        <p className="max-w-[180px] truncate text-muted-foreground text-xs">{company.website}</p>
+                      )}
+                    </TableCell>
+                    <TableCell>{company.industry}</TableCell>
+                    <TableCell>{company.city}</TableCell>
+                    <TableCell>
+                      {company.type && (
+                        <span
+                          className={`rounded px-1.5 py-0.5 font-medium text-xs capitalize ${TYPE_COLORS[company.type] ?? ""}`}
+                        >
+                          {t(`types.${company.type as "customer" | "prospect" | "partner" | "vendor"}`)}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="capitalize">{company.status}</TableCell>
+                    <TableCell>{company.employeeCount}</TableCell>
+                    <TableCell>
+                      {company.ownerName ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-[10px] text-primary">
+                            {company.ownerName.charAt(0).toUpperCase()}
+                          </span>
+                          <span className="text-sm">{company.ownerName}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                    {canEdit && (
+                      <TableCell className="text-right">
+                        <CompanyActions company={company} categories={categories} companyTypes={companyTypes} />
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          }
+        />
+      )}
     </div>
   );
 }

@@ -406,7 +406,7 @@ export function TaskModal({
         </Button>
       </DialogTrigger>
 
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-[680px]">
+      <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[680px]">
         {/* Header */}
         <DialogHeader className="border-b px-6 pt-6 pb-4">
           <div className="flex items-center gap-3">

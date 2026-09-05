@@ -122,22 +122,53 @@ describe("the platform key stays the platform key", () => {
 });
 
 describe("what is not a bearer token", () => {
-  it("falls back to the session, and a viewer gets nothing", async () => {
-    auth.mockResolvedValue({ user: { id: "u1", role: "viewer" } });
+  it("⚠️⚠️ refuses a workspace member who is read-only", async () => {
+    // The two scales. `role` is Flux's own staff field and reads "user" for every
+    // customer who has ever signed in, so a check written against it was never
+    // true for anybody outside Flux — and a viewer could create contacts, leads,
+    // companies, notes and orders through this API, and trigger erasure and
+    // opt-out with them. The earlier version of this very test hid that, by
+    // putting the workspace role into the platform field.
+    auth.mockResolvedValue({ user: { id: "u1", role: "user", tenantRole: "viewer" } });
 
-    expect(await authenticateApiRequest(richiesta({}))).toBeNull();
+    expect(await authenticateApiRequest(richiesta({ "x-tenant-id": ACME.id }))).toBeNull();
+  });
+
+  it("⚠️ refuses somebody who belongs to no workspace at all", async () => {
+    // No membership is not the same as a low rank, and it must not read as one:
+    // an unresolved role falls to viewer, which is refused.
+    auth.mockResolvedValue({ user: { id: "u1", role: "user", tenantRole: null } });
+
+    expect(await authenticateApiRequest(richiesta({ "x-tenant-id": ACME.id }))).toBeNull();
   });
 
   it("gives a session user the tenant the middleware injected", async () => {
-    auth.mockResolvedValue({ user: { id: "u1", role: "editor" } });
+    auth.mockResolvedValue({ user: { id: "u1", role: "user", tenantRole: "editor" } });
 
     const outcome = await authenticateApiRequest(richiesta({ "x-tenant-id": ACME.id }));
 
     expect(outcome).toEqual({ via: "session", userId: "u1", role: "editor", tenantId: ACME.id });
   });
 
+  it("accepts the legacy spelling of the editor role", async () => {
+    // `tenant_members.role` still holds "user" on older rows, which the role
+    // table reads as editor. A member whose row was never rewritten must not
+    // silently lose access.
+    auth.mockResolvedValue({ user: { id: "u1", role: "user", tenantRole: "user" } });
+
+    expect((await authenticateApiRequest(richiesta({ "x-tenant-id": ACME.id })))?.role).toBe("editor");
+  });
+
+  it("lets Flux's own staff through, whatever their workspace rank", async () => {
+    // Platform staff operate across every tenant from /admin; that is what the
+    // platform scale is actually for.
+    auth.mockResolvedValue({ user: { id: "u1", role: "admin", tenantRole: "viewer" } });
+
+    expect((await authenticateApiRequest(richiesta({ "x-tenant-id": ACME.id })))?.via).toBe("session");
+  });
+
   it("never reaches the session path when a bearer token is present but wrong", async () => {
-    auth.mockResolvedValue({ user: { id: "u1", role: "admin" } });
+    auth.mockResolvedValue({ user: { id: "u1", role: "user", tenantRole: "admin" } });
 
     expect(await authenticateApiRequest(conChiave("wrong"))).toBeNull();
     // A bad key must not be silently upgraded by whatever cookie happens to ride along.

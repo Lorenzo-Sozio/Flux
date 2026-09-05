@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createTenantDb } from "@/db";
 import { activities } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint, whereToNote } from "@/lib/contact-point";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest) {
   if (!authResult) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
   if (!authResult.tenantId) {
     return NextResponse.json(
       { error: "Tenant context required. Supply X-Tenant-ID header with a valid tenant ID." },
@@ -33,6 +35,18 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // Conta la chiamata sul piano, come ogni altra rotta /api/crm. Le rotte di
+  // opposizione e cancellazione sono volutamente escluse: rifiutarle per un
+  // limite di piano significherebbe continuare a contattare chi ha chiesto di
+  // smettere, e mancare una scadenza che non è nostra da spostare.
+  try {
+    await checkAndTrackApiCall(authResult.tenantId);
+  } catch (err) {
+    if (err instanceof EntitlementError) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    throw err;
+  }
   let body: unknown;
   try {
     body = await req.json();

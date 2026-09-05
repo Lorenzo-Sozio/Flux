@@ -5,6 +5,8 @@ import { eq } from "drizzle-orm";
 import { auth } from "@/auth";
 import { APP_CONFIG } from "@/config/app-config";
 import { quotes } from "@/db/schema";
+import { getActor } from "@/lib/auth-guard";
+import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -29,11 +31,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   if (!q) return new NextResponse("Not found", { status: 404 });
 
+  // ⚠️ Il ruolo del WORKSPACE, non quello di piattaforma: le due ultime righe
+  // leggevano `session.user.role`, che per ogni cliente vale "user", quindi
+  // nessun amministratore di workspace poteva aprire il preventivo di un collega.
   const canView =
-    session.user.id === q.ownerId ||
-    session.user.id === q.deal?.ownerId ||
-    session.user.role === "admin" ||
-    session.user.role === "owner";
+    session.user.id === q.ownerId || session.user.id === q.deal?.ownerId || can(await getActor(), "user:read");
 
   if (!canView) return new NextResponse("Forbidden", { status: 403 });
 

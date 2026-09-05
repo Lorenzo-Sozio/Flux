@@ -19,6 +19,10 @@ let valori: { id: string; fieldId: string; value: string }[] = [];
 const creati: { name: string; slug: string; entityType: string; fieldType: string }[] = [];
 let person: { leadIds: string[]; contactIds: string[] } = { leadIds: ["l1"], contactIds: [] };
 
+vi.mock("@/lib/billing/usage", () => ({
+  checkAndTrackApiCall: async () => undefined,
+  EntitlementError: class extends Error {},
+}));
 vi.mock("@/components/crm/automation/rule-engine", () => ({
   runAutomations: async (ctx: { entityType: string; event: string; oldData: unknown; newData: unknown }) => {
     regole.push(ctx);

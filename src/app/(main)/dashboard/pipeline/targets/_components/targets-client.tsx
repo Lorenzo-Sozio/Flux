@@ -122,45 +122,45 @@ export function TargetsClient({ users, initialTargets }: Props) {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+          <h1 className="flex items-center gap-2 font-bold text-2xl tracking-tight">
             <Target className="h-6 w-6 text-primary" /> {t("title")}
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">{t("subtitle")}</p>
+          <p className="mt-1 text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
       </div>
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">{t("cardTitle")}</CardTitle>
+          <CardTitle className="font-medium text-muted-foreground text-sm">{t("cardTitle")}</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/40">
-                  <th className="px-4 py-2.5 text-left font-medium text-xs text-muted-foreground sticky left-0 bg-muted/40 min-w-[160px]">
+                  <th className="sticky left-0 min-w-[160px] bg-muted/40 px-4 py-2.5 text-left font-medium text-muted-foreground text-xs">
                     {t("colUser")}
                   </th>
                   {months.map((m) => (
                     <th
                       key={m}
-                      className="px-3 py-2.5 text-center font-medium text-xs text-muted-foreground min-w-[140px]"
+                      className="min-w-[140px] px-3 py-2.5 text-center font-medium text-muted-foreground text-xs"
                     >
-                      {format(new Date(m + "-01"), "MMM yyyy")}
+                      {format(new Date(`${m}-01`), "MMM yyyy")}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {users.map((user) => (
-                  <tr key={user.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-4 py-3 sticky left-0 bg-background">
+                  <tr key={user.id} className="transition-colors hover:bg-muted/20">
+                    <td className="sticky left-0 bg-background px-4 py-3">
                       <div>
                         <p className="font-medium leading-none">{user.name ?? user.email}</p>
-                        <Badge variant="outline" className="text-xs mt-1 capitalize">
+                        <Badge variant="outline" className="mt-1 text-xs capitalize">
                           {user.role}
                         </Badge>
                       </div>
@@ -173,10 +173,10 @@ export function TargetsClient({ users, initialTargets }: Props) {
                       return (
                         <td key={period} className="px-3 py-2.5 text-center">
                           {isEditing ? (
-                            <div className="flex flex-col gap-1.5 min-w-[130px]">
+                            <div className="flex min-w-[130px] flex-col gap-1.5">
                               <div className="flex items-center gap-1">
                                 <Select value={editCurrency} onValueChange={setEditCurrency}>
-                                  <SelectTrigger className="h-7 w-16 text-xs px-1.5">
+                                  <SelectTrigger className="h-7 w-16 px-1.5 text-xs">
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -195,7 +195,7 @@ export function TargetsClient({ users, initialTargets }: Props) {
                                   value={editAmount}
                                   onChange={(e) => setEditAmount(e.target.value)}
                                   placeholder={t("amountPlaceholder")}
-                                  className="h-7 text-xs flex-1"
+                                  className="h-7 flex-1 text-xs"
                                 />
                               </div>
                               <Input
@@ -235,7 +235,7 @@ export function TargetsClient({ users, initialTargets }: Props) {
                               <button
                                 type="button"
                                 onClick={() => startEdit(target)}
-                                className="text-sm font-semibold tabular-nums hover:text-primary transition-colors"
+                                className="font-semibold text-sm tabular-nums transition-colors hover:text-primary"
                               >
                                 {formatCurrency(parseFloat(target.targetAmount), {
                                   currency: target.currency,
@@ -243,14 +243,14 @@ export function TargetsClient({ users, initialTargets }: Props) {
                                 })}
                               </button>
                               {target.targetDeals != null && (
-                                <span className="text-xs text-muted-foreground">
+                                <span className="text-muted-foreground text-xs">
                                   {t("dealsLabel", { count: target.targetDeals })}
                                 </span>
                               )}
                               <Button
                                 size="icon"
                                 variant="ghost"
-                                className="h-5 w-5 absolute -right-5 top-0 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
+                                className="-right-5 absolute top-0 h-5 w-5 text-destructive opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
                                 onClick={() => handleDelete(target.id)}
                                 disabled={isPending}
                               >
@@ -261,10 +261,10 @@ export function TargetsClient({ users, initialTargets }: Props) {
                             <button
                               type="button"
                               onClick={() => startNew(user.id, period)}
-                              className="text-muted-foreground/40 hover:text-primary transition-colors"
+                              className="text-muted-foreground/40 transition-colors hover:text-primary"
                               title={t("setTargetTitle")}
                             >
-                              <Plus className="h-4 w-4 mx-auto" />
+                              <Plus className="mx-auto h-4 w-4" />
                             </button>
                           )}
                         </td>
@@ -278,7 +278,7 @@ export function TargetsClient({ users, initialTargets }: Props) {
         </CardContent>
       </Card>
 
-      <p className="text-xs text-muted-foreground">{t("footerHint")}</p>
+      <p className="text-muted-foreground text-xs">{t("footerHint")}</p>
     </div>
   );
 }

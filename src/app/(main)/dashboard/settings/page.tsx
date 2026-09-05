@@ -75,7 +75,7 @@ export default async function SettingsPage() {
   const visible = cards.filter((c) => can(actor, c.need));
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div>
         <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
         <p className="text-muted-foreground">{t("general.title")}</p>

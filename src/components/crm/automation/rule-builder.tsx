@@ -418,7 +418,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
 
-      <DialogContent className="flex max-h-[90vh] flex-col gap-0 p-0 sm:max-w-[700px]">
+      <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[700px]">
         <DialogHeader className="border-b px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Zap className="h-5 w-5 text-yellow-500" />

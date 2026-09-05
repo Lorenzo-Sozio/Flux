@@ -125,10 +125,10 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
   );
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
           <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button onClick={() => setAddOpen(true)}>
@@ -148,7 +148,7 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
           </CardHeader>
           <CardContent>
             {groupedByEntity[et]?.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
+              <p className="py-4 text-center text-muted-foreground text-sm">
                 {t("noFieldsForEntity", { entity: t(`entityTypes.${et as "contact" | "lead" | "company" | "deal"}`) })}
               </p>
             ) : (

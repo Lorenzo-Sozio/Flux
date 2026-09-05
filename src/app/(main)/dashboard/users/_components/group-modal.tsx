@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2Icon, Users } from "lucide-react";
-import { Controller, useForm } from "react-hook-form";
+import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -149,8 +149,8 @@ export function GroupModal({ group, children, onSaved }: Props) {
       }}
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[520px] max-h-[90vh] flex flex-col p-0 gap-0">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+      <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[520px]">
+        <DialogHeader className="border-b px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-2">
             <span
               className="inline-flex h-7 w-7 items-center justify-center rounded-full"
@@ -162,20 +162,20 @@ export function GroupModal({ group, children, onSaved }: Props) {
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
-          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+          <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
             {/* Name */}
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                 Group Name <span className="text-destructive">*</span>
               </Label>
               <Input {...register("name")} placeholder="e.g. Sales Team" />
-              {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
+              {errors.name && <p className="text-destructive text-xs">{errors.name.message}</p>}
             </div>
 
             {/* Description */}
             <div className="flex flex-col gap-1.5">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Description</Label>
+              <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Description</Label>
               <Textarea
                 {...register("description")}
                 placeholder="Briefly describe this group's purpose…"
@@ -186,8 +186,8 @@ export function GroupModal({ group, children, onSaved }: Props) {
 
             {/* Color */}
             <div className="flex flex-col gap-2">
-              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Color</Label>
-              <div className="flex items-center gap-2 flex-wrap">
+              <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Color</Label>
+              <div className="flex flex-wrap items-center gap-2">
                 {PRESET_COLORS.map((c) => (
                   <button
                     key={c}
@@ -195,7 +195,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
                     onClick={() => setValue("color", c, { shouldDirty: true })}
                     className={`h-6 w-6 rounded-full transition-all ${
                       watchedColor === c
-                        ? "ring-2 ring-offset-2 ring-primary scale-110"
+                        ? "scale-110 ring-2 ring-primary ring-offset-2"
                         : "opacity-80 hover:opacity-100"
                     }`}
                     style={{ backgroundColor: c }}
@@ -204,7 +204,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
                 <Input
                   {...register("color")}
                   type="color"
-                  className="h-6 w-10 cursor-pointer p-0.5 rounded-full border"
+                  className="h-6 w-10 cursor-pointer rounded-full border p-0.5"
                 />
               </div>
             </div>
@@ -212,7 +212,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
             {/* Members */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Members</Label>
+                <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Members</Label>
                 <Badge variant="secondary" className="text-xs">
                   {watchedMemberIds.length} selected
                 </Badge>
@@ -224,31 +224,39 @@ export function GroupModal({ group, children, onSaved }: Props) {
                 className="h-8 text-sm"
               />
               <ScrollArea className="h-48 rounded-md border">
-                <div className="p-2 space-y-0.5">
+                <div className="space-y-0.5 p-2">
                   {filteredUsers.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-4">
+                    <p className="py-4 text-center text-muted-foreground text-xs">
                       {users.length === 0 ? "Loading users…" : "No users match your search."}
                     </p>
                   )}
                   {filteredUsers.map((u) => (
+                    // The row was a <label> wrapped around a Radix checkbox,
+                    // which renders a button rather than an input — so the label
+                    // was associated with nothing and only the checkbox itself
+                    // was ever the target. A real, visually hidden input is the
+                    // control now; the Radix one is the picture of it, and the
+                    // whole row is tappable, which is what a phone needs.
                     <label
                       key={u.id}
-                      className="flex items-center gap-3 rounded-md px-2 py-1.5 hover:bg-accent cursor-pointer"
+                      className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-accent"
                     >
-                      <Controller
-                        control={control}
-                        name="memberIds"
-                        render={() => (
-                          <Checkbox
-                            checked={watchedMemberIds.includes(u.id)}
-                            onCheckedChange={() => toggleMember(u.id)}
-                          />
-                        )}
+                      <input
+                        type="checkbox"
+                        className="sr-only"
+                        checked={watchedMemberIds.includes(u.id)}
+                        onChange={() => toggleMember(u.id)}
+                      />
+                      <Checkbox
+                        checked={watchedMemberIds.includes(u.id)}
+                        tabIndex={-1}
+                        aria-hidden
+                        className="pointer-events-none"
                       />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium leading-none truncate">{u.name || u.email || u.id}</p>
+                        <p className="truncate font-medium text-sm leading-none">{u.name || u.email || u.id}</p>
                         {u.name && u.email && (
-                          <p className="text-xs text-muted-foreground mt-0.5 truncate">{u.email}</p>
+                          <p className="mt-0.5 truncate text-muted-foreground text-xs">{u.email}</p>
                         )}
                       </div>
                     </label>
@@ -258,13 +266,13 @@ export function GroupModal({ group, children, onSaved }: Props) {
             </div>
           </div>
 
-          <DialogFooter className="px-6 py-4 border-t bg-muted/30 flex-row items-center">
+          <DialogFooter className="flex-row items-center border-t bg-muted/30 px-6 py-4">
             {isEditing && (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="mr-auto text-destructive hover:text-destructive/90 hover:bg-destructive/10"
+                className="mr-auto text-destructive hover:bg-destructive/10 hover:text-destructive/90"
                 onClick={handleDelete}
               >
                 Delete Group

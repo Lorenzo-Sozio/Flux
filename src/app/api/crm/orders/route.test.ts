@@ -18,6 +18,10 @@ const regole: { entityType: string; event: string }[] = [];
 const eventi: string[] = [];
 let contatti: { id: string }[] = [];
 
+vi.mock("@/lib/billing/usage", () => ({
+  checkAndTrackApiCall: async () => undefined,
+  EntitlementError: class extends Error {},
+}));
 vi.mock("@/components/crm/automation/rule-engine", () => ({
   runAutomations: async (ctx: { entityType: string; event: string }) => {
     regole.push(ctx);

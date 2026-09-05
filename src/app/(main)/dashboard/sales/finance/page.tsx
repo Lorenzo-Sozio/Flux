@@ -21,7 +21,7 @@ export default async function FinancePage() {
   const [data, t] = await Promise.all([getFinanceDashboard(), getTranslations("finance")]);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-bold text-2xl tracking-tight">{t("overviewTitle")}</h1>

@@ -133,10 +133,10 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
           <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button onClick={openAdd}>
@@ -152,24 +152,24 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
         </CardHeader>
         <CardContent>
           {stages.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-6 text-center">{t("noStages")}</p>
+            <p className="py-6 text-center text-muted-foreground text-sm">{t("noStages")}</p>
           ) : (
             <div className="space-y-2">
               {stages.map((stage, index) => (
                 <div
                   key={stage.id}
-                  className="flex items-center gap-3 rounded-lg border bg-background px-3 py-2.5 group"
+                  className="group flex items-center gap-3 rounded-lg border bg-background px-3 py-2.5"
                 >
-                  <GripVertical className="h-4 w-4 text-muted-foreground/40 shrink-0" />
+                  <GripVertical className="h-4 w-4 shrink-0 text-muted-foreground/40" />
                   <span
-                    className="h-3.5 w-3.5 rounded-full shrink-0 border border-border/50"
+                    className="h-3.5 w-3.5 shrink-0 rounded-full border border-border/50"
                     style={{ background: stage.color ?? "#94a3b8" }}
                   />
                   <span className="flex-1 font-medium text-sm">{stage.name}</span>
-                  <Badge variant="outline" className="text-xs shrink-0">
+                  <Badge variant="outline" className="shrink-0 text-xs">
                     {stage.defaultProbability ?? 0}%
                   </Badge>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
                     <Button
                       variant="ghost"
                       size="icon"
@@ -289,7 +289,7 @@ function StageFormFields({
               onChange={(e) => onChange({ ...form, color: e.target.value })}
               className="h-9 w-14 cursor-pointer rounded-md border border-input bg-background p-1"
             />
-            <span className="text-xs text-muted-foreground font-mono">{form.color}</span>
+            <span className="font-mono text-muted-foreground text-xs">{form.color}</span>
           </div>
         </div>
         <div className="space-y-1.5">

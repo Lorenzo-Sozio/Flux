@@ -61,17 +61,45 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-xl bg-background p-6 text-sm ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          // ── Shared ──────────────────────────────────────────────────────────
+          "fixed z-50 flex flex-col bg-background text-sm ring-1 ring-foreground/10 duration-100 outline-none",
+          // ⚠️ The height cap is `dvh`, not `vh`. On iOS Safari `100vh` is the
+          // window *without* the address bar, so a dialog capped at 90vh is
+          // taller than the screen and its buttons sit under the toolbar, where
+          // they cannot be tapped. There was no cap at all before this, and
+          // eighteen dialogs had each grown their own — all of them in `vh`.
+          "max-h-[100dvh]",
+          // ── Phone: the whole screen ────────────────────────────────────────
+          // Nearly every dialog in this product is a form, and a form on a
+          // 375px screen wants the width. Full screen also settles the virtual
+          // keyboard question: the content is an ordinary scroll container
+          // filling the viewport, so the browser scrolls the focused field into
+          // view by itself. A sheet pinned to `bottom-0` does not have that
+          // property — the keyboard opens underneath it and the fields at the
+          // bottom become unreachable on iOS.
+          "inset-0 w-full rounded-none p-5",
+          "pt-[calc(1.25rem+var(--safe-top))] pb-[calc(1.25rem+var(--safe-bottom))]",
+          "data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom-4",
+          "data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom-4",
+          // ── Tablet and up: the centred box it has always been ──────────────
+          "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2",
+          "sm:max-h-[calc(100dvh-4rem)] sm:rounded-xl sm:p-6",
+          "sm:data-open:zoom-in-95 sm:data-open:slide-in-from-bottom-0 sm:data-closed:zoom-out-95 sm:data-closed:slide-out-to-bottom-0",
           className
         )}
         {...props}
       >
-        {children}
+        {/* ⚠️ The scroll lives here, not on the content box, so the close button
+            outside it stays put instead of scrolling away from a long form.
+            `gap-6` moves in with the children it was spacing. */}
+        <div className="-mx-5 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto overscroll-contain px-5 sm:-mx-6 sm:px-6">
+          {children}
+        </div>
         {showCloseButton && (
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <Button
               variant="ghost"
-              className="absolute top-4 right-4"
+              className="absolute top-3 right-3 sm:top-4 sm:right-4"
               size="icon-sm"
             >
               <XIcon

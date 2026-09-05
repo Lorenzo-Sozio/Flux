@@ -1,10 +1,6 @@
-import Link from "next/link";
-
-import { ArrowLeft, CheckCircle2, DollarSign, Target, TrendingUp } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { getForecastData } from "@/actions/pipeline";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 import { ForecastBarChart, OwnerPieChart } from "./_components/forecast-charts";
@@ -14,10 +10,10 @@ export default async function ForecastPage() {
   const [data, t] = await Promise.all([getForecastData(), getTranslations("pipeline.forecast")]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
           <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
       </div>
@@ -36,7 +32,7 @@ export default async function ForecastPage() {
           <CardTitle className="text-base">{t("monthlyChart")}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+          <div className="mb-4 flex flex-wrap items-center gap-4 text-muted-foreground text-xs">
             <span className="flex items-center gap-1.5">
               <span className="h-3 w-3 rounded-sm bg-[#bfdbfe]" /> {t("legendAll")}
             </span>
@@ -71,7 +67,7 @@ export default async function ForecastPage() {
           </CardHeader>
           <CardContent>
             {data.byOwner.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("noAssignedDeals")}</p>
+              <p className="text-muted-foreground text-sm">{t("noAssignedDeals")}</p>
             ) : (
               <ForecastOwnerTable byOwner={data.byOwner} />
             )}

@@ -100,8 +100,8 @@ export function PlansClient({ plans: initialPlans }: PlansClientProps) {
               New Plan
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
-            <DialogHeader className="px-6 pt-6 pb-4 border-b">
+          <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[700px]">
+            <DialogHeader className="border-b px-6 pt-6 pb-4">
               <DialogTitle className="text-lg">Create Plan</DialogTitle>
             </DialogHeader>
             <PlanForm onCancel={() => setCreateOpen(false)} onSuccess={() => setCreateOpen(false)} />
@@ -139,7 +139,7 @@ export function PlansClient({ plans: initialPlans }: PlansClientProps) {
                 <TableCell>
                   <div>
                     <p className="font-medium">{plan.displayName}</p>
-                    <p className="text-xs text-muted-foreground">{plan.name}</p>
+                    <p className="text-muted-foreground text-xs">{plan.name}</p>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -188,8 +188,8 @@ export function PlansClient({ plans: initialPlans }: PlansClientProps) {
 
       {/* Edit dialog */}
       <Dialog open={!!editPlan} onOpenChange={(open) => !open && setEditPlan(null)}>
-        <DialogContent className="sm:max-w-[700px] max-h-[90vh] flex flex-col p-0 gap-0">
-          <DialogHeader className="px-6 pt-6 pb-4 border-b">
+        <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[700px]">
+          <DialogHeader className="border-b px-6 pt-6 pb-4">
             <DialogTitle className="text-lg">Edit Plan — {editPlan?.displayName}</DialogTitle>
           </DialogHeader>
           {editPlan && (

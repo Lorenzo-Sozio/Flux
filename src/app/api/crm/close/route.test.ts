@@ -14,6 +14,17 @@ let aperti: { id: string; status: string; name: string }[] = [];
 const scritti: Record<string, unknown>[] = [];
 let person: { leadIds: string[]; contactIds: string[] } = { leadIds: [], contactIds: ["c1"] };
 
+class LimiteRaggiunto extends Error {}
+/** Impostata da un test per far scattare il limite del piano. */
+let limiteEsaurito = false;
+vi.mock("@/lib/billing/usage", () => ({
+  checkAndTrackApiCall: async () => {
+    if (limiteEsaurito) throw new LimiteRaggiunto("Monthly API call limit reached for your plan.");
+  },
+  get EntitlementError() {
+    return LimiteRaggiunto;
+  },
+}));
 vi.mock("@/components/crm/automation/rule-engine", () => ({
   runAutomations: async (ctx: { entityType: string; entityId: string; event: string }) => {
     regole.push(ctx);
@@ -130,5 +141,20 @@ describe("closing what the assistant stopped following", () => {
       expect((await POST(richiesta(body))).status).toBe(422);
     }
     expect(scritti).toHaveLength(0);
+  });
+
+  it("⚠️ conta la chiamata sul piano, e si ferma quando il piano è esaurito", async () => {
+    // Le rotte per recapito non contavano niente, mentre tutte le altre di
+    // /api/crm sì: un'integrazione poteva scrivere all'infinito senza che una
+    // sola chiamata risultasse. Le due eccezioni volute sono l'opposizione e la
+    // cancellazione, che non si rifiutano per una ragione di fatturazione.
+    limiteEsaurito = true;
+    try {
+      const risposta = await POST(richiesta({ contactPoint: "mario@example.it", outcome: "ABBANDONATO" }));
+      expect(risposta.status).toBe(429);
+      expect(scritti).toHaveLength(0);
+    } finally {
+      limiteEsaurito = false;
+    }
   });
 });

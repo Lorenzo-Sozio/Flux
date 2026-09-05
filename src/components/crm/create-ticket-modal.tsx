@@ -452,7 +452,7 @@ export function CreateTicketModal({
         {/* Body */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="max-h-[70vh] space-y-5 overflow-y-auto px-6 py-5">
+            <div className="max-h-[70dvh] space-y-5 overflow-y-auto px-6 py-5">
               {/* Subject */}
               <FormField
                 control={form.control}

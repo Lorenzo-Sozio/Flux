@@ -184,9 +184,9 @@ export default function NewQuotePage() {
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6 p-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
         {/* ── The bar that stays put ─────────────────────────────────────── */}
-        <div className="-mx-6 -mt-6 sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/85 px-6 py-3 backdrop-blur-md">
+        <div className="-mx-4 -mt-4 md:-mx-6 md:-mt-6 sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/85 px-4 py-3 backdrop-blur-md md:px-6">
           <div className="flex min-w-0 items-center gap-2">
             <Button
               asChild

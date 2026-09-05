@@ -17,7 +17,6 @@ import {
 import { getCampaignReport, getEmailTemplates } from "@/actions/marketing";
 import { CampaignModal } from "@/components/crm/campaign-modal";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
@@ -53,12 +52,12 @@ export default async function CampaignDetailPage({ params }: Props) {
   ];
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       {/* ── Header ── */}
       <div>
         <Link
           href="/dashboard/marketing/campaigns"
-          className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
+          className="mb-3 inline-flex items-center gap-1 text-muted-foreground text-sm transition-colors hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
           Back to Campaigns
@@ -66,18 +65,18 @@ export default async function CampaignDetailPage({ params }: Props) {
 
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-xl font-bold tracking-tight">{campaign.name}</h1>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="font-bold text-xl tracking-tight">{campaign.name}</h1>
               <Badge variant="outline" className={`text-xs ${statusCfg.className}`}>
                 {statusCfg.label}
               </Badge>
               {/* Tracking always-on badge */}
-              <Badge variant="outline" className="text-xs border-emerald-300 text-emerald-700 bg-emerald-50 gap-1">
+              <Badge variant="outline" className="gap-1 border-emerald-300 bg-emerald-50 text-emerald-700 text-xs">
                 <ShieldCheck className="h-3 w-3" />
                 Open + Click tracking
               </Badge>
             </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-sm">
               {templateName && (
                 <span className="flex items-center gap-1.5">
                   <Mail className="h-3.5 w-3.5" />
@@ -102,17 +101,17 @@ export default async function CampaignDetailPage({ params }: Props) {
           />
         </div>
 
-        {campaign.description && <p className="text-sm text-muted-foreground mt-2">{campaign.description}</p>}
+        {campaign.description && <p className="mt-2 text-muted-foreground text-sm">{campaign.description}</p>}
       </div>
 
       {/* ── Stats grid ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
         {statCards.map(({ label, value, icon: Icon, color }) => (
-          <Card key={label} className="border shadow-none text-center">
+          <Card key={label} className="border text-center shadow-none">
             <CardContent className="pt-4 pb-3">
-              <Icon className={`h-4 w-4 mx-auto mb-1.5 ${color}`} />
-              <p className="text-lg font-bold tabular-nums leading-none">{value}</p>
-              <p className="text-[11px] text-muted-foreground mt-1">{label}</p>
+              <Icon className={`mx-auto mb-1.5 h-4 w-4 ${color}`} />
+              <p className="font-bold text-lg tabular-nums leading-none">{value}</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
             </CardContent>
           </Card>
         ))}
@@ -122,7 +121,7 @@ export default async function CampaignDetailPage({ params }: Props) {
       {stats.sent > 0 && (
         <Card className="shadow-none">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">Engagement Funnel</CardTitle>
+            <CardTitle className="font-semibold text-sm">Engagement Funnel</CardTitle>
             <CardDescription className="text-xs">
               Tracking self-hosted — data updates as recipients interact.
             </CardDescription>
@@ -130,7 +129,7 @@ export default async function CampaignDetailPage({ params }: Props) {
           <CardContent className="space-y-4">
             {/* Open rate */}
             <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-sm">
+              <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
                   <Eye className="h-3.5 w-3.5 text-violet-500" />
                   Open Rate
@@ -140,9 +139,9 @@ export default async function CampaignDetailPage({ params }: Props) {
                 </span>
                 <span className="font-semibold tabular-nums">{stats.openRate}%</span>
               </div>
-              <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+              <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full bg-violet-500 rounded-full transition-all"
+                  className="h-full rounded-full bg-violet-500 transition-all"
                   style={{ width: `${Math.min(parseFloat(stats.openRate), 100)}%` }}
                 />
               </div>
@@ -150,7 +149,7 @@ export default async function CampaignDetailPage({ params }: Props) {
 
             {/* Click rate */}
             <div className="space-y-1.5">
-              <div className="flex justify-between items-center text-sm">
+              <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
                   <MousePointerClick className="h-3.5 w-3.5 text-green-500" />
                   Click Rate
@@ -160,9 +159,9 @@ export default async function CampaignDetailPage({ params }: Props) {
                 </span>
                 <span className="font-semibold tabular-nums">{stats.clickRate}%</span>
               </div>
-              <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+              <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full bg-green-500 rounded-full transition-all"
+                  className="h-full rounded-full bg-green-500 transition-all"
                   style={{ width: `${Math.min(parseFloat(stats.clickRate), 100)}%` }}
                 />
               </div>
@@ -171,7 +170,7 @@ export default async function CampaignDetailPage({ params }: Props) {
             {/* CTR of openers */}
             {stats.opened > 0 && (
               <div className="space-y-1.5">
-                <div className="flex justify-between items-center text-sm">
+                <div className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-1.5 text-muted-foreground">
                     <MousePointerClick className="h-3.5 w-3.5 text-emerald-500" />
                     Click-to-Open Rate
@@ -183,9 +182,9 @@ export default async function CampaignDetailPage({ params }: Props) {
                     {((stats.clicked / stats.opened) * 100).toFixed(1)}%
                   </span>
                 </div>
-                <div className="h-2.5 rounded-full bg-muted overflow-hidden">
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                   <div
-                    className="h-full bg-emerald-500 rounded-full transition-all"
+                    className="h-full rounded-full bg-emerald-500 transition-all"
                     style={{ width: `${Math.min((stats.clicked / stats.opened) * 100, 100)}%` }}
                   />
                 </div>
@@ -194,7 +193,7 @@ export default async function CampaignDetailPage({ params }: Props) {
 
             {/* Negative events summary */}
             {(stats.bounced > 0 || stats.unsubscribed > 0 || stats.complained > 0) && (
-              <div className="flex flex-wrap gap-3 pt-2 border-t text-xs text-muted-foreground">
+              <div className="flex flex-wrap gap-3 border-t pt-2 text-muted-foreground text-xs">
                 {stats.bounced > 0 && (
                   <span className="flex items-center gap-1">
                     <AlertCircle className="h-3 w-3 text-amber-500" />
@@ -223,8 +222,8 @@ export default async function CampaignDetailPage({ params }: Props) {
       <Card className="shadow-none">
         <CardHeader className="pb-3">
           <div>
-            <CardTitle className="text-sm font-semibold">Send Log</CardTitle>
-            <CardDescription className="text-xs mt-0.5">
+            <CardTitle className="font-semibold text-sm">Send Log</CardTitle>
+            <CardDescription className="mt-0.5 text-xs">
               {stats.total} total recipients — filter by status or search by name / email
             </CardDescription>
           </div>

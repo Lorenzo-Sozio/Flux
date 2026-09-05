@@ -1,0 +1,14 @@
+[
+  {
+    "file": "src/app/api/crm/close/route.ts",
+    "description": "⚠️ la chiamata non viene piu' contata sul piano: un'integrazione scrive all'infinito e nessuna chiamata risulta",
+    "find": "    await checkAndTrackApiCall(authResult.tenantId);",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/close/route.ts",
+    "description": "il limite di piano viene ingoiato invece di fermare la scrittura",
+    "find": "      return NextResponse.json({ error: err.message }, { status: 429 });",
+    "replace": ""
+  }
+]

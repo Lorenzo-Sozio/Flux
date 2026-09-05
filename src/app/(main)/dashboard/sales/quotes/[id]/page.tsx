@@ -31,7 +31,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-6">
+    <div className="flex flex-col gap-6">
       <div>
         <Link
           href="/dashboard/sales/quotes"

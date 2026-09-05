@@ -1527,7 +1527,8 @@
       "notifications": "Notifiche",
       "logout": "Esci",
       "unknownUser": "Utente Sconosciuto"
-    }
+    },
+    "more": "Altro"
   },
   "nextActions": {
     "title": "Ti aspetta",
@@ -1588,7 +1589,8 @@
       "customer": "Cliente",
       "status": "Stato",
       "total": "Totale",
-      "date": "Data"
+      "date": "Data",
+      "owner": "Titolare"
     },
     "createSuccess": "Ordine creato.",
     "updateSuccess": "Ordine aggiornato.",
@@ -3303,5 +3305,16 @@
     "alreadyTried": "Già provato",
     "exchanges": "{count, plural, one {# messaggio} other {# messaggi}}",
     "notes": "{count, plural, one {# nota interna} other {# note interne}}"
+  },
+  "pwa": {
+    "updateTitle": "È pronta una nuova versione",
+    "updateBody": "Ricarica per usarla. Quello che stai scrivendo andrà perso.",
+    "updateAction": "Ricarica",
+    "installTitle": "Installa Flux",
+    "installBody": "Aggiungilo alla schermata home e aprilo come un'app.",
+    "installAction": "Installa",
+    "installDismiss": "Non ora",
+    "iosInstallBody": "Tocca Condividi, poi Aggiungi a Home.",
+    "offlineBanner": "Nessuna connessione. Le modifiche non possono essere salvate."
   }
 }

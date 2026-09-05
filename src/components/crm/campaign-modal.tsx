@@ -16,7 +16,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -80,12 +79,12 @@ function F({
 }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+      <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
         {label}
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
-      {error && <p className="text-xs text-destructive">{error}</p>}
+      {error && <p className="text-destructive text-xs">{error}</p>}
     </div>
   );
 }
@@ -170,11 +169,11 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
     >
       <DialogTrigger asChild>{trigger}</DialogTrigger>
 
-      <DialogContent className="sm:max-w-[620px] max-h-[90vh] flex flex-col p-0 gap-0">
+      <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[620px]">
         {/* Header */}
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
+        <DialogHeader className="border-b px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-2.5 text-lg">
-            <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
               <TargetIcon className="h-4 w-4 text-primary" />
             </div>
             {isEditing ? `Edit — ${campaign.name}` : "New Campaign"}
@@ -182,10 +181,10 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
         </DialogHeader>
 
         {/* Body */}
-        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
           <div className="flex-1 overflow-y-auto px-6 py-5">
             <Tabs defaultValue="details">
-              <TabsList className="w-full mb-6">
+              <TabsList className="mb-6 w-full">
                 <TabsTrigger value="details" className="relative flex-1 gap-1.5">
                   <FileText className="h-3.5 w-3.5" />
                   Details
@@ -200,7 +199,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
               </TabsList>
 
               {/* ── Details Tab ───────────────────────────────────────────── */}
-              <TabsContent value="details" className="space-y-5 mt-0">
+              <TabsContent value="details" className="mt-0 space-y-5">
                 <F label="Campaign Name" required error={e.name?.message}>
                   <Input {...register("name")} placeholder="e.g. Q2 Product Launch, Summer Promo…" autoFocus />
                 </F>
@@ -217,7 +216,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
                 <Separator />
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Status</Label>
+                  <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Status</Label>
                   <Controller
                     control={control}
                     name="status"
@@ -236,11 +235,11 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
                                   : "border-border hover:border-muted-foreground/40 hover:bg-muted/30"
                               }`}
                             >
-                              <div className="flex items-center gap-1.5 mb-0.5">
-                                {active && <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />}
-                                <span className="text-sm font-medium">{opt.label}</span>
+                              <div className="mb-0.5 flex items-center gap-1.5">
+                                {active && <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-primary" />}
+                                <span className="font-medium text-sm">{opt.label}</span>
                               </div>
-                              <p className="text-xs text-muted-foreground">{opt.desc}</p>
+                              <p className="text-muted-foreground text-xs">{opt.desc}</p>
                             </button>
                           );
                         })}
@@ -251,15 +250,15 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
               </TabsContent>
 
               {/* ── Template Tab ──────────────────────────────────────────── */}
-              <TabsContent value="template" className="space-y-5 mt-0">
+              <TabsContent value="template" className="mt-0 space-y-5">
                 {templates.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed py-12 text-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                  <div className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed py-12 text-center">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
                       <MailIcon className="h-5 w-5 text-muted-foreground" />
                     </div>
                     <div>
-                      <p className="text-sm font-medium">No templates yet</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
+                      <p className="font-medium text-sm">No templates yet</p>
+                      <p className="mt-0.5 text-muted-foreground text-xs">
                         Create an email template before assigning it to a campaign.
                       </p>
                     </div>
@@ -278,7 +277,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
                       </F>
                       <Link
                         href="/dashboard/marketing/templates"
-                        className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 shrink-0 mb-1"
+                        className="mb-1 flex shrink-0 items-center gap-1 text-muted-foreground text-xs hover:text-foreground"
                         onClick={() => setOpen(false)}
                       >
                         <ExternalLink className="h-3 w-3" />
@@ -290,7 +289,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
                       control={control}
                       name="templateId"
                       render={({ field }) => (
-                        <div className="space-y-2 -mt-3">
+                        <div className="-mt-3 space-y-2">
                           {/* None option */}
                           <button
                             type="button"
@@ -301,7 +300,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
                                 : "border-border hover:border-muted-foreground/40 hover:bg-muted/20"
                             }`}
                           >
-                            <span className="text-sm text-muted-foreground">No template (assign later)</span>
+                            <span className="text-muted-foreground text-sm">No template (assign later)</span>
                           </button>
 
                           {/* Template cards */}
@@ -320,15 +319,15 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
                                 }`}
                               >
                                 <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    {active && <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />}
-                                    <span className="text-sm font-medium truncate">{t.name}</span>
+                                  <div className="flex min-w-0 items-center gap-2">
+                                    {active && <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />}
+                                    <span className="truncate font-medium text-sm">{t.name}</span>
                                   </div>
-                                  <Badge variant="outline" className={`text-[10px] shrink-0 ${catCfg.className}`}>
+                                  <Badge variant="outline" className={`shrink-0 text-[10px] ${catCfg.className}`}>
                                     {catCfg.label}
                                   </Badge>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1 truncate pl-0">Subject: {t.subject}</p>
+                                <p className="mt-1 truncate pl-0 text-muted-foreground text-xs">Subject: {t.subject}</p>
                               </button>
                             );
                           })}
@@ -338,12 +337,12 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
 
                     {/* Selected template summary */}
                     {selectedTemplate && (
-                      <div className="rounded-lg bg-muted/40 border px-4 py-3 space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      <div className="space-y-1 rounded-lg border bg-muted/40 px-4 py-3">
+                        <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                           Selected template
                         </p>
-                        <p className="text-sm font-semibold">{selectedTemplate.name}</p>
-                        <p className="text-xs text-muted-foreground">Subject: {selectedTemplate.subject}</p>
+                        <p className="font-semibold text-sm">{selectedTemplate.name}</p>
+                        <p className="text-muted-foreground text-xs">Subject: {selectedTemplate.subject}</p>
                       </div>
                     )}
                   </>
@@ -353,7 +352,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
           </div>
 
           {/* Footer */}
-          <DialogFooter className="px-6 py-4 border-t bg-muted/30">
+          <DialogFooter className="border-t bg-muted/30 px-6 py-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>

@@ -331,7 +331,7 @@ export function ProductsClient({ products: initial }: Props) {
   const formatPrice = (price: string) => formatAmount(Number(price));
 
   return (
-    <div className="space-y-5 p-6">
+    <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

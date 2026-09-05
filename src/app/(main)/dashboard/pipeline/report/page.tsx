@@ -18,7 +18,7 @@ export default async function PipelineReportPage() {
     new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center gap-4">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/dashboard/pipeline">
@@ -26,7 +26,7 @@ export default async function PipelineReportPage() {
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("report")}</h1>
+          <h1 className="font-bold text-2xl tracking-tight">{t("report")}</h1>
           <p className="text-muted-foreground text-sm">{t("reportSubtitle")}</p>
         </div>
       </div>
@@ -35,48 +35,48 @@ export default async function PipelineReportPage() {
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <CardTitle className="flex items-center gap-2 font-medium text-muted-foreground text-sm">
               <DollarSign className="h-4 w-4 text-green-500" /> {t("pipelineValue")}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{fmt(report.totalPipeline)}</div>
-            <p className="text-xs text-muted-foreground mt-1">{t("openDeals", { count: report.openCount })}</p>
+            <div className="font-bold text-2xl">{fmt(report.totalPipeline)}</div>
+            <p className="mt-1 text-muted-foreground text-xs">{t("openDeals", { count: report.openCount })}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <CardTitle className="flex items-center gap-2 font-medium text-muted-foreground text-sm">
               <TrendingUp className="h-4 w-4 text-blue-500" /> {t("revenueWon")}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{fmt(report.totalWonValue)}</div>
-            <p className="text-xs text-muted-foreground mt-1">{t("dealsClosed", { count: report.wonCount })}</p>
+            <div className="font-bold text-2xl">{fmt(report.totalWonValue)}</div>
+            <p className="mt-1 text-muted-foreground text-xs">{t("dealsClosed", { count: report.wonCount })}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <CardTitle className="flex items-center gap-2 font-medium text-muted-foreground text-sm">
               <Target className="h-4 w-4 text-orange-500" /> {t("winRate")}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{report.winRate}%</div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <div className="font-bold text-2xl">{report.winRate}%</div>
+            <p className="mt-1 text-muted-foreground text-xs">
               {t("lostWon", { lost: report.lostCount, won: report.wonCount })}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+            <CardTitle className="flex items-center gap-2 font-medium text-muted-foreground text-sm">
               <DollarSign className="h-4 w-4 text-purple-500" /> {t("weightedForecast")}
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{fmt(report.stageReport.reduce((s, r) => s + r.weightedValue, 0))}</div>
-            <p className="text-xs text-muted-foreground mt-1">{t("probabilityAdjusted")}</p>
+            <div className="font-bold text-2xl">{fmt(report.stageReport.reduce((s, r) => s + r.weightedValue, 0))}</div>
+            <p className="mt-1 text-muted-foreground text-xs">{t("probabilityAdjusted")}</p>
           </CardContent>
         </Card>
       </div>
@@ -95,10 +95,10 @@ export default async function PipelineReportPage() {
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="pb-2 font-medium">{t("columns.stage")}</th>
-                  <th className="pb-2 font-medium text-right">{t("deals")}</th>
-                  <th className="pb-2 font-medium text-right">{t("totalValue")}</th>
-                  <th className="pb-2 font-medium text-right">{t("weightedValue")}</th>
-                  <th className="pb-2 font-medium text-right">{t("avgDays")}</th>
+                  <th className="pb-2 text-right font-medium">{t("deals")}</th>
+                  <th className="pb-2 text-right font-medium">{t("totalValue")}</th>
+                  <th className="pb-2 text-right font-medium">{t("weightedValue")}</th>
+                  <th className="pb-2 text-right font-medium">{t("avgDays")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y">

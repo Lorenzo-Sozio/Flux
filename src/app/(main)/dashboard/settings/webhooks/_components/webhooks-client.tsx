@@ -147,10 +147,10 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">{t("title")}</h1>
+          <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
           <p className="text-muted-foreground">{t("subtitle")}</p>
         </div>
         <Button onClick={() => setAddOpen(true)}>
@@ -169,7 +169,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
         </CardHeader>
         <CardContent>
           {webhooks.length === 0 ? (
-            <p className="text-center py-8 text-muted-foreground text-sm">{t("noWebhooksYet")}</p>
+            <p className="py-8 text-center text-muted-foreground text-sm">{t("noWebhooksYet")}</p>
           ) : (
             <Table>
               <TableHeader>
@@ -187,7 +187,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
                   <TableRow key={wh.id}>
                     <TableCell className="font-medium">{wh.name}</TableCell>
                     <TableCell>
-                      <code className="text-xs text-muted-foreground truncate max-w-xs block">{wh.url}</code>
+                      <code className="block max-w-xs truncate text-muted-foreground text-xs">{wh.url}</code>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">

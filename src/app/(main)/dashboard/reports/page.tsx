@@ -37,7 +37,7 @@ export default async function ReportsPage() {
     ]);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div>
         <h1 className="flex items-center gap-2 font-bold text-2xl tracking-tight">
           <BarChart3 className="h-6 w-6 text-primary" />

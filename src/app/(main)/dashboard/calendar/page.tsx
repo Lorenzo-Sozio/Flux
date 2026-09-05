@@ -395,7 +395,7 @@ export default async function CalendarPage({
             >
               <div className="flex items-center justify-center overflow-hidden border-r py-2">
                 <span
-                  className="font-medium text-[10px] text-muted-foreground/60 uppercase tracking-wider whitespace-nowrap"
+                  className="whitespace-nowrap font-medium text-[10px] text-muted-foreground/60 uppercase tracking-wider"
                   style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                 >
                   {t("allDay")}
@@ -737,7 +737,7 @@ export default async function CalendarPage({
 
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
-    <div className="space-y-4 p-6">
+    <div className="space-y-4">
       {/* ── Header ── */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         {/* Left: title + stats + legend inline */}

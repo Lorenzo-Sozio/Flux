@@ -5,6 +5,8 @@ import { unparse } from "papaparse";
 
 import { auth } from "@/auth";
 import { companies } from "@/db/schema";
+import { getActor } from "@/lib/auth-guard";
+import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
 
 export async function GET() {
@@ -12,7 +14,12 @@ export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const isPrivileged = session.user.role === "admin" || session.user.role === "owner";
+  // ⚠️⚠️ Il ruolo del WORKSPACE. `session.user.role` è la scala del personale di
+  // Flux e vale "user" per ogni cliente, quindi questo confronto era sempre falso:
+  // l'esportazione restituiva solo le righe di chi chiamava, anche al proprietario
+  // del workspace. Un CSV incompleto in silenzio è peggio di uno che fallisce.
+  // Vedi le due scale nel CLAUDE.md.
+  const isPrivileged = can(await getActor(), "user:read");
 
   const baseQuery = db
     .select({

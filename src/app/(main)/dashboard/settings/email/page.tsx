@@ -130,7 +130,7 @@ export default function EmailSettingsPage() {
   }
 
   return (
-    <div className="w-full max-w-none space-y-6 p-6">
+    <div className="w-full max-w-none space-y-6">
       {/* Page header */}
       <div>
         <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>

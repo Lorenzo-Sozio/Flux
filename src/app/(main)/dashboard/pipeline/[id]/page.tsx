@@ -148,7 +148,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 md:flex-row">
+    <div className="flex flex-col gap-6 md:flex-row">
       <RecordVisit type="deal" name={deal.name} href={`/dashboard/pipeline/${dealId}`} />
 
       {/* ── Left sidebar ──────────────────────────────────────────────────── */}

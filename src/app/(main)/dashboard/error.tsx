@@ -65,7 +65,7 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
   const { icon: Icon, title, hint } = COPY[kind];
 
   return (
-    <div className="flex min-h-[60vh] items-center justify-center p-6">
+    <div className="flex min-h-[60dvh] items-center justify-center">
       <div className="w-full max-w-md text-center">
         <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-muted">
           <Icon className="size-6 text-muted-foreground" />

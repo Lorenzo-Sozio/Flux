@@ -7,7 +7,6 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { updateUserRoleAction } from "@/actions/auth";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -68,7 +67,7 @@ function RoleBadge({ role }: { role: string }) {
   const cfg = getRoleConfig(role);
   const Icon = cfg.icon;
   return (
-    <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${cfg.color}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium text-xs ${cfg.color}`}>
       <Icon className="h-3 w-3" />
       {t(`roleLabel.${role as RoleId}`)}
     </span>
@@ -103,13 +102,13 @@ function UserCard({
 
   return (
     <div className="flex items-center justify-between gap-3 py-2.5">
-      <div className="flex items-center gap-3 min-w-0">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-primary text-sm">
           {initials}
         </span>
         <div className="min-w-0">
-          <p className="text-sm font-medium truncate">{user.name ?? "—"}</p>
-          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+          <p className="truncate font-medium text-sm">{user.name ?? "—"}</p>
+          <p className="truncate text-muted-foreground text-xs">{user.email}</p>
         </div>
       </div>
       <div className="shrink-0">
@@ -169,36 +168,36 @@ export function RolesClient({ users: initialUsers, currentUserId, currentUserRol
   }));
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">{t("title")}</h1>
-        <p className="text-muted-foreground mt-1">{t("subtitle")}</p>
+        <h1 className="font-bold text-3xl tracking-tight">{t("title")}</h1>
+        <p className="mt-1 text-muted-foreground">{t("subtitle")}</p>
       </div>
 
       {/* Permission Matrix */}
       <section>
-        <h2 className="text-lg font-semibold mb-4">{t("permissionOverview")}</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <h2 className="mb-4 font-semibold text-lg">{t("permissionOverview")}</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {ROLES.map((role) => {
             const Icon = role.icon;
             const perms = t.raw(`rolePerms.${role.id}`) as string[];
             return (
               <Card key={role.id} className="border">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
                     <span
-                      className={`inline-flex items-center gap-1.5 text-sm font-semibold px-2.5 py-1 rounded-full ${role.color}`}
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-semibold text-sm ${role.color}`}
                     >
                       <Icon className="h-3.5 w-3.5" />
                       {t(`roleLabel.${role.id}`)}
                     </span>
                   </CardTitle>
-                  <p className="text-xs text-muted-foreground mt-1">{t(`roleDesc.${role.id}`)}</p>
+                  <p className="mt-1 text-muted-foreground text-xs">{t(`roleDesc.${role.id}`)}</p>
                 </CardHeader>
                 <CardContent>
                   <ul className="space-y-1.5">
                     {perms.map((perm) => (
-                      <li key={perm} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                      <li key={perm} className="flex items-start gap-1.5 text-muted-foreground text-xs">
                         <span className="mt-0.5 text-green-500">✓</span>
                         {perm}
                       </li>
@@ -215,26 +214,26 @@ export function RolesClient({ users: initialUsers, currentUserId, currentUserRol
 
       {/* Users by Role */}
       <section>
-        <h2 className="text-lg font-semibold mb-4">{t("usersByRole")}</h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <h2 className="mb-4 font-semibold text-lg">{t("usersByRole")}</h2>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {usersByRole.map((role) => {
             const Icon = role.icon;
             return (
               <div key={role.id}>
-                <div className="flex items-center gap-2 mb-3">
+                <div className="mb-3 flex items-center gap-2">
                   <span
-                    className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${role.color}`}
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium text-xs ${role.color}`}
                   >
                     <Icon className="h-3 w-3" />
                     {t(`roleLabel.${role.id}`)}
                   </span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-muted-foreground text-xs">
                     {t("userCount", { count: role.members.length })}
                   </span>
                 </div>
-                <div className="rounded-lg border divide-y">
+                <div className="divide-y rounded-lg border">
                   {role.members.length === 0 ? (
-                    <p className="text-xs text-muted-foreground text-center py-4">{t("noUsers")}</p>
+                    <p className="py-4 text-center text-muted-foreground text-xs">{t("noUsers")}</p>
                   ) : (
                     role.members.map((user) => (
                       <div key={user.id} className="px-3">

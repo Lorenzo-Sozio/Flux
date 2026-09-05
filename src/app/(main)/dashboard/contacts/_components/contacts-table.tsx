@@ -12,6 +12,7 @@ import { bulkAssignContacts, bulkDeleteContacts, bulkUpdateContactStatus } from 
 import { BulkActionBar } from "@/components/crm/bulk-action-bar";
 import { EmptyState } from "@/components/crm/empty-state";
 import { LeadScoreBadge } from "@/components/crm/lead-score-badge";
+import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -117,6 +118,23 @@ export function ContactsTable({ contacts, users, canEdit, narrowed }: Props) {
     });
   }
 
+  const emptyState = narrowed ? (
+    <EmptyState icon={UsersIcon} title={te("filteredTitle")} description={te("filteredDescription")} />
+  ) : (
+    <EmptyState
+      icon={UsersIcon}
+      title={te("contacts.title")}
+      description={te("contacts.description")}
+      action={
+        canEdit ? (
+          <ContactModal>
+            <Button size="sm">{t("newContact")}</Button>
+          </ContactModal>
+        ) : undefined
+      }
+    />
+  );
+
   return (
     <div className="space-y-3">
       {canEdit && selected.size > 0 && (
@@ -131,94 +149,104 @@ export function ContactsTable({ contacts, users, canEdit, narrowed }: Props) {
         />
       )}
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            {canEdit && (
-              <TableHead className="w-10">
-                <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
-              </TableHead>
-            )}
-            <TableHead>{t("columns.name")}</TableHead>
-            <TableHead>{tc("email")}</TableHead>
-            <TableHead>{t("jobTitle")}</TableHead>
-            <TableHead>{tc("address")}</TableHead>
-            <TableHead>{tc("status")}</TableHead>
-            <TableHead>{t("columns.score")}</TableHead>
-            <TableHead>{t("columns.assignedTo")}</TableHead>
-            {canEdit && <TableHead className="w-[100px] text-right">{t("columns.actions")}</TableHead>}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {contacts.map((contact) => (
-            <TableRow
-              key={contact.id}
-              className={`hover:bg-muted/40 ${selected.has(contact.id) ? "bg-primary/5" : ""}`}
-            >
-              {canEdit && (
-                <TableCell>
-                  <Checkbox
-                    checked={selected.has(contact.id)}
-                    onCheckedChange={() => toggle(contact.id)}
-                    aria-label={`Select ${contact.firstName} ${contact.lastName}`}
-                  />
-                </TableCell>
-              )}
-              <TableCell>
-                <Link href={`/dashboard/contacts/${contact.id}`} className="font-medium hover:underline">
-                  {contact.firstName} {contact.lastName}
-                </Link>
-              </TableCell>
-              <TableCell>{contact.email}</TableCell>
-              <TableCell>{contact.jobTitle}</TableCell>
-              <TableCell>{contact.city}</TableCell>
-              <TableCell className="capitalize">{contact.status}</TableCell>
-              <TableCell>
-                <LeadScoreBadge score={contact.leadScore} />
-              </TableCell>
-              <TableCell>
-                {contact.ownerName ? (
-                  <div className="flex items-center gap-1.5">
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-[10px] text-primary">
-                      {contact.ownerName.charAt(0).toUpperCase()}
-                    </span>
-                    <span className="text-sm">{contact.ownerName}</span>
-                  </div>
-                ) : (
-                  <span className="text-muted-foreground text-xs">—</span>
-                )}
-              </TableCell>
-              {canEdit && (
-                <TableCell className="text-right">
-                  <ContactActions contact={contact} />
-                </TableCell>
-              )}
-            </TableRow>
-          ))}
-          {contacts.length === 0 && (
-            <TableRow className="hover:bg-transparent">
-              <TableCell colSpan={canEdit ? 9 : 8} className="p-0">
-                {narrowed ? (
-                  <EmptyState icon={UsersIcon} title={te("filteredTitle")} description={te("filteredDescription")} />
-                ) : (
-                  <EmptyState
-                    icon={UsersIcon}
-                    title={te("contacts.title")}
-                    description={te("contacts.description")}
-                    action={
-                      canEdit ? (
-                        <ContactModal>
-                          <Button size="sm">{t("newContact")}</Button>
-                        </ContactModal>
-                      ) : undefined
-                    }
-                  />
-                )}
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+      {contacts.length === 0 ? (
+        emptyState
+      ) : (
+        <ResponsiveRecordList
+          cards={
+            <RecordCards
+              items={contacts.map((contact) => ({
+                id: contact.id,
+                href: `/dashboard/contacts/${contact.id}`,
+                title: `${contact.firstName} ${contact.lastName}`,
+                subtitle: contact.email,
+                badge: <LeadScoreBadge score={contact.leadScore} />,
+                // Four fields, not eight: the job title and the city say which
+                // of two people with the same name this is, and the owner and
+                // status are what a list is filtered by.
+                fields: [
+                  { label: t("jobTitle"), value: contact.jobTitle },
+                  { label: tc("address"), value: contact.city },
+                  { label: tc("status"), value: <span className="capitalize">{contact.status}</span> },
+                  { label: t("columns.assignedTo"), value: contact.ownerName },
+                ],
+                actions: canEdit ? <ContactActions contact={contact} /> : undefined,
+                selected: selected.has(contact.id),
+                onToggle: canEdit ? () => toggle(contact.id) : undefined,
+                selectLabel: `${contact.firstName} ${contact.lastName}`,
+              }))}
+            />
+          }
+          table={
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {canEdit && (
+                    <TableHead className="w-10">
+                      <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
+                    </TableHead>
+                  )}
+                  <TableHead>{t("columns.name")}</TableHead>
+                  <TableHead>{tc("email")}</TableHead>
+                  <TableHead>{t("jobTitle")}</TableHead>
+                  <TableHead>{tc("address")}</TableHead>
+                  <TableHead>{tc("status")}</TableHead>
+                  <TableHead>{t("columns.score")}</TableHead>
+                  <TableHead>{t("columns.assignedTo")}</TableHead>
+                  {canEdit && <TableHead className="w-[100px] text-right">{t("columns.actions")}</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {contacts.map((contact) => (
+                  <TableRow
+                    key={contact.id}
+                    className={`hover:bg-muted/40 ${selected.has(contact.id) ? "bg-primary/5" : ""}`}
+                  >
+                    {canEdit && (
+                      <TableCell>
+                        <Checkbox
+                          checked={selected.has(contact.id)}
+                          onCheckedChange={() => toggle(contact.id)}
+                          aria-label={`Select ${contact.firstName} ${contact.lastName}`}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell>
+                      <Link href={`/dashboard/contacts/${contact.id}`} className="font-medium hover:underline">
+                        {contact.firstName} {contact.lastName}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{contact.email}</TableCell>
+                    <TableCell>{contact.jobTitle}</TableCell>
+                    <TableCell>{contact.city}</TableCell>
+                    <TableCell className="capitalize">{contact.status}</TableCell>
+                    <TableCell>
+                      <LeadScoreBadge score={contact.leadScore} />
+                    </TableCell>
+                    <TableCell>
+                      {contact.ownerName ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 font-bold text-[10px] text-primary">
+                            {contact.ownerName.charAt(0).toUpperCase()}
+                          </span>
+                          <span className="text-sm">{contact.ownerName}</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                    {canEdit && (
+                      <TableCell className="text-right">
+                        <ContactActions contact={contact} />
+                      </TableCell>
+                    )}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          }
+        />
+      )}
     </div>
   );
 }

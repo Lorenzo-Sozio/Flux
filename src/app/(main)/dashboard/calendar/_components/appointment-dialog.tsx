@@ -124,7 +124,7 @@ function ParticipantSearch({
               sublabel: u.email ?? "",
               entry: {
                 key: `user-${u.id}`,
-                email: u.email!,
+                email: u.email ?? "",
                 name: u.name ?? u.email ?? "",
                 userId: u.id,
               } as AttendeeEntry,
@@ -143,7 +143,7 @@ function ParticipantSearch({
               sublabel: c.email ?? "",
               entry: {
                 key: `contact-${c.id}`,
-                email: c.email!,
+                email: c.email ?? "",
                 name: `${c.firstName} ${c.lastName}`,
                 contactId: c.id,
               } as AttendeeEntry,
@@ -431,7 +431,7 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
           if (!v) reset();
         }}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarCheck className="h-5 w-5 text-amber-500" />
@@ -646,7 +646,7 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
                 </button>
                 {showAvailability && (
                   <AvailabilityPicker
-                    userIds={attendees.filter((a) => a.userId).map((a) => a.userId!)}
+                    userIds={attendees.map((a) => a.userId).filter((id): id is string => Boolean(id))}
                     users={internalUsers}
                     date={startAt.split("T")[0]}
                     onSelect={(start, end) => {
