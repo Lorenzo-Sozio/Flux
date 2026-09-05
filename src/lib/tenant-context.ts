@@ -16,6 +16,7 @@ import { headers } from "next/headers";
 import { AsyncLocalStorage } from "node:async_hooks";
 
 import { createTenantDb, platformDb } from "@/db";
+import { ensureTenantMigrated } from "@/db/auto-migrate";
 
 import { getTenantById } from "./get-tenant";
 import { decryptDbUrl } from "./tenant-db";
@@ -64,7 +65,7 @@ async function resolveDb() {
       (err as NodeJS.ErrnoException).code = "TENANT_NOT_FOUND";
       throw err;
     }
-    return createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
+    return openTenant(tenant.id, decryptDbUrl(tenant.dbUrl));
   }
 
   try {
@@ -96,7 +97,27 @@ async function resolveDb() {
     throw err;
   }
 
-  return createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
+  return openTenant(tenant.id, decryptDbUrl(tenant.dbUrl));
+}
+
+/**
+ * The handle for one workspace, up to date with the code that is about to use it.
+ *
+ * Every customer has their own database, so a schema change lands once per
+ * customer and used to wait for somebody to press a button in the admin panel —
+ * after the deploy. In between, the code knew about columns the database had not
+ * got, and a single missing column takes down a whole screen because a relational
+ * read names every column the schema declares. That window broke production three
+ * times before it was closed here.
+ *
+ * The check costs one SELECT per workspace per process, and only the first
+ * request pays it: `ensureTenantMigrated` remembers the attempt. It never throws,
+ * so a workspace that cannot be migrated still serves its pages.
+ */
+async function openTenant(tenantId: string, url: string) {
+  const db = createTenantDb(tenantId, url);
+  await ensureTenantMigrated(tenantId, db);
+  return db;
 }
 
 /**

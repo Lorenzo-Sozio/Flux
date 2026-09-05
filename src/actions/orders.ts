@@ -360,11 +360,29 @@ export async function updateOrderStatus(id: string, status: OrderStatus) {
   revalidatePath(`/dashboard/sales/orders/${id}`);
 
   if (updated) {
+    // Who the order belongs to, so a listener can reach them.
+    //
+    // An order event without a customer is half an event: whoever receives it knows
+    // something happened and not to whom, so the one thing it enables — telling the
+    // person their order is ready — it cannot do. The assistant that took the order on
+    // WhatsApp is exactly such a listener, and it has no other way back: the order id
+    // means nothing outside this database.
+    //
+    // Read here rather than joined into the update: a second small read is easier to
+    // follow than a join that exists for a webhook, and it runs only when someone is
+    // listening for order events at all.
+    const [contatto] = updated.contactId
+      ? await db.select().from(contacts).where(eq(contacts.id, updated.contactId))
+      : [];
     dispatchWebhook(`order.${status}`, {
       id: updated.id,
       number: updated.orderNumber,
       total: updated.totalAmount,
       currency: updated.currency,
+      // The field names a consumer already looks for. Both when both are known: which
+      // one reaches that person is the caller's decision, not this side's.
+      ...(contatto?.phone ? { phone: contatto.phone } : {}),
+      ...(contatto?.email ? { email: contatto.email } : {}),
       // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
     }).catch(() => {});
 

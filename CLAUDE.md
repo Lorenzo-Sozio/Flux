@@ -259,6 +259,37 @@ So the migrations travel with the code, in
 newer than the newest recorded — so databases migrated by the old code carry on from where
 they were.
 
+### A workspace migrates itself the first time it is used
+
+⚠️ **The order used to matter and no longer does.** Every customer has their own
+database, so a schema change lands once per customer, and the admin panel's button
+applies whatever is in the **deployed** bundle. That made the sequence deploy first,
+migrate second — and in the window between them the code knew about columns the
+database had not got. A relational read names every column the schema declares, so
+one missing column took down a whole screen. It broke production three times: the
+opening-hours page, the SLA job, and creating a ticket.
+
+[src/db/auto-migrate.ts](src/db/auto-migrate.ts) closes the window.
+`ensureTenantMigrated` runs when a workspace's database handle is opened — on a
+request, and in every scheduled job through `forEachTenant`, which means a deploy's
+migrations land on their own within the minute. It costs one `SELECT` per workspace
+per process when there is nothing to do.
+
+Three rules it keeps:
+
+- **It never provisions.** A database with no migration history is a new workspace,
+  and building it belongs to the admin panel, which does it deliberately and reports
+  what happened. Auto-migration applies pending migrations only.
+- **It never fails a request.** A migration that will not apply is logged and the
+  page still renders; `tolerateUnmigrated` in [src/lib/schema-ready.ts](src/lib/schema-ready.ts)
+  covers the features that need the new column, and the button still works.
+- **A race is survivable**, because every tenant migration is already required to be
+  re-runnable. Two isolates migrating at once produce a duplicate bookkeeping row,
+  and "newer than the newest recorded" does not care how many rows say the same thing.
+
+`SKIP_AUTO_MIGRATE=1` turns it off, for when a write on a request path has to stop
+without waiting for a deploy.
+
 ```bash
 npm run generate:tenant-migrations   # drizzle-kit generate + embed, in one step
 npm run generate:migrations          # re-embed only

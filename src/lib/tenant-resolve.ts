@@ -24,6 +24,7 @@
 import { asc } from "drizzle-orm";
 
 import { createTenantDb, platformDb } from "@/db";
+import { ensureTenantMigrated } from "@/db/auto-migrate";
 import { tenants } from "@/db/schema";
 import type * as tenantSchema from "@/db/schema-tenant";
 import { getTenantById } from "@/lib/get-tenant";
@@ -36,7 +37,9 @@ export type TenantDb = ReturnType<typeof createTenantDb>;
 export async function openTenantDb(tenantId: string): Promise<TenantDb | null> {
   const tenant = await getTenantById(tenantId);
   if (!tenant) return null;
-  return createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
+  const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
+  await ensureTenantMigrated(tenant.id, db);
+  return db;
 }
 
 /**
@@ -79,6 +82,12 @@ export async function forEachTenant<T>(
       slice.map(async (tenant): Promise<TenantRunResult<T>> => {
         try {
           const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
+          // Scheduled work is the best place for this: a job runs every minute
+          // across every workspace, in the background, so a deploy's migrations
+          // land on their own within the minute rather than on whichever page
+          // request happens to arrive first. It costs one SELECT when there is
+          // nothing to do, and never throws.
+          await ensureTenantMigrated(tenant.id, db);
           return { tenantId: tenant.id, subdomain: tenant.subdomain, result: await fn(db, tenant) };
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);

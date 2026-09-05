@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/db/auto-migrate.ts",
+    "description": "⚠️⚠️ un database senza storia viene costruito da zero da una richiesta di pagina: il provisioning smette di essere una decisione del pannello",
+    "find": "  if (lastApplied === null) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/db/auto-migrate.ts",
+    "description": "⚠️ un errore di migrazione torna a far fallire la richiesta che l'ha innescata",
+    "find": "    attempt = bringUpToDate(tenantId, db).catch((err) => {\n      // Never fail the request. Whatever is not migrated stays not migrated, the\n      // tolerant reads cover the features that need it, and the panel still works.\n      console.error(`[auto-migrate] ${tenantId} could not be brought up to date:`, err);\n    });",
+    "replace": "    attempt = bringUpToDate(tenantId, db);"
+  },
+  {
+    "file": "src/db/auto-migrate.ts",
+    "description": "⚠️ il tentativo non viene piu' memorizzato: ogni richiesta rilegge la tabella di bookkeeping",
+    "find": "    attempts.set(tenantId, attempt);",
+    "replace": ""
+  },
+  {
+    "file": "src/db/auto-migrate.ts",
+    "description": "il controllo «gia' aggiornato» sparisce: la migrazione viene tentata a ogni processo anche quando non c'e' nulla da fare",
+    "find": "  if (lastApplied >= target) return;",
+    "replace": ""
+  }
+]

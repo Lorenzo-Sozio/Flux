@@ -68,6 +68,26 @@ function toRows<T>(result: unknown): T[] {
 }
 
 /**
+ * The newest migration this database records having applied, or null when it has
+ * none at all.
+ *
+ * Exported because "has this database ever been migrated" is a different question
+ * from "bring it up to date", and the auto-migrator has to ask the first before
+ * deciding whether it is allowed to do the second: a database with no history is
+ * a workspace being provisioned, which belongs to the admin panel.
+ *
+ * Reads without creating anything, so asking is never itself a change.
+ */
+export async function readLastApplied(db: Runner): Promise<number | null> {
+  const rows = toRows<{ created_at: string | number | null }>(
+    await db.execute(
+      sql`select created_at from ${sql.identifier(MIGRATIONS_SCHEMA)}.${sql.identifier(MIGRATIONS_TABLE)} order by created_at desc limit 1`,
+    ),
+  );
+  return rows[0] ? Number(rows[0].created_at) : null;
+}
+
+/**
  * Brings one tenant database up to date.
  *
  * Safe to call repeatedly: nothing is applied twice.
