@@ -64,8 +64,11 @@ export function ListToolbar({ total, page, pageCount, pageSize, shown, searchPla
 
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {/* Full width on a phone: the search box is the toolbar's reason to exist,
+          and 224px beside a page-size select and two arrows leaves room for
+          about four characters. */}
       <form
-        className="relative"
+        className="relative w-full sm:w-auto"
         onSubmit={(e) => {
           e.preventDefault();
           submitSearch(term);
@@ -76,7 +79,7 @@ export function ListToolbar({ total, page, pageCount, pageSize, shown, searchPla
           value={term}
           onChange={(e) => setTerm(e.target.value)}
           placeholder={searchPlaceholder ?? t("search")}
-          className="h-9 w-56 pr-8 pl-8"
+          className="h-9 w-full pr-8 pl-8 sm:w-56"
           aria-label={searchPlaceholder ?? t("search")}
         />
         {term && (
@@ -96,9 +99,11 @@ export function ListToolbar({ total, page, pageCount, pageSize, shown, searchPla
 
       {isPending && <Loader2 className="size-4 animate-spin text-muted-foreground" />}
 
-      <div className="flex-1" />
+      <div className="hidden flex-1 sm:block" />
 
-      <span className="text-muted-foreground text-xs tabular-nums">{t("listRange", { from, to, total })}</span>
+      <span className="mr-auto text-muted-foreground text-xs tabular-nums sm:mr-0">
+        {t("listRange", { from, to, total })}
+      </span>
 
       <Select
         value={String(pageSize)}

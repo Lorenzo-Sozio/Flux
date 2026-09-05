@@ -129,7 +129,9 @@ export function NotificationCenter({ notifications: initial }: Props) {
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
+      {/* 20rem is wider than the margin a 360px phone leaves, so the panel
+          would be clipped at one edge. It takes what is there instead. */}
+      <DropdownMenuContent align="end" className="w-[min(20rem,calc(100vw-1.5rem))]">
         <DropdownMenuLabel className="flex items-center justify-between py-3">
           <span>Notifications</span>
           {unreadCount > 0 && (

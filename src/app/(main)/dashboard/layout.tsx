@@ -11,6 +11,8 @@ import { auth } from "@/auth";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { RecentlyVisited } from "@/components/crm/recently-visited";
 import { NotificationCenter } from "@/components/notifications/notification-center";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { OfflineBanner } from "@/components/pwa/offline-banner";
 import { CurrencySwitcher } from "@/components/ui/currency-switcher";
 import { LocaleSwitcher } from "@/components/ui/locale-switcher";
 import { Separator } from "@/components/ui/separator";
@@ -152,6 +154,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
               </div>
             </div>
           </header>
+          <OfflineBanner />
           {/*
             ⚠️ **This wrapper is the only owner of page padding.** It used to add
             p-4/p-6 on top of the p-6 that most pages set on their own root, so a
@@ -166,6 +169,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
           </div>
         </SidebarInset>
         <MobileTabBar navAccess={navAccess} />
+        <InstallPrompt />
         {session?.user?.id && <ChatWidget userId={session.user.id} />}
       </SidebarProvider>
     </CurrencyProvider>

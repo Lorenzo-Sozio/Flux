@@ -1,38 +1,56 @@
 [
   {
     "file": "src/navigation/sidebar/filter-nav.ts",
-    "description": "⚠️⚠️ nel carico che attraversa il confine finisce un componente React: e' esattamente il difetto che ha tolto la dashboard a tutti in produzione, e in sviluppo non si vedeva",
+    "description": "⚠️⚠️ a React component ends up in the payload that crosses the boundary: exactly the defect that took the dashboard away from everybody in production, and that was invisible in development",
     "find": "      locked[entry.url] = entry.module;",
     "replace": "      locked[entry.url] = entry.module;\n      (locked as unknown as Record<string, unknown>)[`${entry.url}:icon`] = (entry as { icon?: unknown }).icon;"
   },
   {
     "file": "src/navigation/sidebar/filter-nav.ts",
-    "description": "⚠️ una voce che il ruolo non consente resta nel menu: il viewer vede Utenti e Impostazioni e viene rimbalzato senza una parola",
+    "description": "⚠️ an entry the role does not allow stays in the menu: a viewer sees Users and Settings and is bounced without a word",
     "find": "    if (!allowedByRole(entry.need, actor)) {\n      hidden.push(entry.url);\n      return;\n    }",
     "replace": "    if (!allowedByRole(entry.need, actor)) {\n      return;\n    }"
   },
   {
     "file": "src/navigation/sidebar/filter-nav.ts",
-    "description": "⚠️ un modulo fuori piano viene nascosto invece che mostrato col lucchetto: sparisce l'unico invito all'upgrade del prodotto",
+    "description": "⚠️ a module outside the plan is hidden rather than shown with a lock: the product's only invitation to upgrade disappears",
     "find": "    if (entry.module && lockedByPlan(entry.module, enabledModules)) {\n      locked[entry.url] = entry.module;\n    }",
     "replace": "    if (entry.module && lockedByPlan(entry.module, enabledModules)) {\n      hidden.push(entry.url);\n    }"
   },
   {
     "file": "src/navigation/sidebar/filter-nav.ts",
-    "description": "senza piano noto si blocca tutto: un workspace le cui abilitazioni non si caricano perde meta' del menu",
+    "description": "with no plan known everything is locked: a workspace whose entitlements fail to load loses half its menu",
     "find": "  if (!module || !enabled) return false;",
     "replace": "  if (!module) return false;"
   },
   {
     "file": "src/navigation/sidebar/filter-nav.ts",
-    "description": "le sotto-voci non vengono piu' valutate: Fatturazione e Webhook restano visibili a chi non puo' aprirle",
+    "description": "sub-items are no longer evaluated: Billing and Webhooks stay visible to somebody who cannot open them",
     "find": "      for (const sub of item.subItems ?? []) consider(sub);",
     "replace": ""
   },
   {
     "file": "src/navigation/sidebar/filter-nav.ts",
-    "description": "il filtro sul client ignora l'elenco delle voci nascoste: il server decide e nessuno applica",
+    "description": "the client-side filter ignores the list of hidden urls: the server decides and nobody applies it",
     "find": "      .filter((item) => !hidden.has(item.url))",
     "replace": "      .filter(() => true)"
+  },
+  {
+    "file": "src/navigation/sidebar/sidebar-items.ts",
+    "description": "⚠️⚠️ the bottom bar is built from the unfiltered menu: a viewer gets a tab straight to Users, and the one permission rule now has a second, quieter copy that disagrees with it",
+    "find": "  for (const group of sidebarPlacement(groups)) {\n    for (const item of group.items) {\n      if (!item.locked) reachable.set(item.url, item);\n    }\n  }",
+    "replace": "  for (const group of sidebarItems) {\n    for (const item of group.items) {\n      reachable.set(item.url, item);\n    }\n  }"
+  },
+  {
+    "file": "src/navigation/sidebar/sidebar-items.ts",
+    "description": "a module outside the plan takes a slot in the bottom bar: a quarter of the phone's navigation goes to a page that does not open",
+    "find": "      if (!item.locked) reachable.set(item.url, item);",
+    "replace": "      reachable.set(item.url, item);"
+  },
+  {
+    "file": "src/navigation/sidebar/sidebar-items.ts",
+    "description": "the bottom bar draws from the account menu too: Settings and the help centre compete for the four slots a phone has",
+    "find": "  for (const group of sidebarPlacement(groups)) {",
+    "replace": "  for (const group of groups) {"
   }
 ]

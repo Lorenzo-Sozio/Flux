@@ -7,6 +7,8 @@ import Link from "next/link";
 import { Command } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
+import { CurrencySwitcher } from "@/components/ui/currency-switcher";
+import { LocaleSwitcher } from "@/components/ui/locale-switcher";
 import {
   Sidebar,
   SidebarContent,
@@ -68,6 +70,15 @@ export function AppSidebar({
         <NavMain items={mainGroups} />
       </SidebarContent>
       <SidebarFooter>
+        {/* ⚠️ Language and currency come off the header below md — nine controls
+            do not fit a 375px bar — so they have to be somewhere, and this panel
+            is the somewhere: two taps from the bottom bar, and the only other
+            place a person looks for a setting. Hidden from md up, where the
+            header still carries them. */}
+        <div className="flex items-center gap-1 px-1 pb-1 md:hidden">
+          <LocaleSwitcher />
+          <CurrencySwitcher />
+        </div>
         <NavUser user={user} groups={accountGroups} />
       </SidebarFooter>
     </Sidebar>

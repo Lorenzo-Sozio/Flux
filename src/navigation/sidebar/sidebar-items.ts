@@ -264,3 +264,52 @@ export function sidebarPlacement(groups: readonly NavGroup[]): NavGroup[] {
 export function accountPlacement(groups: readonly NavGroup[]): NavGroup[] {
   return groups.filter((g) => g.placement === "account");
 }
+
+/**
+ * What a person moves between on a phone, in the order it matters there.
+ *
+ * The bottom bar has four slots and this list runs longer, so a workspace
+ * without sales — or without support — still gets a full bar instead of gaps.
+ */
+export const MOBILE_TAB_PREFERENCE = [
+  "/dashboard/crm",
+  "/dashboard/contacts",
+  "/dashboard/pipeline",
+  "/dashboard/support/tickets",
+  "/dashboard/tasks",
+  "/dashboard/calendar",
+  "/dashboard/companies",
+  "/dashboard/sales/orders",
+] as const;
+
+/**
+ * The tabs for the bottom bar, chosen from an **already filtered** menu.
+ *
+ * ⚠️ It adds no permission rule of its own — it only orders what survived the
+ * one in `filter-nav`. Anything it could add would be a second, quieter copy of
+ * that rule, and the two would disagree the first time one of them changed.
+ *
+ * Locked entries are skipped rather than shown. In the sidebar a locked module
+ * is the upgrade prompt and worth its line; in four slots it is a quarter of the
+ * navigation spent on something that does not open.
+ */
+export function pickMobileTabs(
+  groups: readonly NavGroup[],
+  { preference = MOBILE_TAB_PREFERENCE, limit = 4 }: { preference?: readonly string[]; limit?: number } = {},
+): NavMainItem[] {
+  const reachable = new Map<string, NavMainItem>();
+  // Sidebar groups only. Administration is drawn in the account menu, and a
+  // phone's four slots are not where Settings and the help centre belong —
+  // today's preference list happens not to name them, and this is what keeps
+  // that true when somebody edits the list.
+  for (const group of sidebarPlacement(groups)) {
+    for (const item of group.items) {
+      if (!item.locked) reachable.set(item.url, item);
+    }
+  }
+
+  return preference
+    .map((url) => reachable.get(url))
+    .filter((item): item is NavMainItem => Boolean(item))
+    .slice(0, limit);
+}

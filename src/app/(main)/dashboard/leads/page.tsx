@@ -59,7 +59,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
   }
 
   return (
-    <div className="">
+    <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <h1 className="font-bold text-2xl">{t("title")}</h1>
@@ -73,7 +73,7 @@ export default async function LeadsPage({ searchParams }: { searchParams: Promis
             </Badge>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <FilterBuilder
             entityType="leads"
             fields={fields}

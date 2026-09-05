@@ -11,7 +11,7 @@ import { useTranslations } from "next-intl";
 import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { applyNavAccess, type NavAccess } from "@/navigation/sidebar/filter-nav";
-import { type NavMainItem, sidebarItems, sidebarPlacement } from "@/navigation/sidebar/sidebar-items";
+import { pickMobileTabs, sidebarItems } from "@/navigation/sidebar/sidebar-items";
 
 /**
  * The bottom bar, on phones only.
@@ -32,26 +32,6 @@ import { type NavMainItem, sidebarItems, sidebarPlacement } from "@/navigation/s
  * navigation spent on something that does not open.
  */
 
-/**
- * What a person moves between, in the order they matter on a phone.
- *
- * Whichever four are reachable win their slot. The list runs longer than four so
- * that a workspace without sales, or without support, still gets a full bar
- * rather than gaps.
- */
-const PREFERRED = [
-  "/dashboard/crm",
-  "/dashboard/contacts",
-  "/dashboard/pipeline",
-  "/dashboard/support/tickets",
-  "/dashboard/tasks",
-  "/dashboard/calendar",
-  "/dashboard/companies",
-  "/dashboard/sales/orders",
-] as const;
-
-const SLOTS = 4;
-
 function isActive(pathname: string, url: string): boolean {
   if (pathname === url) return true;
   // A ticket's own page keeps the Tickets tab lit; /dashboard/crm must not claim
@@ -64,17 +44,7 @@ export function MobileTabBar({ navAccess }: { readonly navAccess: NavAccess }) {
   const pathname = usePathname();
   const { setOpenMobile } = useSidebar();
 
-  const tabs = useMemo(() => {
-    const allowed = new Map<string, NavMainItem>();
-    for (const group of sidebarPlacement(applyNavAccess(sidebarItems, navAccess))) {
-      for (const item of group.items) {
-        if (!item.locked) allowed.set(item.url, item);
-      }
-    }
-    return PREFERRED.map((url) => allowed.get(url))
-      .filter((item): item is NavMainItem => Boolean(item))
-      .slice(0, SLOTS);
-  }, [navAccess]);
+  const tabs = useMemo(() => pickMobileTabs(applyNavAccess(sidebarItems, navAccess)), [navAccess]);
 
   // The active tab decides which of the five is highlighted; when the current
   // page is not one of them, none is, and "More" is not falsely lit either.

@@ -19,7 +19,14 @@ import { describe, expect, it } from "vitest";
 import type { Actor } from "@/lib/permissions";
 
 import { applyNavAccess, computeNavAccess, type NavAccess } from "./filter-nav";
-import { accountPlacement, type NavGroup, sidebarItems, sidebarPlacement } from "./sidebar-items";
+import {
+  accountPlacement,
+  MOBILE_TAB_PREFERENCE,
+  type NavGroup,
+  pickMobileTabs,
+  sidebarItems,
+  sidebarPlacement,
+} from "./sidebar-items";
 
 const viewer: Actor = { userId: "u1", tenantRole: "viewer", isPlatformStaff: false };
 const editor: Actor = { userId: "u2", tenantRole: "editor", isPlatformStaff: false };
@@ -257,5 +264,70 @@ describe("the shape of the menu itself", () => {
   it("gives every entry a distinct url", () => {
     const urls = urlsOf([...sidebarItems]);
     expect(new Set(urls).size, `duplicates in ${urls.join(", ")}`).toBe(urls.length);
+  });
+});
+
+describe("the bottom bar on a phone", () => {
+  // Four slots, and every one of them a place the person may actually go. The
+  // bar is a second navigation surface, and the whole point of building it out
+  // of the filtered menu is that it cannot disagree with the first one.
+  it("never offers a tab to something the role cannot open", () => {
+    const forbidden = ["/dashboard/users", "/dashboard/settings", "/dashboard/support/sla"];
+    for (const actor of [viewer, editor, admin, owner]) {
+      const urls = pickMobileTabs(menuFor(actor)).map((tab) => tab.url);
+      for (const url of forbidden) {
+        expect(urls, `${actor.tenantRole} must not get a tab to ${url}`).not.toContain(url);
+      }
+    }
+  });
+
+  it("fills every slot for a workspace with the whole product", () => {
+    expect(pickMobileTabs(menuFor(owner))).toHaveLength(4);
+  });
+
+  it("skips a module the plan excludes, and fills the slot from further down", () => {
+    // Support and sales are out of the plan, so tickets and orders are locked.
+    const tabs = pickMobileTabs(menuFor(admin, ["crm", "reporting"]));
+    const urls = tabs.map((tab) => tab.url);
+
+    expect(urls).not.toContain("/dashboard/support/tickets");
+    expect(urls).not.toContain("/dashboard/pipeline");
+    // Still four: a locked entry costs a quarter of the bar for a page that
+    // does not open, so the list runs longer than the bar on purpose.
+    expect(tabs).toHaveLength(4);
+  });
+
+  it("keeps the preference order rather than the menu order", () => {
+    const urls = pickMobileTabs(menuFor(owner)).map((tab) => tab.url);
+    expect(urls[0]).toBe("/dashboard/crm");
+    expect(urls).toEqual(
+      [...urls].sort((a, b) => MOBILE_TAB_PREFERENCE.indexOf(a as never) - MOBILE_TAB_PREFERENCE.indexOf(b as never)),
+    );
+  });
+
+  it("draws every tab from the sidebar, never from the account menu", () => {
+    const accountUrls = urlsOf(accountPlacement(menuFor(owner)));
+    for (const tab of pickMobileTabs(menuFor(owner))) {
+      expect(accountUrls).not.toContain(tab.url);
+    }
+
+    // Asked for administration by name, it still refuses. The list above only
+    // proves the current preference happens to name no account url; this proves
+    // the rule, which is what has to survive somebody editing that list.
+    const asked = pickMobileTabs(menuFor(owner), {
+      preference: ["/dashboard/settings", "/dashboard/users", "/dashboard/help", "/dashboard/contacts"],
+    });
+    expect(asked.map((tab) => tab.url)).toEqual(["/dashboard/contacts"]);
+  });
+
+  it("has an icon and a label key for every preferred destination that exists", () => {
+    // A tab with no icon is a label floating in a bar that is all icons.
+    const byUrl = new Map(sidebarItems.flatMap((g) => g.items).map((i) => [i.url, i]));
+    for (const url of MOBILE_TAB_PREFERENCE) {
+      const item = byUrl.get(url);
+      if (!item) continue;
+      expect(item.icon, `${url} has no icon`).toBeDefined();
+      expect(item.titleKey, `${url} has no label`).toBeTruthy();
+    }
   });
 });

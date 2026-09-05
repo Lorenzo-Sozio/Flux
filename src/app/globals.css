@@ -335,10 +335,22 @@ body {
 
 /* A native `<select>` under 16px makes iOS zoom the whole page on focus, and it
  * does not zoom back out. The Input and Textarea primitives already handle this
- * with `text-base md:text-sm`; the native select did not. */
+ * with `text-base md:text-sm`; the native select did not.
+ *
+ * The height rule is the same argument as the touch targets above, but scoped
+ * to phone widths rather than to `(pointer: coarse)`: the dense 9-column line
+ * editor on an order is a deliberate desktop layout, and a touchscreen laptop
+ * should keep it. A phone should not. */
 @media (max-width: 767px) {
   select {
     font-size: 1rem;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  [data-slot="select-trigger"],
+  [data-slot="combobox-trigger"] {
+    min-height: 2.75rem;
   }
 }
 
@@ -347,5 +359,21 @@ body {
 @media (pointer: coarse) {
   [data-slot="table-container"] {
     -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ⚠️ Controls that appear on hover do not appear at all on a touchscreen.
+ *
+ * A row's actions — open, delete, the overflow menu — are commonly drawn with
+ * `opacity-0 group-hover:opacity-100`, which is a good desktop affordance and a
+ * missing feature on a phone: not awkward, *absent*. Twenty-five places in this
+ * codebase do it.
+ *
+ * `(hover: none)` is the right question to ask. It is true on a phone and false
+ * on a mouse-driven desktop, including one with a touchscreen attached, where
+ * the hover reveal still works and is still wanted. */
+@media (hover: none) {
+  [class*="group-hover:opacity-100"] {
+    opacity: 1;
   }
 }
