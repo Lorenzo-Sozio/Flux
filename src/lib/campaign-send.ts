@@ -15,6 +15,7 @@ import {
   marketingCampaigns,
 } from "@/db/schema";
 import { getAppUrl } from "@/lib/app-url";
+import { resolveSegmentIds } from "@/lib/campaign-segment";
 import { ensureUnsubscribe, renderPlaceholders, valuesForRecipient } from "@/lib/email-placeholders";
 import { getDb } from "@/lib/tenant-context";
 import { signTrackingUrl } from "@/lib/tracking-token";
@@ -46,9 +47,20 @@ export async function executeCampaignSend(data: {
   campaignId: string;
   recipientType: "contacts" | "leads";
   recipientIds?: string[];
+  /** A saved filter to send to, instead of everyone eligible. */
+  filterId?: string | null;
 }): Promise<{ success: true; queued: number; skipped: number; total: number } | { error: string }> {
   const db = await getDb();
-  const { campaignId, recipientType, recipientIds } = data;
+  const { campaignId, recipientType } = data;
+
+  // A segment resolves to a list of ids. Null means none was chosen and everybody
+  // eligible is the audience; an empty list means one was chosen and it matches
+  // nobody, which must not quietly become everybody.
+  const segmentIds = await resolveSegmentIds(recipientType, data.filterId);
+  const recipientIds = segmentIds ?? data.recipientIds;
+  if (segmentIds !== null && segmentIds.length === 0) {
+    return { success: true, queued: 0, skipped: 0, total: 0 };
+  }
 
   const [campaign] = await db.select().from(marketingCampaigns).where(eq(marketingCampaigns.id, campaignId));
 
@@ -166,7 +178,12 @@ export async function dispatchDueCampaigns(): Promise<Array<{ id: string; name: 
   const results: Array<{ id: string; name: string; result: unknown }> = [];
   for (const campaign of due) {
     const recipientType = (campaign.recipientType as "contacts" | "leads") ?? "contacts";
-    const result = await executeCampaignSend({ campaignId: campaign.id, recipientType });
+    const result = await executeCampaignSend({
+      campaignId: campaign.id,
+      recipientType,
+      // The segment chosen when it was scheduled, not everybody eligible now.
+      filterId: campaign.recipientFilterId,
+    });
     results.push({ id: campaign.id, name: campaign.name, result });
   }
   return results;

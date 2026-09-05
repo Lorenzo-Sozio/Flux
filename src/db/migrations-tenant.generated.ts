@@ -306,4 +306,13 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\n-- Separately, and guarded, because a constraint cannot be added twice and this\n-- migration may be re-applied to a database that already has it.\nDO $$\nBEGIN\n  ALTER TABLE "sla"\n    ADD CONSTRAINT "sla_escalation_group_id_user_group_id_fk"\n    FOREIGN KEY ("escalation_group_id") REFERENCES "user_group"("id") ON DELETE SET NULL;\nEXCEPTION\n  WHEN duplicate_object THEN NULL;\n  WHEN undefined_table THEN NULL;\nEND $$;\n',
     ],
   },
+  {
+    tag: "0010_a_campaign_can_be_aimed",
+    folderMillis: 1788960000000,
+    hash: "31e10b61e67d08aea187b37ae5b77d397eb825ee74c7f1d4b053769b1d7332b1",
+    sql: [
+      '-- A campaign remembers the segment it was aimed at.\n--\n-- Sending could be pointed at every contact with marketing consent, or every\n-- lead, and at nothing narrower. The saved filters the lists are built on —\n-- "customers in Lombardy", "leads scoring over sixty" — existed and could not be\n-- used in the one place where sending to the wrong people costs something.\n--\n-- Null on every campaign that exists today, which means exactly what it meant\n-- before: everybody eligible. Nothing changes for a campaign already scheduled.\n--\n-- Kept on the campaign rather than passed at send time because a scheduled send\n-- happens hours or days later, when whoever chose the segment has gone home.\nALTER TABLE "marketing_campaign" ADD COLUMN IF NOT EXISTS "recipient_filter_id" text;\n',
+      '\n-- Separately and guarded: a constraint cannot be added twice, and this migration\n-- may be re-applied to a database that already carries it. ON DELETE SET NULL,\n-- because deleting a saved view should widen a campaign back to everybody rather\n-- than break the row.\nDO $$\nBEGIN\n  ALTER TABLE "marketing_campaign"\n    ADD CONSTRAINT "marketing_campaign_recipient_filter_id_custom_filter_id_fk"\n    FOREIGN KEY ("recipient_filter_id") REFERENCES "custom_filter"("id") ON DELETE SET NULL;\nEXCEPTION\n  WHEN duplicate_object THEN NULL;\n  WHEN undefined_table THEN NULL;\nEND $$;\n',
+    ],
+  },
 ];

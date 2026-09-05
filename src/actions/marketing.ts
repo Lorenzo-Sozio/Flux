@@ -7,6 +7,7 @@ import { z } from "zod";
 
 import { campaignLogs, contacts, emailSuppressions, emailTemplates, leads, marketingCampaigns } from "@/db/schema";
 import { requireCapability, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
+import { listSegments, resolveSegmentIds } from "@/lib/campaign-segment";
 import { executeCampaignSend } from "@/lib/campaign-send";
 import { getDb } from "@/lib/tenant-context";
 
@@ -137,11 +138,43 @@ export async function sendCampaignAction(data: {
   campaignId: string;
   recipientType: "contacts" | "leads";
   recipientIds?: string[];
+  /** A saved filter to aim at, instead of everybody eligible. */
+  filterId?: string | null;
 }) {
   await requireWriteAccess();
   await requirePlanModule("marketing");
   // The database handle opened here was never used: the send resolves its own.
   return executeCampaignSend(data);
+}
+
+/**
+ * The saved views a campaign can be aimed at, and how many people each reaches.
+ *
+ * Counted here rather than guessed in the dialog, because the number that
+ * matters is the one the send will actually use: same filter, same consent rule,
+ * same suppression list.
+ */
+export async function getSegments() {
+  await requireCapability("record:read");
+  await requirePlanModule("marketing");
+  const segments = await listSegments();
+  return segments.map((s) => ({
+    id: s.id,
+    name: s.name,
+    recipientType: s.entityType === "contacts" ? ("contacts" as const) : ("leads" as const),
+  }));
+}
+
+/** How many people a segment reaches, or everybody eligible when none is chosen. */
+export async function getSegmentCount(recipientType: "contacts" | "leads", filterId: string | null) {
+  await requireCapability("record:read");
+  await requirePlanModule("marketing");
+  if (!filterId) {
+    const counts = await getEligibleRecipientCounts();
+    return counts[recipientType];
+  }
+  const ids = await resolveSegmentIds(recipientType, filterId);
+  return ids?.length ?? 0;
 }
 
 // ─── Campaign Report ──────────────────────────────────────────────────────────
@@ -280,6 +313,8 @@ export async function scheduleCampaignAction(data: {
   campaignId: string;
   recipientType: "contacts" | "leads";
   scheduledAt: Date;
+  /** Kept on the campaign: the send happens later, when this dialog is gone. */
+  filterId?: string | null;
 }) {
   await requireWriteAccess();
   await requirePlanModule("marketing");
@@ -288,7 +323,13 @@ export async function scheduleCampaignAction(data: {
   if (scheduledAt <= new Date()) throw new Error("Scheduled time must be in the future");
   await db
     .update(marketingCampaigns)
-    .set({ status: "scheduled", scheduledAt, recipientType, updatedAt: new Date() })
+    .set({
+      status: "scheduled",
+      scheduledAt,
+      recipientType,
+      recipientFilterId: data.filterId ?? null,
+      updatedAt: new Date(),
+    })
     .where(eq(marketingCampaigns.id, campaignId));
   revalidatePath("/dashboard/marketing/campaigns");
 }

@@ -532,6 +532,10 @@ export const marketingCampaigns = pgTable("marketing_campaign", {
   ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
   scheduledAt: timestamp("scheduled_at", { mode: "date" }),
   recipientType: text("recipient_type"), // contacts | leads — stored when scheduling
+  // The saved filter this campaign goes to, or null for everybody eligible. Kept
+  // on the campaign because a scheduled send happens later, when the dialog that
+  // chose the segment is long gone.
+  recipientFilterId: text("recipient_filter_id").references(() => customFilters.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });

@@ -71,6 +71,13 @@
       "when": 1788950000000,
       "tag": "0009_who_hears_about_a_missed_promise",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788960000000,
+      "tag": "0010_a_campaign_can_be_aimed",
+      "breakpoints": true
     }
   ]
 }
