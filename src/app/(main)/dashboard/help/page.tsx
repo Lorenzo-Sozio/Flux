@@ -146,7 +146,11 @@ const sections = [
       },
       {
         q: "Come esporto la lista contatti?",
-        a: "Vai su Contatti → usa il pulsante 'Esporta CSV' per scaricare tutti i contatti (o quelli filtrati) in un file compatibile con Excel, Google Sheets e altri strumenti.",
+        a: "Contatti → 'Esporta CSV', in un file che Excel e Google Sheets aprono direttamente. ⚠️ L'esportazione NON tiene conto del filtro a schermo: scarica tutti i contatti che ti è permesso vedere. Con rango di amministratore o proprietario sono tutti quelli del workspace; con gli altri ruoli solo quelli di cui sei titolare.",
+      },
+      {
+        q: "Come unisco due contatti duplicati?",
+        a: "Dalla lista, seleziona il duplicato e usa 'Unisci': scegli quale scheda tiene il campo quando i due non concordano, e tutto ciò che era attaccato al doppione — attività, task, trattative, ticket — passa alla scheda che resta, invece di sparire con lui. Vale anche per aziende e lead.",
       },
     ],
   },
@@ -330,7 +334,15 @@ const sections = [
       },
       {
         q: "Come vedo le righe di un ordine?",
-        a: "Apri il dettaglio dell'ordine: trovi la lista di tutti i prodotti con quantità, prezzo unitario e totale per riga. Il totale dell'ordine è riepilogato in fondo alla pagina.",
+        a: "Apri il dettaglio dell'ordine: trovi tutti i prodotti con quantità, prezzo unitario e totale per riga, e il totale in fondo. Le date di creazione e dell'ordine riportano anche l'orario esatto, non solo il giorno.",
+      },
+      {
+        q: "Come faccio avanzare un ordine?",
+        a: "Accanto al menu dello stato ci sono due pulsanti distinti, con un'icona ciascuno: uno porta l'ordine al passo successivo del flusso (bozza → in lavorazione → completato), l'altro lo segna concluso in un colpo solo. Sono separati apposta, perché sono due intenzioni diverse e confonderle costa: un ordine chiuso per sbaglio va riaperto a mano. Su un ordine completato o annullato non compare nessuno dei due, perché da lì non si avanza.",
+      },
+      {
+        q: "Dove registro pagamenti e consegna?",
+        a: "Nel dettaglio dell'ordine trovi il riquadro dei pagamenti: i versamenti sono elencati uno per uno con data e importo, non sommati in un unico numero, così si vede un acconto seguito da un saldo. Accanto puoi registrare la data di consegna effettiva.",
       },
     ],
   },
@@ -374,7 +386,7 @@ const sections = [
     topics: [
       {
         q: "Come creo un template email?",
-        a: "Vai su Marketing → Template → 'Nuovo Template'. Dai un nome al template, scrivi l'oggetto e il corpo dell'email in formato HTML. Usa le variabili {{nome}}, {{cognome}}, {{azienda}} per personalizzare automaticamente il messaggio per ogni destinatario.",
+        a: "Marketing → Template → 'Nuovo Template'. Dai un nome, scrivi oggetto e corpo in HTML, e usa i segnaposto per personalizzare ogni copia: nome, cognome, nome completo, azienda, email, telefono e ruolo, ciascuno fra doppie graffe. Gli stessi funzionano anche in inglese (first_name, last_name, company…) e con qualche sinonimo — societa vale come azienda — perché un segnaposto scritto quasi giusto non deve partire com'è verso il cliente. Gli spazi dentro le graffe sono tollerati. C'è anche il segnaposto del collegamento per disiscriversi, che va messo in ogni campagna.",
       },
       {
         q: "Come creo e invio una campagna?",
@@ -386,7 +398,7 @@ const sections = [
       },
       {
         q: "Cosa succede se un contatto si disiscrizza?",
-        a: "Il sistema lo aggiunge automaticamente alla lista soppressioni. Da quel momento, quel contatto verrà escluso da tutti i futuri invii di campagne, anche se inserito manualmente nella lista destinatari. La disiscrizione è permanente e non reversibile dall'utente.",
+        a: "L'indirizzo finisce nella lista soppressioni ed è escluso da ogni invio successivo, anche se qualcuno lo rimette a mano fra i destinatari. ⚠️ La lista lavora sull'INDIRIZZO, non sulla scheda: rimettere la spunta del consenso marketing sul contatto non lo riporta fra i destinatari, perché sono due cose diverse — il consenso dice cosa vorreste fare, la soppressione dice cosa la persona ha chiesto. Anche i rimbalzi permanenti e le segnalazioni di spam finiscono lì, dallo stesso percorso.",
       },
     ],
   },
@@ -544,7 +556,15 @@ const sections = [
       },
       {
         q: "Quali azioni può eseguire una regola?",
-        a: "Le azioni disponibili sono: inviare un'email automatica a un destinatario specificato, creare un task collegato all'entità, aggiornare un campo dell'entità (es. cambiare lo stato), inviare una notifica interna a un collega.",
+        a: "Sei: inviare un'email, creare un task collegato al record, aggiornare un campo del record (per esempio lo stato), inviare una notifica interna a un collega, chiamare un webhook, ed emettere un evento verso un'integrazione collegata. L'evento parte marcato come originato da una persona, non da una macchina, perché la regola scatta per qualcosa che qualcuno ha fatto: un'integrazione che ignora le proprie scritture lo vedrebbe altrimenti passare per suo e non reagirebbe.",
+      },
+      {
+        q: "Devo scrivere ogni regola da zero?",
+        a: "No. Nella pagina Automazione c'è una libreria di regole già pronte per le situazioni più comuni — un lead da richiamare, una trattativa importante appena arrivata, un ticket urgente, un ringraziamento al cliente. Ne scegli una, la adatti e la attivi: è più veloce che partire da un foglio bianco, e mostra come sono fatte.",
+      },
+      {
+        q: "Quali condizioni posso mettere?",
+        a: "Oltre a uguale e diverso: maggiore, minore, maggiore o uguale, minore o uguale, contiene, non contiene, è vuoto, non è vuoto. E tre che guardano il cambiamento invece del valore — è cambiato, è diventato, era — che servono per reagire a un passaggio di stato invece che allo stato in sé.",
       },
       {
         q: "Esempio pratico di automazione?",
@@ -577,6 +597,10 @@ const sections = [
         a: "Vai su Report → Report Builder. Seleziona l'entità da analizzare (deal, contatti, lead, ticket, ecc.), scegli le metriche da visualizzare, applica i filtri e scegli il tipo di grafico (barre, linea, torta o tabella). Puoi salvare il report per consultarlo in futuro o condividerlo con il team.",
       },
       {
+        q: "Posso esportare il registro delle attività?",
+        a: "Sì, in CSV, filtrabile per intervallo di date e per singola persona. Serve il rango di amministratore dello spazio di lavoro: è il registro di chi ha fatto cosa, quindi non è una lettura come le altre.",
+      },
+      {
         q: "Dove trovo le analisi avanzate della pipeline?",
         a: "In Analytics → Pipeline trovi analisi approfondite: distribuzione deal per stage, azioni di gestione in coda, rischi identificati e confronto forecast vs. target. Questa sezione è pensata per i responsabili commerciali.",
       },
@@ -604,7 +628,7 @@ const sections = [
       },
       {
         q: "Come collego un programma esterno a Flux?",
-        a: "Impostazioni → API, dove generi una chiave del workspace. Si passa come intestazione `Authorization: Bearer <chiave>` e vale solo per questo workspace: quale sia lo dice la chiave stessa, quindi chi integra non deve indicarlo da nessun'altra parte, e non può sbagliare workspace per errore. La chiave si vede una volta sola al momento della creazione: se la perdi ne generi un'altra e la vecchia smette di funzionare. Le rotte disponibili, con corpi e risposte, sono nella documentazione API del pannello di amministrazione.",
+        a: "Impostazioni → Chiavi API, dove generi una chiave del workspace. Si passa come intestazione `Authorization: Bearer <chiave>` e vale solo per questo workspace: quale sia lo dice la chiave stessa, quindi chi integra non deve indicarlo da nessun'altra parte, e non può sbagliare workspace per errore. La chiave si vede una volta sola al momento della creazione: se la perdi ne generi un'altra e la vecchia smette di funzionare. Le rotte disponibili, con corpi e risposte, sono nella documentazione API del pannello di amministrazione.",
       },
       {
         q: "Come gestisco le risposte rapide per i ticket?",
@@ -626,7 +650,7 @@ const sections = [
     topics: [
       {
         q: "Quali eventi generano una notifica?",
-        a: "Ricevi una notifica quando: un task assegnato a te sta per scadere, una tua deal viene chiusa come vinta, ti viene assegnato un nuovo lead, viene inviata una campagna email che hai avviato, o si verificano eventi di sistema rilevanti.",
+        a: "Quando un task assegnato a te sta per scadere o è scaduto, quando una tua trattativa viene chiusa come vinta, quando ti viene assegnato un lead, quando parte una campagna che hai avviato. Sui ticket: quando una promessa SLA ha consumato metà del tempo e poi l'80%, così puoi ancora farci qualcosa, e alla violazione — che avvisa anche le persone del gruppo indicato nella politica, ciascuna una volta sola. Le automazioni possono aggiungerne altre.",
       },
       {
         q: "Come segno le notifiche come lette?",
@@ -648,7 +672,7 @@ const sections = [
     topics: [
       {
         q: "Quali sono i ruoli disponibili?",
-        a: "Owner: accesso totale, inclusa l'amministrazione del tenant. Admin: gestione utenti, ruoli e impostazioni di sistema. Editor: può creare e modificare tutti i record CRM. Viewer: sola lettura, non può creare né modificare nulla. I ruoli sono gerarchici: ogni ruolo superiore include i permessi di quello inferiore.",
+        a: "Owner: accesso totale, inclusa l'amministrazione dello spazio di lavoro. Admin: utenti, ruoli e impostazioni. Editor: crea e modifica i record CRM. Viewer: sola lettura. Sono gerarchici — ogni ruolo include i permessi di quello sotto — e valgono DENTRO questo spazio di lavoro: sono cosa diversa dal ruolo del personale di Flux, che opera sul pannello di amministrazione e non c'entra con quello che vedi qui. ⚠️ Sola lettura vuol dire ovunque, comprese le API: una chiamata fatta con la sessione di un viewer viene rifiutata come lo sarebbe un pulsante.",
       },
       {
         q: "Come invito un nuovo utente?",
@@ -656,7 +680,7 @@ const sections = [
       },
       {
         q: "Come cambio il ruolo a un utente?",
-        a: "Utenti → trova l'utente nella lista → clicca sul dropdown del ruolo e seleziona il nuovo ruolo. La modifica è immediata: al successivo caricamento di pagina, l'utente vedrà le funzionalità corrispondenti al nuovo ruolo.",
+        a: "Utenti → trova la persona nella lista → apri il menu del ruolo e scegline uno nuovo. ⚠️ Non ha effetto all'istante: il ruolo viene riletto al massimo ogni cinque minuti, quindi fino ad allora la sessione già aperta continua a vedere i permessi di prima. Vale anche per una rimozione dal workspace. Se devi togliere l'accesso subito, rimuovi la persona e falla disconnettere.",
       },
       {
         q: "Cosa sono i Gruppi Utente?",

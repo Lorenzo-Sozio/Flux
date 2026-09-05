@@ -93,13 +93,17 @@ describe("the API documentation", () => {
     expect(phantom).toEqual([]);
   });
 
-  it("⚠️ documents every endpoint an integration is meant to call", () => {
-    // Everything under /api/crm is the machine-to-machine surface: it exists for
-    // somebody outside to call, and one that is not written down might as well
-    // not be there. The rest of /api is internal to the product's own screens.
+  it("⚠️ documents every endpoint the app serves", () => {
+    // Sixteen were missing when this was first checked, six of them a whole
+    // capability — the routes that start from a phone number instead of an id.
+    // An endpoint nobody wrote down might as well not exist, and the person who
+    // needed it had no way to learn it was there.
+    //
+    // NextAuth's catch-all is the one exception: it is the library's surface, not
+    // this product's, and documenting it here would only go stale.
     const documented = new Set(documentedEndpoints().map((e) => `${e.method} ${e.path}`));
     const missing = realEndpoints()
-      .filter((e) => e.path.startsWith("/api/crm/"))
+      .filter((e) => !e.path.startsWith("/api/auth/"))
       .map((e) => `${e.method} ${e.path}`)
       .filter((e) => !documented.has(e));
     expect(missing).toEqual([]);

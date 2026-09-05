@@ -21,6 +21,7 @@ import {
   Lock,
   Mail,
   Search,
+  Server,
   Shield,
   Terminal,
   UserPlus,
@@ -182,7 +183,7 @@ const GROUPS: ApiGroup[] = [
     border: "border-amber-200",
     description:
       "Ci sono tre credenziali e non sono intercambiabili.\n\n" +
-      "1. CHIAVE DEL WORKSPACE — è così che si autentica un'integrazione, ed è la via normale per tutto ciò che sta sotto /api/crm. Si passa come `Authorization: Bearer <chiave>` e si genera dal workspace stesso, in Impostazioni → API.\n" +
+      "1. CHIAVE DEL WORKSPACE — è così che si autentica un'integrazione, ed è la via normale per tutto ciò che sta sotto /api/crm. Si passa come `Authorization: Bearer <chiave>` e si genera dal workspace stesso, in Impostazioni → Chiavi API.\n" +
       "⚠️ Il workspace è una proprietà della chiave, non della richiesta: `X-Tenant-ID` non serve, e un `X-Tenant-ID` che ne indica un altro fa fallire la chiamata con 401 invece di essere ignorato. Ignorarlo lascerebbe un'integrazione mal configurata scrivere allegramente nel proprio workspace mentre chi l'ha configurata crede stia scrivendo in un altro, e non lo scoprirebbe nessuno finché un messaggio non arriva al cliente sbagliato.\n\n" +
       "2. CHIAVE DI PIATTAFORMA (`IMPORT_API_KEY`) — la sola credenziale che può nominare un workspace qualsiasi, ed è di Flux, non del cliente. Anche questa come `Authorization: Bearer <chiave>`, ma richiede `X-Tenant-ID` con l'identificativo del workspace di destinazione, validato contro il registro. Senza quell'header si riceve 400 `Tenant context required`; con un identificativo che non esiste, 404.\n\n" +
       "3. SESSIONE — il cookie HttpOnly `authjs.session-token` di NextAuth v5, cioè il modo in cui il prodotto chiama sé stesso dal browser. Il workspace viene dal JWT e il proxy inietta `x-tenant-id` internamente; lo stesso header inviato dal client non viene mai creduto.\n" +
@@ -200,7 +201,8 @@ const GROUPS: ApiGroup[] = [
     bg: "bg-cyan-50",
     border: "border-cyan-200",
     description:
-      "Flux CRM è un'applicazione multi-tenant a dominio singolo: ogni organizzazione ha il proprio database isolato e tutti i tenant condividono lo stesso dominio (app.fluxcrm.com). Il tenant attivo viene identificato dal JWT di sessione (campo activeTenantId) — il middleware inietta l'header interno x-tenant-id dopo aver verificato la firma del token, rendendo impossibile la falsificazione lato client. Dopo il login, se l'utente appartiene a un solo workspace viene selezionato automaticamente; se appartiene a più workspace viene mostrata la pagina /select-tenant. Il cambio workspace aggiorna il JWT tramite session.update(). Se il tenant non viene trovato la richiesta fallisce con HTTP 500 (TENANT_NOT_FOUND). ownerId nei record CRM: con autenticazione via sessione, l'ID utente della sessione viene automaticamente impostato come ownerId del record creato.",
+      "Flux CRM è un'applicazione multi-tenant a dominio singolo: ogni organizzazione ha il proprio database isolato e tutti i tenant condividono lo stesso dominio (app.fluxcrm.com). Il tenant attivo viene identificato dal JWT di sessione (campo activeTenantId) — il middleware inietta l'header interno x-tenant-id dopo aver verificato la firma del token, rendendo impossibile la falsificazione lato client. Dopo il login, se l'utente appartiene a un solo workspace viene selezionato automaticamente; se appartiene a più workspace viene mostrata la pagina /select-tenant. Il cambio workspace aggiorna il JWT tramite session.update(). Un workspace che non esiste fa fallire una pagina della dashboard con 500 (TENANT_NOT_FOUND), perché lì è un errore di sistema e non un dato in ingresso; le rotte /api/crm invece lo controllano e rispondono 404, perché lì l'identificativo arriva da chi chiama.\n\n" +
+      "⚠️ Tutto questo descrive la SESSIONE. Un'integrazione non ha un JWT: il suo workspace viene dalla credenziale, e la sezione Authentication dice come. Il proprietario dei record segue la stessa distinzione — con la sessione il record nasce assegnato a chi ha chiamato, con una chiave API nasce senza proprietario, perché una chiave non è una persona.",
     isInfoOnly: true,
     endpoints: [],
   },
@@ -1647,6 +1649,59 @@ const GROUPS: ApiGroup[] = [
             status: 200,
             description: "Promemoria inviati",
             example: JSON.stringify({ notified: 8, tasks: ["task_01", "task_02"] }, null, 2),
+          },
+        ],
+      },
+      {
+        id: "cron-task-overdue",
+        method: "GET",
+        path: "/api/cron/task-overdue-check",
+        summary: "Segnala i task scaduti",
+        description:
+          "Marca come scaduti i task la cui data è passata e avvisa chi li ha in carico. Una volta al giorno.",
+        auth: "cron",
+        parameters: [
+          {
+            name: "Authorization",
+            in: "header",
+            required: true,
+            type: "string",
+            description: "Bearer token `CRON_SECRET`.",
+            example: "Bearer sk_cron_abc123xyz",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "Task marcati e avvisi inviati",
+            example: JSON.stringify({ flagged: 7 }, null, 2),
+          },
+        ],
+      },
+      {
+        id: "cron-webhook-retry",
+        method: "GET",
+        path: "/api/cron/webhook-retry",
+        summary: "Riprova i webhook non consegnati",
+        description:
+          "Rispedisce gli eventi in uscita la cui consegna è fallita. Ogni cinque minuti.\n\n" +
+          "⚠️ È questo job a rendere gli eventi in uscita «almeno una volta» invece che «al massimo una volta». Senza, un evento perso è perso, e chi lo stava aspettando non ha modo di saperlo — non fallisce niente, semplicemente non arriva.",
+        auth: "cron",
+        parameters: [
+          {
+            name: "Authorization",
+            in: "header",
+            required: true,
+            type: "string",
+            description: "Bearer token `CRON_SECRET`.",
+            example: "Bearer sk_cron_abc123xyz",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "Quanti ne sono stati ritentati e quanti sono passati",
+            example: JSON.stringify({ retried: 4, delivered: 3 }, null, 2),
           },
         ],
       },
@@ -3725,6 +3780,228 @@ const GROUPS: ApiGroup[] = [
       },
     ],
   },
+  {
+    id: "internal",
+    label: "Rotte interne",
+    icon: Server,
+    color: "text-slate-600",
+    bg: "bg-slate-50",
+    border: "border-slate-200",
+    description:
+      "Rotte che le schermate del prodotto chiamano per conto proprio. Sono documentate per completezza — chi legge i log o costruisce un client alternativo le incontra — ma non fanno parte della superficie pensata per un'integrazione: quella è /api/crm.\n\n" +
+      "Tutte richiedono una sessione, e il workspace arriva dal JWT.",
+    endpoints: [
+      {
+        id: "calendar-feed",
+        method: "GET",
+        path: "/api/calendar/{token}",
+        summary: "Feed iCal degli appuntamenti",
+        description:
+          "Il calendario a cui Google Calendar, Outlook e Calendario di Apple si iscrivono. Restituisce `text/calendar` secondo RFC 5545, con `METHOD:PUBLISH`.\n\n" +
+          "⚠️ Nessuna sessione, e non può averne una: un programma di calendario non sa fare login. È il token firmato nell'indirizzo a dire chi sei, quindi quell'indirizzo vale come una password. Chi lo possiede legge gli appuntamenti di quella persona. Non c'è revoca per singola persona: si ritirano tutte insieme ruotando `CALENDAR_FEED_SECRET`.\n\n" +
+          "Contiene gli appuntamenti organizzati dalla persona o a cui è invitata, da 90 giorni indietro a 365 avanti. Un appuntamento annullato resta nel feed marcato `CANCELLED` e non viene tolto: un client che smette di vederlo non cancella la copia che ha già, quindi la riunione resterebbe sul calendario di tutti per sempre.\n\n" +
+          "La risposta non è mai memorizzata in cache, e un token la cui persona non esiste più risponde 404 come uno inventato: non si distingue fra i due, così l'indirizzo non dice se un account esiste.",
+        auth: "public",
+        parameters: [
+          {
+            name: "token",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "Il token firmato. Si ottiene dal pulsante «Iscriviti» nella pagina Calendario",
+            example: "MTExMTExMTEtLi4u.9f2c8ab1d4e0",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "Il calendario. `Content-Type: text/calendar; charset=utf-8`, `Cache-Control: no-store`",
+            example:
+              "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//FluxCRM//FluxCRM//EN\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\nX-WR-CALNAME:Flux — Anna Rossi\nREFRESH-INTERVAL;VALUE=DURATION:PT15M\nX-PUBLISHED-TTL:PT15M\nBEGIN:VEVENT\nUID:a011600a-c347@fluxcrm.app\nDTSTAMP:20260608T092705Z\nDTSTART:20260608T100000Z\nDTEND:20260608T110000Z\nSUMMARY:Riunione con Acme\nSEQUENCE:1\nSTATUS:CONFIRMED\nEND:VEVENT\nEND:VCALENDAR",
+          },
+          {
+            status: 404,
+            description:
+              "Token non valido, workspace non trovato, o persona non più esistente. I tre casi non si distinguono",
+            example: "Not found",
+          },
+          {
+            status: 429,
+            description: "Troppe richieste per lo stesso token",
+            example: "Too many requests",
+          },
+        ],
+      },
+      {
+        id: "documents-download",
+        method: "GET",
+        path: "/api/documents/{id}",
+        summary: "Scarica un documento",
+        description:
+          "Restituisce i byte del file. Di base come allegato: `Content-Disposition: attachment` e `X-Content-Type-Options: nosniff`, così un file caricato non può essere eseguito dal browser di chi lo apre. Con `?view=1` viene mostrato in linea, e solo per i tipi per cui è sicuro.\n\n" +
+          "⚠️ I documenti caricati prima del passaggio all'archiviazione a oggetti contengono un percorso su disco invece di una chiave. Si leggono ancora solo dal driver locale, che su un server distribuito non ha quei byte: in quel caso la rotta lo dice invece di restituire un file rotto.",
+        auth: "session",
+        parameters: [
+          { name: "id", in: "path", required: true, type: "string", description: "Identificativo del documento" },
+          {
+            name: "view",
+            in: "query",
+            required: false,
+            type: "string",
+            description: "`1` per mostrarlo in linea invece di scaricarlo",
+            example: "1",
+          },
+        ],
+        responses: [
+          { status: 200, description: "I byte del file", example: "<binario>" },
+          { status: 401, description: "Sessione assente", example: "Unauthorized" },
+          { status: 403, description: "Il documento è di un altro workspace", example: "Forbidden" },
+          { status: 404, description: "Documento inesistente, o byte non più raggiungibili", example: "Not found" },
+          { status: 502, description: "L'archivio non ha restituito il file", example: "Could not read the file." },
+        ],
+      },
+      {
+        id: "quote-read",
+        method: "GET",
+        path: "/api/quotes/{id}",
+        summary: "Leggi un preventivo",
+        description:
+          "Il preventivo con le sue righe, usato dalle schermate interne. ⚠️ Lo vede chi ne è proprietario, chi possiede la trattativa collegata, o chi ha rango di amministratore nel workspace — non nella scala di piattaforma, che per ogni cliente vale «utente» e quindi non avrebbe mai concesso niente a nessuno.",
+        auth: "session",
+        parameters: [
+          { name: "id", in: "path", required: true, type: "string", description: "Identificativo del preventivo" },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "Il preventivo",
+            example: JSON.stringify({ id: "qte_1a2b", quoteNumber: "Q-2026-014" }, null, 2),
+          },
+          { status: 401, description: "Sessione assente", example: "Unauthorized" },
+          { status: 403, description: "Non è tuo e non hai il rango per vederlo", example: "Forbidden" },
+          { status: 404, description: "Preventivo inesistente", example: "Not found" },
+        ],
+      },
+      {
+        id: "reports-export",
+        method: "GET",
+        path: "/api/reports/export",
+        summary: "Esporta il registro attività",
+        description:
+          "CSV del registro di chi ha fatto cosa. ⚠️ Richiede la capacità `report:manage`, cioè rango amministratore NEL WORKSPACE. Questa riga leggeva il ruolo di piattaforma, che vale «utente» per ogni cliente: l'esportazione era vietata a chiunque, proprietario compreso, e restava aperta solo al personale di Flux.",
+        auth: "session",
+        parameters: [
+          {
+            name: "from",
+            in: "query",
+            required: false,
+            type: "string (YYYY-MM-DD)",
+            description: "Dalla data",
+            example: "2026-09-01",
+          },
+          {
+            name: "to",
+            in: "query",
+            required: false,
+            type: "string (YYYY-MM-DD)",
+            description: "Alla data, inclusa",
+            example: "2026-09-30",
+          },
+          {
+            name: "userId",
+            in: "query",
+            required: false,
+            type: "string",
+            description: "Solo le azioni di questa persona",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "Il CSV",
+            example: "data,utente,azione,entita\n2026-09-05,Anna Rossi,create_ticket,TKT-202609-1A2B",
+          },
+          { status: 401, description: "Sessione assente", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+          {
+            status: 403,
+            description: "Serve il rango amministratore del workspace",
+            example: JSON.stringify({ error: "Forbidden" }, null, 2),
+          },
+          {
+            status: 500,
+            description: "Esportazione fallita",
+            example: JSON.stringify({ error: "Export failed" }, null, 2),
+          },
+        ],
+      },
+      {
+        id: "ticket-presence-get",
+        method: "GET",
+        path: "/api/tickets/{id}/presence",
+        summary: "Chi sta guardando il ticket",
+        description:
+          "Le persone che stanno guardando o scrivendo su questo ticket in questo momento, così due agenti non rispondono insieme.\n\n" +
+          "⚠️ Lo stato sta in memoria del processo, non nel database: si azzera a ogni riavvio e non è condiviso fra istanze. È voluto — è un segnale di cortesia di pochi secondi, non un dato — ma va saputo prima di farci affidamento.",
+        auth: "session",
+        parameters: [
+          { name: "id", in: "path", required: true, type: "string", description: "Identificativo del ticket" },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "Chi c'è adesso",
+            example: JSON.stringify([{ userId: "usr_1", userName: "Anna Rossi", action: "typing" }], null, 2),
+          },
+          { status: 401, description: "Sessione assente", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "ticket-presence-post",
+        method: "POST",
+        path: "/api/tickets/{id}/presence",
+        summary: "Segnala che stai guardando o scrivendo",
+        description:
+          "Registra la propria presenza sul ticket. Va richiamata periodicamente: una presenza smette di contare da sola dopo pochi secondi di silenzio.",
+        auth: "session",
+        parameters: [
+          { name: "id", in: "path", required: true, type: "string", description: "Identificativo del ticket" },
+          {
+            name: "action",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "`typing` mentre si scrive, altrimenti `viewing`. Qualunque altro valore vale `viewing`",
+            enum: ["viewing", "typing"],
+            example: "typing",
+          },
+        ],
+        requestBody: { contentType: "application/json", example: JSON.stringify({ action: "typing" }, null, 2) },
+        responses: [
+          { status: 200, description: "Registrato", example: JSON.stringify({ ok: true }, null, 2) },
+          { status: 401, description: "Sessione assente", example: JSON.stringify({ error: "Unauthorized" }, null, 2) },
+        ],
+      },
+      {
+        id: "admin-migrate-all",
+        method: "GET",
+        path: "/api/admin/migrate-all",
+        summary: "Applica le migrazioni a ogni workspace",
+        description:
+          "Applica le migrazioni pendenti al database di ogni cliente. È la rotta dietro il pulsante del pannello di amministrazione.\n\n" +
+          "Le migrazioni viaggiano dentro il bundle e non vengono lette dal disco: un server distribuito non porta con sé file che il bundler non ha visto importare, e un Worker non ha filesystem. Dalla stessa ragione discende che il pulsante applica sempre e solo ciò che c'è nel bundle attualmente distribuito.\n\n" +
+          "⚠️ Di norma non serve premerlo: il database di un workspace si migra da solo la prima volta che viene aperto dopo un rilascio.",
+        auth: "admin",
+        responses: [
+          {
+            status: 200,
+            description: "Esito per ogni workspace",
+            example: JSON.stringify({ ok: true, tenants: [{ subdomain: "acme", applied: 2 }] }, null, 2),
+          },
+          { status: 401, description: "Sessione di amministrazione assente", example: "Unauthorized" },
+        ],
+      },
+    ],
+  },
 ];
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
@@ -3923,7 +4200,8 @@ function EndpointSection({
 
       {/* Body */}
       <div className="p-5">
-        <p className="mb-5 text-gray-500 text-sm leading-relaxed">{endpoint.description}</p>
+        {/* Come per le sezioni: chi scrive paragrafi deve poterli avere. */}
+        <p className="mb-5 whitespace-pre-line text-gray-500 text-sm leading-relaxed">{endpoint.description}</p>
 
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Left: params + request body */}
