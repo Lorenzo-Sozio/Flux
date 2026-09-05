@@ -40,10 +40,13 @@ interface Props {
   contacts: Contact[];
   users: User[];
   canEdit: boolean;
-  activeCount: number;
+  /** Filtered or searched. A narrowed list that finds nothing is not an empty
+   * workspace, and must not be offered a create button for a record the person
+   * was not looking to create. */
+  narrowed: boolean;
 }
 
-export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) {
+export function ContactsTable({ contacts, users, canEdit, narrowed }: Props) {
   const t = useTranslations("contacts");
   const te = useTranslations("emptyStates");
   const tc = useTranslations("common");
@@ -195,7 +198,7 @@ export function ContactsTable({ contacts, users, canEdit, activeCount }: Props) 
           {contacts.length === 0 && (
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={canEdit ? 9 : 8} className="p-0">
-                {activeCount > 0 ? (
+                {narrowed ? (
                   <EmptyState icon={UsersIcon} title={te("filteredTitle")} description={te("filteredDescription")} />
                 ) : (
                   <EmptyState

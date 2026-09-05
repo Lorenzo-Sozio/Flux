@@ -51,12 +51,15 @@ interface Props {
   companies: Company[];
   users: User[];
   canEdit: boolean;
-  activeCount: number;
+  /** Filtered or searched. A narrowed list that finds nothing is not an empty
+   * workspace, and must not be offered a create button for a record the person
+   * was not looking to create. */
+  narrowed: boolean;
   categories?: LookupItem[];
   companyTypes?: LookupItem[];
 }
 
-export function CompaniesTable({ companies, users, canEdit, activeCount, categories = [], companyTypes = [] }: Props) {
+export function CompaniesTable({ companies, users, canEdit, narrowed, categories = [], companyTypes = [] }: Props) {
   const t = useTranslations("companies");
   const te = useTranslations("emptyStates");
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -216,7 +219,7 @@ export function CompaniesTable({ companies, users, canEdit, activeCount, categor
           {companies.length === 0 && (
             <TableRow className="hover:bg-transparent">
               <TableCell colSpan={canEdit ? 9 : 8} className="p-0">
-                {activeCount > 0 ? (
+                {narrowed ? (
                   <EmptyState
                     icon={Building2Icon}
                     title={te("filteredTitle")}

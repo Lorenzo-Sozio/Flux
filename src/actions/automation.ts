@@ -203,11 +203,20 @@ export async function deleteAutomationRule(id: string) {
  * "moved to won" is not a property a deal has, so counting deals for it would be
  * a number that means nothing.
  */
-export async function getRecipeMatchCounts(): Promise<Record<string, number | null>> {
+export async function getRecipeMatchCounts(): Promise<{
+  counts: Record<string, number | null>;
+  installed: string[];
+}> {
   // The same bar as installing one: whoever is shown the dialog can ask it.
   await requireWriteAccess();
   await requirePlanModule("automation");
   const db = await getDb();
+
+  // Which are already here. Installing the same recipe twice writes two identical
+  // rules and both of them fire, so the dialog has to know before it offers.
+  const existing = await db.select({ name: automationRules.name }).from(automationRules);
+  const names = new Set(existing.map((r) => r.name));
+  const installed = AUTOMATION_RECIPES.filter((r) => names.has(r.rule.name)).map((r) => r.id);
 
   const evaluator = new ConditionEvaluator();
   const tables = { lead: leads, contact: contacts, company: companies, deal: deals, ticket: tickets, order: orders };
@@ -242,12 +251,30 @@ export async function getRecipeMatchCounts(): Promise<Record<string, number | nu
     ).length;
   }
 
-  return counts;
+  return { counts, installed };
 }
 
-/** Writes one recipe as a rule of its own. Nothing marks it as having come from here. */
+/**
+ * Writes one recipe as a rule of its own. Nothing marks it as having come from
+ * here, which is the point: it is an ordinary rule afterwards.
+ *
+ * Refused when a rule of that name is already there. Two copies of the same rule
+ * both fire, so a second click would quietly double every task it creates — and
+ * the dialog's memory of what it installed does not survive a reload, so the
+ * second click is easy to make.
+ */
 export async function installAutomationRecipe(recipeId: string) {
   const recipe = findRecipe(recipeId);
   if (!recipe) return { success: false, error: "No such recipe" };
+
+  await requireWriteAccess();
+  const db = await getDb();
+  const [already] = await db
+    .select({ id: automationRules.id })
+    .from(automationRules)
+    .where(eq(automationRules.name, recipe.rule.name))
+    .limit(1);
+  if (already) return { success: false, error: "already-installed" };
+
   return createAutomationRule(recipe.rule);
 }

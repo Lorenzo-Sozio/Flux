@@ -48,7 +48,13 @@ export function RecipeLibrary() {
     // entity type, and nobody is waiting for it until they look.
     if (next && counts === null) {
       getRecipeMatchCounts()
-        .then(setCounts)
+        .then((state) => {
+          setCounts(state.counts);
+          // What is already here, read from the workspace rather than remembered:
+          // this component's memory does not survive a reload, and a second click
+          // would write a second copy of the same rule.
+          setInstalled(new Set(state.installed));
+        })
         .catch(() => setCounts({}));
     }
   }
@@ -60,6 +66,9 @@ export function RecipeLibrary() {
         setInstalled((prev) => new Set(prev).add(id));
         toast.success(t("installed"));
         router.refresh();
+      } else if (result.error === "already-installed") {
+        setInstalled((prev) => new Set(prev).add(id));
+        toast.info(t("alreadyAdded"));
       } else {
         toast.error(result.error ?? t("installFailed"));
       }

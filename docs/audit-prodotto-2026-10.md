@@ -895,7 +895,16 @@ che nessuno ha fatto.
 
 Sei schermate lo montano — contatti, aziende, lead, ordini, prodotti e ticket — ognuna
 con l'unica azione che ha senso lì e una riga che dice a cosa serve quella schermata. I
-preventivi ne avevano già uno buono ed è rimasto com'era.
+preventivi ne avevano già uno buono ed è rimasto com'era. La pipeline no: una board vuota
+mostra comunque le sue fasi e il pulsante per la trattativa, e uno stato vuoto coprirebbe
+proprio la struttura che spiega la schermata.
+
+⚠️ Distinguere i due vuoti è più sottile di quanto sembri, e la prima versione sbagliava.
+Le tre liste CRM chiedevano «ci sono filtri attivi?», che conta solo le condizioni del
+costruttore di filtri: una **ricerca** che non trova nulla lasciava quel numero a zero, e
+la schermata rispondeva «ancora nessun contatto» offrendo di crearne uno, a chi ne stava
+cercando un altro. Ora la domanda è «la lista è ristretta?», filtri **o** ricerca. Ordini,
+prodotti e ticket la ponevano già nel modo giusto.
 
 **Rimedio.** Fasi, SLA e categorie predefiniti alla creazione del workspace. Una lista di
 avvio in cinque passi con avanzamento visibile. Stati vuoti che propongono l'azione.
@@ -1040,6 +1049,18 @@ riusando il valutatore di condizioni già esistente su una lettura per tipo di e
 risponde alla domanda dietro la domanda: questa regola ha qualcosa su cui mordere. Le
 ricette che scattano su un cambiamento — «passa a vinto» non è una proprietà di una
 trattativa — lo dicono invece di mostrare uno zero che non significa niente.
+
+Installare due volte la stessa ricetta è rifiutato. La memoria della finestra non
+sopravvive a un ricaricamento, quindi il secondo clic era facile da fare, e due copie
+identiche della stessa regola scattano entrambe: ogni task che crea sarebbe stato doppio.
+La finestra chiede al workspace quali ci sono già invece di ricordarselo.
+
+Il catalogo è scritto a mano e validato da Zod al momento dell'installazione, dove l'unica
+risposta possibile è «non è stato possibile aggiungere la regola»: TypeScript non se ne
+accorgerebbe, perché per lui una stringa è una stringa. Un test lo fa passare tutto dallo
+schema vero, e controlla anche che ogni campo nominato esista nel costruttore — una regola
+installata che poi non si può aprire e modificare è peggio di una che non si installa.
+Quattro mutazioni lo tengono onesto.
 
 Trovato mentre si montava il pulsante: la pagina delle automazioni decideva chi può
 modificare leggendo `session.user.role`, che è il campo dello staff di piattaforma e vale

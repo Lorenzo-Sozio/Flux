@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/lib/automation-recipes.ts",
+    "description": "⚠️⚠️ a recipe carries a priority Zod does not accept: it installs with one click that answers «could not add that rule», and nothing says which of the eight is broken",
+    "find": "priority: \"high\",",
+    "replace": "priority: \"critical\","
+  },
+  {
+    "file": "src/lib/automation-recipes.ts",
+    "description": "⚠️ a condition names a field the rule builder cannot show: the recipe installs, and the rule it wrote cannot be opened and edited afterwards",
+    "find": "field: \"leadScore\", operator: \"greater_than_or_equal\", value: \"80\", logic: \"AND\"",
+    "replace": "field: \"score\", operator: \"greater_than_or_equal\", value: \"80\", logic: \"AND\""
+  },
+  {
+    "file": "src/lib/automation-recipes.ts",
+    "description": "a recipe fires on a schedule: node-cron does not start on Workers, so it would do nothing at all on that deployment and say nothing about it",
+    "find": "triggerOn: [\"onCreate\", \"onUpdate\"],",
+    "replace": "triggerOn: [\"scheduled:0 8 * * 1\"],"
+  },
+  {
+    "file": "src/lib/automation-recipes.ts",
+    "description": "two recipes share an id: installing one installs the other, and the dialog marks the wrong one as added",
+    "find": "id: \"hot-lead-call\",",
+    "replace": "id: \"big-deal-notify\","
+  }
+]

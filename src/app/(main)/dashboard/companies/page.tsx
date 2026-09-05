@@ -107,7 +107,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
         companies={pageResult.rows}
         users={users}
         canEdit={canEdit}
-        activeCount={activeCount}
+        narrowed={activeCount > 0 || listParams.search.length > 0}
         categories={categories}
         companyTypes={companyTypes}
       />

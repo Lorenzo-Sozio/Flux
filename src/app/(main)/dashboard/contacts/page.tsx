@@ -88,7 +88,12 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
         />
       </div>
 
-      <ContactsTable contacts={pageResult.rows} users={users} canEdit={canEdit} activeCount={activeCount} />
+      <ContactsTable
+        contacts={pageResult.rows}
+        users={users}
+        canEdit={canEdit}
+        narrowed={activeCount > 0 || listParams.search.length > 0}
+      />
     </div>
   );
 }

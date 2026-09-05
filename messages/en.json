@@ -1662,7 +1662,8 @@
       "installed": "Rule added. It is on and running.",
       "installFailed": "Could not add that rule.",
       "onChange": "Fires on a change, so there is nothing to count yet",
-      "matchesNow": "{count} records match this right now"
+      "matchesNow": "{count} records match this right now",
+      "alreadyAdded": "That rule is already here."
     }
   },
   "analytics": {

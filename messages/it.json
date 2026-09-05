@@ -1662,7 +1662,8 @@
       "installed": "Regola aggiunta. È attiva.",
       "installFailed": "Non è stato possibile aggiungere la regola.",
       "onChange": "Scatta su un cambiamento, quindi non c'è ancora niente da contare",
-      "matchesNow": "{count} record la soddisfano in questo momento"
+      "matchesNow": "{count} record la soddisfano in questo momento",
+      "alreadyAdded": "Quella regola c'è già."
     }
   },
   "analytics": {
