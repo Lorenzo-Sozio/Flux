@@ -69,7 +69,8 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
         entity: "ticket",
         id: t.id,
         title: `${t.ticketNumber} — ${t.subject}`,
-        detail: `Past its deadline by ${daysBetween(t.slaDeadlineAt, now)}d`,
+        detailKey: "pastDeadline",
+        detailValue: daysBetween(t.slaDeadlineAt, now),
         href: `/dashboard/support/tickets/${t.id}`,
         urgency: urgencyOf("sla_breached", daysBetween(t.slaDeadlineAt, now)),
       });
@@ -79,7 +80,8 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
         entity: "ticket",
         id: t.id,
         title: `${t.ticketNumber} — ${t.subject}`,
-        detail: `${Math.round(left * 100)}% of its SLA left`,
+        detailKey: "slaLeft",
+        detailValue: Math.round(left * 100),
         href: `/dashboard/support/tickets/${t.id}`,
         // The less is left, the more urgent — inverted so an empty window scores highest.
         urgency: urgencyOf("sla_at_risk", (THRESHOLDS.slaRemainingFraction - left) * 5),
@@ -112,7 +114,8 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
           entity: "quote",
           id: q.id,
           title: q.quoteNumber,
-          detail: daysLeft <= 0 ? "Expired" : `Expires in ${daysLeft}d`,
+          detailKey: daysLeft <= 0 ? "expired" : "expiresIn",
+          detailValue: daysLeft,
           href: `/dashboard/sales/quotes/${q.id}`,
           urgency: urgencyOf("quote_expiring", Math.max(0, -daysLeft)),
         });
@@ -130,7 +133,8 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
           entity: "quote",
           id: q.id,
           title: q.quoteNumber,
-          detail: `Sent ${quiet}d ago, never opened`,
+          detailKey: "sentNeverOpened",
+          detailValue: quiet,
           href: `/dashboard/sales/quotes/${q.id}`,
           urgency: urgencyOf("quote_unopened", quiet / THRESHOLDS.quoteUnopenedDays - 1),
         });
@@ -174,7 +178,8 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
         entity: "deal",
         id: d.id,
         title: d.name,
-        detail: `Should have closed ${late}d ago`,
+        detailKey: "shouldHaveClosed",
+        detailValue: late,
         href: `/dashboard/pipeline?deal=${d.id}`,
         urgency: urgencyOf("deal_overdue", late / THRESHOLDS.dealStalledDays),
       });
@@ -189,7 +194,8 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
         entity: "deal",
         id: d.id,
         title: d.name,
-        detail: `No contact for ${quiet}d`,
+        detailKey: "noContactFor",
+        detailValue: quiet,
         href: `/dashboard/pipeline?deal=${d.id}`,
         urgency: urgencyOf("deal_stalled", quiet / THRESHOLDS.dealStalledDays - 1),
       });
@@ -226,7 +232,8 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
       entity: "lead",
       id: l.id,
       title: [l.firstName, l.lastName].filter(Boolean).join(" ") || (l.companyName ?? "Lead"),
-      detail: `Arrived ${quiet}d ago, never contacted`,
+      detailKey: "arrivedNeverContacted",
+      detailValue: quiet,
       href: `/dashboard/leads/${l.id}`,
       urgency: urgencyOf("lead_untouched", quiet / THRESHOLDS.leadUntouchedDays - 1),
     });
@@ -267,7 +274,8 @@ export async function getNextActions(limit = 12): Promise<NextAction[]> {
       entity: "company",
       id: c.id,
       title: c.name,
-      detail: `No contact for ${quiet}d`,
+      detailKey: "noContactFor",
+      detailValue: quiet,
       href: `/dashboard/companies/${c.id}`,
       urgency: urgencyOf("customer_quiet", quiet / THRESHOLDS.customerQuietDays - 1),
     });

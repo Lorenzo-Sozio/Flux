@@ -33,8 +33,15 @@ export interface NextAction {
   id: string;
   /** What the record is called, as the user knows it. */
   title: string;
-  /** The one number that makes the case: days quiet, hours left. */
-  detail: string;
+  /**
+   * The one number that makes the case, and the sentence it belongs in.
+   *
+   * A key and a value rather than a finished string: this runs on the server and
+   * the sentence has to arrive in the reader's language, which only the component
+   * knows (audit rilievi U-06, U-08).
+   */
+  detailKey: string;
+  detailValue: number;
   href: string;
   /** 0–100. Only ever used to order the list. */
   urgency: number;

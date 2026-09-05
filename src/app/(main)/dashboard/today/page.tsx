@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { AlarmClock, ArrowRight, Headphones, Inbox } from "lucide-react";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { getNextActions } from "@/actions/next-actions";
 import { getTodayView } from "@/actions/today";
@@ -14,16 +14,20 @@ import { AgendaWidget } from "../crm/_components/agenda-widget";
 import { NextActionsCard } from "../crm/_components/next-actions-card";
 
 /** How long is left, said the way a person would say it. */
-function timeLeft(deadline: Date | null): { text: string; late: boolean } | null {
+function timeLeft(
+  deadline: Date | null,
+  t: Awaited<ReturnType<typeof getTranslations<"today">>>,
+): { text: string; late: boolean } | null {
   if (!deadline) return null;
   const ms = new Date(deadline).getTime() - Date.now();
   const late = ms < 0;
+
   const mins = Math.round(Math.abs(ms) / 60_000);
-  if (mins < 60) return { text: late ? `${mins}m late` : `${mins}m left`, late };
+  if (mins < 60) return { text: t(late ? "minutesLate" : "minutesLeft", { n: mins }), late };
   const hours = Math.round(mins / 60);
-  if (hours < 24) return { text: late ? `${hours}h late` : `${hours}h left`, late };
+  if (hours < 24) return { text: t(late ? "hoursLate" : "hoursLeft", { n: hours }), late };
   const days = Math.round(hours / 24);
-  return { text: late ? `${days}d late` : `${days}d left`, late };
+  return { text: t(late ? "daysLate" : "daysLeft", { n: days }), late };
 }
 
 const PRIORITY_CLASS: Record<string, string> = {
@@ -54,7 +58,11 @@ export default async function TodayPage() {
   const actor = await getActor();
   const firstName = actor?.name?.split(" ")[0];
 
-  const [{ agenda, tickets }, nextActions] = await Promise.all([getTodayView(), getNextActions(10).catch(() => [])]);
+  const [{ agenda, tickets }, nextActions, t] = await Promise.all([
+    getTodayView(),
+    getNextActions(10).catch(() => []),
+    getTranslations("today"),
+  ]);
 
   const now = new Date();
   const dayLabel = now.toLocaleDateString(locale, {
@@ -63,7 +71,9 @@ export default async function TodayPage() {
     month: "long",
   });
 
-  const greeting = now.getHours() < 12 ? "Good morning" : now.getHours() < 18 ? "Good afternoon" : "Good evening";
+  const greeting = t(
+    now.getHours() < 12 ? "greetingMorning" : now.getHours() < 18 ? "greetingAfternoon" : "greetingEvening",
+  );
 
   return (
     <div className="space-y-6 p-6">
@@ -88,21 +98,21 @@ export default async function TodayPage() {
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Headphones className="h-4 w-4 text-muted-foreground" />
-                Your tickets
+                {t("ticketsTitle")}
               </CardTitle>
-              <CardDescription>{tickets.length === 0 ? "Nothing open." : "Soonest deadline first."}</CardDescription>
+              <CardDescription>{tickets.length === 0 ? t("ticketsNothing") : t("ticketsSoonest")}</CardDescription>
             </CardHeader>
 
             <CardContent className="pt-0">
               {tickets.length === 0 ? (
                 <div className="flex items-center gap-2 py-6 text-muted-foreground text-sm">
                   <Inbox className="h-4 w-4" />
-                  <span>No open tickets assigned to you.</span>
+                  <span>{t("ticketsEmpty")}</span>
                 </div>
               ) : (
                 <ul className="divide-y">
                   {tickets.map((ticket) => {
-                    const left = timeLeft(ticket.slaDeadlineAt);
+                    const left = timeLeft(ticket.slaDeadlineAt, t);
                     return (
                       <li key={ticket.id}>
                         <Link
