@@ -32,8 +32,8 @@
   {
     "file": "src/lib/ticket-triage.ts",
     "description": "gli accenti non vengono piu' ripiegati: «però» e «pero» diventano due parole diverse",
-    "find": "    .normalize(\"NFD\")\n    .replace(/[\u0300-\u036f]/g, \"\");",
-    "replace": "    .normalize(\"NFD\");"
+    "find": ".normalize(\"NFD\").replace(/[̀-ͯ]/g, \"\")",
+    "replace": ""
   },
   {
     "file": "src/lib/ticket-triage.ts",

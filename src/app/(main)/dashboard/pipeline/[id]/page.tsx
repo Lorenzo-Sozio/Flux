@@ -47,7 +47,11 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
   const { id: dealId } = await params;
   const session = await auth();
   const userId = session?.user?.id;
-  const userRole = session?.user?.role ?? "user";
+  // ⚠️ The workspace role. `session.user.role` is Flux's own staff scale and
+  // reads "user" for every customer, so the comment thread offered no workspace
+  // admin the delete control — while `deleteDealComment` would have allowed it,
+  // because the guard hands back the tenant role. See CLAUDE.md on the two scales.
+  const tenantRole = session?.user?.tenantRole ?? null;
   const db = await getDb();
 
   const [
@@ -461,7 +465,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
               dealId={dealId}
               initialComments={commentsList}
               currentUserId={userId ?? ""}
-              currentUserRole={userRole}
+              currentUserRole={tenantRole ?? "viewer"}
             />
           </CardContent>
         </Card>

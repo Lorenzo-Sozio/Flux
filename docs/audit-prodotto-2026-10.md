@@ -13,38 +13,61 @@ Aggiornato dopo il primo ciclo di correzioni.
 | | |
 |---|---|
 | ✅ Risolti | 61 |
-| ◐ Parziali | 1 |
+| ◐ Parziali | 4 |
 | ⊘ Non si fa | 1 |
-| Aperti | 3 |
+| Aperti | 0 |
 
 Verifiche dopo le correzioni: build di produzione riuscito, `tsc --noEmit` pulito,
-**293 test** superati (erano 91), **152 mutazioni su 152** catturate (erano 78), zero
-errori Biome sui file toccati. Le nuove suite coprono il modello dei permessi,
+**413 test** superati (erano 91), zero errori Biome sui file toccati. Le nuove suite coprono il modello dei permessi,
 l'aritmetica dei documenti commerciali, l'allineamento delle traduzioni, le
 migrazioni dei tenant, il confine server/client della sidebar, la corrispondenza fra
 nomi di aziende e la paginazione — cioè le aree dove un guasto somiglia a un
 successo.
 
-I tre punti ancora aperti sono funzioni da costruire, non difetti: S-05, S-06 e
-S-10. I primi due sono in realtà una decisione sola — mettere o no un modello
-linguistico dentro il prodotto, con i dati dei clienti che ci passano e un costo
-per chiamata — e S-10 è un progetto con una dipendenza esterna, la verifica di
-Google sugli ambiti di calendario e posta, che decide i tempi al posto tuo.
+**Nessun punto resta interamente aperto.** I tre che lo erano — S-05, S-06 e S-10 —
+erano registrati come bloccati su decisioni altrui: mettere o no un modello linguistico
+dentro il prodotto, e aspettare che Google verifichi gli ambiti di calendario e posta.
+Guardandoli da vicino, la parte bloccata era più piccola di quanto sembrasse.
 
-Resta un solo parziale, M-09: una sola libreria di trascinamento ormai, e sulla
-lingua dei commenti la regola sta nel `CLAUDE.md`, con i file esistenti che si
-allineano quando li si tocca.
+Di S-05 tre parti su quattro non sono una domanda per un modello, ma per lo storico del
+workspace, e rispondere da lì è meglio: la proposta arriva con i ticket da cui viene,
+quindi si può non essere d'accordo. Di S-06 la decisione che conta — se sollecitare, e a
+proposito di che cosa — la prendono due date. Di S-10 la metà che toglie il doppio
+inserimento è un abbonamento iCal, che ogni calendario sa già leggere e che non aspetta
+nessuno.
 
-Dei due parziali ciascuna voce dice cosa le manca: M-09 ha una sola libreria di
-trascinamento ormai, e sulla lingua dei commenti la regola sta nel `CLAUDE.md`;
-U-11 lascia fuori le preferenze di notifica per tipo e canale, che l'audit stesso
-riconosce non più giustificate ora che il polling non costa più quello che costava.
+Resta fuori ciò che serve davvero: il riassunto di un thread in prosa, il testo delle
+bozze, e il senso Google → CRM.
+
+Ciascun parziale dice, nella propria voce, che cosa gli manca. M-09 ha una sola
+libreria di trascinamento ormai, e sulla lingua dei commenti la regola sta nel
+`CLAUDE.md`, con i file esistenti che si allineano quando li si tocca. S-05, S-06 e
+S-10 lasciano fuori le tre cose elencate sopra.
 
 Due migrazioni tenant. `0002_odd_ulik.sql` aggiunge le colonne mancanti (data di
 chiusura e motivo di perdita sulle trattative, imponibile/imposta/valuta sugli ordini,
 fasi terminali sulla pipeline, scadenza di prima risposta sui ticket) e ripopola i dati
 esistenti. `0003_open_jackpot.sql` rimuove la tabella `opportunity`, verificata vuota su
 ogni tenant. **Vanno applicate a ogni database tenant prima del deploy.**
+
+⚠️ Trovato durante il lavoro e non presente in questa analisi: **due schermate
+chiedevano il ruolo sbagliato**, cioè di nuovo le due scale confuse — il difetto che
+questo documento chiama il più dannoso che il codice abbia avuto — ma dalla parte
+dell'interfaccia, dove non toglie permessi: li nega a chi ce li ha.
+
+La pagina di un preventivo leggeva `session.user.role`, che è la scala del personale di
+Flux e vale `"user"` per ogni cliente che abbia mai fatto login. Il pulsante *Approva* era
+condizionato a quel valore, quindi non lo vedeva nessun amministratore di workspace,
+mentre `approveQuoteAction` — che chiede la capacità `quote:approve` — glielo avrebbe
+consentito. Risultato: un preventivo mandato in approvazione non era approvabile
+dall'interfaccia, e al suo posto compariva «In attesa di approvazione da un
+amministratore» letto proprio dall'amministratore. Stessa cosa, meno grave, sui commenti
+di una trattativa: nessun amministratore poteva togliere il commento di un altro, benché
+l'azione lo permettesse.
+
+Nessuno dei due casi somiglia a un errore. Somigliano a una funzione che non c'è. Ora
+entrambe le schermate chiamano `can(...)` con il ruolo di workspace, che è la regola già
+scritta nel `CLAUDE.md`: **mai confrontare una stringa di ruolo, chiedere una capacità.**
 
 ⚠️ Trovato durante il lavoro e non presente in questa analisi: **le viste salvate non
 avevano alcun controllo d'accesso**. Ogni funzione in `src/actions/filters.ts` prendeva
@@ -1067,15 +1090,51 @@ modificare leggendo `session.user.role`, che è il campo dello staff di piattafo
 «user» per ogni cliente. Un viewer del workspace vedeva tutti i pulsanti e il server glieli
 rifiutava uno per uno. Ora la domanda è la capacità, la stessa che fa l'azione.
 
-### S-05 — Triage assistito sul supporto
+### S-05 ◐ — Triage assistito sul supporto
 
 Categoria e priorità proposte, ticket simili già risolti mostrati di fianco, bozza di
 risposta dalle macro esistenti, riassunto del thread per chi subentra.
 
-### S-06 — Composizione assistita dove il testo si scrive già
+**◐ Tre parti su quattro, e senza modello linguistico.** Erano registrate come bloccate
+in attesa di quella decisione. Tre di quelle quattro cose non sono una domanda per un
+modello: «che categoria è», «a cosa somiglia», «quale risposta salvata serve» sono la
+stessa domanda — *a che cosa assomiglia questo* — fatta allo storico del workspace. E
+rispondere dallo storico è meglio che rispondere da un modello, perché la proposta arriva
+con le prove attaccate: i ticket da cui viene sono elencati e cliccabili, quindi un
+operatore vede **perché** ed è in grado di non essere d'accordo.
+
+L'aritmetica sta in `src/lib/ticket-triage.ts`, modulo puro: parole chiave senza le
+comuni (inglese e italiano, accenti ripiegati), somiglianza di Jaccard, voto pesato sulla
+somiglianza fra i ticket vicini.
+
+Rifiuta più spesso di quanto risponda, ed è il punto. Una proposta ha bisogno di due terzi
+del peso, non della maggioranza: fra due candidati «più della metà» è il vicino che
+somigliava un filo di più, cioè testa o croce con un numero davanti. Il primo test scritto
+per questo era troppo debole per accorgersene — i due ticket non erano ugualmente simili —
+e quindi approvava una soglia che avrebbe dovuto bocciare.
+
+Niente viene applicato. La regola della sezione è «sempre proposta, sempre modificabile,
+mai spedita da sola», e un triage che imposta la priorità di nascosto ne è l'opposto.
+
+**Resta aperto** il riassunto del thread in prosa, che un modello lo richiede davvero.
+
+### S-06 ◐ — Composizione assistita dove il testo si scrive già
 
 Bozza del sollecito su un preventivo, risposta al ticket, verbale della riunione
 dall'attività registrata. Sempre proposta, sempre modificabile, mai spedita da sola.
+
+**◐ Deciso *se* e *su cosa* sollecitare; resta da scrivere il testo.** Anche qui il
+modello non serve per la parte che conta: se un preventivo vada sollecitato, e a proposito
+di che cosa, lo decidono due fatti soli — se è stato aperto e quando scade.
+`src/lib/quote-followup.ts` distingue tre situazioni, perché vogliono tre messaggi diversi:
+mai aperto (probabilmente la mail non è arrivata, quindi si chiede quello, non una
+decisione che il cliente non ha avuto modo di prendere), aperto e senza risposta (offrire
+di parlarne, non ripetere ciò che ha già), in scadenza (la data è la notizia).
+
+La scadenza batte il silenzio: un preventivo a due giorni dal decadere merita un messaggio
+comunque, perché la scadenza è il fatto che il cliente non vede e chi invia sì. Non
+sollecita mai un preventivo già accettato o rifiutato — il messaggio che costa di più da
+mandare — né uno spedito ieri, che si legge come pressione e non come servizio.
 
 ### S-07 ✅ — SLA con orari lavorativi e scala di escalation
 
@@ -1201,11 +1260,46 @@ vinta o persa, quindi un workspace che arrivava alla pipeline da lì otteneva un
 senza modo di chiudere nulla. Ora usa gli stessi valori predefiniti di ogni altro
 percorso.
 
-### S-10 — Sincronizzazione con calendario ed email
+### S-10 ◐ — Sincronizzazione con calendario ed email
 
 Google OAuth è già configurato per il login. Estenderlo a calendario e posta significa
 appuntamenti bidirezionali e conversazioni email agganciate alla scheda del contatto. Il
 doppio inserimento è la ragione principale per cui un CRM viene abbandonato.
+
+**◐ Fatta la metà che non dipende da nessuno.** Il doppio senso è fermo dietro la verifica
+di Google sugli ambiti di calendario e posta: è una coda di qualcun altro e non una data
+che questo progetto possa promettere. Un abbonamento invece non dipende da niente, e
+toglie il doppio inserimento nella direzione che lo provoca. Google Calendar, Outlook e
+Calendario di Apple si iscrivono tutti e tre a un indirizzo: un appuntamento fissato qui
+compare nel calendario della persona e resta aggiornato, senza schermata OAuth e senza
+tenere credenziali per conto di nessuno.
+
+Il generatore iCal esisteva già, ma per gli **inviti**: evento singolo, `METHOD:REQUEST`,
+partecipanti, promemoria. Un feed è un'altra cosa — `METHOD:PUBLISH`, molti eventi,
+indirizzato a nessuno — e spedirlo come invito fa chiedere ad alcuni client di rispondere
+a ogni riunione contenuta. Le due strade ora condividono le primitive in
+[src/lib/ical.ts](src/lib/ical.ts) e non la struttura.
+
+⚠️ Un appuntamento annullato resta nel feed, marcato `CANCELLED`. Toglierlo sarebbe la
+cosa ovvia ed è sbagliata: un client che smette di vedere un evento non cancella la copia
+che ha già. Ometterlo lascia la riunione sul calendario di tutti per sempre — esattamente
+il guasto che questa funzione esiste per evitare, e che nessuno segnalerebbe, perché da qui
+risulta annullata.
+
+⚠️ **L'indirizzo è una credenziale.** Un calendario non sa fare login, quindi è l'indirizzo
+a dire chi sei, e chi lo riceve legge quegli appuntamenti. La finestra che lo mostra lo
+dice, insieme al fatto che funziona in una direzione sola: chi lo dà per scontato fissa una
+riunione su Google, non la vede qui e conclude che il CRM l'ha persa.
+
+Il token è firmato, non memorizzato: niente colonna da aggiungere al database di ogni
+cliente prima che la funzione possa servire da qualche parte, e nessuna riga che sopravviva
+alla persona. Il prezzo è la revoca — non ce n'è una per persona, un indirizzo sfuggito si
+ritira ruotando `CALENDAR_FEED_SECRET`, che invalida tutte le iscrizioni insieme. Per
+questo il segreto è separato da `AUTH_SECRET`: ritirarle non deve buttare fuori nessuno.
+
+Un token nomina una persona, e le persone se ne vanno: la rotta verifica che l'utente
+esista ancora, altrimenti l'iscrizione impostata sul telefono da chi ha lasciato l'azienda
+continuerebbe a consegnare il calendario per sempre.
 
 ### S-11 — Una vista «oggi» che sostituisca la barra laterale ✅
 

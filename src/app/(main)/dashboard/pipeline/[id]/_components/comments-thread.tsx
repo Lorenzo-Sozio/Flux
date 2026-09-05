@@ -13,6 +13,7 @@ import { addDealComment, deleteDealComment, editDealComment } from "@/actions/de
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { can } from "@/lib/permissions";
 import { getInitials } from "@/lib/utils";
 
 interface Props {
@@ -41,7 +42,10 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
   const [replyLoading, setReplyLoading] = useState(false);
 
   const canEdit = comment.userId === currentUserId;
-  const canDelete = comment.userId === currentUserId || currentUserRole === "admin" || currentUserRole === "owner";
+  // Asked as a capability rather than compared as a string, so this cannot drift
+  // from what `deleteDealComment` actually allows. Your own comment is always
+  // yours to remove; anybody else's needs the workspace's admin rank.
+  const canDelete = comment.userId === currentUserId || can(currentUserRole, "user:read");
 
   async function run(action: () => Promise<void>, setLoading: (v: boolean) => void, errorMsg: string) {
     setLoading(true);
@@ -81,17 +85,17 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
 
   return (
     <div className="flex gap-3">
-      <Avatar size="sm" className="shrink-0 mt-0.5">
+      <Avatar size="sm" className="mt-0.5 shrink-0">
         <AvatarImage src={comment.userImage ?? undefined} />
         <AvatarFallback>{getInitials(comment.userName ?? "")}</AvatarFallback>
       </Avatar>
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium">{comment.userName ?? "Unknown"}</span>
-          <span className="text-xs text-muted-foreground">
+          <span className="font-medium text-sm">{comment.userName ?? "Unknown"}</span>
+          <span className="text-muted-foreground text-xs">
             {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
           </span>
-          {comment.editedAt && <span className="text-xs text-muted-foreground italic">(edited)</span>}
+          {comment.editedAt && <span className="text-muted-foreground text-xs italic">(edited)</span>}
         </div>
 
         {editing ? (
@@ -119,25 +123,25 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
             </div>
           </div>
         ) : (
-          <p className="text-sm mt-0.5 whitespace-pre-wrap">{comment.content}</p>
+          <p className="mt-0.5 whitespace-pre-wrap text-sm">{comment.content}</p>
         )}
 
         {!editing && (
-          <div className="flex items-center gap-1 mt-1">
+          <div className="mt-1 flex items-center gap-1">
             <Button
               size="sm"
               variant="ghost"
-              className="h-6 px-1.5 text-xs text-muted-foreground"
+              className="h-6 px-1.5 text-muted-foreground text-xs"
               onClick={() => setReplying(!replying)}
             >
-              <CornerDownRight className="h-3 w-3 mr-1" />
+              <CornerDownRight className="mr-1 h-3 w-3" />
               Reply
             </Button>
             {canEdit && (
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-6 px-1.5 text-xs text-muted-foreground"
+                className="h-6 px-1.5 text-muted-foreground text-xs"
                 onClick={() => setEditing(true)}
               >
                 <Pencil className="h-3 w-3" />
@@ -147,7 +151,7 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-6 px-1.5 text-xs text-muted-foreground hover:text-destructive"
+                className="h-6 px-1.5 text-muted-foreground text-xs hover:text-destructive"
                 onClick={handleDelete}
                 disabled={deleteLoading}
               >
@@ -185,7 +189,7 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
         )}
 
         {replies.length > 0 && (
-          <div className="mt-3 space-y-3 pl-4 border-l-2 border-muted">
+          <div className="mt-3 space-y-3 border-muted border-l-2 pl-4">
             {replies.map((reply) => (
               <CommentRow
                 key={reply.id}
@@ -226,13 +230,15 @@ export function CommentsThread({ dealId, initialComments, currentUserId, current
   const roots = initialComments.filter((c) => !c.parentId);
   const repliesByParent: Record<string, DealComment[]> = {};
   for (const c of initialComments) {
-    if (c.parentId) (repliesByParent[c.parentId] ??= []).push(c);
+    if (!c.parentId) continue;
+    repliesByParent[c.parentId] ??= [];
+    repliesByParent[c.parentId].push(c);
   }
 
   return (
     <div className="space-y-4">
       <div className="flex gap-3">
-        <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary/10">
           <MessageSquare className="h-4 w-4 text-primary" />
         </div>
         <div className="flex-1 space-y-2">
@@ -240,7 +246,7 @@ export function CommentsThread({ dealId, initialComments, currentUserId, current
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
             placeholder="Add a comment…"
-            className="min-h-[72px] text-sm resize-none"
+            className="min-h-[72px] resize-none text-sm"
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSubmit();
             }}
@@ -252,9 +258,9 @@ export function CommentsThread({ dealId, initialComments, currentUserId, current
       </div>
 
       {roots.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-4">No comments yet.</p>
+        <p className="py-4 text-center text-muted-foreground text-sm">No comments yet.</p>
       ) : (
-        <div className="space-y-4 pt-2 border-t">
+        <div className="space-y-4 border-t pt-2">
           {roots.map((comment) => (
             <CommentRow
               key={comment.id}

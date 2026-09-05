@@ -24,19 +24,53 @@ interface SendQuoteEmailDialogProps {
   onOpenChange: (open: boolean) => void;
   quoteId: string;
   onSuccess?: () => void;
+  /**
+   * What the form opens with. The follow-up draft fills these in (rilievo S-06);
+   * everything about them stays editable, and nothing is sent without a click.
+   */
+  defaultTo?: string;
+  defaultSubject?: string;
+  defaultMessage?: string;
+  /** Overridden when the dialog is chasing rather than sending for the first time. */
+  title?: string;
+  descriptionText?: string;
+  submitLabel?: string;
 }
 
-export function SendQuoteEmailDialog({ open, onOpenChange, quoteId, onSuccess }: SendQuoteEmailDialogProps) {
+export function SendQuoteEmailDialog({
+  open,
+  onOpenChange,
+  quoteId,
+  onSuccess,
+  defaultTo,
+  defaultSubject,
+  defaultMessage,
+  title,
+  descriptionText,
+  submitLabel,
+}: SendQuoteEmailDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof SendQuoteEmailSchema>>({
     resolver: zodResolver(SendQuoteEmailSchema),
     defaultValues: {
-      toEmail: "",
-      subject: "Your Quote",
-      message: "Please review the attached quote and let me know if you have any questions.",
+      toEmail: defaultTo ?? "",
+      subject: defaultSubject ?? "Your Quote",
+      message: defaultMessage ?? "Please review the attached quote and let me know if you have any questions.",
     },
   });
+
+  // The dialog stays mounted between openings, so the draft has to be put back
+  // each time it opens. Without this, a follow-up opened after a first send shows
+  // the previous message — the one already sent to that customer.
+  React.useEffect(() => {
+    if (!open) return;
+    form.reset({
+      toEmail: defaultTo ?? "",
+      subject: defaultSubject ?? "Your Quote",
+      message: defaultMessage ?? "Please review the attached quote and let me know if you have any questions.",
+    });
+  }, [open, defaultTo, defaultSubject, defaultMessage, form]);
 
   async function onSubmit(data: z.infer<typeof SendQuoteEmailSchema>) {
     setIsLoading(true);
@@ -46,8 +80,8 @@ export function SendQuoteEmailDialog({ open, onOpenChange, quoteId, onSuccess }:
       onOpenChange(false);
       form.reset();
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send quote");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send quote");
     } finally {
       setIsLoading(false);
     }
@@ -57,8 +91,10 @@ export function SendQuoteEmailDialog({ open, onOpenChange, quoteId, onSuccess }:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Send Quote via Email</DialogTitle>
-          <DialogDescription>Send this quote to your customer for review and approval</DialogDescription>
+          <DialogTitle>{title ?? "Send Quote via Email"}</DialogTitle>
+          <DialogDescription>
+            {descriptionText ?? "Send this quote to your customer for review and approval"}
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -105,13 +141,13 @@ export function SendQuoteEmailDialog({ open, onOpenChange, quoteId, onSuccess }:
               )}
             />
 
-            <div className="flex gap-2 justify-end">
+            <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Send Quote
+                {submitLabel ?? "Send Quote"}
               </Button>
             </div>
           </form>

@@ -5,7 +5,7 @@ import { after } from "next/server";
 
 import crypto from "node:crypto";
 
-import { and, asc, desc, eq, inArray, isNotNull, lt, ne, notInArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, lt, ne, notInArray, or, sql } from "drizzle-orm";
 import type { z } from "zod";
 
 import {
@@ -1117,13 +1117,25 @@ export async function triageTicket(input: { subject: string; description?: strin
         type: tickets.type,
         component: tickets.component,
         priority: tickets.priority,
-        resolvedAt: tickets.resolvedAt,
+        resolvedAt: sql<Date>`coalesce(${tickets.resolvedAt}, ${tickets.closedAt})`.as("finished_at"),
       })
       .from(tickets)
       // Only what somebody actually finished: an open ticket's priority is a guess
       // nobody has confirmed, and proposing from guesses compounds them.
-      .where(and(isNotNull(tickets.resolvedAt), inArray(tickets.status, ["resolved", "closed"])))
-      .orderBy(desc(tickets.resolvedAt))
+      //
+      // ⚠️ Finished means resolved **or** closed, and the two are separate columns
+      // because the state machine lets a ticket go to `closed` from anywhere
+      // without passing through `resolved`. Requiring `resolvedAt` looked right and
+      // silently emptied the whole window for any desk that just closes things —
+      // and an empty window renders as "nothing similar found", which is exactly
+      // what a working triage looks like on a new desk. Nobody would report it.
+      .where(
+        and(
+          or(isNotNull(tickets.resolvedAt), isNotNull(tickets.closedAt)),
+          inArray(tickets.status, ["resolved", "closed"]),
+        ),
+      )
+      .orderBy(desc(sql`coalesce(${tickets.resolvedAt}, ${tickets.closedAt})`))
       .limit(TRIAGE_WINDOW),
     db
       .select({

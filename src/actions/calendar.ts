@@ -5,6 +5,9 @@ import { and, eq, gte, inArray, isNotNull, lte, or } from "drizzle-orm";
 import { getAppointmentCalendarEvents } from "@/actions/appointments";
 import { auth } from "@/auth";
 import { activities, companies, contacts, deals, leads, taskAssignees, tasks, userGroupMembers } from "@/db/schema";
+import { getAppUrlOrNull } from "@/lib/app-url";
+import { requireCapability } from "@/lib/auth-guard";
+import { signCalendarFeedToken } from "@/lib/calendar-feed-token";
 import { getDb } from "@/lib/tenant-context";
 
 export type CalendarFilter = "all" | "mine" | "group";
@@ -194,4 +197,35 @@ export async function getCalendarEvents(filter: CalendarFilter = "all", range?: 
     }));
 
   return [...formattedTasks, ...formattedActivities, ...formattedAppointments];
+}
+
+// ─── Subscription feed ────────────────────────────────────────────────────────
+
+/**
+ * The address to paste into Google Calendar, Outlook or Apple Calendar.
+ *
+ * ⚠️ The URL is a credential: anyone holding it can read this person's
+ * appointments, because a calendar client has no way to log in. The page that
+ * shows it says so — a link presented as an ordinary link gets forwarded.
+ *
+ * Read-only and one-way, which the page also says. An appointment booked here
+ * reaches the person's calendar; one booked in Google does not come back. The
+ * other direction needs Google to verify the calendar scope, which is not a date
+ * this project can promise (audit rilievo S-10).
+ */
+export async function getCalendarFeedUrl(): Promise<{ url: string } | { error: string }> {
+  await requireCapability("record:read");
+
+  const session = await auth();
+  const userId = session?.user?.id;
+  const tenantId = session?.user?.activeTenantId;
+  if (!userId || !tenantId) return { error: "not-signed-in" };
+
+  // Prefers omitting the link to publishing one that points at localhost: a
+  // subscription is set up once and then never looked at again, so a wrong
+  // address here is wrong for as long as the calendar stays empty (rilievo B-04).
+  const base = getAppUrlOrNull();
+  if (!base) return { error: "no-app-url" };
+
+  return { url: `${base}/api/calendar/${signCalendarFeedToken({ tenantId, userId })}` };
 }

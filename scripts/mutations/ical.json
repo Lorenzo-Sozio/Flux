@@ -1,0 +1,56 @@
+[
+  {
+    "file": "src/lib/ical.ts",
+    "description": "⚠️⚠️ il feed viene pubblicato come invito: alcuni client chiedono all'abbonato di rispondere a ogni riunione che contiene",
+    "find": "    \"METHOD:PUBLISH\",",
+    "replace": "    \"METHOD:REQUEST\","
+  },
+  {
+    "file": "src/lib/ical.ts",
+    "description": "⚠️⚠️ un appuntamento annullato viaggia come confermato e resta sul calendario di tutti per sempre, mentre da qui risulta annullato",
+    "find": "  return status === \"cancelled\" ? \"CANCELLED\" : \"CONFIRMED\";",
+    "replace": "  return \"CONFIRMED\";"
+  },
+  {
+    "file": "src/lib/ical.ts",
+    "description": "⚠️ l'ultima riga del feed non e' terminata: fuori specifica, e i lettori piu' severi rifiutano il calendario intero",
+    "find": "  // RFC 5545 §3.4: the last content line is terminated by CRLF like any other.\n  return `${lines.join(CRLF)}${CRLF}`;",
+    "replace": "  return lines.join(CRLF);"
+  },
+  {
+    "file": "src/lib/ical.ts",
+    "description": "⚠️ le righe lunghe non vengono piegate e superano i 75 ottetti: fuori specifica, e un titolo lungo fa scartare l evento",
+    "find": "  if (enc.encode(line).length <= 75) return line;",
+    "replace": "  return line;"
+  },
+  {
+    "file": "src/lib/ical.ts",
+    "description": "⚠️ la virgola non viene protetta: nel titolo apre un secondo valore e il lettore tronca o scarta l'evento",
+    "find": ".replace(/,/g, \"\\\\,\")",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ical.ts",
+    "description": "il punto e virgola non viene protetto e chiude la proprieta' a meta' del titolo",
+    "find": ".replace(/;/g, \"\\\\;\")",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ical.ts",
+    "description": "un a capo dentro una nota spezza la proprieta' in due righe e il resto della nota diventa una riga non valida",
+    "find": ".replace(/\\n/g, \"\\\\n\")",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ical.ts",
+    "description": "il numero di revisione resta a zero: una modifica non sostituisce la copia gia' presente, la affianca",
+    "find": "    `SEQUENCE:${event.sequence ?? 0}`,",
+    "replace": "    \"SEQUENCE:0\","
+  },
+  {
+    "file": "src/lib/ical.ts",
+    "description": "il calendario perde il nome e compare nella barra laterale con l'indirizzo al posto del titolo",
+    "find": "    foldLine(`X-WR-CALNAME:${escapeText(options.name)}`),",
+    "replace": ""
+  }
+]

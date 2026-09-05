@@ -80,3 +80,44 @@ describe("translation files", () => {
     expect(blank).toEqual([]);
   });
 });
+
+describe("keys built at runtime", () => {
+  /**
+   * ⚠️ The checks above compare the two files against each other, so a key
+   * missing from *both* passes them. That is fine while every key is written out
+   * literally and TypeScript-adjacent tooling can see it — but the quote
+   * follow-up composes its key from the situation it detected, as
+   * `notOpenedSubject`, `expiringBody` and so on. Nothing else would notice one
+   * of the sixteen going missing until next-intl threw on a customer's quote
+   * page, which is the moment somebody was about to chase a real deal.
+   */
+  const FOLLOW_UP_KINDS = ["notOpened", "noAnswer", "expiring", "expired"];
+  const FOLLOW_UP_PARTS = ["Badge", "Why", "Subject", "Body"];
+
+  it("has every quote follow-up message, in both languages", () => {
+    const expected = FOLLOW_UP_KINDS.flatMap((kind) => FOLLOW_UP_PARTS.map((part) => `quoteFollowUp.${kind}${part}`));
+    const missing = expected.filter((key) => !flatEn.has(key) || !flatIt.has(key));
+    expect(missing).toEqual([]);
+  });
+
+  it("states a duration on every follow-up badge", () => {
+    // The badge exists to say how long: "sent 10 days ago", "expires in 2 days".
+    // One without the number is a badge that says nothing.
+    const badges = FOLLOW_UP_KINDS.map((kind) => `quoteFollowUp.${kind}Badge`);
+    const silent = badges.filter((key) => !(flatEn.get(key) ?? "").includes("{days}"));
+    expect(silent).toEqual([]);
+  });
+
+  it("names the quote in every drafted subject and body", () => {
+    // A follow-up that does not say which quote it is about makes the customer
+    // go and look, which is the opposite of what a chase is for. The bodies do
+    // not all carry {days} on purpose — "is there anything I can clarify?" reads
+    // worse with a day count in it, not better.
+    const drafts = FOLLOW_UP_KINDS.flatMap((kind) => [`quoteFollowUp.${kind}Subject`, `quoteFollowUp.${kind}Body`]);
+    const anonymous = drafts.filter((key) => {
+      for (const file of [flatEn, flatIt]) if (!(file.get(key) ?? "").includes("{quoteNumber}")) return true;
+      return false;
+    });
+    expect(anonymous).toEqual([]);
+  });
+});

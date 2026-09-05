@@ -47,6 +47,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
+import { can } from "@/lib/permissions";
+import { whatToChase } from "@/lib/quote-followup";
 import { quoteStatusConfig } from "@/lib/quote-status";
 
 import { SendQuoteEmailDialog } from "./send-quote-email-dialog";
@@ -57,7 +59,8 @@ interface QuoteDetailProps {
   quote: Quote;
   autoOpenSend?: boolean;
   onStatusChange?: (newStatus: string) => void;
-  userRole?: string;
+  /** The **workspace** role. Never the platform one: see the two scales in CLAUDE.md. */
+  tenantRole?: string | null;
 }
 
 const ACTIVITY_LABELS: Record<string, string> = {
@@ -75,16 +78,22 @@ const ACTIVITY_LABELS: Record<string, string> = {
   rejected: "Preventivo rifiutato",
 };
 
-export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userRole = "user" }: QuoteDetailProps) {
+export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, tenantRole }: QuoteDetailProps) {
   const router = useRouter();
   const { formatAmount } = useCurrency();
   const fmt = (amount: string | null) => formatAmount(parseFloat(amount ?? "0"));
   const [isLoading, setIsLoading] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [showFollowUpDialog, setShowFollowUpDialog] = useState(false);
   const [rejectNote, setRejectNote] = useState("");
 
-  const isPrivileged = userRole === "admin" || userRole === "owner";
+  // ⚠️ Asked as a capability, not compared as a string. This line used to read
+  // the platform role, which is "user" for every customer, so no workspace admin
+  // ever saw the approve button and a quote sent for approval could not be
+  // approved from the interface at all — while `approveQuoteAction` would have
+  // let them, because it asks the right question.
+  const canApprove = can(tenantRole ?? null, "quote:approve");
 
   async function runAction(action: () => Promise<void>, successMsg: string, errorMsg: string) {
     setIsLoading(true);
@@ -106,6 +115,31 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
   }, [autoOpenSend, quote.status]);
 
   const tq = useTranslations("quotes");
+  const tf = useTranslations("quoteFollowUp");
+
+  // Whether this quote wants chasing, and about what. Decided by two dates and
+  // nothing else, in a pure module that can be argued with in one place
+  // (rilievo S-06). Null means there is nothing to say, and then nothing renders.
+  const followUp = whatToChase(
+    {
+      quoteNumber: quote.quoteNumber,
+      status: quote.status,
+      sentAt: quote.sentAt ? new Date(quote.sentAt) : null,
+      viewedAt: quote.viewedAt ? new Date(quote.viewedAt) : null,
+      expiresAt: quote.expiresAt ? new Date(quote.expiresAt) : null,
+    },
+    Date.now(),
+  );
+
+  const FOLLOW_UP_KEYS = {
+    "not-opened": "notOpened",
+    "no-answer": "noAnswer",
+    expiring: "expiring",
+    expired: "expired",
+  } as const;
+
+  const followUpKey = followUp ? FOLLOW_UP_KEYS[followUp.kind] : null;
+  const followUpVars = { quoteNumber: quote.quoteNumber, days: followUp?.days ?? 0 };
   const statusCfg = quoteStatusConfig(quote.status);
   const contactName = quote.contact ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim() : null;
 
@@ -255,6 +289,28 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
           </CardContent>
         </Card>
 
+        {/* What to chase, and why — nothing here is sent on its own (rilievo S-06). */}
+        {followUp && followUpKey && (
+          <Card className="border-amber-500/40 bg-amber-500/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                <Clock className="h-4 w-4 text-amber-600" />
+                {tf("title")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <p className="font-medium text-sm">{tf(`${followUpKey}Badge`, followUpVars)}</p>
+                <p className="mt-1 text-muted-foreground text-xs">{tf(`${followUpKey}Why`)}</p>
+              </div>
+              <Button variant="outline" className="w-full justify-start" onClick={() => setShowFollowUpDialog(true)}>
+                <Mail className="mr-2 h-4 w-4" />
+                {tf("action")}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Actions card */}
         <Card>
           <CardHeader className="pb-3">
@@ -263,7 +319,7 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
-            {quote.status === "draft" && !isPrivileged && (
+            {quote.status === "draft" && !canApprove && (
               <Button
                 variant="outline"
                 className="w-full justify-start border-orange-300 text-orange-700 hover:bg-orange-50"
@@ -275,7 +331,7 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
               </Button>
             )}
 
-            {quote.status === "pending_approval" && isPrivileged && (
+            {quote.status === "pending_approval" && canApprove && (
               <>
                 <Button
                   className="w-full justify-start bg-green-600 hover:bg-green-700"
@@ -297,7 +353,7 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
               </>
             )}
 
-            {quote.status === "pending_approval" && !isPrivileged && (
+            {quote.status === "pending_approval" && !canApprove && (
               <div className="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-2.5 text-orange-700 text-xs">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <span>In attesa di approvazione da un amministratore.</span>
@@ -596,6 +652,25 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, userR
           router.refresh();
         }}
       />
+
+      {/* Follow-up draft — prefilled, fully editable, and sent only on a click. */}
+      {followUp && followUpKey && (
+        <SendQuoteEmailDialog
+          open={showFollowUpDialog}
+          onOpenChange={setShowFollowUpDialog}
+          quoteId={quote.id}
+          defaultTo={quote.contact?.email ?? ""}
+          defaultSubject={tf(`${followUpKey}Subject`, followUpVars)}
+          defaultMessage={tf(`${followUpKey}Body`, followUpVars)}
+          title={tf("dialogTitle")}
+          descriptionText={tf("dialogDescription")}
+          submitLabel={tf("submitLabel")}
+          onSuccess={() => {
+            setShowFollowUpDialog(false);
+            router.refresh();
+          }}
+        />
+      )}
 
       {/* Reject Dialog */}
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>

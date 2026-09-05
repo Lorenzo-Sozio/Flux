@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 
 import { EXPIRING_WITHIN_DAYS, QUIET_AFTER_DAYS, type QuoteState, whatToChase } from "./quote-followup";
+import { QUOTE_STATUSES } from "./quote-status";
 
 const NOW = new Date("2026-09-20T12:00:00Z").getTime();
 const daysAgo = (n: number) => new Date(NOW - n * 86_400_000);
@@ -28,11 +29,20 @@ describe("whatToChase", () => {
     expect(whatToChase(quote({ sentAt: null, status: "draft" }), NOW)).toBeNull();
   });
 
-  it("⚠️ says nothing about a quote that has been answered", () => {
-    // Chasing an accepted quote is the message that costs the most to send.
-    for (const status of ["accepted", "declined", "converted", "expired", "draft"]) {
-      expect(whatToChase(quote({ status }), NOW), status).toBeNull();
-    }
+  it("⚠️ says nothing when the status says sent but no date was recorded", () => {
+    // The status alone is not evidence that anything left the building, and this
+    // pair does occur: a send that failed after the status was written. Chasing
+    // then asks the customer about a message nobody ever sent them.
+    expect(whatToChase(quote({ status: "sent", sentAt: null }), NOW)).toBeNull();
+    expect(whatToChase(quote({ status: "viewed", sentAt: null, viewedAt: daysAgo(2) }), NOW)).toBeNull();
+  });
+
+  it("⚠️ chases from two states and no others, whatever the list grows to", () => {
+    // Read from the real list rather than a copy of it: a status added later
+    // would otherwise be chaseable or not by accident, and the accident that
+    // costs is chasing a quote the customer already accepted.
+    const chased = QUOTE_STATUSES.filter((status) => whatToChase(quote({ status }), NOW) !== null);
+    expect([...chased].sort()).toEqual(["sent", "viewed"]);
   });
 
   it("says nothing the day after sending", () => {

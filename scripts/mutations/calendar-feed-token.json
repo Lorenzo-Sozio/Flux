@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/lib/calendar-feed-token.ts",
+    "description": "⚠️⚠️ la firma non viene piu' confrontata: basta cambiare lo spazio di lavoro nell'indirizzo per leggere il calendario di un altro cliente",
+    "find": "    if (!timingSafeEqual(a, b)) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/calendar-feed-token.ts",
+    "description": "un contenuto che non e' una coppia di identificativi passa comunque",
+    "find": "    if (!tenantId || !userId || rest.length > 0) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/calendar-feed-token.ts",
+    "description": "⚠️ la firma copre solo lo spazio di lavoro: due persone dello stesso cliente ricevono lo stesso indirizzo",
+    "find": "  return `${identity.tenantId}:${identity.userId}`;",
+    "replace": "  return identity.tenantId;"
+  },
+  {
+    "file": "src/lib/calendar-feed-token.ts",
+    "description": "⚠️ il token non viene piu' firmato con la chiave del server ma con una costante",
+    "find": "  return createHmac(\"sha256\", getSecret()).update(value).digest(\"base64url\");",
+    "replace": "  return Buffer.from(value).toString(\"base64url\");"
+  }
+]

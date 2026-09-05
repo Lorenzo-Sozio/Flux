@@ -227,6 +227,10 @@ export const proxy = auth((req) => {
  * - /api/currency/*  Exchange rate cache, no tenant concept
  * - /api/quotes/public  Public quote preview, no auth required
  * - /api/appointments/rsvp  External RSVP link — no session
+ * - /api/calendar/*  Calendar subscription feed — fetched by Google Calendar,
+ *                    Outlook and Apple Calendar, which have no session and no
+ *                    way to obtain one. The workspace comes from the signed
+ *                    token in the URL.
  */
 function isPublicApiPath(pathname: string): boolean {
   const PUBLIC_PREFIXES = [
@@ -239,6 +243,7 @@ function isPublicApiPath(pathname: string): boolean {
     "/api/currency/",
     "/api/quotes/public",
     "/api/appointments/rsvp",
+    "/api/calendar/",
   ];
   return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
 }

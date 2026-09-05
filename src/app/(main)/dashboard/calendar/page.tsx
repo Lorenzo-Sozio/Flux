@@ -44,6 +44,7 @@ import { Button } from "@/components/ui/button";
 
 import { AppointmentDetailSheet } from "./_components/appointment-detail-sheet";
 import { AppointmentDialog } from "./_components/appointment-dialog";
+import { SubscribeDialog } from "./_components/subscribe-dialog";
 
 // ─── URL helper ──────────────────────────────────────────────────────────────
 
@@ -849,6 +850,8 @@ export default async function CalendarPage({
               <Link href={todayUrl}>{t("today")}</Link>
             </Button>
           )}
+
+          <SubscribeDialog />
 
           <AppointmentDialog defaultDate={dateParam ? `${dateParam}T09:00` : undefined} />
         </div>
