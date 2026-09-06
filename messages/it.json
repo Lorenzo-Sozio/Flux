@@ -345,7 +345,8 @@
     "filterGroup": "Il mio gruppo",
     "noEventsThisDay": "Nessun evento programmato per questo giorno",
     "previousPeriod": "Periodo precedente",
-    "nextPeriod": "Periodo successivo"
+    "nextPeriod": "Periodo successivo",
+    "newAppointment": "Nuovo appuntamento"
   },
   "calendarFeed": {
     "subscribe": "Iscriviti",

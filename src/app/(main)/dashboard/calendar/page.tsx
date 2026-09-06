@@ -41,6 +41,7 @@ import { FormattedTime } from "@/components/crm/formatted-time";
 import { OverdueTasksPopover } from "@/components/crm/overdue-tasks-popover";
 import { WeekCurrentTimeLine } from "@/components/crm/week-current-time-line";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 import { AppointmentDetailSheet } from "./_components/appointment-detail-sheet";
 import { AppointmentDialog } from "./_components/appointment-dialog";
@@ -153,6 +154,18 @@ export default async function CalendarPage({
   ]);
 
   const currentView = viewParam ?? "week";
+
+  /**
+   * ⚠️ Nobody chose the week — it is the default, and on a phone it is seven
+   * columns in 390 pixels: three days visible and a grid that has to be dragged
+   * sideways to find the fourth. The agenda is the same day, read as a list.
+   *
+   * So when the view is a *default* rather than a choice, the phone gets the
+   * agenda and everything from md up gets the week. Both are rendered and CSS
+   * picks; the two share one `events` array, so this costs markup and not a
+   * second query. Ask for a view explicitly and you get it at every width.
+   */
+  const weekIsADefault = !viewParam && currentView === "week";
   const currentFilter = (filterParam ?? "all") as CalendarFilter;
   const baseDate = dateParam ? new Date(dateParam) : new Date();
   const today = new Date();
@@ -850,7 +863,10 @@ export default async function CalendarPage({
                 <OverdueTasksPopover tasks={overdueEvents} />
               </>
             )}
-            <span className="text-muted-foreground/40">·</span>
+            {/* ⚠️ The colour key is reference, not a control, and on a phone it
+                took a whole row above a grid it explains. The dots are on the
+                events themselves; from sm up the key comes back. */}
+            <span className="hidden text-muted-foreground/40 sm:inline">·</span>
             {Object.entries(TYPE_STYLES).map(([key, cfg]) => {
               const label =
                 {
@@ -860,7 +876,7 @@ export default async function CalendarPage({
                   appointment: t("typeAppointment"),
                 }[key] ?? key;
               return (
-                <span key={key} className="flex items-center gap-1.5">
+                <span key={key} className="hidden items-center gap-1.5 sm:flex">
                   <span className={`h-2 w-2 shrink-0 rounded-full ${cfg.dot}`} />
                   {label}
                 </span>
@@ -869,22 +885,34 @@ export default async function CalendarPage({
           </div>
         </div>
 
-        {/* Right: controls */}
+        {/* Right: controls. Six segments and two dialogs; on a phone they wrap
+            into two rows instead of four. */}
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {/* View toggle */}
-          <div className="flex rounded-lg border bg-muted/40 p-0.5">
+          <div className="flex shrink-0 rounded-lg border bg-muted/40 p-0.5">
             {(["month", "week", "agenda"] as const).map((v) => {
               const ICONS = { month: LayoutGrid, week: Columns3, agenda: List };
               const LABELS = { month: t("month"), week: t("week"), agenda: t("agenda") };
               const Icon = ICONS[v];
               const isActive = currentView === v;
+              // When the week is a default, the switch has to say what is on
+              // screen: agenda below md, week above it.
+              const activeClass = "bg-background text-foreground shadow-sm";
+              const idleClass = "text-muted-foreground hover:text-foreground";
+              const state = !weekIsADefault
+                ? isActive
+                  ? activeClass
+                  : idleClass
+                : v === "week"
+                  ? `${idleClass} md:${activeClass.split(" ").join(" md:")}`
+                  : v === "agenda"
+                    ? `${activeClass} md:bg-transparent md:text-muted-foreground md:shadow-none`
+                    : idleClass;
               return (
                 <Link
                   key={v}
                   href={calUrl(v, format(baseDate, "yyyy-MM-dd"), currentFilter)}
-                  className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium text-xs transition-all ${
-                    isActive ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-                  }`}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 font-medium text-xs transition-all sm:px-3 ${state}`}
                 >
                   <Icon className="h-3.5 w-3.5" />
                   {LABELS[v]}
@@ -894,7 +922,7 @@ export default async function CalendarPage({
           </div>
 
           {/* Filter toggle */}
-          <div className="flex rounded-lg border bg-muted/40 p-0.5">
+          <div className="flex shrink-0 rounded-lg border bg-muted/40 p-0.5">
             {(["all", "mine", "group"] as CalendarFilter[]).map((f) => {
               const LABELS: Record<CalendarFilter, string> = {
                 all: t("filterAll"),
@@ -917,8 +945,16 @@ export default async function CalendarPage({
           </div>
 
           {/* Navigation */}
+          {/* The agenda walks its own days, so the week's range walker would be a
+              second, differently-scoped navigation next to it. Hidden below md
+              exactly when the agenda is the thing on screen. */}
           {currentView !== "agenda" && (
-            <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-0.5">
+            <div
+              className={cn(
+                "flex items-center gap-1 rounded-lg border bg-muted/40 p-0.5",
+                weekIsADefault && "hidden md:flex",
+              )}
+            >
               <Link
                 href={prevUrl}
                 aria-label={t("previousPeriod")}
@@ -939,7 +975,7 @@ export default async function CalendarPage({
 
           {/* Today */}
           {currentView !== "agenda" && (
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" asChild className={cn(weekIsADefault && "hidden md:inline-flex")}>
               <Link href={todayUrl}>{t("today")}</Link>
             </Button>
           )}
@@ -953,7 +989,15 @@ export default async function CalendarPage({
       {/* ── Calendar view ── */}
       <div>
         {currentView === "month" && renderMonth()}
-        {currentView === "week" && renderWeek()}
+        {currentView === "week" &&
+          (weekIsADefault ? (
+            <>
+              <div className="md:hidden">{renderAgenda()}</div>
+              <div className="hidden md:block">{renderWeek()}</div>
+            </>
+          ) : (
+            renderWeek()
+          ))}
         {currentView === "agenda" && renderAgenda()}
       </div>
 

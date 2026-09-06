@@ -81,9 +81,11 @@ export function SubscribeDialog() {
   return (
     <Dialog onOpenChange={load}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+        {/* Subscribing to the feed is done once; the word costs 80px of a
+            343px row, and the icon carries it below sm. */}
+        <Button variant="outline" size="sm" className="gap-2" aria-label={t("subscribe")}>
           <CalendarSync className="h-4 w-4" />
-          {t("subscribe")}
+          <span className="max-sm:sr-only">{t("subscribe")}</span>
         </Button>
       </DialogTrigger>
 

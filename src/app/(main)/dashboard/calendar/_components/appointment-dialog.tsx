@@ -20,6 +20,7 @@ import {
   Video,
   X,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import {
@@ -258,6 +259,7 @@ function ParticipantSearch({
 // ─── Main Dialog ──────────────────────────────────────────────────────────────
 
 export function AppointmentDialog({ defaultDate, trigger }: Props) {
+  const tCal = useTranslations("calendar");
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -418,9 +420,13 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
           {trigger}
         </button>
       ) : (
-        <Button size="sm" variant="outline" className="shrink-0 gap-2" onClick={() => setOpen(true)}>
+        // ⚠️ The label was written in Italian, in the source, on the calendar's
+        // primary action — so an English workspace read "Nuovo appuntamento".
+        // And it was an outline button: the one thing this page exists to do,
+        // styled as a secondary.
+        <Button size="sm" className="shrink-0 gap-2" onClick={() => setOpen(true)}>
           <CalendarCheck className="h-4 w-4" />
-          Nuovo appuntamento
+          {tCal("newAppointment")}
         </Button>
       )}
 
