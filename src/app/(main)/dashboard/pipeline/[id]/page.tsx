@@ -17,7 +17,7 @@ import {
 import { getTranslations } from "next-intl/server";
 
 import { createActivity, getActivitiesByDeal } from "@/actions/activities";
-import { getCompanies, getContacts } from "@/actions/crm";
+import { getCompaniesForSelect, getContactsForSelect } from "@/actions/crm";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { getDealComments } from "@/actions/deal-comments";
 import { getOrdersByDeal } from "@/actions/orders";
@@ -82,8 +82,13 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     // the conversion was wired up and nothing on the page showed it.
     getOrdersByDeal(dealId),
     db.query.products.findMany(),
-    getCompanies(),
-    getContacts(),
+    // ⚠️ The `ForSelect` variants, not the full ones. These two feed the dropdowns
+    // in the deal edit dialog, which need an id and a name; the full versions
+    // select every column of every company and every contact in the workspace, on
+    // every visit to every deal. That is audit rilievo B-08 — the defect the list
+    // pagination was built to close — left behind on a page nobody re-checked.
+    getCompaniesForSelect(),
+    getContactsForSelect(),
     getDealComments(dealId),
     // Custom fields have always been definable for a deal — the entity type is in
     // the picker — and there was nowhere to fill them in (audit rilievo U-09).
