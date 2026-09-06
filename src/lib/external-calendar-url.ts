@@ -101,6 +101,61 @@ export function checkExternalCalendarUrl(raw: string, ourOwnOrigin?: string | nu
   return { ok: true, url: url.toString() };
 }
 
+/** How many hops a calendar address may take before we stop believing it. */
+export const MAX_REDIRECTS = 3;
+
+/**
+ * Fetches an address, checking **every hop**, not only the first.
+ *
+ * ⚠️⚠️ This exists because `redirect: "follow"` throws the check above away.
+ * The address a person saved is validated; the address they are *sent to* is
+ * not. A server that answers `302 Location: http://169.254.169.254/latest/…`
+ * gets its instance metadata fetched and parsed, and every guard in this file
+ * was bypassed by one header. Nothing about the first request looks wrong, and
+ * nothing in the logs says a second one happened.
+ *
+ * So redirects are followed by hand and each destination goes back through
+ * `checkExternalCalendarUrl`. A hop we would have refused ends the walk, and the
+ * caller is told the fetch failed — which is what it did.
+ *
+ * `request` is injected so this can be tested without a network: the walk, not
+ * the fetching, is the part that has to be right.
+ */
+export async function fetchWithCheckedRedirects(
+  startUrl: string,
+  request: (url: string) => Promise<Response>,
+): Promise<Response | null> {
+  let current = startUrl;
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+    const response = await request(current);
+    if (response.status < 300 || response.status >= 400) return response;
+
+    const location = response.headers.get("location");
+    // A 3xx with nowhere to go is the far end's problem, not a redirect.
+    if (!location) return response;
+
+    let next: string;
+    try {
+      // Relative Locations are ordinary and must resolve against the hop we are
+      // on — not against the address originally saved.
+      next = new URL(location, current).toString();
+    } catch {
+      return null;
+    }
+
+    // ⚠️ The same check, unweakened. `ourOwnOrigin` is not passed: refusing our
+    // own feed is about what a person may subscribe to, and has nothing to say
+    // about where a third party is pointing us.
+    const verdict = checkExternalCalendarUrl(next, null);
+    if (!verdict.ok) return null;
+    current = verdict.url;
+  }
+
+  // More hops than any real calendar needs is a loop or an attempt.
+  return null;
+}
+
 /**
  * ⚠️ What this does **not** check: a public hostname whose DNS points at a
  * private address. Closing that needs the resolved address at the moment of

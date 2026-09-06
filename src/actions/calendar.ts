@@ -20,7 +20,7 @@ import {
 import { getAppUrlOrNull } from "@/lib/app-url";
 import { requireCapability } from "@/lib/auth-guard";
 import { signCalendarFeedToken } from "@/lib/calendar-feed-token";
-import { checkExternalCalendarUrl, type UrlRefusal } from "@/lib/external-calendar-url";
+import { checkExternalCalendarUrl, fetchWithCheckedRedirects, type UrlRefusal } from "@/lib/external-calendar-url";
 import { type ExternalEvent, parseIcal } from "@/lib/ical-parse";
 import { getDb } from "@/lib/tenant-context";
 
@@ -319,13 +319,19 @@ export async function getExternalCalendar(window: { from: Date; to: Date }): Pro
   if (!url) return null;
 
   try {
-    const response = await fetch(url, {
-      // A plain GET with nothing of ours attached: no cookies, no credentials.
-      redirect: "follow",
-      headers: { Accept: "text/calendar, text/plain" },
-      next: { revalidate: EXTERNAL_TTL_SECONDS },
-    });
-    if (!response.ok) return { events: [], unreadable: 0, failed: true };
+    // ⚠️⚠️ `redirect: "follow"` used to be here, and it threw the address check
+    // away: the saved address is validated, the address the far end *sends us
+    // to* was not. One `302 Location: http://169.254.169.254/…` and the
+    // instance metadata gets fetched. Every hop is checked now.
+    const response = await fetchWithCheckedRedirects(url, (target) =>
+      fetch(target, {
+        // A plain GET with nothing of ours attached: no cookies, no credentials.
+        redirect: "manual",
+        headers: { Accept: "text/calendar, text/plain" },
+        next: { revalidate: EXTERNAL_TTL_SECONDS },
+      }),
+    );
+    if (!response || !response.ok) return { events: [], unreadable: 0, failed: true };
 
     const text = await response.text();
     const parsed = parseIcal(text, window, { defaultZone: "UTC" });

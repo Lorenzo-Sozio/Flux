@@ -46,5 +46,29 @@
     "description": "un indirizzo incollato con spazi attorno viene rifiutato come non valido",
     "find": "  const trimmed = raw.trim();",
     "replace": "  const trimmed = raw;"
+  },
+  {
+    "file": "src/lib/external-calendar-url.ts",
+    "description": "⚠️⚠️ a redirect is followed without being checked: the address a person saved is validated and the address the far end sends us to is not, so one Location header reaches the instance metadata service",
+    "find": "    const verdict = checkExternalCalendarUrl(next, null);\n    if (!verdict.ok) return null;\n    current = verdict.url;",
+    "replace": "    current = next;"
+  },
+  {
+    "file": "src/lib/external-calendar-url.ts",
+    "description": "⚠️ the hop limit goes: a redirect loop is walked for ever and the request never returns",
+    "find": "  for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {",
+    "replace": "  for (let hop = 0; hop <= 10_000; hop++) {"
+  },
+  {
+    "file": "src/lib/external-calendar-url.ts",
+    "description": "a relative Location resolves against the address originally saved instead of the hop we are on: the walk goes somewhere nobody pointed at",
+    "find": "      next = new URL(location, current).toString();",
+    "replace": "      next = new URL(location, startUrl).toString();"
+  },
+  {
+    "file": "src/lib/external-calendar-url.ts",
+    "description": "⚠️ a refused hop returns the redirect response instead of nothing: the caller treats a 302 to a private address as an answer",
+    "find": "    if (!verdict.ok) return null;",
+    "replace": "    if (!verdict.ok) return response;"
   }
 ]

@@ -9,7 +9,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { checkExternalCalendarUrl } from "./external-calendar-url";
+import { checkExternalCalendarUrl, fetchWithCheckedRedirects, MAX_REDIRECTS } from "./external-calendar-url";
 
 const ok = (raw: string, origin?: string) => checkExternalCalendarUrl(raw, origin);
 const refusedFor = (raw: string, origin?: string) => {
@@ -102,5 +102,108 @@ describe("addresses it refuses", () => {
 
   it("survives a misconfigured origin instead of refusing the user", () => {
     expect(ok("https://calendar.google.com/a.ics", "not a url").ok).toBe(true);
+  });
+});
+
+/**
+ * ⚠️⚠️ The redirect walk.
+ *
+ * Checking the address a person saved and then handing it to
+ * `fetch(url, { redirect: "follow" })` is not a check: the far end decides the
+ * second request, and every guard above is bypassed by one `Location` header.
+ * These tests are the ones that would have caught it.
+ */
+describe("where a calendar address is allowed to send us", () => {
+  /** A fake far end: a script of responses, and a log of what was asked for. */
+  function server(script: Record<string, { status: number; location?: string }>) {
+    const asked: string[] = [];
+    const request = async (url: string) => {
+      asked.push(url);
+      const step = script[url] ?? { status: 404 };
+      return new Response(null, {
+        status: step.status,
+        headers: step.location ? { location: step.location } : undefined,
+      });
+    };
+    return { asked, request };
+  }
+
+  it("returns the first response when there is no redirect", async () => {
+    const { asked, request } = server({ "https://cal.example.com/a.ics": { status: 200 } });
+    const response = await fetchWithCheckedRedirects("https://cal.example.com/a.ics", request);
+
+    expect(response?.status).toBe(200);
+    expect(asked).toEqual(["https://cal.example.com/a.ics"]);
+  });
+
+  it("⚠️⚠️ refuses to be redirected to the instance metadata service", async () => {
+    // The whole reason this walk exists. 169.254.169.254 answers on every major
+    // cloud and hands over credentials to anything that asks from inside.
+    const { asked, request } = server({
+      "https://cal.example.com/a.ics": { status: 302, location: "http://169.254.169.254/latest/meta-data/" },
+    });
+    const response = await fetchWithCheckedRedirects("https://cal.example.com/a.ics", request);
+
+    expect(response).toBeNull();
+    // And it was never asked for: refused before the request, not after.
+    expect(asked).not.toContain("http://169.254.169.254/latest/meta-data/");
+  });
+
+  it("⚠️ refuses a redirect to localhost and to a private range", async () => {
+    for (const target of ["http://localhost:8080/x.ics", "http://10.0.0.5/x.ics", "http://[::1]/x.ics"]) {
+      const { request } = server({ "https://cal.example.com/a.ics": { status: 302, location: target } });
+      expect(await fetchWithCheckedRedirects("https://cal.example.com/a.ics", request)).toBeNull();
+    }
+  });
+
+  it("follows a redirect that lands somewhere public", async () => {
+    // Calendar providers redirect constantly; refusing every hop would refuse
+    // most real addresses.
+    const { asked, request } = server({
+      "https://cal.example.com/a.ics": { status: 301, location: "https://files.example.net/a.ics" },
+      "https://files.example.net/a.ics": { status: 200 },
+    });
+    const response = await fetchWithCheckedRedirects("https://cal.example.com/a.ics", request);
+
+    expect(response?.status).toBe(200);
+    expect(asked).toEqual(["https://cal.example.com/a.ics", "https://files.example.net/a.ics"]);
+  });
+
+  it("resolves a relative Location against the hop it is on, not the address saved", async () => {
+    const { asked, request } = server({
+      "https://a.example.com/one.ics": { status: 302, location: "https://b.example.com/deep/two.ics" },
+      "https://b.example.com/deep/two.ics": { status: 302, location: "three.ics" },
+      "https://b.example.com/deep/three.ics": { status: 200 },
+    });
+    const response = await fetchWithCheckedRedirects("https://a.example.com/one.ics", request);
+
+    expect(response?.status).toBe(200);
+    expect(asked.at(-1)).toBe("https://b.example.com/deep/three.ics");
+  });
+
+  it("⚠️ gives up rather than walk a redirect loop for ever", async () => {
+    const { asked, request } = server({
+      "https://a.example.com/x.ics": { status: 302, location: "https://b.example.com/x.ics" },
+      "https://b.example.com/x.ics": { status: 302, location: "https://a.example.com/x.ics" },
+    });
+    const response = await fetchWithCheckedRedirects("https://a.example.com/x.ics", request);
+
+    expect(response).toBeNull();
+    expect(asked.length).toBeLessThanOrEqual(MAX_REDIRECTS + 1);
+  });
+
+  it("treats a 3xx with no Location as the answer, not as a redirect", async () => {
+    const { request } = server({ "https://cal.example.com/a.ics": { status: 304 } });
+    const response = await fetchWithCheckedRedirects("https://cal.example.com/a.ics", request);
+
+    expect(response?.status).toBe(304);
+  });
+
+  it("refuses a redirect to a scheme that is not http", async () => {
+    // `file:///etc/passwd` is the other half of the same trick.
+    const { request } = server({
+      "https://cal.example.com/a.ics": { status: 302, location: "file:///etc/passwd" },
+    });
+    expect(await fetchWithCheckedRedirects("https://cal.example.com/a.ics", request)).toBeNull();
   });
 });
