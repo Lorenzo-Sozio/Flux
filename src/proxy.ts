@@ -25,6 +25,11 @@ function buildCsp(nonce: string): string {
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
     "connect-src 'self'",
+    // The service worker and the web app manifest. Both already fall back to
+    // `default-src 'self'`; naming them means a later change to that default
+    // cannot take the installed app apart without anybody noticing.
+    "worker-src 'self'",
+    "manifest-src 'self'",
     "frame-src 'none'",
     "frame-ancestors 'none'",
     "object-src 'none'",

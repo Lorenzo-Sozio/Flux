@@ -9,10 +9,15 @@ import { Button } from "@/components/ui/button";
 /**
  * The two sentences, in the two languages the product speaks.
  *
- * Not next-intl: this component renders from a cache written at install time,
- * long before the person picked a language, and a translation resolved on the
- * server then would be the wrong one now. Reading `<html lang>` gets it right
- * whichever page was open when the connection went.
+ * ⚠️ Not next-intl, and not `<html lang>` either. This page is written to the
+ * cache once, at install, and served from there forever after — so **anything
+ * the server decided is frozen at that moment**, including the locale and the
+ * lang attribute that came with it. Somebody who installs the app in English
+ * and switches to Italian would keep getting the English page.
+ *
+ * The cookie is not frozen: it is read at the moment this renders. So that is
+ * what decides, and `<html lang>` is only the fallback for a first visit that
+ * has not set one.
  */
 const COPY = {
   it: {
@@ -34,7 +39,8 @@ export function OfflineNotice() {
   const [online, setOnline] = useState(true);
 
   useEffect(() => {
-    const lang = document.documentElement.lang?.slice(0, 2);
+    const cookie = document.cookie.match(/(?:^|;\s*)NEXT_LOCALE=([^;]+)/)?.[1];
+    const lang = (cookie ?? document.documentElement.lang ?? "").slice(0, 2);
     setCopy(lang === "it" ? COPY.it : COPY.en);
 
     const sync = () => setOnline(navigator.onLine);
