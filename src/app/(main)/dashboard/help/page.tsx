@@ -69,6 +69,10 @@ const sections = [
         a: "Il percorso standard è: Lead → Contatto + Azienda → Deal (Pipeline) → Preventivo → Ordine. Un lead che mostra interesse viene convertito in un contatto qualificato, si apre una deal nella pipeline, si invia un preventivo e una volta accettato si genera l'ordine.",
       },
       {
+        q: "Come funzionano gli elenchi (contatti, lead, aziende, preventivi, ordini)?",
+        a: "Ogni elenco carica una pagina di righe alla volta, 50 per default. Sopra la tabella trovi la casella di ricerca, quante righe stai vedendo sul totale, il selettore per passare a 25, 50, 100 o 200 righe per pagina e le frecce per spostarti. La ricerca e i filtri lavorano sull'intero elenco, non solo sulla pagina a schermo, quindi cercare un cliente lo trova anche se sta a pagina venti. Ricerca, filtri, ordinamento e pagina finiscono nell'indirizzo della pagina: puoi copiarlo e mandarlo a un collega, salvarlo tra i preferiti, e il tasto indietro del browser funziona come ti aspetti.",
+      },
+      {
         q: "Come funziona la navigazione?",
         a: "La barra laterale raggruppa tutto in sette sezioni: Lavoro (dashboard, calendario, task, chat), Clienti (contatti, aziende, lead), Vendite (pipeline con obiettivi, funnel, win/loss, previsioni e report, poi preventivi, ordini, prodotti e finance), Assistenza (panoramica, ticket, SLA, macro), Marketing e automazioni, Analisi, e Amministrazione (utenti, ruoli, impostazioni). Alcune voci compaiono solo se il piano include il modulo corrispondente. Su telefono la barra lascia il posto a una barra di schede in basso con le sezioni più usate.",
       },
@@ -435,6 +439,14 @@ const sections = [
         a: "La vista Workload (Task → Workload) mostra per ogni membro del team quante ore di lavoro sono pianificate settimana per settimana. Le celle in rosso segnalano un sovraccarico; quelle grigie indicano un sottoutilizzo. Utile per bilanciare il carico tra le persone.",
       },
       {
+        q: "Non trovo più un task che avevo completato mesi fa. Dove è finito?",
+        a: "L'elenco dei task è una coda di lavoro, non un archivio: mostra sempre tutto ciò che è ancora aperto, a qualunque data, e in più solo ciò che è stato completato negli ultimi 30 giorni. Quando qualcosa resta fuori, sopra l'elenco compare una riga che dice quanti task sono nascosti e un link 'Mostrale' per vederli tutti. Niente viene cancellato, e un link diretto a un task lo apre comunque, anche se è vecchio.",
+      },
+      {
+        q: "L'elenco dice che mostra solo i primi 500 task. Perché?",
+        a: "È un tetto di sicurezza: oltre quel numero la pagina diventerebbe lenta per tutti, anche per chi cerca un solo task. Quando il tetto interviene l'elenco lo scrive, invece di fermarsi in silenzio. Usa i filtri in alto — stato, priorità, assegnatario — oppure la ricerca per restringere e ritrovare quello che cerchi.",
+      },
+      {
         q: "Come registro il tempo lavorato su un task?",
         a: "Nel dettaglio del task trovi la sezione 'Time Tracking'. Avvia il timer quando inizi a lavorare e fermalo quando finisci, oppure inserisci manualmente le ore. Il sistema confronta le ore stimate con quelle effettive, dandoti una visione del rispetto dei tempi pianificati.",
       },
@@ -602,7 +614,7 @@ const sections = [
       },
       {
         q: "Dove trovo le analisi avanzate della pipeline?",
-        a: "In Analytics → Pipeline trovi analisi approfondite: distribuzione deal per stage, azioni di gestione in coda, rischi identificati e confronto forecast vs. target. Questa sezione è pensata per i responsabili commerciali.",
+        a: "Sotto Vendite → Pipeline, e sono quattro pagine con quattro domande diverse. Funnel: dove si perdono i lead lungo il percorso. Win/Loss: perché le trattative si vincono e si perdono, con i motivi registrati alla chiusura. Previsioni: quanto è ragionevole aspettarsi questo mese, per titolare. Report pipeline: la distribuzione per fase. Gli obiettivi stanno accanto, in Obiettivi di vendita.\n\nCiò che invece richiede attenzione adesso — trattative ferme, preventivi mai aperti, SLA vicini alla scadenza — non sta in una pagina di analisi ma nel riquadro delle prossime azioni sulla dashboard, dove ogni riga si apre sul record da cui viene.",
       },
     ],
   },
@@ -884,7 +896,12 @@ export default function HelpPage() {
                           <AccordionTrigger className="py-4 text-left text-sm font-medium hover:no-underline">
                             {topic.q}
                           </AccordionTrigger>
-                          <AccordionContent className="pb-4 text-muted-foreground text-sm leading-relaxed">
+                          {/*
+                            `whitespace-pre-line` so an answer that needs two
+                            paragraphs can have them. Answers written as one block
+                            are unaffected: they contain no newlines to honour.
+                          */}
+                          <AccordionContent className="whitespace-pre-line pb-4 text-muted-foreground text-sm leading-relaxed">
                             {topic.a}
                           </AccordionContent>
                         </AccordionItem>
