@@ -13,6 +13,7 @@ import { and, desc, eq, inArray, or } from "drizzle-orm";
 import { platformDb } from "@/db";
 import { billingPlans, billingSubscriptions, billingTenantAddons, tenants } from "@/db/schema";
 import { requireAdminPanelAccess } from "@/lib/auth-guard";
+import { breaksFreePlanSlug, FREE_PLAN_SLUG, isFreePlan } from "@/lib/billing/free-plan";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -76,6 +77,19 @@ export async function createPlan(input: UpsertPlanInput) {
 
 export async function updatePlan(id: string, input: Partial<UpsertPlanInput>) {
   await requireAdminPanelAccess();
+
+  // ⚠️ The slug is not decoration: the billing logic recognises the free plan by
+  // it. Renaming it would start recording workspaces on that plan as active
+  // paying subscriptions, silently, and Stripe would never hear about it. The
+  // display name is the one meant to be edited.
+  const [current] = await platformDb.select().from(billingPlans).where(eq(billingPlans.id, id));
+  if (current && breaksFreePlanSlug(current, input)) {
+    throw new Error(
+      `The "${FREE_PLAN_SLUG}" slug is what the billing logic recognises as the free plan. ` +
+        "Change the display name instead, or migrate the data deliberately.",
+    );
+  }
+
   await platformDb
     .update(billingPlans)
     .set({ ...input, updatedAt: new Date() })
@@ -357,10 +371,10 @@ export async function adminSetTenantPlan(tenantId: string, planId: string) {
     // Tenant predates billing — provision the subscription row now
     await platformDb.insert(billingSubscriptions).values({
       tenantId,
-      planId: plan.name === "free" ? null : planId,
-      status: plan.name === "free" ? "free" : "active",
+      planId: isFreePlan(plan) ? null : planId,
+      status: isFreePlan(plan) ? "free" : "active",
     });
-  } else if (plan.name === "free") {
+  } else if (isFreePlan(plan)) {
     // Cancel any active Stripe subscription
     if (previousSub.stripeSubscriptionId) {
       await getStripe()

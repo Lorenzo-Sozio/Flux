@@ -24,6 +24,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { isFreePlan } from "@/lib/billing/free-plan";
 
 interface Tenant {
   id: string;
@@ -93,7 +94,7 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
   };
 
   const openPlanDialog = (tenant: Tenant) => {
-    const currentId = tenant.planId ?? activePlans.find((p) => p.name === "free")?.id ?? "";
+    const currentId = tenant.planId ?? activePlans.find(isFreePlan)?.id ?? "";
     setPlanDialogTenant(tenant);
     setPendingPlanId(currentId);
     setPlanError(null);
@@ -278,7 +279,7 @@ export function TenantsList({ tenants, plans }: { tenants: Tenant[]; plans: Plan
               disabled={
                 savingPlan ||
                 !pendingPlanId ||
-                pendingPlanId === (planDialogTenant?.planId ?? activePlans.find((p) => p.name === "free")?.id ?? "")
+                pendingPlanId === (planDialogTenant?.planId ?? activePlans.find(isFreePlan)?.id ?? "")
               }
             >
               {savingPlan && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

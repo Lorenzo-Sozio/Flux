@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/lib/billing/free-plan.ts",
+    "description": "⚠️⚠️ lo slug del piano gratuito diventa rinominabile: i workspace gratuiti risultano abbonamenti attivi paganti e Stripe non ne sa niente",
+    "find": "  return current.name === FREE_PLAN_SLUG || next.name === FREE_PLAN_SLUG;",
+    "replace": "  return false;"
+  },
+  {
+    "file": "src/lib/billing/free-plan.ts",
+    "description": "⚠️ lo slug puo' essere assegnato a un altro piano: cambia quale piano conta come gratuito senza che nessuno lo decida",
+    "find": " || next.name === FREE_PLAN_SLUG;",
+    "replace": ";"
+  },
+  {
+    "file": "src/lib/billing/free-plan.ts",
+    "description": "⚠️ ogni piano risulta gratuito e nessun workspace viene mai registrato come pagante",
+    "find": "  return plan?.name === FREE_PLAN_SLUG;",
+    "replace": "  return true;"
+  },
+  {
+    "file": "src/lib/billing/free-plan.ts",
+    "description": "una modifica che non tocca lo slug viene rifiutata: cambiare il nome visualizzato o il prezzo diventa impossibile",
+    "find": "  if (next.name === undefined || next.name === current.name) return false;",
+    "replace": ""
+  }
+]
