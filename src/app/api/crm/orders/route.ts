@@ -1,9 +1,11 @@
 import { after, type NextRequest, NextResponse } from "next/server";
 
+import { inArray } from "drizzle-orm";
+
 import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { createTenantDb } from "@/db";
-import { contacts, orderItems, orders } from "@/db/schema";
+import { contacts, notifications, orderItems, orders, users } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint, whereToNote } from "@/lib/contact-point";
@@ -293,6 +295,44 @@ export async function POST(req: NextRequest) {
       });
     }
     dispatchWebhook("order.created", { order: { ...ordine, contactId } }, API_ORIGIN);
+    // ⚠️⚠️ **The bell, and until now an order rang nothing.** Five parts of this CRM create
+    // notifications — internal chat, lead assignment, pipeline, quotes, activity reminders —
+    // and orders created none. Somebody had to be looking at the orders list to know one had
+    // arrived.
+    //
+    // ⚠️ **Admins and owners, the same choice quotes already makes.** An order is not
+    // assigned to anyone: there is no owner field to read, and picking a single user would
+    // mean inventing a rule. These are the people who run the business.
+    //
+    // ⚠️ **It does not replace the assistant's own alert.** That one leaves the product and
+    // reaches a phone; this one is in the panel, and a kitchen at eight in the evening does
+    // not have the panel open. Complementary, not alternative.
+  });
+
+  // ⚠️ Its own `after`, and awaited inside: a fire-and-forget closure would make the bell
+  // untestable — the test double would never see the rows, and the `catch` below would hide
+  // a feature that was broken from the first line. It cost one measurement to find that out.
+  after(async () => {
+    try {
+      const destinatari = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(inArray(users.role, ["admin", "owner"]));
+      if (destinatari.length === 0) return;
+      await db.insert(notifications).values(
+        destinatari.map((u) => ({
+          userId: u.id,
+          type: "order_created",
+          title: `New order ${ordine.orderNumber}`,
+          message: `${totali.total} — ${righe.length} line${righe.length === 1 ? "" : "s"}.`,
+          link: `/dashboard/sales/orders/${ordine.id}`,
+        })),
+      );
+    } catch (err) {
+      // A bell that fails must not fail the order: it is already written, and the assistant
+      // has already told the customer it was taken.
+      console.error("order notification not delivered", err);
+    }
   });
 
   return NextResponse.json(

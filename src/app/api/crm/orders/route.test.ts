@@ -51,6 +51,15 @@ vi.mock("@/lib/contact-point", async () => {
 vi.mock("@/lib/order-number", () => ({ nextOrderNumber: async () => "ORD-2026-0007" }));
 vi.mock("@/db", () => ({
   createTenantDb: () => ({
+    // ⚠️ Il doppio **dichiara** anche le letture, e senza questa riga la campanella era
+    // rotta nel banco senza che nulla lo dicesse: `select` non esisteva, la rotta sollevava,
+    // e il `catch` che protegge l'ordine si mangiava l'errore. Un doppio che non dichiara
+    // ciò che serve rende verde una funzione che non esiste.
+    select: () => ({
+      from: () => ({
+        where: async () => amministratori,
+      }),
+    }),
     insert: (tabella: { [k: string]: unknown }) => ({
       values: (valori: Record<string, unknown>) => {
         // Il nome della tabella si legge dal simbolo di drizzle: il doppio deve poter dire
@@ -71,6 +80,10 @@ vi.mock("@/db", () => ({
     }),
   }),
 }));
+
+//: Chi riceve la campanella. È una lista dichiarata: un doppio che restituisse sempre
+//: l'insieme vuoto renderebbe verde anche il caso in cui non si scrive niente a nessuno.
+let amministratori: { id: string }[] = [{ id: "u1" }, { id: "u2" }];
 
 const { POST } = await import("@/app/api/crm/orders/route");
 
@@ -257,5 +270,39 @@ describe("an order taken by an assistant", () => {
 
     expect(risposta.status).toBe(422);
     expect(inseriti).toHaveLength(0);
+  });
+});
+
+describe("la campanella dell'ordine", () => {
+  it("⚠️⚠️ avvisa chi manda avanti l'attività: un ordine non suonava niente", async () => {
+    inseriti.length = 0;
+    amministratori = [{ id: "u1" }, { id: "u2" }];
+
+    await POST(richiesta(ORDINE));
+    await new Promise((r) => setTimeout(r, 0));
+
+    // ⚠️ Una sola chiamata con **un elenco di righe**: è la forma che il doppio registra,
+    // ed è anche la forma che il CRM usa altrove per avvisare più persone insieme.
+    const scritte = inseriti.filter((r) => r.tabella === "notification");
+    expect(scritte).toHaveLength(1);
+    const avvisi = scritte[0].valori as unknown as Record<string, unknown>[];
+    expect(avvisi).toHaveLength(2);
+    expect(avvisi.map((a) => a.userId).sort()).toEqual(["u1", "u2"]);
+    expect(String(avvisi[0].type)).toBe("order_created");
+    // Il link porta all'ordine, non alla lista: chi la riceve deve poterlo aprire.
+    expect(String(avvisi[0].link)).toContain("/dashboard/sales/orders/");
+  });
+
+  it("⚠️ senza nessun destinatario non scrive righe vuote", async () => {
+    inseriti.length = 0;
+    amministratori = [];
+
+    const risposta = await POST(richiesta(ORDINE));
+    await new Promise((r) => setTimeout(r, 0));
+
+    // L'ordine resta scritto: la campanella è un di più, e non può farlo cadere.
+    expect(risposta.status).toBe(201);
+    expect(inseriti.filter((r) => r.tabella === "notification")).toHaveLength(0);
+    expect(inseriti.some((r) => r.tabella === "order")).toBe(true);
   });
 });
