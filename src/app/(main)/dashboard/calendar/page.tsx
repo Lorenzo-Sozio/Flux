@@ -697,7 +697,8 @@ export default async function CalendarPage({
             <div className="flex items-center gap-1">
               <Link
                 href={prevAgendaUrl}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
+                aria-label={t("previousPeriod")}
+                className="flex size-11 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-muted hover:text-foreground sm:size-8"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Link>
@@ -706,7 +707,8 @@ export default async function CalendarPage({
               </Button>
               <Link
                 href={nextAgendaUrl}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-muted hover:text-foreground"
+                aria-label={t("nextPeriod")}
+                className="flex size-11 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-muted hover:text-foreground sm:size-8"
               >
                 <ChevronRight className="h-4 w-4" />
               </Link>
@@ -919,14 +921,16 @@ export default async function CalendarPage({
             <div className="flex items-center gap-1 rounded-lg border bg-muted/40 p-0.5">
               <Link
                 href={prevUrl}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-background hover:text-foreground"
+                aria-label={t("previousPeriod")}
+                className="flex size-11 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-background hover:text-foreground sm:size-8"
               >
                 <ChevronLeft className="h-4 w-4" />
               </Link>
-              <span className="min-w-[148px] px-2 text-center font-semibold text-sm">{periodTitle}</span>
+              <span className="px-2 text-center font-semibold text-sm sm:min-w-[148px]">{periodTitle}</span>
               <Link
                 href={nextUrl}
-                className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-background hover:text-foreground"
+                aria-label={t("nextPeriod")}
+                className="flex size-11 items-center justify-center rounded-md text-muted-foreground transition-all hover:bg-background hover:text-foreground sm:size-8"
               >
                 <ChevronRight className="h-4 w-4" />
               </Link>

@@ -251,7 +251,9 @@ export default async function CRMPage() {
       </div>
 
       {/* ── Metric Cards ─────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      {/* Two across on a phone. Each card is a label and a number; one per row
+          made the dashboard six screens long before the first chart. */}
+      <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-3 xl:grid-cols-6">
         <Link href="/dashboard/pipeline" className="group">
           <Card className="cursor-pointer border-l-4 border-l-blue-500 shadow-sm transition-shadow group-hover:shadow-md">
             <CardHeader className="flex flex-row items-center justify-between pb-2">

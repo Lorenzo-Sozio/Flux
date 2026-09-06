@@ -1,19 +1,5 @@
 {
   "analytics": {
-    "title": "Analisi",
-    "overview": "Panoramica",
-    "visitors": "Visitatori",
-    "pageViews": "Visualizzazioni Pagina",
-    "sessions": "Sessioni",
-    "bounceRate": "Frequenza di Rimbalzo",
-    "avgSessionDuration": "Durata Media Sessione",
-    "topPages": "Pagine Principali",
-    "topSources": "Fonti Principali",
-    "conversions": "Conversioni",
-    "last7Days": "Ultimi 7 giorni",
-    "last30Days": "Ultimi 30 giorni",
-    "last90Days": "Ultimi 90 giorni",
-    "thisYear": "Quest'anno",
     "funnel": {
       "title": "Funnel Vendite",
       "subtitle": "Analisi conversione lead→vinto — ultimi {days} giorni",
@@ -357,7 +343,9 @@
     "filterAll": "Tutti",
     "filterMine": "I miei",
     "filterGroup": "Il mio gruppo",
-    "noEventsThisDay": "Nessun evento programmato per questo giorno"
+    "noEventsThisDay": "Nessun evento programmato per questo giorno",
+    "previousPeriod": "Periodo precedente",
+    "nextPeriod": "Periodo successivo"
   },
   "calendarFeed": {
     "subscribe": "Iscriviti",
@@ -1510,7 +1498,6 @@
       "reports": "Rapporti",
       "salesFunnel": "Funnel Vendite",
       "salesTargets": "Obiettivi di Vendita",
-      "salesTrend": "Andamento vendite",
       "settings": "Impostazioni",
       "slaManagement": "Gestione SLA",
       "supportOverview": "Panoramica",

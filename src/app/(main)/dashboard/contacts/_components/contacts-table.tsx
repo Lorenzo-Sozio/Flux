@@ -13,6 +13,7 @@ import { BulkActionBar } from "@/components/crm/bulk-action-bar";
 import { EmptyState } from "@/components/crm/empty-state";
 import { LeadScoreBadge } from "@/components/crm/lead-score-badge";
 import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -160,17 +161,26 @@ export function ContactsTable({ contacts, users, canEdit, narrowed }: Props) {
                 href: `/dashboard/contacts/${contact.id}`,
                 title: `${contact.firstName} ${contact.lastName}`,
                 subtitle: contact.email,
-                badge: <LeadScoreBadge score={contact.leadScore} />,
-                // Four fields, not eight: the job title and the city say which
-                // of two people with the same name this is, and the owner and
-                // status are what a list is filtered by.
+                // Status is a badge, not a field. As a labelled row it spent a
+                // third of every card saying "Active", which is what almost
+                // every contact is; beside the name it is read at a glance and
+                // costs nothing. The score joins it there when there is one.
+                badge: (
+                  <div className="flex items-center gap-1.5">
+                    <LeadScoreBadge score={contact.leadScore} />
+                    <Badge variant="outline" className="h-5 shrink-0 text-[10px] capitalize">
+                      {contact.status}
+                    </Badge>
+                  </div>
+                ),
                 fields: [
                   { label: t("jobTitle"), value: contact.jobTitle },
                   { label: tc("address"), value: contact.city },
-                  { label: tc("status"), value: <span className="capitalize">{contact.status}</span> },
                   { label: t("columns.assignedTo"), value: contact.ownerName },
                 ],
-                actions: canEdit ? <ContactActions contact={contact} /> : undefined,
+                // The card is already a link to this record, so the eye would be
+                // a third of the row spent on a duplicate.
+                actions: canEdit ? <ContactActions contact={contact} hideView /> : undefined,
                 selected: selected.has(contact.id),
                 onToggle: canEdit ? () => toggle(contact.id) : undefined,
                 selectLabel: `${contact.firstName} ${contact.lastName}`,

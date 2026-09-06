@@ -312,10 +312,33 @@ body {
  * A touchscreen laptop needs this and a narrow desktop window does not, and
  * width cannot tell them apart. */
 @media (pointer: coarse) {
-  button:not([data-slot="sidebar-menu-button"]):not([data-no-touch-target]),
+  /* ⚠️ Checkboxes, switches and radios are excluded, and they must be. Each is
+   * a <button> with a fixed square size, so a minimum *height* alone turns a
+   * 16px box into a 16×44 oval — which is what every row of the contacts list
+   * looked like. They get the target below, as an invisible overlay, so the
+   * control keeps its shape and the finger still gets 44px. */
+  button:not([data-slot="sidebar-menu-button"]):not([data-no-touch-target]):not([data-slot="checkbox"]):not(
+      [data-slot="switch"]
+    ):not([data-slot="radio-group-item"]),
   [role="button"]:not([data-no-touch-target]),
   a[data-slot="button"] {
     min-height: 2.75rem;
+  }
+
+  /* The hit area a fingertip needs, without resizing the control it belongs to. */
+  [data-slot="checkbox"],
+  [data-slot="switch"],
+  [data-slot="radio-group-item"] {
+    position: relative;
+  }
+
+  [data-slot="checkbox"]::after,
+  [data-slot="switch"]::after,
+  [data-slot="radio-group-item"]::after {
+    content: "";
+    position: absolute;
+    /* 16px control + 2×14px = 44px, which is the number both platforms ask for. */
+    inset: -0.875rem;
   }
 
   /* Icon-only controls need the width too, or they stay 36px wide and 44px tall,

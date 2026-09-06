@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { usePathname } from "next/navigation";
+
 import { Download, Share, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 
@@ -51,6 +53,7 @@ function isIosSafari(): boolean {
 
 export function InstallPrompt() {
   const t = useTranslations("pwa");
+  const pathname = usePathname();
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [showIosHint, setShowIosHint] = useState(false);
 
@@ -106,6 +109,11 @@ export function InstallPrompt() {
     dismiss();
   }
 
+  // ⚠️ Only on the dashboard. It is a fixed strip above the tab bar, so
+  // anywhere else it covers whatever is under it — and it was covering the
+  // status field of an order somebody was in the middle of writing. An offer
+  // belongs on the screen you arrive at, not on the one you are working in.
+  if (pathname !== "/dashboard/crm") return null;
   if (!deferred && !showIosHint) return null;
 
   return (

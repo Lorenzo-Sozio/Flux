@@ -89,35 +89,41 @@ export function RecordCards({ items, className }: { readonly items: RecordCardIt
           <li
             key={item.id}
             className={cn(
-              "relative rounded-lg border bg-card transition-colors",
+              "rounded-lg border bg-card transition-colors",
               item.selected && "border-primary/40 bg-primary/5",
             )}
           >
-            {/* The checkbox and the menu live outside the link: an anchor may not
-                contain a button, and a tap meant for either must not navigate. */}
-            {selectable && (
-              <div className="absolute top-3 left-3 z-10">
-                <Checkbox
-                  checked={item.selected}
-                  onCheckedChange={() => item.onToggle?.()}
-                  aria-label={item.selectLabel}
-                />
-              </div>
-            )}
-            {item.actions && <div className="absolute top-1.5 right-1.5 z-10">{item.actions}</div>}
+            {/*
+              ⚠️ The actions used to be absolutely positioned in the corner, with
+              the link body given 44px of right padding to keep clear of them.
+              That works for one action and fails for three: on the contacts list
+              the eye, pencil and bin — 132px of them — sat on top of the name
+              and the lead score. A row, not an overlay: the link takes what is
+              left and the buttons take what they need.
+            */}
+            <div className="flex items-start">
+              {selectable && (
+                <div className="shrink-0 py-3 pl-3">
+                  <Checkbox
+                    checked={item.selected}
+                    onCheckedChange={() => item.onToggle?.()}
+                    aria-label={item.selectLabel}
+                  />
+                </div>
+              )}
 
-            {item.href ? (
-              <Link
-                href={item.href}
-                className={cn("block rounded-lg p-3", selectable && "pl-11", item.actions && "pr-11")}
-              >
-                <CardBody item={item} />
-              </Link>
-            ) : (
-              <div className={cn("p-3", selectable && "pl-11", item.actions && "pr-11")}>
-                <CardBody item={item} />
-              </div>
-            )}
+              {item.href ? (
+                <Link href={item.href} className="min-w-0 flex-1 rounded-lg p-3">
+                  <CardBody item={item} />
+                </Link>
+              ) : (
+                <div className="min-w-0 flex-1 p-3">
+                  <CardBody item={item} />
+                </div>
+              )}
+
+              {item.actions && <div className="flex shrink-0 items-center gap-0.5 py-1.5 pr-1.5">{item.actions}</div>}
+            </div>
 
             {item.footer && <div className="flex items-center gap-2 border-t px-3 py-2">{item.footer}</div>}
           </li>

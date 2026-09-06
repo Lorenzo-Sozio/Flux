@@ -187,11 +187,10 @@ export function LeadsTable({ leads, users, canEdit, narrowed, categories = [], c
                 fields: [
                   { label: tc("email"), value: lead.email },
                   { label: t("columns.city"), value: lead.city },
-                  { label: tc("status"), value: <span className="capitalize">{lead.status}</span> },
                   { label: t("columns.assignedTo"), value: lead.ownerName },
                 ],
                 actions: canEdit ? (
-                  <LeadActions lead={lead} categories={categories} companyTypes={companyTypes} />
+                  <LeadActions lead={lead} categories={categories} companyTypes={companyTypes} hideView />
                 ) : undefined,
                 selected: selected.has(lead.id),
                 onToggle: canEdit ? () => toggle(lead.id) : undefined,

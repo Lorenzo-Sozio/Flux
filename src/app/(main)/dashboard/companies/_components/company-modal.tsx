@@ -710,22 +710,28 @@ export function CompanyActions({
   company,
   categories = [],
   companyTypes = [],
+  hideView = false,
 }: {
   // biome-ignore lint/suspicious/noExplicitAny: typing this as the schema row surfaces three real mismatches — annualRevenue and employeeCount come back from the numeric columns as strings while the form expects numbers, and CompaniesTable passes a narrower row. That is a change to the form, not to this signature.
   company: any;
   categories?: LookupItem[];
   companyTypes?: LookupItem[];
+  readonly hideView?: boolean;
 }) {
   // An icon on its own is a target with no name — on a phone there is no
   // hover to reveal one, and a screen reader is told nothing at all.
   const tc = useTranslations("common");
   return (
     <div className="flex items-center justify-end gap-2">
-      <Link href={`/dashboard/companies/${company.id}`}>
-        <Button variant="ghost" size="icon" aria-label={tc("view")}>
-          <EyeIcon className="h-4 w-4" />
-        </Button>
-      </Link>
+      {/* The card itself already opens the record; on a phone this is a third
+          of the row spent on a duplicate. */}
+      {!hideView && (
+        <Link href={`/dashboard/companies/${company.id}`}>
+          <Button variant="ghost" size="icon" aria-label={tc("view")}>
+            <EyeIcon className="h-4 w-4" />
+          </Button>
+        </Link>
+      )}
       <CompanyModal company={company} categories={categories} companyTypes={companyTypes}>
         <Button variant="ghost" size="icon" aria-label={tc("edit")}>
           <PencilIcon className="h-4 w-4" />

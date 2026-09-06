@@ -172,6 +172,8 @@ export function CompaniesTable({ companies, users, canEdit, narrowed, categories
                 href: `/dashboard/companies/${company.id}`,
                 title: company.name,
                 subtitle: company.website,
+                // The type is the badge; the status joins it, because as a
+                // labelled field it said "Active" on every card.
                 badge: company.type ? (
                   <span
                     className={`rounded px-1.5 py-0.5 font-medium text-xs capitalize ${TYPE_COLORS[company.type] ?? ""}`}
@@ -182,11 +184,10 @@ export function CompaniesTable({ companies, users, canEdit, narrowed, categories
                 fields: [
                   { label: t("columns.industry"), value: company.industry },
                   { label: t("columns.city"), value: company.city },
-                  { label: t("columns.status"), value: <span className="capitalize">{company.status}</span> },
                   { label: t("columns.assignedTo"), value: company.ownerName },
                 ],
                 actions: canEdit ? (
-                  <CompanyActions company={company} categories={categories} companyTypes={companyTypes} />
+                  <CompanyActions company={company} categories={categories} companyTypes={companyTypes} hideView />
                 ) : undefined,
                 selected: selected.has(company.id),
                 onToggle: canEdit ? () => toggle(company.id) : undefined,

@@ -1,6 +1,5 @@
 {
   "analytics": {
-    "title": "Analytics",
     "funnel": {
       "title": "Sales Funnel",
       "subtitle": "Lead-to-won conversion analysis — last {days} days",
@@ -19,20 +18,7 @@
       "leadsBySource": "Leads by Source",
       "back": "Pipeline",
       "daysLabel": "{count} days"
-    },
-    "overview": "Overview",
-    "visitors": "Visitors",
-    "pageViews": "Page Views",
-    "sessions": "Sessions",
-    "bounceRate": "Bounce Rate",
-    "avgSessionDuration": "Avg. Session Duration",
-    "topPages": "Top Pages",
-    "topSources": "Top Sources",
-    "conversions": "Conversions",
-    "last7Days": "Last 7 days",
-    "last30Days": "Last 30 days",
-    "last90Days": "Last 90 days",
-    "thisYear": "This year"
+    }
   },
   "appointment": {
     "title": "Appointments",
@@ -357,7 +343,9 @@
     "filterAll": "All",
     "filterMine": "Mine",
     "filterGroup": "My group",
-    "noEventsThisDay": "No events scheduled for this day"
+    "noEventsThisDay": "No events scheduled for this day",
+    "previousPeriod": "Previous period",
+    "nextPeriod": "Next period"
   },
   "calendarFeed": {
     "subscribe": "Subscribe",
@@ -1510,7 +1498,6 @@
       "reports": "Reports",
       "salesFunnel": "Sales Funnel",
       "salesTargets": "Sales Targets",
-      "salesTrend": "Sales trend",
       "settings": "Settings",
       "slaManagement": "SLA Management",
       "supportOverview": "Overview",

@@ -848,21 +848,27 @@ export function LeadActions({
   lead,
   categories,
   companyTypes,
+  hideView = false,
 }: {
   lead: any;
   categories?: LookupItem[];
   companyTypes?: LookupItem[];
+  readonly hideView?: boolean;
 }) {
   // An icon on its own is a target with no name — on a phone there is no
   // hover to reveal one, and a screen reader is told nothing at all.
   const tc = useTranslations("common");
   return (
     <div className="flex items-center gap-2">
-      <Link href={`/dashboard/leads/${lead.id}`}>
-        <Button variant="ghost" size="icon" aria-label={tc("view")}>
-          <EyeIcon className="h-4 w-4" />
-        </Button>
-      </Link>
+      {/* The card itself already opens the record; on a phone this is a third
+          of the row spent on a duplicate. */}
+      {!hideView && (
+        <Link href={`/dashboard/leads/${lead.id}`}>
+          <Button variant="ghost" size="icon" aria-label={tc("view")}>
+            <EyeIcon className="h-4 w-4" />
+          </Button>
+        </Link>
+      )}
       <LeadModal lead={lead} categories={categories} companyTypes={companyTypes}>
         <Button variant="ghost" size="icon" aria-label={tc("edit")}>
           <PencilIcon className="h-4 w-4" />
