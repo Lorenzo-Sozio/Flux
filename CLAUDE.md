@@ -374,6 +374,23 @@ subtle one: there is no hover, so the control never appears. A rule under
 `@media (hover: none)` in globals.css reveals all of them; a touchscreen laptop
 still has hover and keeps the reveal.
 
+⚠️⚠️ **The thing that actually pushes content off a phone is `min-width: auto`.**
+A flex child will not shrink below its own content, so a long title in a
+`justify-between` row does not elide — it grows, and the buttons beside it go
+past the edge of the screen. Twenty-two headers did this. The fix is always
+`min-w-0` on the text block plus a gap; `npm run mobile:audit` looks at the line
+*after* a flex row to find the next one.
+
+⚠️ **Two columns of form fields is 160px a field.** Labels wrap, placeholders are
+cut off mid-word, and a date input has no room for the picker the browser draws
+over it. Form grids are `grid-cols-1 sm:grid-cols-2`, and every `col-span-2`
+inside one carries the same breakpoint — a span of two on a one-column grid makes
+the browser invent a second column, which is the overlap it was meant to remove.
+
+⚠️ `overflow-hidden` on a table's wrapper does **not** contain the table. It cuts
+the columns off with no way to reach them. Use `overflow-x-auto`. (The `Table`
+primitive already wraps itself; a hand-rolled `<table>` does not.)
+
 Touch targets go to 44px under `(pointer: coarse)`; form controls go to 44px below
 `md` — scoped to *width* there rather than to pointer type, because the dense
 nine-column line editor on an order is a deliberate desktop layout a touchscreen
