@@ -31,9 +31,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   if (!q) return new NextResponse("Not found", { status: 404 });
 
-  // ⚠️ Il ruolo del WORKSPACE, non quello di piattaforma: le due ultime righe
-  // leggevano `session.user.role`, che per ogni cliente vale "user", quindi
-  // nessun amministratore di workspace poteva aprire il preventivo di un collega.
+  // ⚠️ The WORKSPACE role, not the platform one: the last two lines read
+  // `session.user.role`, which is "user" for every customer, so no workspace admin could
+  // open a colleague's quote.
   const canView =
     session.user.id === q.ownerId || session.user.id === q.deal?.ownerId || can(await getActor(), "user:read");
 

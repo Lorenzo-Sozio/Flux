@@ -117,7 +117,7 @@ export async function eraseByContactPoint(
   // biome-ignore lint/suspicious/noExplicitAny: drizzle query builders are not one type
   const quanti = (righe: any) => (Array.isArray(righe) ? righe.length : 0);
 
-  // ── 1. Il lead se ne va per intero: activity, task e campaign_log cascano dietro.
+  // ── 1. The lead goes entirely: activity, task and campaign_log cascade behind it.
   report.deleted.lead = quanti(
     await db
       .delete(leads)
@@ -127,15 +127,15 @@ export async function eraseByContactPoint(
 
   const { contactIds } = person;
   if (contactIds.length > 0) {
-    // ── 2. Il diario di quella persona. È il diario *di lei*: senza di lei non significa
-    // niente, e riscrivere un testo libero lascia sempre qualcosa dentro.
+    // ── 2. That person's diary. It is a diary *of them*: without them it means nothing,
+    // and rewriting free text always leaves something behind.
     report.deleted.activity = quanti(
       await db.delete(activities).where(inArray(activities.contactId, contactIds)).returning({ id: activities.id }),
     );
     report.deleted.task = quanti(
       await db.delete(tasks).where(inArray(tasks.contactId, contactIds)).returning({ id: tasks.id }),
     );
-    // ── 3. La coda di invio: ha già fatto il suo lavoro, e il corpo contiene l'indirizzo.
+    // ── 3. The send queue: it has done its job, and the body contains the address.
     // `email_job` casca dietro `campaign_log`.
     report.deleted.campaign_log = quanti(
       await db
@@ -143,7 +143,7 @@ export async function eraseByContactPoint(
         .where(inArray(campaignLogs.contactId, contactIds))
         .returning({ id: campaignLogs.id }),
     );
-    // ── 4. L'appuntamento è avvenuto: è un fatto dell'azienda. Chi c'era, non più.
+    // ── 4. The appointment happened: that is a fact about the company. Who attended is not.
     report.anonymised.appointment_attendee = quanti(
       await db
         .update(appointmentAttendees)
@@ -151,7 +151,7 @@ export async function eraseByContactPoint(
         .where(inArray(appointmentAttendees.contactId, contactIds))
         .returning({ id: appointmentAttendees.id }),
     );
-    // ── 5. Il ticket resta come caso; le parole della persona no.
+    // ── 5. The ticket stays as a case; the person's own words do not.
     report.anonymised.ticket = quanti(
       await db
         .update(tickets)
@@ -167,8 +167,8 @@ export async function eraseByContactPoint(
     report.anonymised.ticket = 0;
   }
 
-  // ── 6. Le tabelle **senza chiave esterna verso il contatto** si raggiungono dal
-  // recapito: è la stessa regola per cui l'art. 17 parte dal recapito.
+  // ── 6. Tables **with no foreign key to the contact** are reached by the contact point:
+  // the same rule by which article 17 starts from one.
   if (email) {
     report.anonymised.ticket_message = quanti(
       await db
@@ -177,15 +177,15 @@ export async function eraseByContactPoint(
         .where(sql`lower(btrim(${ticketMessages.senderEmail})) = ${email}`)
         .returning({ id: ticketMessages.id }),
     );
-    // L'indirizzo IP è dato personale. Questa tabella serve a sapere *se* un preventivo è
-    // stato aperto: il fatto si tiene anche senza chi.
+    // An IP address is personal data. This table exists to know *whether* a quote was
+    // opened: the fact survives without the who.
     report.deleted.quote_activity = quanti(
       await db
         .delete(quoteActivities)
         .where(sql`lower(btrim(${quoteActivities.email})) = ${email}`)
         .returning({ id: quoteActivities.id }),
     );
-    // Messaggi in coda non legati a una campagna cancellata sopra.
+    // Queued messages not tied to a campaign deleted above.
     report.deleted.email_job = quanti(
       await db
         .delete(emailJobs)
@@ -198,8 +198,8 @@ export async function eraseByContactPoint(
     report.deleted.email_job = 0;
   }
 
-  // ── 7. ⚠️⚠️ **Ultimo, e non è un dettaglio d'ordine.** Da qui in poi il recapito non
-  // esiste più, e niente di quanto sopra sarebbe più raggiungibile.
+  // ── 7. ⚠️⚠️ **Last, and the order is not incidental.** From here on the contact point
+  // no longer exists, and nothing above would still be reachable.
   if (contactIds.length > 0) {
     report.anonymised.contact = quanti(
       await db

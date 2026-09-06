@@ -59,7 +59,7 @@ export function replaceMergeFields(template: string, data: Record<string, any>):
 }
 
 /**
- * Carica i dati dell'entity per il merge
+ * Loads the entity's data for the merge.
  */
 async function loadEntityData(entityType: string, entityId: string): Promise<Record<string, any>> {
   let table: any;

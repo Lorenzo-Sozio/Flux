@@ -7,7 +7,6 @@
 import { after } from "next/server";
 
 import crypto from "node:crypto";
-import { join } from "node:path";
 
 import { eq } from "drizzle-orm";
 
@@ -313,12 +312,11 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
         await db.update(tickets).set({ updatedAt: new Date() }).where(eq(tickets.id, ticket.id));
       }
 
-      // ⚠️ Dentro `runWithTenant`. Le regole leggono il database con `getDb()`,
-      // che su un webhook non ha nessun workspace da cui partire: senza questo
-      // fallivano tutte, in silenzio, perché girano dopo la risposta e l'errore
-      // viene ingoiato. Un workspace con una regola «quando arriva un ticket,
-      // avvisa il gruppo assistenza» non riceveva niente per i ticket nati da
-      // email, e non c'era modo di accorgersene.
+      // ⚠️ Inside `runWithTenant`. The rules read the database through `getDb()`, which
+      // on a webhook has no workspace to start from: without this they all failed, in
+      // silence, because they run after the response and the error is swallowed. A desk
+      // with a rule saying "when a ticket arrives, tell the support group" received
+      // nothing for tickets born from email, and had no way of noticing.
       after(() =>
         runWithTenant(tenantId, () =>
           runAutomations({
@@ -380,7 +378,7 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
     attachmentIds,
   });
 
-  // Come sopra: le regole hanno bisogno del workspace, e qui non c'è intestazione.
+  // As above: the rules need the workspace, and there is no header here to give it.
   after(() =>
     runWithTenant(tenantId, () =>
       runAutomations({

@@ -40,7 +40,7 @@ export function tokenizeExpression(expr: string): string[] {
 }
 
 /**
- * Valida il bilanciamento delle parentesi
+ * Checks that the parentheses balance.
  */
 export function validateParentheses(expr: string): ValidationError[] {
   const errors: ValidationError[] = [];
@@ -76,14 +76,16 @@ export function validateParentheses(expr: string): ValidationError[] {
 
 /**
  * Valida i riferimenti alle condizioni
- * Esempio: "(C0 AND C1) OR C2" con 3 condizioni è valido
+ * Example: "(C0 AND C1) OR C2" is valid with 3 conditions.
  */
 export function validateConditionReferences(expr: string, conditionCount: number): ValidationError[] {
   const errors: ValidationError[] = [];
   const conditionPattern = /C(\d+)/g;
-  let match;
 
-  while ((match = conditionPattern.exec(expr)) !== null) {
+  // `matchAll` rather than a loop assigning inside its own condition: the older
+  // shape needed an untyped `let` and an assignment used as a value, which the
+  // linter refuses for the same reason a reader has to stop and check it.
+  for (const match of expr.matchAll(conditionPattern)) {
     const index = parseInt(match[1], 10);
     if (index >= conditionCount) {
       errors.push({
@@ -100,7 +102,7 @@ export function validateConditionReferences(expr: string, conditionCount: number
 
 /**
  * Parser ricorsivo per espressioni logiche
- * Supporta priorità: NOT > AND > OR > Parentesi
+ * Precedence: NOT > AND > OR > parentheses.
  */
 class ConditionParser {
   private tokens: string[];
@@ -187,7 +189,7 @@ class ConditionParser {
       };
     }
 
-    // Prova a parsare una condizione (C0, C1, etc)
+    // Try to parse a condition (C0, C1, …)
     const token = this.currentToken();
     if (token.match(/^C\d+$/)) {
       const conditionId = parseInt(token.substring(1), 10);
@@ -239,7 +241,7 @@ export function validateExpression(expr: string, conditionCount: number): Valida
   // 2. Valida riferimenti
   errors.push(...validateConditionReferences(expr, conditionCount));
 
-  // 3. Parse se non ci sono errori
+  // 3. Parse, if nothing went wrong
   let tree: ParsedCondition | undefined;
   if (errors.length === 0) {
     const tokens = tokenizeExpression(expr);
@@ -257,7 +259,7 @@ export function validateExpression(expr: string, conditionCount: number): Valida
 }
 
 /**
- * Converte l'albero di parsing in una descrizione leggibile
+ * Turns the parse tree into something a person can read.
  */
 export function describeTree(tree: ParsedCondition, conditionLabels?: string[]): string {
   if (tree.type === "condition") {
@@ -287,7 +289,7 @@ export function describeTree(tree: ParsedCondition, conditionLabels?: string[]):
 }
 
 /**
- * Compila l'espressione in una funzione che valuta le condizioni
+ * Compiles the expression into a function that evaluates the conditions.
  */
 export function compileExpression(tree: ParsedCondition): (values: boolean[]) => boolean {
   return (values: boolean[]): boolean => {

@@ -9,12 +9,12 @@
  */
 
 /**
- * Su Cloudflare Workers non esiste un processo che sopravviva alla richiesta:
+ * On Cloudflare Workers no process outlives the request:
  * `NEXT_RUNTIME` vale comunque "nodejs" sotto OpenNext, ma i timer di node-cron
- * verrebbero azzerati a ogni isolate — e registrarli al cold start significa una
+ * they would be reset with every isolate — and registering them at cold start means a
  * query al database prima di poter servire la prima richiesta.
  *
- * Su Workers gli scheduled trigger arrivano invece dai Cron Trigger dichiarati in
+ * On Workers the scheduled runs arrive instead from the Cron Triggers declared in
  * wrangler.jsonc, gestiti da custom-worker.ts.
  */
 function isCloudflareWorkers(): boolean {

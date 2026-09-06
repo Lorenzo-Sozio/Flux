@@ -1,11 +1,11 @@
 /**
- * L'azione che permette a una regola di parlare a un'integrazione.
+ * The action that lets a rule speak to an integration.
  *
- * ⚠️⚠️ Il valore difeso qui è che quell'evento sia **firmato e con la busta**. `send_webhook`
- * manda una POST grezza — url, intestazioni e corpo scritti a mano — e va benissimo per
- * chiamare qualcosa dalla forma fissa; non va per un'integrazione che pretende una firma,
- * perché nessuno calcola un HMAC dentro un costruttore di regole. Senza questa distinzione
- * la condizione si può scrivere e l'altro capo la rifiuta: una regola che sembra non essere
+ * ⚠️⚠️ The value defended here is that the event is **signed and in its envelope**.
+ * `send_webhook` sends a raw POST — url, headers and body written by hand — which is fine
+ * for calling something of a fixed shape; it is not fine for an integration that demands a
+ * signature, because nobody computes an HMAC inside a rule builder. Without the
+ * distinction the condition can be written and the far end rejects it: a rule that looks
  * mai scattata.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -77,8 +77,8 @@ describe("una regola che parla a un'integrazione", () => {
   });
 
   it("manda l'entita' com'e' DOPO il cambiamento", async () => {
-    // Una regola reagisce allo stato nuovo: mandare quello vecchio farebbe agire chi
-    // riceve su qualcosa che non e' piu' vero.
+    // A rule reacts to the new state: sending the old one would make the receiver act on
+    // something that is no longer true.
     const d = new Dispatcher();
     await d.dispatch(azione({ event: "deal.big" }), CONTESTO, {});
 
@@ -87,8 +87,8 @@ describe("una regola che parla a un'integrazione", () => {
   });
 
   it("⚠️ dichiara l'origine «persona», perche' una regola scatta per un gesto umano", async () => {
-    // Marcarla «macchina» la farebbe ignorare da un'integrazione che filtra le proprie
-    // scritture, e la regola sembrerebbe non essere mai scattata.
+    // Marking it "machine" would have an integration that filters its own writes ignore
+    // it, and the rule would look as though it had never fired.
     const d = new Dispatcher();
     await d.dispatch(azione({ event: "lead.escalate" }), CONTESTO, {});
 

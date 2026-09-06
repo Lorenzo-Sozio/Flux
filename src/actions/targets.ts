@@ -62,10 +62,9 @@ export async function upsertSalesTarget(data: z.infer<typeof upsertSchema>) {
       },
     });
 
-  // ⚠️ La pagina degli obiettivi sta sotto /dashboard/pipeline, non sotto
-  // /dashboard/settings. Questo percorso indicava una pagina inesistente, quindi
-  // non invalidava niente: si salvava un obiettivo e la schermata continuava a
-  // mostrare il valore di prima fino a un ricaricamento forzato.
+  // ⚠️ The targets page lives under /dashboard/pipeline, not under /dashboard/settings.
+  // This path named a page that does not exist, so it invalidated nothing: a target was
+  // saved and the screen went on showing the previous figure until a hard reload.
   revalidatePath("/dashboard/pipeline/targets");
   revalidatePath("/dashboard/pipeline/forecast");
 }

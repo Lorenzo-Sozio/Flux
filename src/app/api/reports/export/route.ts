@@ -55,12 +55,11 @@ export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // ⚠️⚠️ Il ruolo del WORKSPACE, non quello di piattaforma. Questa riga leggeva
-  // `session.user.role`, che è la scala del personale di Flux e vale "user" per
-  // ogni cliente: la lista non conteneva mai il suo valore, quindi l'esportazione
-  // del registro attività era vietata a chiunque, proprietario del workspace
-  // compreso, mentre restava aperta al personale di Flux. Non somigliava a un
-  // errore: somigliava a una funzione che non c'è. Vedi le due scale nel CLAUDE.md.
+  // ⚠️⚠️ The WORKSPACE role, not the platform one. This line read `session.user.role`,
+  // which is Flux's own staff scale and reads "user" for every customer: the list never
+  // contained its value, so exporting the activity log was forbidden to everybody, the
+  // workspace owner included, while staying open to Flux's own staff. It did not look like
+  // an error. It looked like a feature that is not there. See the two scales in CLAUDE.md.
   const actor = await getActor();
   if (!can(actor, "report:manage")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

@@ -40,8 +40,8 @@ import { decryptDbUrl } from "@/lib/tenant-db";
  * fire — including the ones that reopen it or notify somebody.
  */
 const CHIUDONO: Record<string, string> = {
-  // Nessuno ha risposto: non si sa come sia finita, e «persa» è quanto di più vicino la
-  // pipeline sappia dire. Il perché resta scritto per esteso.
+  // Nobody answered: how it ended is unknown, and "lost" is the closest the pipeline
+  // can say. The reason stays written out in full.
   ABBANDONATO: "L'assistente ha chiuso: nessuna risposta dopo i solleciti",
   NON_RAGGIUNTO: "L'assistente ha chiuso: il processo non è arrivato a destinazione",
 };
@@ -60,10 +60,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Conta la chiamata sul piano, come ogni altra rotta /api/crm. Le rotte di
-  // opposizione e cancellazione sono volutamente escluse: rifiutarle per un
-  // limite di piano significherebbe continuare a contattare chi ha chiesto di
-  // smettere, e mancare una scadenza che non è nostra da spostare.
+  // Counts the call against the plan, like every other /api/crm route. Opt-out and
+  // erasure are deliberately excluded: refusing either because a plan limit was reached
+  // means carrying on contacting somebody who asked you to stop, and missing a deadline
+  // that is not ours to move.
   try {
     await checkAndTrackApiCall(authResult.tenantId);
   } catch (err) {
@@ -88,8 +88,8 @@ export async function POST(req: NextRequest) {
         error: "Validation failed",
         errors: [
           ...(contactPoint ? [] : [{ field: "contactPoint", message: "contactPoint is required" }]),
-          // ⚠️ Un esito sconosciuto si rifiuta invece di essere ignorato: accettarlo senza
-          // chiudere niente farebbe credere a chi ha chiamato di aver chiuso.
+          // ⚠️ An unknown outcome is refused rather than ignored: accepting it and closing
+          // nothing would leave the caller believing they had closed something.
           ...(noto ? [] : [{ field: "outcome", message: "unknown outcome" }]),
         ],
       },
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
   }
 
   if (outcome === LASCIA_APERTO) {
-    // ⚠️⚠️ Prima di qualunque lettura: non c'è niente da fare, e dirlo è la risposta.
+    // ⚠️⚠️ Before any read: there is nothing to do, and saying so is the answer.
     return NextResponse.json(
       {
         status: "left_open",
@@ -127,8 +127,8 @@ export async function POST(req: NextRequest) {
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
 
-  // ⚠️ I deal pendono da un **contatto**: una persona ancora allo stadio di lead non ne ha
-  // uno, e non è un guasto — è il caso normale di chi non è mai stato convertito.
+  // ⚠️ Deals hang off a **contact**: somebody still at the lead stage has none, and that
+  // is not a fault — it is the ordinary case of a person never converted.
   const person = await findByContactPoint(db, parsed.email, parsed.digits);
   if (person.contactIds.length === 0) {
     return NextResponse.json({ error: "No deal to close for that contact point" }, { status: 404 });
@@ -139,12 +139,12 @@ export async function POST(req: NextRequest) {
     .from(deals)
     .where(inArray(deals.contactId, person.contactIds));
 
-  // ⚠️⚠️ **Solo quelle ancora aperte, e il filtro sta qui e non nella query.** Richiudere
-  // una trattativa già chiusa sposterebbe la sua data di chiusura a oggi, e «vinte questo
-  // mese» conterebbe cose finite mesi fa — è il difetto che il commento su `closedAt`
-  // racconta di aver già pagato. Nella clausola SQL questa riga sarebbe una garanzia che
-  // nessun test con un doppio del database può raggiungere; una persona ha una manciata di
-  // trattative, quindi filtrarle qui non costa niente e si può difendere.
+  // ⚠️⚠️ **Only the ones still open, and the filter lives here rather than in the query.**
+  // Re-closing an already closed deal would move its close date to today, and "won this
+  // month" would count things finished months ago — the defect the comment on `closedAt`
+  // records having already paid for. Inside the SQL clause this line would be a guarantee
+  // no test with a database double can reach; a person has a handful of deals, so
+  // filtering here costs nothing and can be defended.
   const aperti = suoi.filter((d) => d.status === "open");
 
   if (aperti.length === 0) {
@@ -165,8 +165,8 @@ export async function POST(req: NextRequest) {
       .where(eq(deals.id, affare.id))
       .returning();
     chiusi.push(affare.id);
-    // Dopo la risposta, come ogni altra scrittura che fa girare le regole: un deal che
-    // passa a «persa» è un cambiamento come gli altri, e chi lo sorveglia deve saperlo.
+    // After the response, like every other write that runs the rules: a deal moving to
+    // "lost" is a change like any other, and whoever watches for it must hear.
     after(() =>
       runAutomations({
         entityType: "deal",

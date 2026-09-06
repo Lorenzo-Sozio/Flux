@@ -1,10 +1,10 @@
 /**
- * L'evento che dice a un'integrazione che il preventivo e' partito.
+ * The event that tells an integration a quote has gone out.
  *
- * ⚠️⚠️ Prima di questo file non veniva emesso niente quando un preventivo passava a
- * «inviato»: un assistente in attesa di consegnare quel documento avrebbe aspettato per
- * sempre, e nulla sarebbe fallito. E' la forma di guasto peggiore, perche' il titolare
- * crede di aver mandato e il cliente non sa che esiste.
+ * ⚠️⚠️ Before this file nothing was emitted when a quote moved to "sent": an assistant
+ * waiting to hand that document over would have waited for ever, and nothing would have
+ * failed. It is the worst shape of failure, because the owner believes they sent it and
+ * the customer does not know it exists.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -52,15 +52,15 @@ describe("il preventivo che parte", () => {
     expect(emessi).toHaveLength(1);
     expect(emessi[0].evento).toBe("quote.sent");
     // La pagina HTML arriverebbe al cliente etichettata come PDF e si aprirebbe come
-    // altro: e' la rotta che rende il documento a chi ha il token.
+    // else: it is the route that renders the document for whoever holds the token.
     expect(emessi[0].carico.url).toBe(
       "https://flux.example.test/api/quotes/q1/pdf?token=6f1c0b2e-1111-2222-3333-444455556666",
     );
   });
 
   it("⚠️⚠️ senza indirizzo di base NON inventa un localhost", async () => {
-    // Un predefinito qui non fallirebbe: manderebbe a un cliente vero il link a una
-    // macchina che non e' la sua. Una consegna riuscita verso il posto sbagliato.
+    // A default here would not fail: it would send a real customer a link to a machine
+    // that is not theirs. A successful delivery to the wrong place.
     delete process.env.NEXTAUTH_URL;
 
     await announceQuoteSent(PREVENTIVO, "u7");
@@ -84,7 +84,7 @@ describe("il preventivo che parte", () => {
   });
 
   it("da' un nome al documento", async () => {
-    // Senza, l'allegato arriva senza nome, che somiglia molto a qualcosa da non aprire.
+    // Without it the attachment arrives nameless, which looks a lot like something not to open.
     await announceQuoteSent(PREVENTIVO, "u7");
 
     expect(emessi[0].carico.nome).toBe("Preventivo PR-2026-014.pdf");
@@ -109,16 +109,16 @@ describe("la risposta del cliente", () => {
   });
 
   it("annuncia anche il NO, non solo il si'", async () => {
-    // Chi sente parlare solo delle accettazioni deve trattare il silenzio come un rifiuto,
-    // e il silenzio significa anche una consegna che non e' mai arrivata.
+    // Anybody who only hears about acceptances has to treat silence as a refusal, and
+    // silence also means a delivery that never arrived.
     await announceQuoteDecision(PREVENTIVO, "declined", null);
 
     expect(emessi[0].evento).toBe("quote.declined");
   });
 
   it("⚠️ dichiara l'origine «persona» anche quando a premere e' il cliente senza account", async () => {
-    // Quel campo serve a scartare gli eventi che un'integrazione ha causato lei. Questo
-    // non lo ha causato: marcarlo «macchina» le farebbe scartare la risposta che aspetta.
+    // That field exists to discard the events an integration caused itself. It did not
+    // cause this one: marking it "machine" would have it discard the answer it is waiting for.
     await announceQuoteDecision(PREVENTIVO, "accepted", null);
 
     expect(emessi[0].origin).toEqual({ via: "user", actor: null });
@@ -134,9 +134,9 @@ describe("la risposta del cliente", () => {
 
 describe("un preventivo che parte una seconda volta", () => {
   it("⚠️⚠️ uno gia' inviato che viene solo risalvato non e' una partenza", () => {
-    // Senza questa distinzione l'evento significa «lo stato dice inviato» invece di
-    // «e' appena partito»: modificare una nota su un preventivo gia' mandato consegna al
-    // cliente lo stesso PDF una seconda volta, e non fallisce niente.
+    // Without that distinction the event means "the status says sent" rather than "it has
+    // just gone out": editing a note on an already-sent quote delivers the same PDF to the
+    // customer a second time, and nothing fails.
     for (const stato of ["sent", "viewed", "accepted", "declined", "converted"]) {
       expect(hasAlreadyLeft(stato), `«${stato}» non e' riconosciuto come gia' uscito`).toBe(true);
     }

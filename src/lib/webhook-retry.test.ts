@@ -1,9 +1,9 @@
 /**
- * Che cosa si riprova, che cosa no, e quando.
+ * What gets retried, what does not, and when.
  *
- * La decisione è pura di proposito, e questi test la fissano senza database: sono le regole
- * che decidono se un evento arriva a destinazione o resta perso — e un evento perso, senza
- * ritentativo, non lo sa nessuno.
+ * The decision is pure on purpose, and these tests pin it down without a database: these
+ * are the rules that decide whether an event reaches its destination or stays lost — and a
+ * lost event, with no retry, is one nobody knows about.
  */
 import { describe, expect, it } from "vitest";
 
@@ -24,7 +24,7 @@ function attempt(extra: Partial<Parameters<typeof isRetryable>[0][number]> = {})
     payload: body("evento-1"),
     response: "boom",
     success: false,
-    // Vecchio abbastanza da essere dovuto con qualunque attesa.
+    // Old enough to be due whatever the wait.
     sentAt: new Date(ADESSO.getTime() - 24 * 60 * 60 * 1000),
     ...extra,
   };
@@ -36,8 +36,8 @@ describe("l'identificativo, che è ciò da cui si ricava tutto il resto", () => 
   });
 
   it("non inventa niente quando il body non è leggibile", () => {
-    // Un identificativo inventato raggrupperebbe tentativi di eventi diversi, e il
-    // conteggio direbbe che si è già provato abbastanza su qualcosa mai spedito.
+    // A made-up id would group attempts from different events together, and the count
+    // would claim enough tries had been made on something never sent.
     expect(eventIdOf("non-json")).toBe("");
     expect(eventIdOf(null)).toBe("");
     expect(eventIdOf(JSON.stringify({ event: "x" }))).toBe("");
@@ -50,16 +50,16 @@ describe("che cosa si riprova", () => {
   });
 
   it("⚠️ NON un evento che è arrivato, anche se prima era fallito dieci volte", () => {
-    // Qualunque tentativo riuscito chiude la partita. Senza, un evento consegnato al
-    // secondo colpo verrebbe rispedito per sempre.
+    // Any successful attempt closes the matter. Without that, an event delivered on the
+    // second try would be sent again for ever.
     const righe = [attempt(), attempt({ success: true })];
 
     expect(isRetryable(righe, ADESSO)).toHaveLength(0);
   });
 
   it("⚠️⚠️ NON un attempt mai partito per mancanza di secret", () => {
-    // Ritentare non aggiunge un segreto: ripeterebbe per giorni una riga che chiede una
-    // configurazione, e il registro si riempirebbe di rumore proprio dove si va a cercare
+    // Retrying does not add a secret: it would repeat, for days, a row that is asking to
+    // be configured, filling the log with noise in exactly the place somebody looks
     // il motivo.
     const righe = [attempt({ response: `${UNSIGNABLE_PREFIX}, so the event…` })];
 
@@ -67,7 +67,7 @@ describe("che cosa si riprova", () => {
   });
 
   it("smette dopo i attempts previsti", () => {
-    // Senza un limite, un indirizzo che non esiste più verrebbe chiamato per sempre.
+    // Without a limit, an address that no longer exists would be called for ever.
     const righe = Array.from({ length: MAX_ATTEMPTS }, () => attempt());
 
     expect(isRetryable(righe, ADESSO)).toHaveLength(0);
@@ -87,15 +87,15 @@ describe("che cosa si riprova", () => {
 
 describe("quando si riprova", () => {
   it("⚠️ non prima che l'attesa sia passata", () => {
-    // Riprovare subito significa martellare un fornitore che è appena caduto, e ottenere
-    // un secondo fallimento che consuma un tentativo per niente.
+    // Retrying at once means hammering a provider that has just fallen over, and earning
+    // a second failure that spends an attempt for nothing.
     const appena = [attempt({ sentAt: new Date(ADESSO.getTime() - 1000) })];
 
     expect(isRetryable(appena, ADESSO)).toHaveLength(0);
   });
 
   it("l'attesa cresce con i attempts", () => {
-    // Al primo fallimento si riprova dopo un minuto; al secondo un minuto non basta più.
+    // After the first failure a minute is enough; after the second it no longer is.
     const dueMinuti = new Date(ADESSO.getTime() - 2 * 60_000);
     const uno = [attempt({ sentAt: dueMinuti })];
     const due = [attempt({ sentAt: dueMinuti }), attempt({ sentAt: dueMinuti })];
@@ -106,7 +106,7 @@ describe("quando si riprova", () => {
 
   it("misura l'attesa dall'ULTIMO attempt, non dal primo", () => {
     // Misurarla dal primo farebbe scattare tutti i ritentativi successivi insieme, subito
-    // dopo il primo fallimento: il contrario di un'attesa crescente.
+    // after the first failure: the opposite of a growing wait.
     const vecchio = attempt({ sentAt: new Date(ADESSO.getTime() - 24 * 60 * 60 * 1000) });
     const recente = attempt({ sentAt: new Date(ADESSO.getTime() - 1000) });
 

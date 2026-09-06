@@ -1,10 +1,10 @@
 /**
- * Chi e' raggiungibile a un recapito, e dove si scrive quello che gli e' successo.
+ * Who is reachable at a contact point, and where what happened to them gets written.
  *
- * ⚠️ Il modulo esiste perche' la regola aveva **due** chiamanti — la cancellazione e la nota
- * che il motore scrive — e due copie di «e' la stessa persona» divergono. Il giorno in cui
- * divergessero, una scriverebbe una nota addosso a qualcun altro mentre l'altra gli dice che
- * e' stato cancellato.
+ * ⚠️ The module exists because the rule had **two** callers — erasure and the note
+ * the engine writes — and two copies of "this is the same person" drift apart. The day
+ * they did, one would write a note onto somebody else while the other told them they had
+ * been erased.
  */
 import { describe, expect, it } from "vitest";
 
@@ -12,9 +12,9 @@ import { readContactPoint, whereToNote } from "@/lib/contact-point";
 
 describe("dove si annota", () => {
   it("⚠️⚠️ il contatto vince sul lead quando ci sono entrambi", () => {
-    // Un lead convertito conserva la propria riga vecchia: scrivere li' mette la nota sulla
-    // pagina che nessuno apre piu', e l'assistente registrerebbe correttamente cio' che ha
-    // fatto in un posto dove il commerciale non guarda.
+    // A converted lead keeps its old row: writing there puts the note on the page nobody
+    // opens any more, and the assistant would correctly record what it did somewhere the
+    // salesperson never looks.
     const dove = whereToNote({ leadIds: ["l1"], contactIds: ["c1"], email: null, digits: null });
 
     expect(dove).toEqual({ contactId: "c1", leadId: null });
@@ -27,7 +27,7 @@ describe("dove si annota", () => {
   });
 
   it("⚠️ niente quando non c'e' nessuno, e chi chiama deve rifiutare", () => {
-    // Una nota orfana e' l'unica traccia di quello che e' successo, persa: e una traccia
+    // An orphaned note is the only trace of what happened, lost: and a trace
     // persa e' invisibile per definizione.
     expect(whereToNote({ leadIds: [], contactIds: [], email: null, digits: null })).toBeNull();
   });
@@ -39,13 +39,13 @@ describe("come si legge un contactPoint", () => {
   });
 
   it("un numero si confronta sulle sole cifre", () => {
-    // Un numero scritto con gli spazi e uno scritto senza sono la stessa persona.
+    // A number written with spaces and one written without are the same person.
     expect(readContactPoint("+39 333 111 2223").digits).toBe(readContactPoint("+393331112223").digits);
   });
 
   it("⚠️ un contactPoint che non e' ne' l'uno ne' l'altro viene rifiutato", () => {
-    // Un refuso che passasse riceverebbe «non trovato», che dice una cosa diversa da
-    // «quello che mi hai dato non e' un recapito».
+    // A typo getting through would be answered "not found", which says something different
+    // from "what you gave me is not a contact point".
     expect(() => readContactPoint("mario")).toThrow();
     expect(() => readContactPoint("   ")).toThrow();
   });

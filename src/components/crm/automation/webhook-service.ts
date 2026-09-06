@@ -62,7 +62,7 @@ export async function sendWebhook(
     resolvedBody = JSON.stringify(resolvedBodyObj);
   }
 
-  // Costruisci le opzioni della request
+  // Build the request options
   const fetchOptions: RequestInit = {
     method,
     headers: {

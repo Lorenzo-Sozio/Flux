@@ -1,11 +1,11 @@
 /**
- * La rotta che chiude le trattative di chi l'assistente ha smesso di seguire.
+ * The route that closes the deals of somebody the assistant stopped following.
  *
- * ⚠️⚠️ **Un processo arrivato a destinazione NON vince una trattativa.** I tre esiti
- * descrivono il processo dell'assistente, non la vendita: `RAGGIUNTO` vuol dire che è
- * arrivato dove andava — un collega ha preso il caso, il cliente ha risposto — e niente di
- * tutto ciò dice che siano passati dei soldi. Segnare «vinta» su quella base metterebbe nel
- * fatturato del titolare una vittoria che nessuno ha verificato.
+ * ⚠️⚠️ **A process reaching its destination does NOT win a deal.** The three outcomes
+ * describe the assistant's process, not the sale: `RAGGIUNTO` means it got where it was
+ * going — a colleague picked the case up, the customer replied — and none of that says
+ * money changed hands. Marking "won" on that basis would put a victory nobody verified
+ * into the owner's revenue.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -15,7 +15,7 @@ const scritti: Record<string, unknown>[] = [];
 let person: { leadIds: string[]; contactIds: string[] } = { leadIds: [], contactIds: ["c1"] };
 
 class LimiteRaggiunto extends Error {}
-/** Impostata da un test per far scattare il limite del piano. */
+/** Set by a test to make the plan limit fire. */
 let limiteEsaurito = false;
 vi.mock("@/lib/billing/usage", () => ({
   checkAndTrackApiCall: async () => {
@@ -75,7 +75,7 @@ beforeEach(() => {
 
 describe("closing what the assistant stopped following", () => {
   it("closes an open deal as lost, with the reason written for a person", async () => {
-    // Chi apre quella trattativa deve poter vedere che l'ha chiusa un assistente, e perché.
+    // Whoever opens that deal must be able to see an assistant closed it, and why.
     const risposta = await POST(richiesta({ contactPoint: "mario@example.it", outcome: "ABBANDONATO" }));
 
     expect(risposta.status).toBe(200);
@@ -86,8 +86,8 @@ describe("closing what the assistant stopped following", () => {
   });
 
   it("⚠️⚠️ a process that reached its destination leaves the deal alone", async () => {
-    // Segnare «vinta» perché il processo è arrivato a destinazione metterebbe nel fatturato
-    // del titolare una vittoria che nessuno ha verificato.
+    // Marking "won" because the process reached its destination would put a victory
+    // nobody verified into the owner's revenue.
     const risposta = await POST(richiesta({ contactPoint: "mario@example.it", outcome: "RAGGIUNTO" }));
 
     expect(risposta.status).toBe(200);
@@ -97,8 +97,8 @@ describe("closing what the assistant stopped following", () => {
   });
 
   it("⚠️ runs the owner's rules on the deal that changed", async () => {
-    // Un deal che passa a «persa» è un cambiamento come gli altri, e chi lo sorveglia deve
-    // saperlo — comprese le regole che lo riaprono o avvisano qualcuno.
+    // A deal moving to "lost" is a change like any other, and whoever watches for it must
+    // hear — including the rules that reopen it or tell somebody.
     await POST(richiesta({ contactPoint: "mario@example.it", outcome: "ABBANDONATO" }));
 
     expect(regole).toHaveLength(1);
@@ -106,7 +106,7 @@ describe("closing what the assistant stopped following", () => {
   });
 
   it("⚠️⚠️ never re-closes a deal that is already closed", async () => {
-    // Richiuderla sposterebbe la sua data di chiusura a oggi, e «vinte questo mese»
+    // Re-closing it would move its close date to today, and "won this month"
     // conterebbe cose finite mesi fa.
     aperti = [
       { id: "vecchia", status: "lost", name: "Chiusa a marzo" },
@@ -120,7 +120,7 @@ describe("closing what the assistant stopped following", () => {
   });
 
   it("nothing to close is a 404, not a silent success", async () => {
-    // Chi ha chiamato deve poter distinguere «non c'era niente» da «l'ho chiusa».
+    // The caller has to be able to tell "there was nothing" from "I closed it".
     aperti = [{ id: "vecchia", status: "lost", name: "Chiusa a marzo" }];
 
     expect((await POST(richiesta({ contactPoint: "mario@example.it", outcome: "ABBANDONATO" }))).status).toBe(404);
@@ -132,7 +132,7 @@ describe("closing what the assistant stopped following", () => {
   });
 
   it("⚠️ an unknown outcome is refused instead of ignored", async () => {
-    // Accettarlo senza chiudere niente farebbe credere a chi ha chiamato di aver chiuso.
+    // Accepting it and closing nothing would leave the caller believing they had closed something.
     for (const body of [
       { contactPoint: "mario@example.it", outcome: "PERSA" },
       { contactPoint: "mario@example.it" },
@@ -144,10 +144,10 @@ describe("closing what the assistant stopped following", () => {
   });
 
   it("⚠️ conta la chiamata sul piano, e si ferma quando il piano è esaurito", async () => {
-    // Le rotte per recapito non contavano niente, mentre tutte le altre di
-    // /api/crm sì: un'integrazione poteva scrivere all'infinito senza che una
-    // sola chiamata risultasse. Le due eccezioni volute sono l'opposizione e la
-    // cancellazione, che non si rifiutano per una ragione di fatturazione.
+    // The contact-point routes counted nothing while every other /api/crm route did: an
+    // integration could write for ever without a single call being recorded. The two
+    // deliberate exceptions are opt-out and erasure, which are not refused for a billing
+    // reason.
     limiteEsaurito = true;
     try {
       const risposta = await POST(richiesta({ contactPoint: "mario@example.it", outcome: "ABBANDONATO" }));

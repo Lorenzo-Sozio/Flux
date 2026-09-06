@@ -23,7 +23,7 @@ const dispatcher = new ActionDispatcher();
 // ─── Condition Evaluation Helper ───────────────────────────────────────────────
 
 /**
- * Valuta le condizioni supportando sia logica semplice che espressioni avanzate
+ * Evaluates the conditions, supporting both simple logic and full expressions.
  */
 function evaluateConditions(
   conditions: Condition[],
@@ -32,7 +32,7 @@ function evaluateConditions(
   oldData: Record<string, unknown> | undefined,
   newData: Record<string, unknown>,
 ): boolean {
-  // Se c'è un'espressione avanzata e non è vuota, usala
+  // Use the advanced expression when there is one and it is not empty
   if (advancedExpression?.trim()) {
     try {
       // Valida l'espressione
@@ -44,7 +44,7 @@ function evaluateConditions(
         return evaluateSimpleConditions(conditions, simpleLogic, oldData, newData);
       }
 
-      // Valuta ogni condizione
+      // Evaluate each condition
       const evaluatedConditions = conditions.map((cond) => evaluateCondition(cond, newData, oldData));
 
       // Compila e esegui l'espressione
@@ -79,7 +79,7 @@ function evaluateSimpleConditions(
 }
 
 /**
- * Valuta una singola condizione
+ * Evaluates a single condition.
  */
 function evaluateCondition(
   condition: Condition,
@@ -225,12 +225,12 @@ async function executeRule(
   const db = await getDb();
 
   try {
-    // 1. Loop detection - Check se è sicuro eseguire questa rule
+    // 1. Loop detection — is it safe to run this rule
     const loopCheck = await checkLoopDetection(rule.id, context.entityType, context.entityId, executionCtx);
     if (!loopCheck.allowed) {
       errorMessage = loopCheck.reason;
       console.warn(`[RuleEngine] Rule "${rule.name}" blocked - ${loopCheck.reason}`);
-      // Non eseguire ma registrare il attempt bloccato
+      // Do not run it, but record the blocked attempt
       await db
         .insert(automationLogs)
         .values({
@@ -250,14 +250,14 @@ async function executeRule(
       return;
     }
 
-    // 2. Update execution context con questa rule
+    // 2. Record this rule in the execution context
     const nextExecCtx = recordRuleExecution(rule.id, context.entityType, context.entityId, executionCtx);
 
     // 3. Parse + validate conditions from stored JSON (defense-in-depth)
     const conditions = z.array(ConditionSchema).parse(JSON.parse(rule.conditions));
     const logic = (rule.conditionLogic ?? "AND") as "AND" | "OR";
 
-    // Valuta le condizioni (supporta sia logica semplice che avanzata)
+    // Evaluate the conditions (simple logic and full expressions alike)
     const conditionsMet = evaluateConditions(
       conditions,
       logic,

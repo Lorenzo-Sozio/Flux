@@ -2,8 +2,8 @@
   {
     "file": "src/lib/erasure.ts",
     "description": "⚠️⚠️ il contatto viene anonimizzato PER PRIMO: brucia l'indice, e da quel momento nessuna traccia e' piu' raggiungibile dal recapito — il dato resta e la capacita' di finire il lavoro se ne va",
-    "find": "  // ── 1. Il lead se ne va per intero",
-    "replace": "  if (person.contactIds.length > 0) {\n    await db.update(contacts).set({ ...CAMPI_DELLA_PERSONA }).where(inArray(contacts.id, person.contactIds)).returning({ id: contacts.id });\n  }\n  // ── 1. Il lead se ne va per intero"
+    "find": "  // ── 1. The lead goes entirely",
+    "replace": "  if (person.contactIds.length > 0) {\n    await db.update(contacts).set({ ...CAMPI_DELLA_PERSONA }).where(inArray(contacts.id, person.contactIds)).returning({ id: contacts.id });\n  }\n  // ── 1. The lead goes entirely"
   },
   {
     "file": "src/lib/erasure.ts",

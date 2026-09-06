@@ -1,9 +1,9 @@
 /**
- * La rotta che crea un lead, e la riga che ferma l'eco alla fonte.
+ * The route that creates a lead, and the line that stops the echo at its source.
  *
- * ⚠️ Il valore difeso qui è uno solo, e non si vede leggendo la rotta: che ogni evento
- * emesso da **questa** porta dichiari di essere stato causato da una macchina. Senza,
- * l'integrazione che ha appena scritto il lead riceve il proprio evento, ci reagisce, e
+ * ⚠️ One value is defended here and it is not visible from reading the route: that every
+ * event leaving **this** door declares a machine caused it. Without that, the integration
+ * which has just written the lead receives its own event, reacts to it, and
  * non smette.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -59,8 +59,8 @@ describe("who the events from this route say caused them", () => {
   });
 
   it("says a machine when a duplicate is updated instead", async () => {
-    // Lo stesso vale sull'altra uscita della rotta: bastava dimenticarne una perché l'eco
-    // tornasse per metà dei casi — che è peggio, perché si manifesta a intermittenza.
+    // The same holds on the route's other exit: forgetting one was enough for the echo to
+    // come back in half the cases — which is worse, because it appears intermittently.
     esistente = [{ id: "gia-la" }];
 
     await POST(richiesta({ email: "anna@example.test", onDuplicate: "update" }));

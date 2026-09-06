@@ -22,16 +22,16 @@ interface Chiamata {
 }
 
 /**
- * Un doppio che **dichiara** che cosa restituisce, invece di ereditare un ripiego.
+ * A double that **declares** what it returns, rather than inheriting a fallback.
  *
- * `presenti` decide se la persona esiste: senza, ogni test proverebbe soltanto il caso in
- * cui non c'è nessuno — che è il caso in cui non succede niente.
+ * `presenti` decides whether the person exists: without it every test would only exercise
+ * the case where nobody does — which is the case where nothing happens.
  */
 function dbFinto(presenti = true) {
   const chiamate: Chiamata[] = [];
-  // ⚠️ `getTableName` e non una lettura a mano: drizzle tiene il nome dietro un simbolo, e
-  // un accesso indovinato tornava "?" per tutte — cioè ogni asserzione di questo file
-  // sarebbe passata su qualunque tabella.
+  // ⚠️ `getTableName` rather than reading it by hand: drizzle keeps the name behind a
+  // symbol, and a guessed access returned "?" for all of them — meaning every assertion in
+  // this file would have passed against any table at all.
   const nome = (t: unknown) => getTableName(t as Parameters<typeof getTableName>[0]);
 
   const righe = presenti ? [{ id: "x1" }] : [];
@@ -110,8 +110,8 @@ describe("⚠️⚠️ the order, which is the part that makes the rest true", (
     expect(ultima.verbo).toBe("update");
     // ...and there was actually something before it, or this test proves nothing.
     expect(scritture.length).toBeGreaterThan(5);
-    // ⚠️ **Una volta sola**: senza questa riga, anonimizzare il contatto anche all'inizio
-    // — cioè bruciare l'indice — passerebbe, perché in fondo ci sarebbe comunque.
+    // ⚠️ **Once only**: without this line, anonymising the contact at the start as well —
+    // that is, burning the index — would pass, because it would still happen at the end.
     const suContact = scritture.filter((c) => c.tabella === "contact");
     expect(suContact).toHaveLength(1);
   });
@@ -205,8 +205,8 @@ describe("a lead goes, a contact is anonymised", () => {
 
     await eraseByContactPoint(db, EMAIL);
 
-    // ⚠️ Anche il verbo: su `contact` c'è prima una **lettura** — è il passo che trova la
-    // persona prima di toccarla — e cercare per sola tabella prendeva quella.
+    // ⚠️ The verb matters too: on `contact` there is a **read** first — the step that
+    // finds the person before touching them — and searching by table alone caught that one.
     const impostati = chiamate.find((c) => c.tabella === "contact" && c.verbo === "update")?.impostati as Record<
       string,
       unknown

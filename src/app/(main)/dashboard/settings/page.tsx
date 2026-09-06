@@ -59,10 +59,10 @@ export default async function SettingsPage() {
       description: t("webhooks.description"),
       need: "webhook:manage",
     },
-    // ⚠️ Accanto ai webhook, e non altrove: chi collega un sistema esterno ha bisogno di
-    // entrambi nello stesso momento — la chiave per farsi chiamare, il segreto del webhook
-    // per verificare ciò che arriva — e trovarli in due posti diversi è dove una
-    // configurazione si ferma.
+    // ⚠️ Next to the webhooks and nowhere else: somebody connecting an external system
+    // needs both at the same moment — the key to call with, the webhook secret to verify
+    // what arrives — and finding them in two different places is where a configuration
+    // stalls.
     {
       href: "/dashboard/settings/api",
       icon: KeyRound,

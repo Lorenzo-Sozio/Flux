@@ -1,6 +1,7 @@
 /**
  * Normalizes a city name into a URL-safe slug used for deduplication.
- * "Milàno" → "milano", "San José" → "san-jose", "L'Aquila" → "l-aquila"
+ * "Milàno" → "milano", "San José" → "san-jose", "L'Aquila" → "l-aquila" — accents folded,
+ * apostrophes and spaces become hyphens.
  */
 export function slugifyCity(name: string): string {
   return name

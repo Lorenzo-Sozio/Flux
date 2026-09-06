@@ -14,11 +14,10 @@ export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // ⚠️⚠️ Il ruolo del WORKSPACE. `session.user.role` è la scala del personale di
-  // Flux e vale "user" per ogni cliente, quindi questo confronto era sempre falso:
-  // l'esportazione restituiva solo le righe di chi chiamava, anche al proprietario
-  // del workspace. Un CSV incompleto in silenzio è peggio di uno che fallisce.
-  // Vedi le due scale nel CLAUDE.md.
+  // ⚠️⚠️ The WORKSPACE role. `session.user.role` is Flux's own staff scale and reads
+  // "user" for every customer, so this comparison was always false: the export returned
+  // only the caller's own rows, to a workspace owner too. A CSV quietly incomplete is
+  // worse than one that fails. See the two role scales in CLAUDE.md.
   const isPrivileged = can(await getActor(), "user:read");
 
   // Admins/owners export all leads; regular users export only their own.

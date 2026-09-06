@@ -2,21 +2,21 @@ import { runCronJob } from "@/lib/cron-runner";
 import { riprova } from "@/lib/webhook-retry";
 
 /**
- * Riprova le consegne di webhook fallite, per ogni workspace.
+ * Retries failed webhook deliveries, for every workspace.
  *
  *   Esterno:  curl -H "Authorization: Bearer $CRON_SECRET" https://.../api/cron/webhook-retry
  *
- * WARN **Senza questo, un evento perso e perso**, e chi lo aspettava non ha modo di
- * saperlo: un'integrazione che riceve gli eventi «quasi sempre» e un'integrazione di cui
- * non ci si puo fidare per decidere qualcosa.
+ * ⚠️ **Without this a lost event is simply lost**, and whoever was waiting for it has no
+ * way of knowing: an integration that receives events "nearly always" is an integration
+ * nothing can be decided on.
  *
- * WARN Prima di `runCronJob` questa rotta apriva un solo database con `getDb()`, che legge
- * il tenant da un header che una richiesta schedulata non porta: il job lanciava
- * un'eccezione prima di ritentare qualsiasi cosa, quindi la consegna era di fatto
- * *at-most-once* nonostante la documentazione dicesse il contrario (rilievo B-02).
+ * ⚠️ Before `runCronJob` this route opened a single database with `getDb()`, which reads
+ * the tenant from a header a scheduled request does not carry: the job threw before
+ * retrying anything, so delivery was in fact *at-most-once* while the documentation said
+ * otherwise (audit rilievo B-02).
  *
- * Che cosa riprovare lo decide `lib/webhook-retry`, che e pura e testata: qui c'e solo
- * l'autenticazione del cron e il ciclo sui workspace.
+ * What to retry is decided by `lib/webhook-retry`, which is pure and tested: this file
+ * holds only the cron authentication and the loop over workspaces.
  */
 export async function GET(req: Request) {
   return runCronJob("webhook-retry", req, async (db) => riprova(db));

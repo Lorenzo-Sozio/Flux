@@ -2,9 +2,9 @@
  * Loop Detection Engine
  *
  * Previene cicli infiniti tracciando:
- * - La catena di rule che si innescan l'una l'altra
- * - La profondità massima di esecuzione
- * - Gli entity ID già processati nella stessa catena
+ * - The chain of rules that set each other off
+ * - The maximum execution depth
+ * - The entity ids already processed within the same chain
  *
  * Esempio ciclo infinito:
  *   Rule A (Deal) → Update Field X
@@ -21,28 +21,28 @@ const MAX_RULE_DEPTH = 5;
 const LOOP_DETECTION_WINDOW_MS = 5000; // 5 secondi per rilevare cicli rapidi
 
 /**
- * Execution context che traccia la catena di automazioni
- * Viene passato attraverso tutta l'esecuzione
+ * The execution context that tracks the chain of automations.
+ * It is passed through the whole run.
  */
 export interface ExecutionContext {
-  // Catena di rule che si sono innescate
+  // The chain of rules that have fired
   ruleChain: {
     ruleId: string;
     timestamp: number;
   }[];
 
-  // Entity (type + id) che sono stati processati
+  // The entities (type + id) already processed
   processedEntities: Set<string>;
 
-  // Profondità corrente
+  // Current depth
   depth: number;
 
-  // User ID che ha triggerato la prima automazione
+  // The user whose action set the first automation off
   originalUserId?: string;
 }
 
 /**
- * Inizializza il context per una nuova catena di automazioni
+ * Starts a context for a new chain of automations.
  */
 export function createExecutionContext(userId?: string): ExecutionContext {
   return {
@@ -54,7 +54,7 @@ export function createExecutionContext(userId?: string): ExecutionContext {
 }
 
 /**
- * Verifica se è sicuro eseguire una rule data la catena attuale
+ * Whether it is safe to run a rule, given the chain so far.
  */
 export async function checkLoopDetection(
   ruleId: string,
@@ -62,7 +62,7 @@ export async function checkLoopDetection(
   entityId: string,
   context: ExecutionContext,
 ): Promise<{ allowed: boolean; reason?: string }> {
-  // 1. Check profondità massima
+  // 1. Maximum depth
   if (context.depth >= MAX_RULE_DEPTH) {
     return {
       allowed: false,
@@ -70,7 +70,7 @@ export async function checkLoopDetection(
     };
   }
 
-  // 2. Check entity già processato (stesso entity non dovrebbe essere toccato 2x nella stessa catena)
+  // 2. Entity already processed — the same one should not be touched twice in a chain
   const entityKey = `${entityType}:${entityId}`;
   if (context.processedEntities.has(entityKey)) {
     return {
@@ -92,8 +92,8 @@ export async function checkLoopDetection(
     };
   }
 
-  // 4. Check per cicli lenti (query gli ultimi log)
-  // Se la stessa rule è stata eseguita 3+ volte sullo stesso entity negli ultimi 10 secondi
+  // 4. Slow loops, read from the recent log
+  // If the same rule has run 3+ times on the same entity in the last 10 seconds
   const db = await getDb();
   const recentLogs = await db
     .select({ ruleId: automationLogs.ruleId, entityId: automationLogs.entityId, createdAt: automationLogs.createdAt })
@@ -116,7 +116,7 @@ export async function checkLoopDetection(
 }
 
 /**
- * Aggiorna il context con la nuova rule eseguita
+ * Records the rule that has just run in the context.
  */
 export function recordRuleExecution(
   ruleId: string,

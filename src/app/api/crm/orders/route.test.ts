@@ -1,14 +1,14 @@
 /**
- * La rotta che riceve un ordine preso a voce da un assistente.
+ * The route that receives an order an assistant took by voice.
  *
- * ⚠️⚠️ **I prezzi arrivano già fatti, e questa rotta non li ricalcola dal proprio catalogo.**
- * Ogni riga porta il prezzo che l'assistente ha *pronunciato* al cliente, copiato dal listino
- * dell'attività. Ricalcolarlo qui vorrebbe dire che il giorno in cui i due cataloghi
- * divergono chi ha ordinato al telefono si sente chiedere una cifra diversa da quella che gli
- * è stata detta, e nessuno se ne accorge.
+ * ⚠️⚠️ **Prices arrive already decided, and this route does not recompute them from its
+ * own catalogue.** Each line carries the price the assistant *said aloud* to the customer,
+ * copied from the business's own list. Recomputing here would mean that the day the two
+ * catalogues diverge, somebody who ordered by phone is asked for a figure different from
+ * the one they were told, and nobody notices.
  *
- * Quello che invece si controlla è che il totale dichiarato **sia il totale delle righe
- * mandate**: due sistemi che si accordano sull'aritmetica costano poco, un ordine al prezzo
+ * What is checked instead is that the declared total **is the total of the lines that
+ * were sent**: two systems agreeing on the arithmetic is cheap; an order at the wrong price
  * sbagliato no.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -51,10 +51,10 @@ vi.mock("@/lib/contact-point", async () => {
 vi.mock("@/lib/order-number", () => ({ nextOrderNumber: async () => "ORD-2026-0007" }));
 vi.mock("@/db", () => ({
   createTenantDb: () => ({
-    // ⚠️ Il doppio **dichiara** anche le letture, e senza questa riga la campanella era
-    // rotta nel banco senza che nulla lo dicesse: `select` non esisteva, la rotta sollevava,
-    // e il `catch` che protegge l'ordine si mangiava l'errore. Un doppio che non dichiara
-    // ciò che serve rende verde una funzione che non esiste.
+    // ⚠️ The double **declares** its reads too, and without this line the notification was
+    // broken on the bench with nothing saying so: `select` did not exist, the route threw,
+    // and the `catch` protecting the order ate the error. A double that does not declare
+    // what is needed turns a function that does not exist green.
     select: () => ({
       from: () => ({
         where: async () => amministratori,
@@ -62,15 +62,15 @@ vi.mock("@/db", () => ({
     }),
     insert: (tabella: { [k: string]: unknown }) => ({
       values: (valori: Record<string, unknown>) => {
-        // Il nome della tabella si legge dal simbolo di drizzle: il doppio deve poter dire
-        // **quale** riga è stata scritta, o «l'ordine ha creato un contatto» sarebbe
-        // indistinguibile da «l'ordine ha scritto una riga qualunque».
+        // The table name is read from drizzle's own symbol: the double has to be able to
+        // say **which** row was written, or "the order created a contact" would be
+        // indistinguishable from "the order wrote some row or other".
         const nome = String((tabella as { [k: symbol]: unknown })[Symbol.for("drizzle:Name")] ?? "?");
         inseriti.push({ tabella: nome, valori });
-        // ⚠️ Un **vero** Promise, non un oggetto con `then`: le righe dell'ordine si
-        // attendono senza chiedere niente indietro, l'ordine e il contatto chiamano
+        // ⚠️ A **real** Promise, not an object with a `then`: the order lines are awaited
+        // without asking for anything back, while the order and the contact call
         // `returning`. Un thenable scritto a mano farebbe la stessa cosa e sarebbe la
-        // forma che questo progetto ha gia' deciso di non avere.
+        // a shape this project has already decided not to have.
         const attesa = Promise.resolve(undefined) as Promise<undefined> & {
           returning: () => Promise<{ id: string; orderNumber: unknown }[]>;
         };
@@ -81,8 +81,8 @@ vi.mock("@/db", () => ({
   }),
 }));
 
-//: Chi riceve la campanella. È una lista dichiarata: un doppio che restituisse sempre
-//: l'insieme vuoto renderebbe verde anche il caso in cui non si scrive niente a nessuno.
+//: Who receives the notification. A declared list: a double always returning the empty
+//: set would turn green even the case where nothing is written to anybody.
 let amministratori: { id: string }[] = [{ id: "u1" }, { id: "u2" }];
 
 const { POST } = await import("@/app/api/crm/orders/route");
@@ -135,7 +135,7 @@ describe("an order taken by an assistant", () => {
   });
 
   it("⚠️⚠️ refuses an order whose declared total is not the total of its lines", async () => {
-    // Qualunque dei due lati abbia sbagliato, una delle due cifre e' quella che il cliente
+    // Whichever side got it wrong, one of the two figures is the one the customer
     // ha sentito. Correggerla in silenzio significherebbe registrarne un'altra.
     const risposta = await POST(richiesta({ ...ORDINE, total: 18 }));
 
@@ -145,9 +145,9 @@ describe("an order taken by an assistant", () => {
   });
 
   it("⚠️ the line says what to prepare, and the note says what was asked", async () => {
-    // Una riga che dice «Diavola» mentre il cliente l'ha chiesta senza piccante e' un
-    // ordine preparato sbagliato. Ma la voce resta quella di listino: e' cio' a cui il
-    // prezzo appartiene, ed e' quello che si cerca sul menu'.
+    // A line reading "Diavola" when the customer asked for it without the heat is an order
+    // prepared wrongly. But the item stays the catalogue one: that is what the price belongs
+    // to, and what somebody looks up on the menu.
     await POST(richiesta(ORDINE));
 
     const righe = inseriti.filter((i) => i.tabella === "order_item");
@@ -156,9 +156,9 @@ describe("an order taken by an assistant", () => {
   });
 
   it("⚠️⚠️ says which line an extra belongs to", async () => {
-    // Un'aggiunta che il listino prezza e' una riga a se' — e' l'unico modo perche' il suo
-    // prezzo sia quello detto al cliente — e su un ordine con due pizze «impasto
-    // integrale» da solo non dice a quale delle due appartenga.
+    // An extra the catalogue prices is a line of its own — the only way its price is the
+    // one quoted to the customer — and on an order with two pizzas "wholemeal base" alone
+    // does not say which of them it belongs to.
     await POST(
       richiesta({
         ...ORDINE,
@@ -175,9 +175,9 @@ describe("an order taken by an assistant", () => {
   });
 
   it("⚠️⚠️ records what the customer called it when the match changed the words", async () => {
-    // Chi ha preso l'ordine ha fatto una corrispondenza fra quello che il cliente ha detto
-    // e una voce di listino. Se era sbagliata — «capricciosa» diventata «quattro stagioni»,
-    // stesso prezzo, pizza diversa — nient'altro in questo ordine lo mostrerebbe.
+    // Whoever took the order matched what the customer said against a catalogue item. If
+    // that match was wrong — "capricciosa" become "quattro stagioni", same price, different
+    // pizza — nothing else in this order would show it.
     await POST(
       richiesta({
         ...ORDINE,
@@ -191,8 +191,8 @@ describe("an order taken by an assistant", () => {
   });
 
   it("⚠️ says nothing when the words agree, instead of repeating the item", async () => {
-    // «Richiesto come: Margherita» sotto una riga che dice «Margherita» e' rumore, e il
-    // rumore fa smettere di leggere proprio le righe che avrebbero qualcosa da dire.
+    // "Asked for as: Margherita" under a line reading "Margherita" is noise, and noise is
+    // what stops people reading the very lines that would have had something to say.
     await POST(
       richiesta({
         ...ORDINE,
@@ -224,9 +224,9 @@ describe("an order taken by an assistant", () => {
   });
 
   it("⚠️⚠️ writes what has to be known to prepare it, where whoever prepares it looks", async () => {
-    // Ritiro o consegna, per quando, a che indirizzo. Senza, l'ordine compare con le righe
-    // giuste e nessuno sa se vada consegnato — e una nota sul contatto sarebbe «da
-    // un'altra parte», che e' esattamente cio' che chi lavora un ordine non deve fare.
+    // Collection or delivery, for when, to what address. Without it the order appears with
+    // the right lines and nobody knows whether to deliver it — and a note on the contact
+    // would be "somewhere else", which is exactly what whoever works an order must not do.
     await POST(richiesta({ ...ORDINE, address: "via Roma 10" }));
 
     const note = String(inseriti.find((i) => i.tabella === "order")?.valori.notes ?? "");
@@ -236,7 +236,7 @@ describe("an order taken by an assistant", () => {
   });
 
   it("⚠️ leaves the note empty rather than writing labels with nothing after them", async () => {
-    // «Consegna:» seguito dal vuoto e' peggio di niente: chi legge crede che manchi il
+    // "Delivery:" followed by nothing is worse than nothing: the reader assumes the
     // dato per un guasto, e va a cercarlo.
     await POST(richiesta({ ...ORDINE, fulfillment: "", when: "", address: "" }));
 
@@ -281,15 +281,15 @@ describe("la campanella dell'ordine", () => {
     await POST(richiesta(ORDINE));
     await new Promise((r) => setTimeout(r, 0));
 
-    // ⚠️ Una sola chiamata con **un elenco di righe**: è la forma che il doppio registra,
-    // ed è anche la forma che il CRM usa altrove per avvisare più persone insieme.
+    // ⚠️ One call with **a list of rows**: the shape the double records, and also the shape
+    // the CRM uses elsewhere to notify several people at once.
     const scritte = inseriti.filter((r) => r.tabella === "notification");
     expect(scritte).toHaveLength(1);
     const avvisi = scritte[0].valori as unknown as Record<string, unknown>[];
     expect(avvisi).toHaveLength(2);
     expect(avvisi.map((a) => a.userId).sort()).toEqual(["u1", "u2"]);
     expect(String(avvisi[0].type)).toBe("order_created");
-    // Il link porta all'ordine, non alla lista: chi la riceve deve poterlo aprire.
+    // The link goes to the order, not to the list: whoever receives it must be able to open it.
     expect(String(avvisi[0].link)).toContain("/dashboard/sales/orders/");
   });
 
@@ -300,7 +300,7 @@ describe("la campanella dell'ordine", () => {
     const risposta = await POST(richiesta(ORDINE));
     await new Promise((r) => setTimeout(r, 0));
 
-    // L'ordine resta scritto: la campanella è un di più, e non può farlo cadere.
+    // The order stays written: the notification is an extra, and cannot bring it down.
     expect(risposta.status).toBe(201);
     expect(inseriti.filter((r) => r.tabella === "notification")).toHaveLength(0);
     expect(inseriti.some((r) => r.tabella === "order")).toBe(true);

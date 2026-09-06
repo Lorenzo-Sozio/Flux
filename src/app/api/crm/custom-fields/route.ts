@@ -62,10 +62,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Conta la chiamata sul piano, come ogni altra rotta /api/crm. Le rotte di
-  // opposizione e cancellazione sono volutamente escluse: rifiutarle per un
-  // limite di piano significherebbe continuare a contattare chi ha chiesto di
-  // smettere, e mancare una scadenza che non è nostra da spostare.
+  // Counts the call against the plan, like every other /api/crm route. Opt-out and
+  // erasure are deliberately excluded: refusing either because a plan limit was reached
+  // means carrying on contacting somebody who asked you to stop, and missing a deadline
+  // that is not ours to move.
   try {
     await checkAndTrackApiCall(authResult.tenantId);
   } catch (err) {
@@ -151,14 +151,13 @@ export async function POST(req: NextRequest) {
     .from(customFieldDefinitions)
     .where(inArray(customFieldDefinitions.slug, slug));
 
-  // ⚠️⚠️ **L'entità si filtra qui e non nella query**, e non è una svista. Un campo
-  // «budget» dichiarato per i lead e uno per i contatti sono due definizioni distinte:
-  // riusare la prima su un contatto attaccherebbe il valore a una definizione che le
-  // schermate dei contatti non interrogano, e il titolare vedrebbe il campo vuoto pur
-  // avendolo ricevuto. Nella clausola SQL questa riga sarebbe una garanzia che nessun test
-  // con un doppio del database può raggiungere — cioè, per la regola di questo progetto,
-  // una garanzia che non esiste. Gli slug sono al massimo una manciata: filtrarli qui non
-  // costa niente e si può difendere.
+  // ⚠️⚠️ **The entity is filtered here rather than in the query**, and that is not an
+  // oversight. A "budget" declared for leads and one declared for contacts are two separate
+  // definitions: reusing the first on a contact would attach the value to a definition the
+  // contact screens never read, and the owner would see the field empty despite having been
+  // given it. Inside the SQL clause this line would be a guarantee no test with a database
+  // double can reach — by this project's rule, a guarantee that does not exist. There are a
+  // handful of slugs at most: filtering them here costs nothing and can be defended.
   const perSlug = new Map(candidate.filter((d) => d.entityType === entityType).map((d) => [d.slug, d.id]));
   for (const nome of slug) {
     if (perSlug.has(nome)) continue;

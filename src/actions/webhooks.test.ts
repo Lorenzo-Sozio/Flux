@@ -14,10 +14,10 @@ const righe: Record<string, unknown>[] = [];
 const inviati: { url: string; headers: Record<string, string>; body: string }[] = [];
 let configurati: Record<string, unknown>[] = [];
 
-// ⚠️ Si sostituiscono i moduli che questo file importa **davvero**: `tenant-context` per
-// il database e `auth-guard` perché tira dentro prossimo-auth, che in un test di nodo non ha un
-// runtime Next da cui prendere `prossimo/server`. Mockare il modulo sbagliato non fallisce: fa
-// caricare quello vero, e l'errore che si legge parla di tutt'altro.
+// ⚠️ The modules replaced are the ones this file **actually** imports: `tenant-context`
+// for the database and `auth-guard` because it drags in next-auth, which in a node test has
+// no Next runtime to take `next/server` from. Mocking the wrong module does not fail: it
+// loads the real one, and the error you then read is about something else entirely.
 vi.mock("@/lib/tenant-context", () => ({
   getDb: async () => ({
     select: () => ({ from: () => ({ where: async () => configurati }) }),
@@ -79,9 +79,9 @@ describe("⚠️⚠️ an event without a signature does not leave", () => {
     expect(righe).toHaveLength(1);
     expect(String(righe[0].response)).toMatch(/no secret|Add one/);
     expect(righe[0].success).toBe(false);
-    // ⚠️ E **nessuno stato HTTP**: non c'è stata una consegna, quindi non c'è un codice
-    // che qualcuno possa aver risposto. Una riga con `success: false` e uno stato `200`
-    // si contraddice, e chi la legge nel pannello non sa a quale delle due credere.
+    // ⚠️ And **no HTTP status**: there was no delivery, so there is no code anybody could
+    // have answered with. A row carrying `success: false` and a status of `200` contradicts
+    // itself, and whoever reads it in the panel cannot tell which half to believe.
     expect(righe[0].statusCode).toBeNull();
   });
 

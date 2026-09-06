@@ -1,7 +1,7 @@
 /**
  * Retry Engine with Exponential Backoff
  *
- * Fornisce retry logic per azioni che possono fallire (HTTP calls, email, etc.)
+ * Retry logic for actions that can fail: HTTP calls, email, and the like.
  *
  * Strategie di backoff:
  * - Linear: 1s, 2s, 3s, 4s, 5s
@@ -28,7 +28,7 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 };
 
 /**
- * Calcola il delay per il tentativo N
+ * The delay before attempt N.
  */
 export function calculateBackoffDelay(
   attempt: number, // 0-indexed
@@ -55,7 +55,7 @@ export function sleep(ms: number): Promise<void> {
 }
 
 /**
- * Esegue una funzione con retry logic
+ * Runs a function, retrying it.
  *
  * @example
  * const result = await executeWithRetry(
@@ -117,14 +117,14 @@ export async function executeWithRetryTracked<T>(
 }
 
 /**
- * Determina se un errore è "retriable" (vale la pena riprovare)
+ * Whether an error is worth retrying.
  *
  * Esempio di errori retriable:
  * - Network timeouts
  * - 5xx server errors
  * - Rate limits (429)
  *
- * Esempio di errori non retriable:
+ * Errors not worth retrying:
  * - 400 Bad Request
  * - 401 Unauthorized
  * - 403 Forbidden

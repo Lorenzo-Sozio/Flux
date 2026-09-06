@@ -35,10 +35,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Conta la chiamata sul piano, come ogni altra rotta /api/crm. Le rotte di
-  // opposizione e cancellazione sono volutamente escluse: rifiutarle per un
-  // limite di piano significherebbe continuare a contattare chi ha chiesto di
-  // smettere, e mancare una scadenza che non è nostra da spostare.
+  // Counts the call against the plan, like every other /api/crm route. Opt-out and
+  // erasure are deliberately excluded: refusing either because a plan limit was reached
+  // means carrying on contacting somebody who asked you to stop, and missing a deadline
+  // that is not ours to move.
   try {
     await checkAndTrackApiCall(authResult.tenantId);
   } catch (err) {

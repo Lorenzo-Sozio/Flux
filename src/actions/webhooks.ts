@@ -14,8 +14,8 @@ export type WebhookDispatchDb = ReturnType<typeof createTenantDb>;
 
 import { ForbiddenError, requireAdminAccess, requireCapability } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
-// ⚠️ La busta vive in una libreria **senza dipendenze**: chi la usa per
-// ritentare non deve importare l'autenticazione per leggere una costante.
+// ⚠️ The envelope lives in a library with **no dependencies**: whoever uses it to retry
+// should not have to import authentication in order to read a constant.
 import { type EventEnvelope, type Origin, UNSIGNABLE_PREFIX } from "@/lib/webhook-envelope";
 import { validateWebhookUrl } from "@/lib/webhook-validator";
 

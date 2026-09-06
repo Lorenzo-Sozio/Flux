@@ -108,10 +108,10 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Conta la chiamata sul piano, come ogni altra rotta /api/crm. Le rotte di
-  // opposizione e cancellazione sono volutamente escluse: rifiutarle per un
-  // limite di piano significherebbe continuare a contattare chi ha chiesto di
-  // smettere, e mancare una scadenza che non è nostra da spostare.
+  // Counts the call against the plan, like every other /api/crm route. Opt-out and
+  // erasure are deliberately excluded: refusing either because a plan limit was reached
+  // means carrying on contacting somebody who asked you to stop, and missing a deadline
+  // that is not ours to move.
   try {
     await checkAndTrackApiCall(authResult.tenantId);
   } catch (err) {
@@ -225,14 +225,14 @@ export async function POST(req: NextRequest) {
     creato = true;
   }
 
-  // ⚠️⚠️ **Quello che serve per prepararlo, dove chi lo prepara guarda.** Ritiro o
-  // consegna, per quando, a che indirizzo: senza, l'ordine compare con le righe giuste e
-  // nessuno sa se vada consegnato. Una nota sul contatto sarebbe «da un'altra parte», che
-  // è esattamente ciò che chi lavora un ordine non deve dover fare.
+  // ⚠️⚠️ **What is needed to prepare it, where whoever prepares it looks.** Collection or
+  // delivery, for when, to what address: without it the order appears with the right lines
+  // and nobody knows whether to deliver it. A note on the contact would be "somewhere
+  // else", which is exactly what whoever works an order must not have to do.
   //
-  // ⚠️ Sono **parole del cliente**, non campi normalizzati: «verso le otto e mezza» è
-  // quello che ha detto, e riscriverlo in un orario sarebbe inventare una precisione che
-  // non ha dato. Le etichette le mette il codice, il contenuto resta suo.
+  // ⚠️ These are the **customer's own words**, not normalised fields: "around half eight"
+  // is what they said, and rewriting it as a time would invent a precision they never gave.
+  // The code supplies the labels; the content stays theirs.
   const note = [
     ["Consegna", typeof dati.fulfillment === "string" ? dati.fulfillment.trim() : ""],
     ["Per quando", typeof dati.when === "string" ? dati.when.trim() : ""],

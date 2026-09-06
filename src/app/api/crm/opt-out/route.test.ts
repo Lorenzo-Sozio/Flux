@@ -1,15 +1,15 @@
 /**
- * La rotta che riceve «questa persona non vuole più essere contattata».
+ * The route that receives "this person does not want to be contacted any more".
  *
- * ⚠️⚠️ **Il rifiuto riguarda la persona, non il record.** Zittire il contatto e lasciare
- * iscritto il lead terrebbe quella persona esattamente nel pubblico da cui ha chiesto di
- * uscire, e nessuno dei due prodotti se ne accorgerebbe: da qui la campagna parte, di là
- * l'assistente crede di aver rispettato il rifiuto.
+ * ⚠️⚠️ **The refusal is about the person, not the record.** Silencing the contact and
+ * leaving the lead subscribed would keep that person in exactly the audience they asked to
+ * leave, and neither product would notice: from here the campaign goes out, over there the
+ * assistant believes it honoured the refusal.
  *
- * ⚠️ **E si scrive solo su chi era ancora iscritto.** Il passo che chiama questa rotta è
- * deliberatamente idempotente e viene ritentato: riscrivere `false` sopra `false` farebbe
- * girare di nuovo le regole del titolare su un cambiamento che non è avvenuto, e chi ha una
- * regola «avvisami quando qualcuno si disiscrive» riceverebbe un avviso a ogni tentativo.
+ * ⚠️ **And it writes only on whoever was still subscribed.** The step that calls this
+ * route is deliberately idempotent and gets retried: writing `false` over `false` would run
+ * the owner's rules again on a change that never happened, and anybody with a rule saying
+ * "tell me when somebody unsubscribes" would be told on every attempt.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -40,9 +40,9 @@ vi.mock("@/lib/contact-point", async () => {
   return { ...vero, findByContactPoint: async () => ({ ...person, email: null, digits: null }) };
 });
 vi.mock("@/db", () => ({
-  // ⚠️ Il doppio **dichiara la tabella** invece di restituire sempre le stesse righe: la
-  // garanzia in prova è che entrambi i record della persona vengano zittiti, e un doppio che
-  // non distingue lead da contatto la renderebbe inverificabile.
+  // ⚠️ The double **declares the table** rather than always returning the same rows: the
+  // guarantee under test is that both of the person's records are silenced, and a double
+  // that cannot tell a lead from a contact would make it unverifiable.
   createTenantDb: () => ({
     select: () => ({
       from: (tabella: unknown) => ({
@@ -51,9 +51,9 @@ vi.mock("@/db", () => ({
     }),
     update: (tabella: unknown) => ({
       set: (valori: Record<string, unknown>) => {
-        // ⚠️ Le due tabelle si nominano **entrambe**: con un `else` implicito una scrittura
-        // finita su una terza tabella verrebbe registrata come «contact», e la mutazione che
-        // lascia iscritto il contatto passerebbe.
+        // ⚠️ **Both** tables are named: with an implicit `else` a write landing on a third
+        // table would be recorded as "contact", and the mutation that leaves the contact
+        // subscribed would survive.
         const nome = tabella === leads ? "lead" : tabella === contacts ? "contact" : "altro";
         scritti.push({ tabella: nome, valori });
         return { where: async () => undefined };
@@ -99,7 +99,7 @@ describe("a refusal said to the assistant reaches the CRM", () => {
   });
 
   it("⚠️ writes nothing on somebody already unsubscribed, and still answers 200", async () => {
-    // Il passo che chiama viene ritentato: riscrivere `false` sopra `false` farebbe partire
+    // The calling step is retried: writing `false` over `false` would set off
     // di nuovo l'avviso di chi sorveglia le disiscrizioni.
     righeLead = [{ id: "l1", marketingConsent: false }];
     righeContatti = [{ id: "c1", marketingConsent: false }];
@@ -121,10 +121,10 @@ describe("a refusal said to the assistant reaches the CRM", () => {
   });
 
   it("refuses a body without a contact point, and says which field is missing", async () => {
-    // ⚠️ Il messaggio è la garanzia, non il codice: senza la guardia il rifiuto arriva
-    // comunque, ma dice «non è né una email né un numero» di un campo che non è stato
-    // mandato affatto — e chi integra va a cercare un errore di formato che non esiste.
-    // È la stessa forma di rifiuto delle altre rotte, e deve restare la stessa.
+    // ⚠️ The message is the guarantee, not the status code: without the guard the refusal
+    // still arrives, but says "neither an email nor a number" about a field that was never
+    // sent at all — and the integrator goes looking for a format error that does not exist.
+    // It is the same shape of refusal the other routes give, and must stay the same.
     const risposta = await POST(richiesta({}));
 
     expect(risposta.status).toBe(422);

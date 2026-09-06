@@ -12,11 +12,11 @@ import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
 /**
- * ⚠️ Ogni evento che esce da questa rotta dice di essere stato causato da una **macchina**.
+ * ⚠️ Every event leaving this route declares that a **machine** caused it.
  *
- * È la riga che ferma l'eco alla fonte: un'integrazione scrive un lead qui, questo CRM
- * emette `lead.created`, e l'integrazione lo riceve. Senza sapere che il cambiamento è
- * suo, reagisce a sé stessa — e non smette.
+ * That is the line which stops the echo at its source: an integration writes a lead here,
+ * this CRM emits `lead.created`, and the integration receives it. Without knowing the
+ * change is its own it reacts to itself — and does not stop.
  */
 const API_ORIGIN = { via: "api" as const, actor: null };
 
