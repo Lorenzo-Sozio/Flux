@@ -1,5 +1,4 @@
 import {
-  Activity,
   Banknote,
   BarChart3,
   Building2,
@@ -167,7 +166,6 @@ export const sidebarItems: NavGroup[] = [
       { titleKey: "quotes", url: "/dashboard/sales/quotes", icon: FileText, module: "sales" },
       { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, module: "sales" },
       { titleKey: "products", url: "/dashboard/sales/products", icon: Package, module: "sales" },
-      { titleKey: "finance", url: "/dashboard/sales/finance", icon: Banknote, module: "sales" },
     ],
   },
   {
@@ -211,7 +209,11 @@ export const sidebarItems: NavGroup[] = [
     id: 6,
     labelKey: "analysis",
     items: [
-      { titleKey: "salesTrend", url: "/dashboard/analytics", icon: Activity, module: "sales" },
+      // ⚠️ Finance moved here from Sales when the analytics screen was deleted,
+      // and it belongs here on its own merits: it is a revenue trend and a
+      // spending breakdown, not a thing you write. It also keeps this group
+      // above one entry, which is the line between a heading and a label.
+      { titleKey: "finance", url: "/dashboard/sales/finance", icon: Banknote, module: "sales" },
       {
         titleKey: "reports",
         url: "/dashboard/reports",

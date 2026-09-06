@@ -78,7 +78,7 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
         {kind !== "unknown" && error.message && <p className="mt-2 text-foreground text-sm">{error.message}</p>}
         <p className="mt-2 text-muted-foreground text-sm">{hint}</p>
 
-        <div className="mt-6 flex items-center justify-center gap-2">
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
           {kind === "unknown" && (
             <Button onClick={reset} variant="default">
               <RefreshCw className="mr-2 size-4" />

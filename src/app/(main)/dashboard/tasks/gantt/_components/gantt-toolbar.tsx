@@ -65,25 +65,29 @@ export function GanttToolbar({
   const handleToday = () => setViewDate(new Date());
 
   return (
-    <div className="flex shrink-0 flex-col gap-3 border-b px-6 py-4">
+    <div className="flex shrink-0 flex-col gap-3 border-b px-4 py-3 md:px-6 md:py-4">
       {/* Row 1: back + title | nav + view selector */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
+      {/* Back arrow, title and a count on the left; a date walker and the view
+          selector on the right. Six controls and a heading is more than a phone
+          has room for in one line, so the row wraps and the count — which is
+          supplementary — steps out below sm. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2 md:gap-3">
           <Button variant="ghost" size="icon" asChild className="h-8 w-8">
             <Link href="/dashboard/tasks">
               <ArrowLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <div className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5 text-muted-foreground" />
-            <h1 className="font-semibold text-lg">{t("title")}</h1>
+          <div className="flex min-w-0 items-center gap-2">
+            <CalendarIcon className="h-5 w-5 shrink-0 text-muted-foreground" />
+            <h1 className="truncate font-semibold text-lg">{t("title")}</h1>
           </div>
-          <span className="rounded-md bg-muted px-2 py-0.5 text-muted-foreground text-xs">
+          <span className="hidden shrink-0 rounded-md bg-muted px-2 py-0.5 text-muted-foreground text-xs sm:inline">
             {t("tasksWithDates", { withDates, total })}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Time navigation */}
           <div className="flex items-center gap-1">
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrev}>

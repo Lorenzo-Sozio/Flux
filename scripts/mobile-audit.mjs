@@ -290,6 +290,18 @@ const required = [
   ["@media (hover: none)", "the rule that reveals hover-only controls on touch"],
   ["pointer: coarse", "the 44px touch targets"],
 ];
+// ⚠️ The safe area on a full-screen dialog has to be an inset, not padding:
+// seventeen dialogs pass `p-0`, and padding is precisely what that removes.
+const dialog = readFileSync("src/components/ui/dialog.tsx", "utf8");
+if (!/top-\[var\(--safe-top\)\]/.test(dialog)) {
+  report(
+    "missing-rule",
+    "src/components/ui/dialog.tsx",
+    0,
+    "a full-screen dialog no longer insets the safe area; every p-0 dialog now sits under the notch",
+  );
+}
+
 const tabs = readFileSync("src/components/ui/tabs.tsx", "utf8");
 if (!/max-sm:flex-wrap/.test(tabs)) {
   report(

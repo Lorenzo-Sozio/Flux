@@ -467,7 +467,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
         </div>
 
         {/* Row 2: date range picker | conflicts */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-1">
             <Button
               variant="outline"

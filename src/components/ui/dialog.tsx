@@ -77,12 +77,17 @@ function DialogContent({
           // view by itself. A sheet pinned to `bottom-0` does not have that
           // property — the keyboard opens underneath it and the fields at the
           // bottom become unreachable on iOS.
-          "inset-0 w-full rounded-none p-5",
-          "pt-[calc(1.25rem+var(--safe-top))] pb-[calc(1.25rem+var(--safe-bottom))]",
+          // ⚠️⚠️ The safe area is **inset, not padding**. Seventeen of the twenty
+          // dialogs in this product pass `p-0` so they can draw their own
+          // header and footer bars, and padding put here is exactly what `p-0`
+          // removes — so every one of them had its header under the notch and
+          // its footer under the home indicator. Pinning top and bottom instead
+          // is something a class on the content cannot undo.
+          "inset-x-0 top-[var(--safe-top)] bottom-[var(--safe-bottom)] w-full rounded-none p-5",
           "data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom-4",
           "data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom-4",
           // ── Tablet and up: the centred box it has always been ──────────────
-          "sm:inset-auto sm:top-1/2 sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2",
+          "sm:inset-auto sm:top-1/2 sm:bottom-auto sm:left-1/2 sm:w-full sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2",
           "sm:max-h-[calc(100dvh-4rem)] sm:rounded-xl sm:p-6",
           "sm:data-open:zoom-in-95 sm:data-open:slide-in-from-bottom-0 sm:data-closed:zoom-out-95 sm:data-closed:slide-out-to-bottom-0",
           className
