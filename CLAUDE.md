@@ -391,6 +391,33 @@ the browser invent a second column, which is the overlap it was meant to remove.
 the columns off with no way to reach them. Use `overflow-x-auto`. (The `Table`
 primitive already wraps itself; a hand-rolled `<table>` does not.)
 
+⚠️⚠️ **The safe area on a full-screen dialog is an inset, not padding.** Seventeen
+of the twenty dialogs pass `p-0` so they can draw their own header and footer
+bars, and padding is exactly what `p-0` removes — so every one of them put its
+header under the notch. `top-[var(--safe-top)] bottom-[var(--safe-bottom)]` is
+something a class on the content cannot undo.
+
+⚠️ **`flex-1` is `flex: 1 1 0%`**, so a width on that element is ignored and its
+`min-w` becomes its *actual* width. The pipeline board's `min-w-[280px]` columns
+were therefore all exactly 280px: one per screen, with no edge of the next one to
+say the board scrolls.
+
+⚠️ **`w-72` is 288px** — the scale form of a fixed width is as wide as the bracket
+form, and it is how every side panel is written. `npm run mobile:audit` reads
+both.
+
+⚠️ **A fixed height with `items-center` and no overflow clips the *top*.** Centring
+pushes what does not fit out of both ends and only the bottom one can be scrolled
+to. On a phone a form exceeds the viewport the moment the keyboard opens, so five
+auth pages were losing their own heading and first field.
+
+The menu trigger is **first on the left of the header at every width**, because
+that is the edge its panel comes out of; the bottom bar below `md` is five
+*destinations* and holds no menu button. `interactive-widget=resizes-content` in
+the root viewport makes the keyboard shrink the layout rather than cover it — on
+Chrome and Android; iOS ignores it, which is why full-screen dialogs are ordinary
+scroll containers rather than sheets pinned to the bottom edge.
+
 Touch targets go to 44px under `(pointer: coarse)`; form controls go to 44px below
 `md` — scoped to *width* there rather than to pointer type, because the dense
 nine-column line editor on an order is a deliberate desktop layout a touchscreen
