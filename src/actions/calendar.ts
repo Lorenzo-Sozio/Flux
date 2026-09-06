@@ -1,13 +1,27 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { and, eq, gte, inArray, isNotNull, lte, or } from "drizzle-orm";
 
 import { getAppointmentCalendarEvents } from "@/actions/appointments";
 import { auth } from "@/auth";
-import { activities, companies, contacts, deals, leads, taskAssignees, tasks, userGroupMembers } from "@/db/schema";
+import {
+  activities,
+  companies,
+  contacts,
+  deals,
+  leads,
+  taskAssignees,
+  tasks,
+  userGroupMembers,
+  users,
+} from "@/db/schema";
 import { getAppUrlOrNull } from "@/lib/app-url";
 import { requireCapability } from "@/lib/auth-guard";
 import { signCalendarFeedToken } from "@/lib/calendar-feed-token";
+import { checkExternalCalendarUrl, type UrlRefusal } from "@/lib/external-calendar-url";
+import { type ExternalEvent, parseIcal } from "@/lib/ical-parse";
 import { getDb } from "@/lib/tenant-context";
 
 export type CalendarFilter = "all" | "mine" | "group";
@@ -228,4 +242,95 @@ export async function getCalendarFeedUrl(): Promise<{ url: string } | { error: s
   if (!base) return { error: "no-app-url" };
 
   return { url: `${base}/api/calendar/${signCalendarFeedToken({ tenantId, userId })}` };
+}
+
+// ─── The calendar somebody keeps elsewhere ────────────────────────────────────
+
+/**
+ * How long a fetched calendar is reused before going back for it.
+ *
+ * The same fifteen minutes our own feed asks subscribers for. Reading somebody
+ * else's calendar on every page render would hammer Google for no benefit: an
+ * appointment made a minute ago is not more urgent than one made ten.
+ */
+const EXTERNAL_TTL_SECONDS = 900;
+
+/** The address currently saved for the signed-in person, if any. */
+export async function getExternalCalendarUrl(): Promise<string | null> {
+  await requireCapability("record:read");
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return null;
+
+  const db = await getDb();
+  const row = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { externalCalendarUrl: true },
+  });
+  return row?.externalCalendarUrl ?? null;
+}
+
+/**
+ * Saves, or clears, the address of a calendar this person publishes elsewhere.
+ *
+ * ⚠️ The address is checked before it is stored, not before it is fetched. Both
+ * would be better; only one of them is guaranteed to happen, because a stored
+ * address is read back by code that has not been written yet.
+ */
+export async function setExternalCalendarUrl(raw: string): Promise<{ ok: true } | { ok: false; reason: UrlRefusal }> {
+  await requireCapability("record:read");
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return { ok: false, reason: "empty" };
+
+  const db = await getDb();
+
+  if (!raw.trim()) {
+    await db.update(users).set({ externalCalendarUrl: null }).where(eq(users.id, userId));
+    revalidatePath("/dashboard/calendar");
+    return { ok: true };
+  }
+
+  const verdict = checkExternalCalendarUrl(raw, getAppUrlOrNull());
+  if (!verdict.ok) return verdict;
+
+  await db.update(users).set({ externalCalendarUrl: verdict.url }).where(eq(users.id, userId));
+  revalidatePath("/dashboard/calendar");
+  return { ok: true };
+}
+
+export interface ExternalCalendar {
+  events: ExternalEvent[];
+  /** Events the parser would not guess at. Shown, not swallowed. */
+  unreadable: number;
+  /** The fetch itself failed: a wrong address, or the far end being down. */
+  failed: boolean;
+}
+
+/**
+ * The busy time from the calendar this person keeps elsewhere.
+ *
+ * ⚠️ Never throws and never blocks the page. A calendar that cannot be reached
+ * is a calendar shown as empty **and said to be**, because the alternative is a
+ * screen that looks free while somebody is in a meeting.
+ */
+export async function getExternalCalendar(window: { from: Date; to: Date }): Promise<ExternalCalendar | null> {
+  const url = await getExternalCalendarUrl().catch(() => null);
+  if (!url) return null;
+
+  try {
+    const response = await fetch(url, {
+      // A plain GET with nothing of ours attached: no cookies, no credentials.
+      redirect: "follow",
+      headers: { Accept: "text/calendar, text/plain" },
+      next: { revalidate: EXTERNAL_TTL_SECONDS },
+    });
+    if (!response.ok) return { events: [], unreadable: 0, failed: true };
+
+    const text = await response.text();
+    const parsed = parseIcal(text, window, { defaultZone: "UTC" });
+    return { events: parsed.events, unreadable: parsed.skipped.length, failed: false };
+  } catch {
+    return { events: [], unreadable: 0, failed: true };
+  }
 }

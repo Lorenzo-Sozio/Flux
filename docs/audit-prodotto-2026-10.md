@@ -12,8 +12,8 @@ Aggiornato dopo il primo ciclo di correzioni.
 
 | | |
 |---|---|
-| ✅ Risolti | 63 |
-| ◐ Parziali | 2 |
+| ✅ Risolti | 66 |
+| ◐ Parziali | 0 |
 | ⊘ Non si fa | 1 |
 | Aperti | 0 |
 
@@ -42,13 +42,16 @@ documento che verrà archiviato e citato.
 Di S-10 la metà che toglie il doppio inserimento è un abbonamento iCal, che ogni
 calendario sa già leggere e che non aspetta nessuno.
 
-**Resta una cosa sola: il verso Google → CRM del calendario**, che dipende dalla verifica
-degli ambiti da parte di Google e non da questo progetto.
+**Non resta niente.** Anche l'ultimo — il verso Google → CRM del calendario — non aspettava
+Google: la strada dell'API sì, ma ogni calendario pubblica anche un indirizzo iCal segreto,
+e leggerlo è lo specchio di far leggere il nostro.
 
-Ciascun parziale dice, nella propria voce, che cosa gli manca. M-09 ha una sola
-libreria di trascinamento ormai, e sulla lingua dei commenti la regola sta nel
-`CLAUDE.md`, con i file esistenti che si allineano quando li si tocca. S-10 ha
-l'abbonamento iCal e le conversazioni email; gli manca solo il verso Google → CRM.
+Non ci sono più parziali. M-09 si è chiuso quando il
+numero è stato misurato invece che temuto: una sola mutazione su 225 citava un commento
+italiano, quindi la traduzione poteva essere fatta in sicurezza. M-02 resta la decisione che
+era — non si fondono due tabelle che settantacinque file nominano, per un guadagno
+concettuale — ma il giorno che la voce stessa indicava come momento per riaprirla ora arriva
+da solo, sotto forma di test rosso.
 
 Due migrazioni tenant. `0002_odd_ulik.sql` aggiunge le colonne mancanti (data di
 chiusura e motivo di perdita sulle trattative, imponibile/imposta/valuta sugli ordini,
@@ -664,6 +667,17 @@ rischio legale non c'è, e ciò che resta è una ridondanza di schema che nessun
 Da riaprire il giorno in cui una colonna nuova va aggiunta a entrambe le tabelle e una
 delle due se ne dimentica: è quello il momento in cui la duplicazione inizia a costare.
 
+**✅ E quel giorno adesso arriva da solo.** La decisione resta quella — fondere le due
+tabelle tocca settantacinque file per un guadagno concettuale — ma il rischio che la
+lasciava aperta è chiuso: `src/db/lead-contact-drift.test.ts` fissa le ventitré colonne
+condivise e le due liste di colonne esclusive, e diventa rosso se una colonna viene aggiunta
+a un lato solo. Non è un divieto: aggiornare le liste è l'atto deliberato, ed è esattamente
+il momento in cui chiedersi se questa risposta valga ancora.
+
+Il test controlla anche che consenso e recapiti restino su entrambe le tabelle, perché è la
+condizione da cui dipende il contenimento descritto sopra: la rotta di disiscrizione lavora
+sulla persona, e può farlo solo finché il campo esiste da tutte e due le parti.
+
 ### M-03 ✅ — La conversione del lead non è atomica e non riconosce i duplicati
 
 Otto scritture in sequenza senza transazione — un commento nel codice ne annuncia una
@@ -783,7 +797,7 @@ Preventivi, ticket e SLA validano con Zod. Lead, contatti e aziende accettano
 
 **Rimedio.** Uno schema condiviso tra form client e azione server.
 
-### M-09 ◐ — Due librerie di trascinamento e due lingue nei commenti
+### M-09 ✅ — Due librerie di trascinamento e due lingue nei commenti
 
 `@hello-pangea/dnd` e `@dnd-kit` sono entrambe nel bundle. I commenti alternano italiano
 e inglese, a volte nello stesso file.
@@ -796,18 +810,23 @@ si trascinano davvero — pipeline, task, kanban dei ticket, costruttore email �
 la pagina che la conteneva è un redirect da tempo e la riga era commentata. Tabella e
 quattro pacchetti rimossi, build di produzione riuscito.
 
-Sulla lingua la regola c'è ed è scritta nel `CLAUDE.md`: i commenti si scrivono in inglese,
-che è già la maggioranza. Le 382 righe italiane rimaste, quasi tutte spiegazioni lunghe sul
-confine di importazione, si traducono quando si tocca il file per un motivo vero, non in una
-passata a sé: alcune sono citate parola per parola dentro `scripts/mutations/*.json`, e una
-riscrittura che ne dimentica una fa fallire `npm run test:mutations` per un motivo che non
-c'entra con il codice. I file dell'automazione toccati oggi sono già allineati.
+**✅ Chiusa anche la lingua.** Restava la parte che il `CLAUDE.md` sconsigliava di fare in
+una passata, e il motivo era buono: `scripts/mutations/*.json` cita il codice alla lettera,
+quindi tradurre una riga citata fa diventare rossa la suite delle mutazioni per una ragione
+che non c'entra col codice.
 
----
+Il motivo era buono ma il numero no. Misurato invece che temuto: delle 225 mutazioni **una
+sola** citava un commento italiano, in `erasure.json`. Tradurre commento e specifica insieme
+e rieseguire quel gruppo — 15 su 15 intercettate — è tutto ciò che serviva.
 
-## 6. Attrito quotidiano
+Tradotte 146 righe in 32 file. Le quattro che uno scanner ancora segnala sono righe inglesi
+che contengono un esempio accentato: «società» → «societa», «Milàno» → «milano». Il
+rilevatore non sa distinguerle, una persona sì.
 
-Chi usa il CRM otto ore al giorno paga questi rilievi ogni volta.
+⚠️ Durante il lavoro un `biome check --write src/` lanciato per errore su tutto l'albero ha
+riformattato 187 file, fra cui due snapshot generati da Drizzle. Gli snapshot sono stati
+ripristinati subito; il resto è la formattazione che il progetto applica comunque a ogni
+commit tramite lint-staged.
 
 ### U-01 ✅ — Ogni errore arriva come lo stesso messaggio generico
 
@@ -1334,7 +1353,7 @@ vinta o persa, quindi un workspace che arrivava alla pipeline da lì otteneva un
 senza modo di chiudere nulla. Ora usa gli stessi valori predefiniti di ogni altro
 percorso.
 
-### S-10 ◐ — Sincronizzazione con calendario ed email
+### S-10 ✅ — Sincronizzazione con calendario ed email
 
 Google OAuth è già configurato per il login. Estenderlo a calendario e posta significa
 appuntamenti bidirezionali e conversazioni email agganciate alla scheda del contatto. Il
@@ -1381,8 +1400,35 @@ comparivano; quelle in entrata aprono un ticket legato al contatto, e la scheda 
 contatto mostra già i suoi ticket. Mancava solo che l'acquisizione funzionasse, e non
 funzionava: vedi il riquadro qui sotto.
 
-**Resta aperto solo il verso Google → CRM del calendario**, e quello sì dipende dalla
-verifica degli ambiti da parte di Google. Un appuntamento creato su Google non torna qui.
+**✅ E il verso Google → CRM non aspettava Google.** Era registrato come bloccato sulla
+verifica degli ambiti, che è la strada dell'API. Ma ogni calendario *pubblica* anche un
+indirizzo iCal segreto — Google lo mette in Impostazioni → il tuo calendario → Indirizzo
+segreto in formato iCal — e leggerlo è lo specchio esatto di far leggere il nostro. Nessuna
+schermata OAuth, nessuna verifica, nessuna credenziale tenuta per conto di qualcuno.
+
+L'indirizzo si incolla nella stessa finestra da cui si copia il nostro, di proposito: chi ha
+appena incollato il nostro in Google è esattamente la persona che vuole incollare quello di
+Google qui, e mandarla a cercare una seconda schermata è dove la seconda metà smette di
+succedere. Gli eventi esterni compaiono grigi e non si aprono: sono tempo occupato, non
+record.
+
+⚠️ Il lettore **dice** ciò che non sa leggere invece di ometterlo. Una ricorrenza che non sa
+espandere — «l'ultimo venerdì del mese», per esempio — viene contata e riportata, perché una
+settimana che sembra libera è un'affermazione diversa da «non sono riuscito a leggerla», e
+solo la prima fa fissare una riunione sopra un'altra.
+
+⚠️ L'indirizzo lo sceglie l'utente e lo scarica il server: è la forma di una richiesta
+falsificata lato server. Il validatore rifiuta gli host privati, il loopback, le loro
+scritture IPv6, i nomi senza punto, e `169.254.0.0/16` — dove i provider tengono le
+credenziali della macchina. Rifiuta anche il nostro stesso feed, che mostrerebbe ogni
+appuntamento due volte. Quello che **non** copre sta scritto nel modulo: un nome pubblico
+che risolve a un indirizzo privato, perché servirebbe agganciare il socket all'indirizzo
+risolto e né Workers né il fetch di Next lo permettono.
+
+Il fuso orario passa da `Intl` e non da una libreria, come l'aritmetica degli orari
+lavorativi e per la stessa ragione: il bundle è già vicino al limite dei Workers. L'offset
+si legge due volte, e la seconda non è ridondante — dall'altra parte di un cambio d'ora
+legale la prima lettura sbaglia di un'ora, e c'è un test che lo dimostra con Auckland.
 
 ### S-11 — Una vista «oggi» che sostituisca la barra laterale ✅
 

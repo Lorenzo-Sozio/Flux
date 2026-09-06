@@ -34,7 +34,7 @@ import {
 } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
-import { type CalendarFilter, getCalendarEvents } from "@/actions/calendar";
+import { type CalendarFilter, getCalendarEvents, getExternalCalendar } from "@/actions/calendar";
 import { CalendarOverdueSection } from "@/components/crm/calendar-overdue-section";
 import { CalendarTaskPill } from "@/components/crm/calendar-task-pill";
 import { FormattedTime } from "@/components/crm/formatted-time";
@@ -56,9 +56,43 @@ function calUrl(view: string, date: string, filter: string) {
 
 // ─── Event type helpers ───────────────────────────────────────────────────────
 
-type CalendarEvent = Awaited<ReturnType<typeof getCalendarEvents>>[number];
+/**
+ * An occurrence read from a calendar somebody keeps elsewhere.
+ *
+ * Shaped like the pills the page already draws so the layout code needs no
+ * special case, but a variant of its own so nothing can accidentally treat it as
+ * a record: there is no id here that anything in this product owns.
+ */
+type ExternalPill = {
+  id: string;
+  title: string;
+  date: Date;
+  endAt: Date | undefined;
+  allDay: boolean;
+  type: "external";
+  status: string;
+  priority: string;
+  displayTitle: string;
+  entityName: string;
+  link: string;
+  leadId: string | null;
+};
+
+type CalendarEvent = Awaited<ReturnType<typeof getCalendarEvents>>[number] | ExternalPill;
 
 const TYPE_STYLES = {
+  /**
+   * Somebody's own calendar, kept elsewhere and read back in (rilievo S-10).
+   *
+   * ⚠️ Deliberately grey and deliberately not a link. It is busy time, not a
+   * record: there is nothing here to open, nothing to edit, and dressing it like
+   * the rest would invite both.
+   */
+  external: {
+    pill: "bg-slate-100 dark:bg-slate-800/70 text-slate-700 dark:text-slate-300 border-l-slate-400",
+    dot: "bg-slate-400",
+    icon: CalendarDays,
+  },
   task: {
     pill: "bg-blue-100 dark:bg-blue-950/70 text-blue-800 dark:text-blue-200 border-l-blue-500",
     dot: "bg-blue-500",
@@ -142,7 +176,31 @@ export default async function CalendarPage({
   const thirtyDaysAgo = startOfDay(subDays(today, 30));
   const rangeStart = visibleStart < thirtyDaysAgo ? visibleStart : thirtyDaysAgo;
 
-  const events = await getCalendarEvents(currentFilter, { start: rangeStart, end: visibleEnd });
+  const [crmEvents, external, tFeed] = await Promise.all([
+    getCalendarEvents(currentFilter, { start: rangeStart, end: visibleEnd }),
+    // Never blocks and never throws: a calendar that cannot be reached is shown
+    // as empty **and said to be**, because a screen that looks free while
+    // somebody is in a meeting is the failure this feature exists to prevent.
+    getExternalCalendar({ from: rangeStart, to: visibleEnd }).catch(() => null),
+    getTranslations("calendarFeed"),
+  ]);
+
+  const externalEvents: ExternalPill[] = (external?.events ?? []).map((e) => ({
+    id: `external:${e.uid}:${e.start.getTime()}`,
+    title: e.summary,
+    date: e.start,
+    endAt: e.allDay ? undefined : e.end,
+    allDay: e.allDay,
+    type: "external" as const,
+    status: "active",
+    priority: "normal",
+    displayTitle: e.summary || "—",
+    entityName: tFeed("externalBusy"),
+    link: "#",
+    leadId: null,
+  }));
+
+  const events: CalendarEvent[] = [...crmEvents, ...externalEvents];
 
   // ── Quick stats ──────────────────────────────────────────────────────────────
   const todayEvents = events.filter((e) => e.date && isSameDay(new Date(e.date), today));

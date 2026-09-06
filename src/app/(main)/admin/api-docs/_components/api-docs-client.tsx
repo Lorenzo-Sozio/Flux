@@ -75,13 +75,12 @@ interface ApiGroup {
 // ─── Errori comuni ─────────────────────────────────────────────────────────────
 
 /**
- * Le risposte che **ogni** rotta sotto /api/crm può restituire.
+ * The responses **every** route under /api/crm can return.
  *
- * ⚠️ Unite al momento del rendering invece di essere ricopiate in ognuna delle
- * diciotto voci, perché ricopiarle è esattamente come nasce la deriva: si
- * aggiorna il testo di una e non delle altre, e chi legge quella sbagliata
- * scopre il comportamento vero solo a runtime. Nessuna di queste era documentata
- * da nessuna parte, quindi un 429 a metà di un'importazione arrivava senza
+ * ⚠️ Merged at render time rather than copied into each of the eighteen entries,
+ * because copying is exactly how drift starts: one entry's text is updated and the others
+ * are not, and whoever reads the wrong one discovers the real behaviour at runtime. None
+ * of these was documented anywhere, so a 429 halfway through an import arrived with no
  * preavviso.
  */
 const CRM_COMMON_RESPONSES: ApiEndpoint["responses"] = [
@@ -121,10 +120,10 @@ const CRM_COMMON_RESPONSES: ApiEndpoint["responses"] = [
 ];
 
 /**
- * Le risposte comuni a ogni rotta protetta da `CRON_SECRET`.
+ * The responses common to every route guarded by `CRON_SECRET`.
  *
- * ⚠️ Il 500 non è teorico: se `CRON_SECRET` non è impostato sul server, ogni job
- * risponde 500 per sempre e nessuno lo esegue. Vale la pena saperlo prima.
+ * ⚠️ The 500 is not theoretical: with `CRON_SECRET` unset on the server every job
+ * answers 500 for ever and none of them run. Worth knowing in advance.
  */
 const CRON_COMMON_RESPONSES: ApiEndpoint["responses"] = [
   {
@@ -140,23 +139,23 @@ const CRON_COMMON_RESPONSES: ApiEndpoint["responses"] = [
 ];
 
 /**
- * Le risposte dichiarate da una voce, più quelle comuni che non ha già.
+ * An entry's declared responses, plus whichever common ones it does not already have.
  *
- * ⚠️ Le varianti bulk non restituiscono 422. Una riga rifiutata non fa fallire la
- * richiesta: si risponde 200 e l'errore sta dentro `results`, riga per riga.
+ * ⚠️ The bulk variants do not return 422. A rejected row does not fail the request: the
+ * answer is 200 and the error sits inside `results`, row by row.
  * Documentare un 422 su di esse manderebbe chi integra a cercare un codice di
- * stato che non arriva mai, invece che dentro il corpo dove sta davvero.
+ * status that never arrives, instead of inside the body where it actually is.
  */
 function responsesFor(endpoint: ApiEndpoint): ApiEndpoint["responses"] {
   const isCrm = endpoint.path.startsWith("/api/crm/");
   const isCron = endpoint.path.startsWith("/api/cron/");
   if (!isCrm && !isCron) return endpoint.responses;
 
-  // ⚠️ L'opposizione e la cancellazione non contano sul piano e quindi non
-  // rispondono mai 429. È una scelta: rifiutare un'opposizione perché il piano è
+  // ⚠️ Opt-out and erasure are not metered against the plan and therefore never answer
+  // 429. That is a choice: refusing an opt-out because the plan is
   // esaurito significa continuare a contattare chi ha chiesto di smettere, e
-  // rifiutare una cancellazione significa mancare una scadenza che non è nostra
-  // da spostare. Nessuna delle due è una decisione di fatturazione.
+  // refusing an erasure means missing a deadline that is not ours to move. Neither is a
+  // billing decision.
   const UNMETERED = ["/api/crm/opt-out", "/api/crm/erasure"];
 
   const common = isCron
@@ -189,7 +188,7 @@ const GROUPS: ApiGroup[] = [
       "3. SESSIONE — il cookie HttpOnly `authjs.session-token` di NextAuth v5, cioè il modo in cui il prodotto chiama sé stesso dal browser. Il workspace viene dal JWT e il proxy inietta `x-tenant-id` internamente; lo stesso header inviato dal client non viene mai creduto.\n" +
       "⚠️ Il diritto di scrivere lo decide il ruolo nel WORKSPACE, non quello di piattaforma: un membro `viewer` è in sola lettura anche qui e riceve 401, esattamente come nell'interfaccia.\n\n" +
       "Un `Authorization: Bearer` presente ma non valido si ferma lì: non viene mai promosso a sessione dal cookie che casualmente accompagna la richiesta.\n\n" +
-      "Fuori da /api/crm: i cron usano `Authorization: Bearer <CRON_SECRET>`, un segreto a parte. I webhook di terze parti (Stripe, Resend) si verificano dalla firma del payload, non da una nostra chiave. Il feed calendario porta un token firmato dentro l'indirizzo, perché un programma di calendario non sa fare login.",
+      "Fuori da /api/crm: i cron usano `Authorization: Bearer <CRON_SECRET>`, un segreto a parte. I webhook di terze parti (Stripe, Resend) si verificano dalla firma del payload, non da una nostra chiave. Il feed calendario porta un token firmato dentro l'indirizzo, perché un programma di calendario non sa fare login. Il verso opposto — un calendario esterno letto qui dentro — non è una rotta: l'indirizzo si salva dalle impostazioni del calendario e viene riletto dal server ogni quindici minuti.",
     isInfoOnly: true,
     endpoints: [],
   },

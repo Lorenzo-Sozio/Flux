@@ -11,6 +11,15 @@ export const users = pgTable("user", {
   image: text("image"),
   password: text("password"),
   role: text("role").default("user").notNull(),
+  /**
+   * The address of a calendar this person publishes elsewhere, read back in.
+   *
+   * ⚠️ It is a credential, the same way ours is: Google, Outlook and Apple each
+   * give a *secret* iCal address, and anybody holding it can read that person's
+   * calendar. It is stored because there is nowhere else to put it, shown back
+   * only to its owner, and cleared by emptying the field.
+   */
+  externalCalendarUrl: text("external_calendar_url"),
 });
 
 // ─── User Groups ──────────────────────────────────────────────────────────────

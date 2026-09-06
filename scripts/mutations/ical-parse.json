@@ -1,0 +1,62 @@
+[
+  {
+    "file": "src/lib/ical-parse.ts",
+    "description": "⚠️⚠️ una regola non comprensibile torna un elenco vuoto invece di null: la settimana risulta libera e qualcuno fissa una riunione sopra un'altra",
+    "find": "  if (!freq || ![\"DAILY\", \"WEEKLY\", \"MONTHLY\", \"YEARLY\"].includes(freq)) return null;",
+    "replace": "  if (!freq || ![\"DAILY\", \"WEEKLY\", \"MONTHLY\", \"YEARLY\"].includes(freq)) return [];"
+  },
+  {
+    "file": "src/lib/ical-parse.ts",
+    "description": "⚠️⚠️ le regole che rimodellano il ricorrere invece di ripeterlo vengono accettate e approssimate: le occorrenze mostrate sono nei giorni sbagliati",
+    "find": "    if (parts[unsupported]) return null;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ical-parse.ts",
+    "description": "⚠️ «il secondo lunedi'» viene letto come «ogni lunedi'»: quattro occorrenze al mese invece di una",
+    "find": "      if (!WEEKDAYS.includes(day)) return null;",
+    "replace": "      if (!WEEKDAYS.includes(day)) continue;"
+  },
+  {
+    "file": "src/lib/ical-parse.ts",
+    "description": "⚠️⚠️ il fuso orario dell'evento viene ignorato e l'ora resta quella scritta: ogni appuntamento si sposta di un paio d'ore",
+    "find": "  return { at: zonedToUtc(`${y}-${m}-${d}T${hh}:${mm}:${ss}`, zone), allDay: false };",
+    "replace": "  return { at: new Date(`${y}-${m}-${d}T${hh}:${mm}:${ss}Z`), allDay: false };"
+  },
+  {
+    "file": "src/lib/ical-parse.ts",
+    "description": "⚠️ l'offset si legge una volta sola: dall'altra parte del cambio d'ora legale ogni appuntamento e' sbagliato di un'ora",
+    "find": "  for (let pass = 0; pass < 2; pass++) {",
+    "replace": "  for (let pass = 0; pass < 1; pass++) {"
+  },
+  {
+    "file": "src/lib/ical-parse.ts",
+    "description": "⚠️ si divide sul primo due punti: un parametro citato che ne contiene uno fa leggere male tutto il resto dell'evento",
+    "find": "    if (c === '\"') quoted = !quoted;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ical-parse.ts",
+    "description": "⚠️ un evento annullato resta sul calendario: la riunione disdetta occupa comunque lo spazio",
+    "find": "    if (status && NOT_HAPPENING.has(status)) continue;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ical-parse.ts",
+    "description": "le occorrenze escluse tornano: la settimana in cui l'incontro era saltato risulta occupata",
+    "find": "      if (exdates.some((x) => x.getTime() === at.getTime())) continue;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ical-parse.ts",
+    "description": "lo spazio che segna la piegatura resta nel testo: ogni riga lunga del feed arriva con uno spazio in mezzo",
+    "find": "  return text.replace(/\\r\\n[ \\t]/g, \"\").replace(/\\n[ \\t]/g, \"\");",
+    "replace": "  return text.replace(/\\r\\n/g, \"\").replace(/\\n/g, \"\");"
+  },
+  {
+    "file": "src/lib/ical-parse.ts",
+    "description": "una durata dichiarata al posto della fine non viene letta e l'evento viene scartato",
+    "find": "    return ms === null ? null : { at: new Date(start.at.getTime() + ms), allDay: start.allDay };",
+    "replace": "    return null;"
+  }
+]

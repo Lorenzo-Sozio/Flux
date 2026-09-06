@@ -369,12 +369,28 @@
     "noAppUrl": "This workspace has no public address configured, so the link would point nowhere. Ask an administrator to set it.",
     "secretTitle": "Treat this address like a password",
     "secretBody": "A calendar cannot sign in, so the address itself is what says who you are. Anyone you send it to can read your appointments.",
-    "oneWayTitle": "It goes one way",
-    "oneWayBody": "Appointments booked here appear in your calendar. Appointments booked in your calendar do not appear here.",
+    "oneWayTitle": "Each direction is set up separately",
+    "oneWayBody": "This address sends appointments out. To bring your own calendar in, paste its address in the box below — the two are independent, and either can be used on its own.",
     "howTitle": "Where to paste it",
     "howGoogle": "Google Calendar: Other calendars, then From URL.",
     "howOutlook": "Outlook: Add calendar, then Subscribe from web.",
-    "howApple": "Apple Calendar: File, then New Calendar Subscription."
+    "howApple": "Apple Calendar: File, then New Calendar Subscription.",
+    "inboundTitle": "And the other way round",
+    "inboundBody": "Paste the secret iCal address of a calendar you keep elsewhere and its appointments appear here as busy time, so nothing gets booked over them. In Google Calendar it is under Settings → your calendar → Secret address in iCal format.",
+    "inboundSaved": "Reading that calendar. It refreshes every fifteen minutes.",
+    "inboundNone": "No outside calendar is being read.",
+    "save": "Save",
+    "refused": {
+      "empty": "Paste an address first.",
+      "not-a-url": "That is not an address a browser could open.",
+      "scheme": "Only http and https addresses can be read.",
+      "private-host": "That address is not on the public internet, so this server would only be talking to itself.",
+      "our-own-feed": "That is this workspace's own feed: reading it back would show every appointment twice.",
+      "failed": "It could not be saved. Try again."
+    },
+    "externalBusy": "Elsewhere",
+    "externalUnreadable": "{count, plural, one {# event in that calendar could not be read} other {# events in that calendar could not be read}}",
+    "externalFailed": "That calendar could not be reached, so nothing from it is shown."
   },
   "chat": {
     "title": "Chat",
@@ -2288,12 +2304,7 @@
       "viewer": "Viewer"
     },
     "rolePerms": {
-      "owner": [
-        "All admin permissions",
-        "Transfer workspace ownership",
-        "Delete workspace",
-        "Manage billing"
-      ],
+      "owner": ["All admin permissions", "Transfer workspace ownership", "Delete workspace", "Manage billing"],
       "admin": [
         "All user permissions",
         "Invite and manage users",

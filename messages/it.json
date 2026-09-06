@@ -369,12 +369,28 @@
     "noAppUrl": "Questo spazio di lavoro non ha un indirizzo pubblico configurato, quindi il collegamento non porterebbe da nessuna parte. Chiedi a un amministratore di impostarlo.",
     "secretTitle": "Tratta questo indirizzo come una password",
     "secretBody": "Un calendario non può accedere, quindi è l'indirizzo stesso a dire chi sei. Chiunque lo riceva può leggere i tuoi appuntamenti.",
-    "oneWayTitle": "Funziona in una direzione sola",
-    "oneWayBody": "Gli appuntamenti creati qui compaiono nel tuo calendario. Quelli creati nel calendario non compaiono qui.",
+    "oneWayTitle": "Le due direzioni si impostano a parte",
+    "oneWayBody": "Questo indirizzo manda fuori gli appuntamenti. Per far entrare il tuo calendario, incolla il suo indirizzo nel riquadro qui sotto: le due cose sono indipendenti e ciascuna funziona da sola.",
     "howTitle": "Dove incollarlo",
     "howGoogle": "Google Calendar: Altri calendari, poi Da URL.",
     "howOutlook": "Outlook: Aggiungi calendario, poi Iscriviti dal web.",
-    "howApple": "Calendario di Apple: File, poi Nuova sottoscrizione calendario."
+    "howApple": "Calendario di Apple: File, poi Nuova sottoscrizione calendario.",
+    "inboundTitle": "E nel verso opposto",
+    "inboundBody": "Incolla l'indirizzo iCal segreto di un calendario che tieni altrove e i suoi appuntamenti compaiono qui come tempo occupato, così nessuno ci fissa sopra qualcos'altro. In Google Calendar sta in Impostazioni → il tuo calendario → Indirizzo segreto in formato iCal.",
+    "inboundSaved": "Quel calendario viene letto. Si aggiorna ogni quindici minuti.",
+    "inboundNone": "Nessun calendario esterno in lettura.",
+    "save": "Salva",
+    "refused": {
+      "empty": "Prima incolla un indirizzo.",
+      "not-a-url": "Non è un indirizzo che un browser saprebbe aprire.",
+      "scheme": "Si possono leggere solo indirizzi http e https.",
+      "private-host": "Quell'indirizzo non è su internet: il server parlerebbe soltanto con sé stesso.",
+      "our-own-feed": "È il feed di questo spazio di lavoro: rileggerlo mostrerebbe ogni appuntamento due volte.",
+      "failed": "Non è stato possibile salvare. Riprova."
+    },
+    "externalBusy": "Altrove",
+    "externalUnreadable": "{count, plural, one {# evento di quel calendario non è leggibile} other {# eventi di quel calendario non sono leggibili}}",
+    "externalFailed": "Quel calendario non è raggiungibile, quindi non se ne mostra niente."
   },
   "chat": {
     "title": "Chat",

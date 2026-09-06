@@ -138,8 +138,8 @@ export function generateICS(event: ICSEvent, method: "REQUEST" | "CANCEL" | "REP
 /**
  * The audit's S-10 asks for two-way sync with Google Calendar and Gmail, and
  * names the reason: double entry is the main thing that gets a CRM abandoned.
- * Two-way is gated on Google verifying the calendar and mail scopes — somebody
- * else's queue, and not a date this project can promise.
+ * Google's API route to it is gated on Google verifying the calendar scope —
+ * somebody else's queue, and not a date this project can promise.
  *
  * A subscription is not gated on anything, and removes the double entry in the
  * direction that causes it. Google Calendar, Outlook and Apple Calendar all
@@ -147,9 +147,9 @@ export function generateICS(event: ICSEvent, method: "REQUEST" | "CANCEL" | "REP
  * own calendar and keeps up to date, with no OAuth screen and no tokens held on
  * anybody's behalf.
  *
- * What it does not do is the other direction. An appointment made in Google does
- * not come back here, and the settings page says so rather than leaving someone
- * to discover it.
+ * The other direction is the mirror of this one and needs Google no more than
+ * this does: every calendar also *publishes* a secret iCal address, and
+ * `ical-parse.ts` reads one back in. So neither direction waits on anybody.
  *
  * ⚠️ The difference from an invitation is not the format, it is the method. An
  * invitation is `REQUEST`: one event, addressed to attendees, which a mail client

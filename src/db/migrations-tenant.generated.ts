@@ -336,4 +336,12 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\n-- The date it reached the customer, which the status cannot say: "completed" is a\n-- state somebody set, and support answering "it has not arrived" needs a when.\nALTER TABLE "order" ADD COLUMN IF NOT EXISTS "delivered_at" timestamp;\n',
     ],
   },
+  {
+    tag: "0013_a_calendar_read_back_in",
+    folderMillis: 1788980010000,
+    hash: "ca6adbe1f9eef664d1b2a0be454685aa51dc6c6a368d28705db094bfa6ff28f5",
+    sql: [
+      '-- The address of a calendar this person publishes elsewhere, so appointments made\n-- in Google, Outlook or Apple show up here instead of being booked over.\n--\n-- Additive and re-runnable, as every tenant migration has to be: the Neon HTTP\n-- driver holds no session, so a migration that fails halfway leaves the statements\n-- before it applied and records nothing.\nALTER TABLE "user" ADD COLUMN IF NOT EXISTS "external_calendar_url" text;\n',
+    ],
+  },
 ];

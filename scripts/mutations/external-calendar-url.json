@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/lib/external-calendar-url.ts",
+    "description": "⚠️⚠️ gli indirizzi privati non vengono piu' rifiutati: il server va a leggere il servizio di metadati del provider e ne restituisce le credenziali",
+    "find": "  if (LOOPBACK.has(host) || isPrivateIPv4(host) || isPrivateIPv6(host)) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/external-calendar-url.ts",
+    "description": "⚠️⚠️ 169.254.0.0/16 smette di essere privato: e' esattamente dove sta il servizio di metadati",
+    "find": "  if (a === 169 && b === 254) return true; // link-local, and the metadata service",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/external-calendar-url.ts",
+    "description": "⚠️⚠️ si accetta qualunque schema: file:// legge il disco del server e lo restituisce",
+    "find": "  if (url.protocol !== \"http:\" && url.protocol !== \"https:\") return { ok: false, reason: \"scheme\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/external-calendar-url.ts",
+    "description": "⚠️ un nome senza punto passa: gli host interni di rete diventano raggiungibili",
+    "find": "  if (!host.includes(\".\") && !host.startsWith(\"[\")) return { ok: false, reason: \"private-host\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/external-calendar-url.ts",
+    "description": "⚠️ gli indirizzi IPv6 privati non vengono riconosciuti: la stessa macchina, scritta in un altro modo",
+    "find": "    bare.startsWith(\"fc\") ||",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/external-calendar-url.ts",
+    "description": "⚠️ il feed di questo stesso spazio di lavoro viene accettato: ogni appuntamento compare due volte e la copia non e' modificabile",
+    "find": "        return { ok: false, reason: \"our-own-feed\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/external-calendar-url.ts",
+    "description": "webcal:// non viene piu' normalizzato: l'indirizzo che ogni client di calendario consegna viene rifiutato",
+    "find": "  const normalised = trimmed.replace(/^webcal:\\/\\//i, \"https://\");",
+    "replace": "  const normalised = trimmed;"
+  },
+  {
+    "file": "src/lib/external-calendar-url.ts",
+    "description": "un indirizzo incollato con spazi attorno viene rifiutato come non valido",
+    "find": "  const trimmed = raw.trim();",
+    "replace": "  const trimmed = raw;"
+  }
+]
