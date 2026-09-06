@@ -271,6 +271,14 @@ export function accountPlacement(groups: readonly NavGroup[]): NavGroup[] {
  * The bottom bar has four slots and this list runs longer, so a workspace
  * without sales — or without support — still gets a full bar instead of gaps.
  */
+/**
+ * Slots in the bottom bar.
+ *
+ * ⚠️ The menu is not one of them: it is the trigger in the header, on the left,
+ * at the edge its panel comes out of. This is five *destinations*.
+ */
+export const MOBILE_TAB_SLOTS = 5;
+
 export const MOBILE_TAB_PREFERENCE = [
   "/dashboard/crm",
   "/dashboard/contacts",
@@ -295,7 +303,10 @@ export const MOBILE_TAB_PREFERENCE = [
  */
 export function pickMobileTabs(
   groups: readonly NavGroup[],
-  { preference = MOBILE_TAB_PREFERENCE, limit = 4 }: { preference?: readonly string[]; limit?: number } = {},
+  {
+    preference = MOBILE_TAB_PREFERENCE,
+    limit = MOBILE_TAB_SLOTS,
+  }: { preference?: readonly string[]; limit?: number } = {},
 ): NavMainItem[] {
   const reachable = new Map<string, NavMainItem>();
   // Sidebar groups only. Administration is drawn in the account menu, and a

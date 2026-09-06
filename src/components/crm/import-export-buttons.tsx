@@ -96,13 +96,16 @@ export function ImportExportButtons({ entityType, onImportSuccess }: Props) {
 
   return (
     <>
-      <Button variant="outline" size="sm" onClick={handleExport}>
-        <Download className="mr-2 h-4 w-4" />
-        Export CSV
+      {/* Icon-only on a phone. Two labelled buttons are 200px of a 343px header
+          row spent on the two things nobody does from a phone — but hiding them
+          outright would remove the capability, and the icons are unambiguous. */}
+      <Button variant="outline" size="sm" onClick={handleExport} aria-label="Export CSV">
+        <Download className="h-4 w-4 sm:mr-2" />
+        <span className="max-sm:sr-only">Export CSV</span>
       </Button>
-      <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-        <Upload className="mr-2 h-4 w-4" />
-        Import CSV
+      <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} aria-label="Import CSV">
+        <Upload className="h-4 w-4 sm:mr-2" />
+        <span className="max-sm:sr-only">Import CSV</span>
       </Button>
 
       <Dialog open={importOpen} onOpenChange={setImportOpen}>

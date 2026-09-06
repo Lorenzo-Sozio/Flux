@@ -126,7 +126,14 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
                 {/* Below md the bottom bar opens the menu, and the trigger would
                     be a second control for the same thing in the hardest corner
                     of the screen to reach one-handed. */}
-                <SidebarTrigger className="-ml-1 hidden md:flex" />
+                {/*
+                  ⚠️ First on the left, at every width, because that is the edge
+                  the panel comes out of. It lived here, moved to the last slot
+                  of the bottom bar for a while, and that was wrong twice over: a
+                  control on the right that opens a panel on the left, and a
+                  quarter of the bar spent on a menu instead of a destination.
+                */}
+                <SidebarTrigger className="-ml-1 shrink-0" />
                 <Separator
                   orientation="vertical"
                   className="mx-2 hidden data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center md:block"

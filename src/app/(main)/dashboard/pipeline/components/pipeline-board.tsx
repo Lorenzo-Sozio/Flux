@@ -29,6 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 
 type Deal = {
   id: string;
@@ -133,7 +134,10 @@ export function PipelineBoard({
   if (!isMounted) return null;
 
   return (
-    <div className="flex h-[calc(100dvh-120px)] w-full flex-col overflow-hidden">
+    // ⚠️ The height has to clear the bottom bar as well as the header, or the
+    // last card in every column sits behind the tabs and the board's own
+    // scrollbar is unreachable.
+    <div className="flex h-[calc(100dvh-120px-var(--mobile-nav-height)-var(--safe-bottom))] w-full flex-col overflow-hidden md:h-[calc(100dvh-120px)]">
       <LostDealDialog
         open={pendingLoss !== null}
         dealName={pendingLoss?.dealName ?? ""}
@@ -231,7 +235,15 @@ export function PipelineBoard({
             return (
               <div
                 key={stage.id}
-                className="flex h-full min-w-[280px] flex-1 shrink-0 flex-col overflow-hidden rounded-xl border bg-muted/30 shadow-sm"
+                className={cn(
+                  "flex h-full min-w-[280px] flex-1 shrink-0 flex-col overflow-hidden rounded-xl border bg-muted/30 shadow-sm",
+                  // ⚠️ `flex-1` means basis 0, so a width is ignored and every
+                  // column is exactly its 280px minimum — which lands one column
+                  // per screen with nothing of the next one showing, and a board
+                  // that scrolls sideways with no sign that it does. Below sm a
+                  // column takes 85% and the edge of the next one is the sign.
+                  "max-sm:w-[85%] max-sm:flex-none",
+                )}
               >
                 <div className="flex shrink-0 flex-col gap-1 border-b bg-background/50 p-4 backdrop-blur-sm">
                   <div className="flex items-center justify-between">

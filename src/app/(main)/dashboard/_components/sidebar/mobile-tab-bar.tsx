@@ -5,10 +5,8 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { Menu } from "lucide-react";
 import { useTranslations } from "next-intl";
 
-import { useSidebar } from "@/components/ui/sidebar";
 import { cn } from "@/lib/utils";
 import { applyNavAccess, type NavAccess } from "@/navigation/sidebar/filter-nav";
 import { pickMobileTabs, sidebarItems } from "@/navigation/sidebar/sidebar-items";
@@ -18,8 +16,13 @@ import { pickMobileTabs, sidebarItems } from "@/navigation/sidebar/sidebar-items
  *
  * A hamburger is two taps and a hidden mental model for every single move
  * between screens, and on a phone held one-handed the top-left corner is the
- * hardest place on the glass to reach. The four destinations someone actually
+ * hardest place on the glass to reach. The five destinations someone actually
  * moves between all day belong under the thumb.
+ *
+ * ⚠️ The menu is **not** one of them. It is the trigger in the header, on the
+ * left, at the edge the panel comes out of. A menu button in the last slot of
+ * this bar opened a panel from the opposite side of the screen and cost a fifth
+ * of the navigation to do it.
  *
  * ⚠️ The entries are chosen from the **already filtered** menu, so a viewer
  * cannot get a tab to a page they would be bounced from, and a workspace whose
@@ -28,7 +31,7 @@ import { pickMobileTabs, sidebarItems } from "@/navigation/sidebar/sidebar-items
  * the first one.
  *
  * Locked entries are skipped rather than shown. In the sidebar a locked module
- * is the upgrade prompt and worth its line; in five slots it is a quarter of the
+ * is the upgrade prompt and worth its line; in five slots it is a fifth of the
  * navigation spent on something that does not open.
  */
 
@@ -42,12 +45,13 @@ function isActive(pathname: string, url: string): boolean {
 export function MobileTabBar({ navAccess }: { readonly navAccess: NavAccess }) {
   const t = useTranslations("nav");
   const pathname = usePathname();
-  const { setOpenMobile } = useSidebar();
 
+  // Five destinations. The menu is the trigger in the header, on the left,
+  // where the panel it opens comes from — it is not one of these.
   const tabs = useMemo(() => pickMobileTabs(applyNavAccess(sidebarItems, navAccess)), [navAccess]);
 
-  // The active tab decides which of the five is highlighted; when the current
-  // page is not one of them, none is, and "More" is not falsely lit either.
+  // When the current page is not one of the five, none of them is lit — rather
+  // than lighting whichever happens to be a prefix of the path.
   const activeUrl = tabs.find((tab) => isActive(pathname, tab.url))?.url;
 
   return (
@@ -83,18 +87,6 @@ export function MobileTabBar({ navAccess }: { readonly navAccess: NavAccess }) {
             </li>
           );
         })}
-
-        <li className="flex-1">
-          <button
-            type="button"
-            onClick={() => setOpenMobile(true)}
-            className="flex h-full w-full flex-col items-center justify-center gap-1 px-1 text-muted-foreground transition-colors"
-            data-no-touch-target
-          >
-            <Menu className="size-5 shrink-0" aria-hidden />
-            <span className="font-medium text-[10px] leading-none">{t("more")}</span>
-          </button>
-        </li>
       </ul>
     </nav>
   );

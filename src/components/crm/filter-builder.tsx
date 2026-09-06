@@ -667,9 +667,16 @@ export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, 
   return (
     <>
       {/* Trigger button */}
-      <Button variant="outline" size="sm" className="relative gap-2" onClick={() => handleOpenChange(true)}>
+      <Button
+        variant="outline"
+        size="sm"
+        className="relative gap-2"
+        onClick={() => handleOpenChange(true)}
+        aria-label={t("triggerLabel")}
+      >
         <SlidersHorizontal className="h-4 w-4" />
-        {t("triggerLabel")}
+        {/* The word costs 60px of a 343px header row and the icon does not. */}
+        <span className="max-sm:sr-only">{t("triggerLabel")}</span>
         {activeCount > 0 && (
           <Badge className="-top-1.5 -right-1.5 absolute flex h-4 min-w-4 items-center justify-center px-1 text-[10px]">
             {activeCount}
@@ -678,10 +685,17 @@ export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, 
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent
-          className="flex flex-col gap-0 overflow-hidden p-0"
-          style={{ maxWidth: "min(760px, 95vw)", width: "100%", maxHeight: "85vh" }}
-        >
+        {/*
+          ⚠️ This used to size itself with an inline style — a max width of
+          min(760px, 95vw) and a max height of 85 percent of the viewport — and
+          an inline style beats every class the Dialog primitive sets. So on a
+          phone the filter builder was a 95-percent-wide box floating in the
+          middle, and 85 percent of a viewport that iOS Safari measures taller
+          than the screen. It takes the full-screen layout every other dialog
+          takes now, and asks for its width in a class the primitive can reason
+          about.
+        */}
+        <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-[760px]">
           {/* Header */}
           <DialogHeader className="shrink-0 border-b px-5 py-4">
             <DialogTitle className="flex items-center gap-2.5">

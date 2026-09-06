@@ -257,9 +257,13 @@ for (const file of files.sort()) {
   // ⚠️ The class rules above read `className` only, so `style={{ maxHeight:
   // "calc(100vh - 280px)" }}` walked straight past them — and the calendar had
   // two of them, holding the height of the week and day grids.
-  for (const match of source.matchAll(/style=\{\{[^}]*\b100vh\b/g)) {
+  // ⚠️ Any `vh`, not only `100vh`: `maxHeight: "85vh"` is the same iOS defect at
+  // 85% of it. And an inline style beats every class a primitive sets, so a
+  // dialog sizing itself here silently opts out of the responsive layout the
+  // primitive was given.
+  for (const match of source.matchAll(/style=\{\{[^}]*[0-9]vh/g)) {
     const line = source.slice(0, match.index ?? 0).split(NEWLINE).length;
-    report("vh-unit", file, line, "100vh in an inline style — use 100dvh");
+    report("vh-unit", file, line, "a vh height in an inline style — use dvh, and prefer a class");
   }
 
   // ── Hover-only controls ─────────────────────────────────────────────────

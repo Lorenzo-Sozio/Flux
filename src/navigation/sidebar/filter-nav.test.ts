@@ -22,6 +22,7 @@ import { applyNavAccess, computeNavAccess, type NavAccess } from "./filter-nav";
 import {
   accountPlacement,
   MOBILE_TAB_PREFERENCE,
+  MOBILE_TAB_SLOTS,
   type NavGroup,
   pickMobileTabs,
   sidebarItems,
@@ -282,7 +283,14 @@ describe("the bottom bar on a phone", () => {
   });
 
   it("fills every slot for a workspace with the whole product", () => {
-    expect(pickMobileTabs(menuFor(owner))).toHaveLength(4);
+    expect(pickMobileTabs(menuFor(owner))).toHaveLength(MOBILE_TAB_SLOTS);
+  });
+
+  it("offers no menu button of its own", () => {
+    // The menu is the header trigger, on the left, where its panel comes from.
+    // A sixth slot here would be a second control for it, on the wrong side.
+    expect(MOBILE_TAB_PREFERENCE).not.toContain("/dashboard/settings");
+    expect(pickMobileTabs(menuFor(owner)).every((tab) => tab.url.startsWith("/dashboard/"))).toBe(true);
   });
 
   it("skips a module the plan excludes, and fills the slot from further down", () => {
@@ -292,9 +300,9 @@ describe("the bottom bar on a phone", () => {
 
     expect(urls).not.toContain("/dashboard/support/tickets");
     expect(urls).not.toContain("/dashboard/pipeline");
-    // Still four: a locked entry costs a quarter of the bar for a page that
-    // does not open, so the list runs longer than the bar on purpose.
-    expect(tabs).toHaveLength(4);
+    // Still full: a locked entry costs a fifth of the bar for a page that does
+    // not open, so the preference list runs longer than the bar on purpose.
+    expect(tabs).toHaveLength(MOBILE_TAB_SLOTS);
   });
 
   it("keeps the preference order rather than the menu order", () => {

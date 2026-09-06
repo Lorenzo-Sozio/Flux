@@ -43,13 +43,13 @@
   },
   {
     "file": "src/navigation/sidebar/sidebar-items.ts",
-    "description": "a module outside the plan takes a slot in the bottom bar: a quarter of the phone's navigation goes to a page that does not open",
+    "description": "a module outside the plan takes a slot in the bottom bar: a fifth of the phone's navigation goes to a page that does not open",
     "find": "      if (!item.locked) reachable.set(item.url, item);",
     "replace": "      reachable.set(item.url, item);"
   },
   {
     "file": "src/navigation/sidebar/sidebar-items.ts",
-    "description": "the bottom bar draws from the account menu too: Settings and the help centre compete for the four slots a phone has",
+    "description": "the bottom bar draws from the account menu too: Settings and the help centre compete for the five slots a phone has",
     "find": "  for (const group of sidebarPlacement(groups)) {",
     "replace": "  for (const group of groups) {"
   }
