@@ -109,6 +109,64 @@ describe("the API documentation", () => {
     expect(missing).toEqual([]);
   });
 
+  it("⚠️ shows every error status a route can actually answer with", () => {
+    // The gap this closes was found by hand twice, and reopened the moment a
+    // route changed: adding a session guard to the exchange-rate endpoint gave it
+    // a 401 that nothing wrote down. An undocumented status is met at the worst
+    // moment — halfway through an import, deciding whether to retry.
+    //
+    // Mirrors what a reader sees rather than what the literals say. The component
+    // merges shared error sets into /api/crm and /api/cron at render time, minus
+    // the 422 on bulk routes — a rejected row comes back inside a 200 — and the
+    // 429 on opt-out and erasure, which are deliberately unmetered.
+    const CRM_COMMON = [400, 401, 404, 422, 429];
+    const CRON_COMMON = [401, 500];
+    const UNMETERED = ["/api/crm/opt-out", "/api/crm/erasure"];
+    /** Statuses a route answers with through a shared helper rather than inline. */
+    const VIA_HELPER: Record<string, number[]> = { "/api/cron/": [401, 500] };
+
+    const src = read(API_DOCS);
+    const drift: string[] = [];
+
+    for (const raw of src.split(/\n {6}\{\n {8}id: "/).slice(1)) {
+      // Bound the block, or the last entry absorbs the rest of the file.
+      const cut = raw.indexOf("\n      },");
+      const block = cut > 0 ? raw.slice(0, cut) : raw;
+
+      const method = block.match(/method:\s*"(\w+)"/)?.[1];
+      const path = block.match(/path:\s*"([^"]+)"/)?.[1];
+      if (!method || !path) continue;
+
+      const declared = [...block.matchAll(/status:\s*(\d{3})/g)].map((m) => Number(m[1]));
+
+      let common: number[] = [];
+      if (path.startsWith("/api/crm/")) {
+        common = CRM_COMMON.filter(
+          (c) => !(path.endsWith("/bulk") && c === 422) && !(UNMETERED.includes(path) && c === 429),
+        );
+      } else if (path.startsWith("/api/cron/")) {
+        common = CRON_COMMON;
+      }
+      const shown = new Set([...declared, ...common]);
+
+      const file = `src/app/api/${path.replace(/^\/api\//, "").replace(/\{(\w+)\}/g, "[$1]")}/route.ts`;
+      if (!existsSync(file)) continue;
+
+      // Attribute a status to the handler it sits in: one file often holds both a
+      // GET and a DELETE, and blaming each for the other's errors is noise.
+      const handlers = read(file).split("\nexport async function ");
+      const mine = handlers.find((h) => h.startsWith(`${method}(`)) ?? (handlers.length === 1 ? handlers[0] : "");
+      const helper = Object.entries(VIA_HELPER).find(([p]) => path.startsWith(p))?.[1] ?? [];
+      const actual = new Set([...[...mine.matchAll(/status:\s*(\d{3})/g)].map((m) => Number(m[1])), ...helper]);
+
+      for (const status of actual) {
+        if (status >= 400 && !shown.has(status)) drift.push(`${method} ${path} answers ${status}`);
+      }
+    }
+
+    expect(drift).toEqual([]);
+  });
+
   it("⚠️ never tells anybody to call a per-workspace subdomain", () => {
     // It did, for long enough that two sections of the same page contradicted
     // each other: one said the product lives on a single domain, the other told

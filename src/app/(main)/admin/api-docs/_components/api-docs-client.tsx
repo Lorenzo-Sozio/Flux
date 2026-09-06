@@ -921,6 +921,12 @@ const GROUPS: ApiGroup[] = [
         ],
         responses: [
           {
+            status: 401,
+            description:
+              "Sessione assente. La cache dei tassi sta nel database del workspace, quindi senza sessione non c'e nessun database da leggere",
+            example: '{\n  "error": "Unauthorized"\n}',
+          },
+          {
             status: 200,
             description: "Tassi di cambio (Cache-Control: public, s-maxage=3600)",
             example: JSON.stringify(
@@ -985,6 +991,12 @@ const GROUPS: ApiGroup[] = [
           example: JSON.stringify({ amount: 1000, from: "USD", to: "GBP" }, null, 2),
         },
         responses: [
+          {
+            status: 401,
+            description:
+              "Sessione assente. La cache dei tassi sta nel database del workspace, quindi senza sessione non c'e nessun database da leggere",
+            example: '{\n  "error": "Unauthorized"\n}',
+          },
           {
             status: 503,
             description: "Il fornitore dei tassi di cambio non risponde",
