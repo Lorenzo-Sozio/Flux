@@ -45,6 +45,16 @@ import type { NavGroup, NavMainItem, NavSubItem } from "@/navigation/sidebar/sid
 
 interface NavMainProps {
   readonly items: readonly NavGroup[];
+  /**
+   * Whether to draw the quick-create button above the groups.
+   *
+   * ⚠️ False for the second call. The sidebar renders this component twice below
+   * md — once for the destinations and once for administration, which is a
+   * dropdown under the avatar at wider widths — and the button belongs to the
+   * panel, not to a group of it. Rendering it twice put a second Crea Rapido in
+   * the middle of the menu.
+   */
+  readonly showQuickCreate?: boolean;
 }
 
 const IsComingSoon = () => (
@@ -195,7 +205,7 @@ const NavItemCollapsed = ({
   );
 };
 
-export function NavMain({ items }: NavMainProps) {
+export function NavMain({ items, showQuickCreate = true }: NavMainProps) {
   const path = usePathname();
   const { state, isMobile } = useSidebar();
   const t = useTranslations("nav");
@@ -213,91 +223,97 @@ export function NavMain({ items }: NavMainProps) {
 
   return (
     <>
-      <SidebarGroup>
-        <SidebarGroupContent className="flex flex-col gap-2">
-          <SidebarMenu>
-            <SidebarMenuItem className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuButton
-                    tooltip={t("quickCreate.title")}
-                    className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
-                  >
-                    <PlusCircleIcon />
-                    <span>{t("quickCreate.title")}</span>
-                  </SidebarMenuButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-52" side="right" align="start">
-                  <DropdownMenuLabel className="text-muted-foreground text-xs">
-                    {t("quickCreate.crm")}
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/leads?new=true" className="flex items-center gap-2">
-                      <Users className="h-3.5 w-3.5" /> {t("quickCreate.newLead")}
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/contacts?new=true" className="flex items-center gap-2">
-                      <Contact className="h-3.5 w-3.5" /> {t("quickCreate.newContact")}
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/companies?new=true" className="flex items-center gap-2">
-                      <Building2 className="h-3.5 w-3.5" /> {t("quickCreate.newCompany")}
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/pipeline?new=true" className="flex items-center gap-2">
-                      <Kanban className="h-3.5 w-3.5" /> {t("quickCreate.newDeal")}
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-muted-foreground text-xs">
-                    {t("quickCreate.sales")}
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/sales/quotes/new" className="flex items-center gap-2">
-                      <FileText className="h-3.5 w-3.5" /> {t("quickCreate.newQuote")}
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/sales/orders?new=true" className="flex items-center gap-2">
-                      <ShoppingCart className="h-3.5 w-3.5" /> {t("quickCreate.newOrder")}
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuLabel className="text-muted-foreground text-xs">
-                    {t("quickCreate.work")}
-                  </DropdownMenuLabel>
-                  <DropdownMenuItem asChild>
-                    <Link prefetch={false} href="/dashboard/tasks?new=true" className="flex items-center gap-2">
-                      <CheckSquare className="h-3.5 w-3.5" /> {t("quickCreate.newTask")}
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link
-                      prefetch={false}
-                      href="/dashboard/support/tickets?new=true"
-                      className="flex items-center gap-2"
+      {showQuickCreate && (
+        <SidebarGroup>
+          <SidebarGroupContent className="flex flex-col gap-2">
+            <SidebarMenu>
+              <SidebarMenuItem className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <SidebarMenuButton
+                      tooltip={t("quickCreate.title")}
+                      className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
                     >
-                      <Headphones className="h-3.5 w-3.5" /> {t("quickCreate.newTicket")}
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link
-                      prefetch={false}
-                      href="/dashboard/marketing/campaigns?new=true"
-                      className="flex items-center gap-2"
-                    >
-                      <MessageSquare className="h-3.5 w-3.5" /> {t("quickCreate.newCampaign")}
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
+                      <PlusCircleIcon />
+                      <span>{t("quickCreate.title")}</span>
+                    </SidebarMenuButton>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-52" side="right" align="start">
+                    <DropdownMenuLabel className="text-muted-foreground text-xs">
+                      {t("quickCreate.crm")}
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem asChild>
+                      <Link prefetch={false} href="/dashboard/leads?new=true" className="flex items-center gap-2">
+                        <Users className="h-3.5 w-3.5" /> {t("quickCreate.newLead")}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link prefetch={false} href="/dashboard/contacts?new=true" className="flex items-center gap-2">
+                        <Contact className="h-3.5 w-3.5" /> {t("quickCreate.newContact")}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link prefetch={false} href="/dashboard/companies?new=true" className="flex items-center gap-2">
+                        <Building2 className="h-3.5 w-3.5" /> {t("quickCreate.newCompany")}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link prefetch={false} href="/dashboard/pipeline?new=true" className="flex items-center gap-2">
+                        <Kanban className="h-3.5 w-3.5" /> {t("quickCreate.newDeal")}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-muted-foreground text-xs">
+                      {t("quickCreate.sales")}
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem asChild>
+                      <Link prefetch={false} href="/dashboard/sales/quotes/new" className="flex items-center gap-2">
+                        <FileText className="h-3.5 w-3.5" /> {t("quickCreate.newQuote")}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        prefetch={false}
+                        href="/dashboard/sales/orders?new=true"
+                        className="flex items-center gap-2"
+                      >
+                        <ShoppingCart className="h-3.5 w-3.5" /> {t("quickCreate.newOrder")}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-muted-foreground text-xs">
+                      {t("quickCreate.work")}
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem asChild>
+                      <Link prefetch={false} href="/dashboard/tasks?new=true" className="flex items-center gap-2">
+                        <CheckSquare className="h-3.5 w-3.5" /> {t("quickCreate.newTask")}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        prefetch={false}
+                        href="/dashboard/support/tickets?new=true"
+                        className="flex items-center gap-2"
+                      >
+                        <Headphones className="h-3.5 w-3.5" /> {t("quickCreate.newTicket")}
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        prefetch={false}
+                        href="/dashboard/marketing/campaigns?new=true"
+                        className="flex items-center gap-2"
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" /> {t("quickCreate.newCampaign")}
+                      </Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      )}
       {items.map((group) => (
         <SidebarGroup key={group.id}>
           {group.labelKey && <SidebarGroupLabel>{t(`groups.${group.labelKey}` as any)}</SidebarGroupLabel>}

@@ -16,7 +16,7 @@ import { OfflineBanner } from "@/components/pwa/offline-banner";
 import { CurrencySwitcher } from "@/components/ui/currency-switcher";
 import { LocaleSwitcher } from "@/components/ui/locale-switcher";
 import { Separator } from "@/components/ui/separator";
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
 import { CurrencyProvider } from "@/contexts/currency-context";
 import { platformDb } from "@/db";
@@ -31,6 +31,7 @@ import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { getPreference } from "@/server/server-actions";
 
 import { LayoutControls } from "./_components/sidebar/layout-controls";
+import { MenuTrigger } from "./_components/sidebar/menu-trigger";
 import { MobileTabBar } from "./_components/sidebar/mobile-tab-bar";
 import { SearchDialog } from "./_components/sidebar/search-dialog";
 import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
@@ -131,9 +132,9 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
                   the panel comes out of. It lived here, moved to the last slot
                   of the bottom bar for a while, and that was wrong twice over: a
                   control on the right that opens a panel on the left, and a
-                  quarter of the bar spent on a menu instead of a destination.
+                  fifth of the bar spent on a menu instead of a destination.
                 */}
-                <SidebarTrigger className="-ml-1 shrink-0" />
+                <MenuTrigger />
                 <Separator
                   orientation="vertical"
                   className="mx-2 hidden data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center md:block"

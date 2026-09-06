@@ -84,8 +84,10 @@ export function NavUser({
                 </div>
               </div>
             </DropdownMenuLabel>
+            {/* Hidden below md, where the sidebar panel lists these as a section
+                of its own. Two renderings of one filtered list, never both. */}
             {groups.map((group) => (
-              <DropdownMenuGroup key={group.id}>
+              <DropdownMenuGroup key={group.id} className="hidden md:block">
                 <DropdownMenuSeparator />
                 {group.items.map((item) =>
                   item.subItems && item.subItems.length > 0 ? (

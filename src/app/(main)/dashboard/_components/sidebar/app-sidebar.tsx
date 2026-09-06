@@ -68,6 +68,21 @@ export function AppSidebar({
         {/* Filtered by the layout against the viewer's role and plan; the full
             list used to be rendered to everybody (audit rilievi D-08, U-02). */}
         <NavMain items={mainGroups} />
+
+        {/*
+          ⚠️ Administration is the account menu from md up — a dropdown under the
+          avatar, which is where a desktop puts settings. On a phone that same
+          dropdown is at the bottom of a slide-out panel, behind a row that looks
+          like a profile, and opening it is a nested menu inside a sheet: four
+          taps to reach Settings, and nothing on the way says Settings is there.
+
+          Below md it is an ordinary section of the panel instead, with its own
+          heading. Same filtered groups, rendered twice at different widths —
+          never both at once, and never a second permission rule.
+        */}
+        <div className="md:hidden">
+          <NavMain items={accountGroups} showQuickCreate={false} />
+        </div>
       </SidebarContent>
       <SidebarFooter>
         {/* ⚠️ Language and currency come off the header below md — nine controls
