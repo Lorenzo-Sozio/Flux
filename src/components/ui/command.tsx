@@ -106,8 +106,8 @@ function CommandList({
       className={cn(
         "no-scrollbar max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none",
         // Inside the full-screen palette on a phone there is no reason to stop
-        // at 18rem: the list takes what is left after the input.
-        "max-sm:in-data-[slot=dialog-content]:max-h-none max-sm:in-data-[slot=dialog-content]:flex-1",
+        // at 18rem: the list takes whatever is left after the input.
+        "max-sm:max-h-none max-sm:flex-1",
         className
       )}
       {...props}

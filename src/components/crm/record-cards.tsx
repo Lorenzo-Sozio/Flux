@@ -36,6 +36,15 @@ export interface RecordCardItem {
   subtitle?: ReactNode;
   /** Top-right of the card: a status badge, an amount, a score. */
   badge?: ReactNode;
+  /**
+   * A line of small facts under the subtitle — a date, a status, a count.
+   *
+   * ⚠️ Use this rather than `fields` when the facts are short and there are
+   * more than two. A labelled grid gives each one a heading and two lines of
+   * height, which for "Created: 146d ago" is a caption longer than the caption
+   * is worth; inline they read at a glance and the card stays one screen.
+   */
+  meta?: ReactNode;
   fields?: RecordCardField[];
   /** The row's own menu. Sits outside the link, so a tap on it does not navigate. */
   actions?: ReactNode;
@@ -64,6 +73,8 @@ function CardBody({ item }: { item: RecordCardItem }) {
         </div>
         {item.badge && <div className="shrink-0">{item.badge}</div>}
       </div>
+
+      {item.meta && <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">{item.meta}</div>}
 
       {fields.length > 0 && (
         <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import {
+  AlarmClock,
   ArrowUpDown,
   BookOpen,
   ChevronLeft,
@@ -31,6 +32,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { timeLeft } from "@/lib/time-left";
+import { cn } from "@/lib/utils";
 
 type SortField = "createdAt" | "subject" | "status" | "priority";
 type SortOrder = "asc" | "desc";
@@ -48,6 +51,7 @@ type StatusTabValue = (typeof STATUS_TAB_VALUES)[number];
 
 export default function TicketsListPage() {
   const t = useTranslations("support.tickets");
+  const tc = useTranslations("common");
   const te = useTranslations("emptyStates");
   const router = useRouter();
   const [tickets, setTickets] = useState<any[]>([]);
@@ -134,19 +138,20 @@ export default function TicketsListPage() {
   return (
     <div className={view === "kanban" ? "flex h-full flex-col gap-6" : "space-y-6"}>
       {/* Header */}
-      <div className="flex shrink-0 items-center justify-between">
+      <div className="flex shrink-0 items-center justify-between gap-2">
         <Link
           href="/dashboard/support"
-          className="inline-flex items-center gap-1.5 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground"
+          className="inline-flex min-w-0 items-center gap-1.5 font-medium text-muted-foreground text-sm transition-colors hover:text-foreground"
         >
-          <ChevronLeft className="h-4 w-4" />
-          {t("supportCenter")}
+          <ChevronLeft className="h-4 w-4 shrink-0" />
+          <span className="truncate">{t("supportCenter")}</span>
         </Link>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* The word costs 70px of a 343px row and the book icon does not. */}
+          <Button variant="outline" size="sm" asChild aria-label={t("macros")}>
             <Link href="/dashboard/settings/macros">
-              <BookOpen className="mr-2 h-4 w-4" />
-              {t("macros")}
+              <BookOpen className="h-4 w-4 sm:mr-2" />
+              <span className="max-sm:sr-only">{t("macros")}</span>
             </Link>
           </Button>
           <CreateTicketButton />
@@ -154,10 +159,14 @@ export default function TicketsListPage() {
       </div>
 
       {/* Title + View Toggle */}
-      <div className="flex shrink-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-bold text-2xl tracking-tight sm:text-3xl">{t("supportTickets")}</h1>
-          <p className="mt-1 text-muted-foreground">
+      {/* ⚠️ A breadcrumb row, a three-line title and a view switch put 500px of
+          chrome above the first ticket. The title stays at 2xl on a phone, the
+          count sits beside it rather than under it, and the row wraps so the
+          switch is not squeezing the heading into three lines. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <h1 className="font-bold text-2xl tracking-tight">{t("supportTickets")}</h1>
+          <p className="text-muted-foreground text-sm">
             {t("totalOpen", { total: statusCounts.all, open: statusCounts.open })}
           </p>
         </div>
@@ -298,10 +307,43 @@ export default function TicketsListPage() {
                           </span>
                         ),
                         badge: <TicketPriorityBadge priority={ticket.priority} />,
-                        fields: [
-                          { label: t("status"), value: <TicketStatusBadge status={ticket.status} /> },
-                          { label: t("columns.created"), value: ticketDateLabel(ticket.createdAt) },
-                        ],
+                        // ⚠️ A line, not a labelled grid. `t("status")` was not
+                        // even a key — the card printed SUPPORT.TICKETS.STATUS —
+                        // and "Created / 146d ago" spent two lines on a caption
+                        // longer than the fact. What a ticket is judged on is
+                        // how long is left before it misses its promise, and
+                        // that was in a column hidden below md.
+                        meta: (
+                          <>
+                            <TicketStatusBadge status={ticket.status} />
+                            {(() => {
+                              const left = timeLeft(ticket.slaDeadlineAt, tc);
+                              if (!left) return null;
+                              return (
+                                <span
+                                  className={cn(
+                                    "flex items-center gap-1 text-xs",
+                                    left.late ? "font-semibold text-destructive" : "text-muted-foreground",
+                                  )}
+                                >
+                                  <AlarmClock className="h-3 w-3" />
+                                  {left.text}
+                                </span>
+                              );
+                            })()}
+                            <span className="flex items-center gap-1 text-muted-foreground text-xs capitalize">
+                              {CHANNEL_ICONS[ticket.channel]}
+                              {ticket.channel}
+                            </span>
+                            {(ticket.messages?.length ?? 0) > 0 && (
+                              <span className="flex items-center gap-1 text-muted-foreground text-xs">
+                                <MessageSquare className="h-3 w-3" />
+                                {ticket.messages?.length}
+                              </span>
+                            )}
+                            <span className="text-muted-foreground text-xs">{ticketDateLabel(ticket.createdAt)}</span>
+                          </>
+                        ),
                       }))}
                     />
                   }

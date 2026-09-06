@@ -15,10 +15,17 @@ import type { Capability } from "@/lib/permissions";
 
 export interface PaletteCommand {
   id: string;
-  /** What the user reads. Phrased as the thing they want, not as a route. */
-  label: string;
-  /** The module it belongs to, shown beside the label so the list stays legible. */
-  group: string;
+  /**
+   * Key under `search.commands` for what the user reads, phrased as the thing
+   * they want rather than as a route.
+   *
+   * ⚠️ A key, not the words. These were English literals and the palette is the
+   * first thing an Italian workspace opens: it read "New quote" under a heading
+   * that said ACCESSO RAPIDO.
+   */
+  labelKey: string;
+  /** Key under `search.commandGroups` for the module it belongs to. */
+  groupKey: string;
   /**
    * Where it goes. `?new=true` is the convention the create modals already read,
    * so a command can land on a list page with its form already open.
@@ -41,8 +48,8 @@ export interface PaletteCommand {
 export const PALETTE_COMMANDS: PaletteCommand[] = [
   {
     id: "new-quote",
-    label: "New quote",
-    group: "Sales",
+    labelKey: "new-quote",
+    groupKey: "sales",
     href: "/dashboard/sales/quotes/new",
     keywords: ["quote", "estimate", "proposal", "offer", "preventivo", "offerta"],
     capability: "quote:write",
@@ -50,8 +57,8 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   },
   {
     id: "new-order",
-    label: "New order",
-    group: "Sales",
+    labelKey: "new-order",
+    groupKey: "sales",
     href: "/dashboard/sales/orders/new",
     keywords: ["order", "sale", "sell", "invoice", "ordine", "vendita"],
     capability: "order:write",
@@ -59,8 +66,8 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   },
   {
     id: "new-contact",
-    label: "New contact",
-    group: "CRM",
+    labelKey: "new-contact",
+    groupKey: "crm",
     href: "/dashboard/contacts?new=true",
     keywords: ["contact", "person", "customer", "contatto", "persona"],
     capability: "record:write",
@@ -68,8 +75,8 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   },
   {
     id: "new-lead",
-    label: "New lead",
-    group: "CRM",
+    labelKey: "new-lead",
+    groupKey: "crm",
     href: "/dashboard/leads?new=true",
     keywords: ["lead", "prospect", "enquiry", "inquiry", "opportunit"],
     capability: "record:write",
@@ -77,8 +84,8 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   },
   {
     id: "new-company",
-    label: "New company",
-    group: "CRM",
+    labelKey: "new-company",
+    groupKey: "crm",
     href: "/dashboard/companies?new=true",
     keywords: ["company", "account", "organisation", "organization", "azienda", "cliente"],
     capability: "record:write",
@@ -86,8 +93,8 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   },
   {
     id: "new-deal",
-    label: "New deal",
-    group: "Sales",
+    labelKey: "new-deal",
+    groupKey: "sales",
     href: "/dashboard/pipeline?new=true",
     keywords: ["deal", "opportunity", "pipeline", "trattativa"],
     capability: "record:write",
@@ -98,8 +105,8 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
     // button is. Sending a parameter nothing reads would look like a broken
     // promise rather than a shortcut.
     id: "new-ticket",
-    label: "New ticket",
-    group: "Support",
+    labelKey: "new-ticket",
+    groupKey: "support",
     href: "/dashboard/support/tickets",
     keywords: ["ticket", "issue", "support", "problem", "complaint", "assistenza"],
     capability: "ticket:write",
@@ -107,8 +114,8 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   },
   {
     id: "new-task",
-    label: "New task",
-    group: "Work",
+    labelKey: "new-task",
+    groupKey: "work",
     href: "/dashboard/tasks",
     keywords: ["task", "todo", "reminder", "attività", "promemoria"],
     capability: "record:write",
@@ -116,16 +123,16 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   },
   {
     id: "dashboard",
-    label: "Go to dashboard",
-    group: "Work",
+    labelKey: "go-to-dashboard",
+    groupKey: "work",
     href: "/dashboard/crm",
     keywords: ["dashboard", "home", "today", "agenda", "day", "oggi", "giornata"],
     icon: "ChartBar",
   },
   {
     id: "win-loss",
-    label: "Win / loss",
-    group: "Sales",
+    labelKey: "win-loss",
+    groupKey: "sales",
     href: "/dashboard/pipeline/win-loss",
     keywords: ["win", "loss", "lost", "why", "analysis", "vinte", "perse"],
     capability: "report:read",
@@ -146,7 +153,18 @@ function availableCommands(allow: (capability?: Capability) => boolean): Palette
  * offer "New order", and should not also offer everything with "or" in the
  * middle of a word.
  */
-export function matchCommands(query: string, allow: (capability?: Capability) => boolean, limit = 5): PaletteCommand[] {
+export function matchCommands(
+  query: string,
+  allow: (capability?: Capability) => boolean,
+  /**
+   * ⚠️ The words the person is actually reading, so typing them finds the
+   * command. The labels are keys now, and matching a key means an Italian
+   * workspace can find "New quote" by typing "quote" and not by typing
+   * "preventivo" — which is the word on their screen.
+   */
+  labelOf: (command: PaletteCommand) => string = (command) => command.labelKey.replace(/-/g, " "),
+  limit = 5,
+): PaletteCommand[] {
   const q = query.trim().toLowerCase();
   if (!q) return [];
 
@@ -154,19 +172,15 @@ export function matchCommands(query: string, allow: (capability?: Capability) =>
 
   const scored = availableCommands(allow)
     .map((command) => {
-      const haystack = [command.label.toLowerCase(), ...command.keywords.map((k) => k.toLowerCase())];
+      const label = labelOf(command).toLowerCase();
+      const haystack = [label, ...command.keywords.map((k) => k.toLowerCase())];
       // Every term has to land somewhere, so "new ord" narrows rather than widens.
       const matchesAll = terms.every((term) =>
-        haystack.some((word) => word.split(/\s+/).some((part) => part.startsWith(term))),
+        haystack.some((word) => word.split(/\s+/).some((part: string) => part.startsWith(term))),
       );
       if (!matchesAll) return null;
       // A hit on the label itself outranks one on a synonym.
-      const onLabel = terms.every((term) =>
-        command.label
-          .toLowerCase()
-          .split(/\s+/)
-          .some((part) => part.startsWith(term)),
-      );
+      const onLabel = terms.every((term) => label.split(/\s+/).some((part: string) => part.startsWith(term)));
       return { command, score: onLabel ? 0 : 1 };
     })
     .filter((x): x is { command: PaletteCommand; score: number } => x !== null)

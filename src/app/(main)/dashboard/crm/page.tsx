@@ -33,6 +33,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { deals, salesTargets } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
+import { timeLeft } from "@/lib/time-left";
 
 import { AgendaWidget } from "./_components/agenda-widget";
 import { MonthTargetCard } from "./_components/month-target-card";
@@ -70,23 +71,6 @@ function formatToday(d: Date, locale: string) {
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
-
-/** How long is left before a ticket misses its promise, said the way a person would say it. */
-function timeLeft(
-  deadline: Date | null,
-  t: Awaited<ReturnType<typeof getTranslations<"crm">>>,
-): { text: string; late: boolean } | null {
-  if (!deadline) return null;
-  const ms = new Date(deadline).getTime() - Date.now();
-  const late = ms < 0;
-
-  const mins = Math.round(Math.abs(ms) / 60_000);
-  if (mins < 60) return { text: t(late ? "minutesLate" : "minutesLeft", { n: mins }), late };
-  const hours = Math.round(mins / 60);
-  if (hours < 24) return { text: t(late ? "hoursLate" : "hoursLeft", { n: hours }), late };
-  const days = Math.round(hours / 24);
-  return { text: t(late ? "daysLate" : "daysLeft", { n: days }), late };
-}
 
 export default async function CRMPage() {
   const db = await getDb();
@@ -215,7 +199,7 @@ export default async function CRMPage() {
                 // How long is left, said the way a person would say it. The card
                 // used to show this only inside the last hour, which is the point
                 // at which knowing is no longer much use.
-                const left = timeLeft(ticket.slaDeadlineAt, t);
+                const left = timeLeft(ticket.slaDeadlineAt, tc);
                 return (
                   <Link
                     key={ticket.id}

@@ -87,7 +87,10 @@ export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
     [tenantRole],
   );
 
-  const commandMatches = React.useMemo(() => matchCommands(query, allow), [query, allow]);
+  const commandMatches = React.useMemo(
+    () => matchCommands(query, allow, (command) => t(`commands.${command.labelKey}` as never)),
+    [query, allow, t],
+  );
   const idleCommands = React.useMemo(() => PALETTE_COMMANDS.filter((c) => allow(c.capability)).slice(0, 6), [allow]);
 
   const ENTITY_CONFIG: Record<string, { icon: React.ReactNode; badge: string; badgeClass: string; href: string }> = {
@@ -245,9 +248,14 @@ export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
         }}
         className="sm:max-w-[620px]"
       >
-        <CommandPrimitive shouldFilter={false}>
-          {/* Search input */}
-          <div className="flex items-center gap-3 border-b px-4 py-3.5">
+        {/* ⚠️ `size-full` on the palette and `flex-1` on the list: inside a
+            full-screen dialog the palette was content-height, so the keyboard
+            hints sat halfway down the screen with dead white below them. */}
+        <CommandPrimitive shouldFilter={false} className="flex size-full flex-col">
+          {/* Search input. The right padding is the close button's — it is
+              always drawn below sm, and without the room it lay across the
+              placeholder. */}
+          <div className="flex shrink-0 items-center gap-3 border-b py-3.5 pr-12 pl-4 sm:pr-4">
             <div className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
             </div>
@@ -334,7 +342,7 @@ export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
                           className="flex items-center gap-2.5 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-left text-sm transition-colors hover:border-border hover:bg-muted"
                         >
                           <span className="text-muted-foreground">{COMMAND_ICONS[command.icon]}</span>
-                          <span className="truncate font-medium">{command.label}</span>
+                          <span className="truncate font-medium">{t(`commands.${command.labelKey}` as never)}</span>
                         </button>
                       ))}
                     </div>
@@ -394,7 +402,7 @@ export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
                             className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm transition-colors hover:bg-muted"
                           >
                             <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-                            {command.label}
+                            {t(`commands.${command.labelKey}` as never)}
                           </button>
                         );
                       })}
@@ -422,8 +430,12 @@ export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
                     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                       {COMMAND_ICONS[command.icon] ?? <Plus className="h-4 w-4" />}
                     </span>
-                    <span className="min-w-0 flex-1 truncate font-medium text-sm">{command.label}</span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">{command.group}</span>
+                    <span className="min-w-0 flex-1 truncate font-medium text-sm">
+                      {t(`commands.${command.labelKey}` as never)}
+                    </span>
+                    <span className="shrink-0 text-[11px] text-muted-foreground">
+                      {t(`commandGroups.${command.groupKey}` as never)}
+                    </span>
                   </CommandItem>
                 ))}
               </CommandGroup>
@@ -483,8 +495,8 @@ export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
             )}
           </CommandList>
 
-          {/* Footer */}
-          <div className="flex items-center gap-4 border-t bg-muted/30 px-4 py-2.5 text-[11px] text-muted-foreground">
+          {/* Footer — four keyboard hints, hidden where there is no keyboard. */}
+          <div className="hidden shrink-0 items-center gap-4 border-t bg-muted/30 px-4 py-2.5 text-[11px] text-muted-foreground sm:flex">
             <span className="flex items-center gap-1">
               <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">↑↓</kbd> {t("navigate")}
             </span>

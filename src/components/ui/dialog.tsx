@@ -104,19 +104,26 @@ function DialogContent({
         <div className="flex min-h-0 flex-1 flex-col gap-[inherit] overflow-y-auto overscroll-contain">
           {children}
         </div>
-        {showCloseButton && (
-          <DialogPrimitive.Close data-slot="dialog-close" asChild>
-            <Button
-              variant="ghost"
-              className="absolute top-3 right-3 sm:top-4 sm:right-4"
-              size="icon-sm"
+        {/*
+          ⚠️⚠️ Below sm the close button is **not optional**, whatever the caller
+          asked for. A dialog that fills the screen has no outside to tap and a
+          phone has no Escape key, so `showCloseButton={false}` — the command
+          palette's default — left no way out at all. Opening the search meant
+          being stuck in it.
+
+          From sm up nothing changes: the caller's choice stands, because there
+          the overlay and the keyboard are both still there.
+        */}
+        <DialogPrimitive.Close data-slot="dialog-close" asChild>
+          <Button
+            variant="ghost"
+            className={cn("absolute top-3 right-3 sm:top-4 sm:right-4", !showCloseButton && "sm:hidden")}
+            size="icon-sm"
             >
-              <XIcon
-              />
-              <span className="sr-only">Close</span>
-            </Button>
-          </DialogPrimitive.Close>
-        )}
+            <XIcon />
+            <span className="sr-only">Close</span>
+          </Button>
+        </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPortal>
   )
