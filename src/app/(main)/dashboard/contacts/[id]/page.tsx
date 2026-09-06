@@ -170,8 +170,18 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
 
       {/* ── 3-column body ── */}
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+        {/*
+          ⚠️ Below lg the two columns become one, and in source order that puts
+          four cards of read-only fields — contact details, company details, CRM
+          details, custom fields — above the two things this page is opened for:
+          what has been sold to this customer, and what has happened. About a
+          thousand pixels of scrolling before the first useful line.
+
+          `order` fixes it without moving anything in the markup, so the desktop
+          two-column arrangement is untouched: sidebar left, record right.
+        */}
         {/* Sidebar */}
-        <div className="flex flex-col gap-6">
+        <div className="order-2 flex flex-col gap-6 lg:order-none">
           {/* Contact Info */}
           <Card>
             <CardHeader className="pb-3">
@@ -372,7 +382,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
         </div>
 
         {/* ── Main: Timeline + Tasks ── */}
-        <div className="flex flex-col gap-6 lg:col-span-2">
+        <div className="order-1 flex flex-col gap-6 lg:order-none lg:col-span-2">
           {/* Above the notes on purpose: what happened commercially outranks what
               somebody wrote down about it. */}
           <CustomerRecordPanel record={record} contactId={contactId} />
