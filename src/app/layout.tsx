@@ -50,6 +50,14 @@ export const viewport: Viewport = {
   // `cover` those insets are always zero and the bottom bar sits on the home
   // indicator.
   viewportFit: "cover",
+  // ⚠️ What the virtual keyboard does to the layout, and it is not the default.
+  // By default the keyboard overlays the page: an element pinned to `bottom-0`
+  // — a dialog's footer, a reply box — ends up behind it. `resizes-content`
+  // shrinks the layout viewport instead, so the bottom of the page is the top
+  // of the keyboard and everything stays reachable. Chrome and Android honour
+  // it; iOS Safari ignores it and scrolls the focused field into view itself,
+  // which is why the full-screen dialogs are ordinary scroll containers.
+  interactiveWidget: "resizes-content",
   // Deliberately no maximumScale/userScalable: capping zoom is an accessibility
   // failure, and it is not what makes an app feel native.
   themeColor: [
