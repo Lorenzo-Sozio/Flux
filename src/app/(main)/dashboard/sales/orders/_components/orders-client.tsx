@@ -1,22 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { CheckCircle2, Clock, ExternalLink, Plus, Search, ShoppingCart, Trash2, TrendingUp } from "lucide-react";
+import { CheckCircle2, Clock, ExternalLink, Plus, ShoppingCart, Trash2, TrendingUp } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteOrder, type OrderStatus, updateOrderStatus } from "@/actions/orders";
 import { EmptyState } from "@/components/crm/empty-state";
+import { ListToolbar } from "@/components/crm/list-toolbar";
 import { RecordCards, ResponsiveRecordList } from "@/components/crm/record-cards";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCurrency } from "@/hooks/use-currency";
+import type { Page } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -62,28 +63,49 @@ function formatDate(date: Date | string) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export function OrdersClient({ orders: initial, stats: initialStats }: { orders: Order[]; stats: Stats }) {
+/**
+ * The orders list.
+ *
+ * ⚠️ Search, status and paging are decided on the server now. This component used
+ * to receive every order the workspace had ever taken and narrow them in the
+ * browser, so the first paint waited for the whole history and the line at the
+ * bottom was the only thing that ever mentioned how much of it there was.
+ */
+export function OrdersClient({
+  page,
+  stats: initialStats,
+  status,
+}: {
+  page: Page<Order>;
+  stats: Stats;
+  status: string;
+}) {
   const t = useTranslations("orders");
   const te = useTranslations("emptyStates");
   const tc = useTranslations("common");
   const { formatAmount } = useCurrency();
-  const _router = useRouter();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
-  const [orders, setOrders] = useState(initial);
+  const [orders, setOrders] = useState(page.rows);
   const [stats] = useState(initialStats);
-  const [search, setSearch] = useState("");
-  const [filterStatus, setFilterStatus] = useState<string>("all");
 
-  const filtered = orders.filter((o) => {
-    const q = search.toLowerCase();
-    const matchSearch =
-      !q ||
-      o.orderNumber.toLowerCase().includes(q) ||
-      (o.companyName ?? "").toLowerCase().includes(q) ||
-      `${o.contactFirstName ?? ""} ${o.contactLastName ?? ""}`.trim().toLowerCase().includes(q);
-    const matchStatus = filterStatus === "all" || o.status === filterStatus;
-    return matchSearch && matchStatus;
-  });
+  // A new page arrives as a new prop, and `useState` reads its argument once —
+  // without this, paging or searching left the previous rows on screen.
+  useEffect(() => setOrders(page.rows), [page.rows]);
+
+  const search = searchParams.get("q") ?? "";
+
+  /** Moves the status filter into the URL, back to page one. */
+  const setFilterStatus = (value: string) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (value === "all") next.delete("status");
+    else next.set("status", value);
+    next.delete("page");
+    const q = next.toString();
+    startTransition(() => router.push(q ? `${pathname}?${q}` : pathname));
+  };
 
   const handleStatusChange = (id: string, status: OrderStatus) => {
     startTransition(async () => {
@@ -135,7 +157,7 @@ export function OrdersClient({ orders: initial, stats: initialStats }: { orders:
       : (order.companyName ?? "—");
 
   const emptyState =
-    search || filterStatus !== "all" ? (
+    search || status !== "all" ? (
       <EmptyState icon={ShoppingCart} title={te("filteredTitle")} description={te("filteredDescription")} />
     ) : (
       <EmptyState
@@ -181,7 +203,7 @@ export function OrdersClient({ orders: initial, stats: initialStats }: { orders:
             onClick={() => filter && setFilterStatus(filter)}
             className={cn(
               "flex items-center gap-3 rounded-lg border bg-card px-4 py-3 text-left transition-colors",
-              filter && filterStatus === filter ? "border-primary bg-primary/5" : "hover:bg-muted/30",
+              filter && status === filter ? "border-primary bg-primary/5" : "hover:bg-muted/30",
               !filter && "cursor-default",
             )}
           >
@@ -196,16 +218,15 @@ export function OrdersClient({ orders: initial, stats: initialStats }: { orders:
 
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative max-w-xs flex-1">
-          <Search className="-translate-y-1/2 absolute top-1/2 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder={t("searchPlaceholder")}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-8 pl-8 text-sm"
-          />
-        </div>
-        <Select value={filterStatus} onValueChange={setFilterStatus}>
+        <ListToolbar
+          total={page.total}
+          page={page.page}
+          pageCount={page.pageCount}
+          pageSize={page.pageSize}
+          shown={orders.length}
+          searchPlaceholder={t("searchPlaceholder")}
+        />
+        <Select value={status} onValueChange={setFilterStatus}>
           <SelectTrigger className="h-8 w-36 text-xs">
             <SelectValue />
           </SelectTrigger>
@@ -220,13 +241,13 @@ export function OrdersClient({ orders: initial, stats: initialStats }: { orders:
         </Select>
       </div>
 
-      {filtered.length === 0 ? (
+      {orders.length === 0 ? (
         emptyState
       ) : (
         <ResponsiveRecordList
           cards={
             <RecordCards
-              items={filtered.map((order) => ({
+              items={orders.map((order) => ({
                 id: order.id,
                 href: `/dashboard/sales/orders/${order.id}`,
                 title: <span className="font-mono">{order.orderNumber}</span>,
@@ -284,7 +305,7 @@ export function OrdersClient({ orders: initial, stats: initialStats }: { orders:
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  {filtered.map((order) => {
+                  {orders.map((order) => {
                     const statusClass = STATUS_CLASS[order.status] ?? STATUS_CLASS.draft;
                     const statusLabel = t(
                       `statuses.${order.status as "draft" | "processing" | "completed" | "cancelled"}`,
@@ -357,12 +378,6 @@ export function OrdersClient({ orders: initial, stats: initialStats }: { orders:
             </div>
           }
         />
-      )}
-
-      {filtered.length > 0 && (
-        <p className="text-right text-muted-foreground text-xs">
-          {t("countOrders", { count: filtered.length, total: orders.length })}
-        </p>
       )}
     </div>
   );

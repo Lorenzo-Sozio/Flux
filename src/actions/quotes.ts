@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import crypto from "node:crypto";
 
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, or, type SQL, sql } from "drizzle-orm";
 import type { z } from "zod";
 
 import { createNotificationAction, createNotificationsBatch } from "@/actions/auth";
@@ -16,6 +16,7 @@ import { computeDocument } from "@/lib/document-totals";
 import { sendEmail } from "@/lib/email-provider";
 import { getExchangeRates } from "@/lib/exchange-rates";
 import { getTenantById } from "@/lib/get-tenant";
+import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { can } from "@/lib/permissions";
 import { announceQuoteDecision, announceQuoteSent, hasAlreadyLeft } from "@/lib/quote-events";
 import { approvalPolicyFrom, approvalRequiredReason, canTransition, transitionError } from "@/lib/quote-status";
@@ -503,37 +504,6 @@ export async function markQuoteAsViewedAction(quoteId: string, email?: string, i
   }
 }
 
-export async function getAllQuotes(filters?: { status?: string; searchTerm?: string }) {
-  const db = await getDb();
-  try {
-    await requireCapability("record:read");
-    await requirePlanModule("sales");
-    const statusFilter = filters?.status && filters.status !== "all" ? eq(quotes.status, filters.status) : undefined;
-
-    const allQuotes = await db.query.quotes.findMany({
-      where: statusFilter,
-      with: { deal: true, company: true, contact: true, owner: true, items: true },
-      orderBy: desc(quotes.createdAt),
-    });
-
-    if (filters?.searchTerm) {
-      const term = filters.searchTerm.toLowerCase();
-      return allQuotes.filter(
-        (q) =>
-          q.quoteNumber.toLowerCase().includes(term) ||
-          q.company?.name?.toLowerCase().includes(term) ||
-          q.deal?.name?.toLowerCase().includes(term) ||
-          (q.contact ? `${q.contact.firstName} ${q.contact.lastName}`.toLowerCase().includes(term) : false),
-      );
-    }
-
-    return allQuotes;
-  } catch (error) {
-    console.error("[getAllQuotes]", error);
-    throw error;
-  }
-}
-
 // ── Approval Workflow ──────────────────────────────────────────────────────────
 
 export async function requestApprovalAction(quoteId: string) {
@@ -689,4 +659,128 @@ export async function getQuoteFormData() {
   ]);
 
   return { deals: dealList, companies: companyList, contacts: contactList, products: productList };
+}
+
+// ── One page of quotes ────────────────────────────────────────────────────────
+
+/** The columns the list may be sorted by, and nothing else. */
+const QUOTE_SORTS = {
+  quoteNumber: quotes.quoteNumber,
+  status: quotes.status,
+  totalAmount: quotes.totalAmount,
+  issuedAt: quotes.issuedAt,
+  expiresAt: quotes.expiresAt,
+  createdAt: quotes.createdAt,
+} as const;
+
+/**
+ * One page of quotes, with the total that matches the query.
+ *
+ * ⚠️ Replaces `getAllQuotes`, which read every quote **with every line item of
+ * every quote** through a relational query, then searched the result in
+ * JavaScript. A workspace with two thousand quotes averaging four lines shipped
+ * ten thousand rows to the browser so somebody could look at fifty — and the
+ * search box could not start narrowing until all of it had arrived.
+ *
+ * The line items are not here on purpose: the list shows a total, and the total
+ * is a column on the quote.
+ */
+export async function listQuotes(params: ListParams, status?: string) {
+  await requireCapability("record:read");
+  await requirePlanModule("sales");
+  const db = await getDb();
+
+  const term = params.search.trim();
+  const clauses: (SQL | undefined)[] = [
+    status && status !== "all" ? eq(quotes.status, status) : undefined,
+    term
+      ? or(
+          ilike(quotes.quoteNumber, `%${term}%`),
+          ilike(companies.name, `%${term}%`),
+          ilike(deals.name, `%${term}%`),
+          ilike(contacts.firstName, `%${term}%`),
+          ilike(contacts.lastName, `%${term}%`),
+        )
+      : undefined,
+  ];
+  const where = clauses.filter(Boolean).length ? and(...(clauses.filter(Boolean) as SQL[])) : undefined;
+
+  const sortCol = params.sort ? QUOTE_SORTS[params.sort as keyof typeof QUOTE_SORTS] : undefined;
+  const order = sortCol ? (params.dir === "asc" ? asc(sortCol) : desc(sortCol)) : desc(quotes.createdAt);
+
+  // ⚠️ The count carries the same joins as the rows. Searching on a company name
+  // means the join decides which quotes match, and a count taken without it would
+  // report a total the pages cannot reach.
+  const [rows, [counted]] = await Promise.all([
+    db
+      .select({
+        id: quotes.id,
+        quoteNumber: quotes.quoteNumber,
+        status: quotes.status,
+        totalAmount: quotes.totalAmount,
+        currency: quotes.currency,
+        issuedAt: quotes.issuedAt,
+        expiresAt: quotes.expiresAt,
+        createdAt: quotes.createdAt,
+        companyName: companies.name,
+        dealName: deals.name,
+        contactFirstName: contacts.firstName,
+        contactLastName: contacts.lastName,
+      })
+      .from(quotes)
+      .leftJoin(companies, eq(quotes.companyId, companies.id))
+      .leftJoin(deals, eq(quotes.dealId, deals.id))
+      .leftJoin(contacts, eq(quotes.contactId, contacts.id))
+      .where(where)
+      .orderBy(order)
+      .limit(params.pageSize)
+      .offset(offsetOf(params)),
+    db
+      .select({ n: count() })
+      .from(quotes)
+      .leftJoin(companies, eq(quotes.companyId, companies.id))
+      .leftJoin(deals, eq(quotes.dealId, deals.id))
+      .leftJoin(contacts, eq(quotes.contactId, contacts.id))
+      .where(where),
+  ]);
+
+  return toPage(rows, Number(counted?.n ?? 0), params);
+}
+
+/**
+ * The four figures above the quotes list, counted over every quote in the
+ * workspace rather than over the page on screen.
+ *
+ * ⚠️ The total value is grouped by currency and not summed across them. The page
+ * used to add every `totalAmount` together and print the result with a `$` in
+ * front of it, which was wrong twice: the symbol was hardcoded while the column
+ * defaults to EUR, and a workspace quoting in two currencies got their sum —
+ * a number that means nothing in either one.
+ */
+export async function getQuoteStats() {
+  await requireCapability("record:read");
+  await requirePlanModule("sales");
+  const db = await getDb();
+
+  const [[counted], byCurrency] = await Promise.all([
+    db
+      .select({
+        total: count(),
+        sent: sql<number>`count(*) filter (where ${quotes.status} in ('sent', 'viewed'))`,
+        accepted: sql<number>`count(*) filter (where ${quotes.status} = 'accepted')`,
+      })
+      .from(quotes),
+    db
+      .select({ currency: quotes.currency, amount: sql<string>`coalesce(sum(${quotes.totalAmount}), 0)` })
+      .from(quotes)
+      .groupBy(quotes.currency)
+      .orderBy(desc(sql`coalesce(sum(${quotes.totalAmount}), 0)`)),
+  ]);
+
+  return {
+    total: Number(counted?.total ?? 0),
+    sent: Number(counted?.sent ?? 0),
+    accepted: Number(counted?.accepted ?? 0),
+    totals: byCurrency.map((r) => ({ currency: r.currency, amount: Number(r.amount) })),
+  };
 }

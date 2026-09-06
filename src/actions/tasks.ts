@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, isNotNull, isNull, type SQL, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
 import { createNotificationAction } from "@/actions/auth";
@@ -21,6 +21,7 @@ import {
 } from "@/db/schema";
 import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
+import { DONE_WINDOW_DAYS, TASK_LIST_CAP } from "@/lib/task-window";
 import { selectTasksDueToday } from "@/lib/tasks-due";
 import { getDb } from "@/lib/tenant-context";
 
@@ -345,7 +346,7 @@ export async function getCalendarTasks() {
  * admin saw only their own tasks. That is audit rilievo P-01 again, in a corner
  * the fix did not reach.
  */
-export async function getAllTasks() {
+export async function getAllTasks(options?: { includeDone?: boolean; alwaysInclude?: string }) {
   const actor = await requireCapability("record:read");
   const userId = actor.userId;
   const db = await getDb();
@@ -398,11 +399,40 @@ export async function getAllTasks() {
     .leftJoin(tickets, eq(tasks.ticketId, tickets.id));
 
   const isPrivileged = can(actor, "user:read");
-  const result = isPrivileged
-    ? await base.orderBy(desc(tasks.createdAt))
-    : await base
-        .where(and(sql`(${tasks.ownerId} = ${userId} OR ${tasks.assigneeId} = ${userId})`))
-        .orderBy(desc(tasks.createdAt));
+  const mine = sql`(${tasks.ownerId} = ${userId} OR ${tasks.assigneeId} = ${userId})`;
+
+  // ⚠️ This used to select every task the workspace had ever had, with six joins,
+  // on every visit — and the board and the list both rendered all of them. The
+  // board cannot be paged, because a column of ten is not a column, so the bound
+  // is on age instead: everything open, plus what was finished recently.
+  //
+  // `completedAt` is null on tasks closed by older code, so the window falls back
+  // to when the task was created. That can hide a task created long ago and
+  // finished yesterday; `done=all` is the way back to it, and the count below
+  // says it is there.
+  const cutoff = new Date(Date.now() - DONE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const recent = sql`(${tasks.status} <> 'done' OR coalesce(${tasks.completedAt}, ${tasks.createdAt}) >= ${cutoff})`;
+  // A link to one task must open it whatever its age, or a notification about a
+  // task somebody has since finished leads to an empty screen.
+  const window = options?.alwaysInclude ? sql`(${recent} OR ${tasks.id} = ${options.alwaysInclude})` : recent;
+
+  const conditions = [isPrivileged ? undefined : mine, options?.includeDone ? undefined : window].filter(Boolean);
+  const result = conditions.length
+    ? await base
+        .where(and(...(conditions as SQL[])))
+        .orderBy(desc(tasks.createdAt))
+        .limit(TASK_LIST_CAP)
+    : await base.orderBy(desc(tasks.createdAt)).limit(TASK_LIST_CAP);
+
+  // What the window left out, so the screen can say so rather than quietly show
+  // a smaller number than the person remembers.
+  const hiddenWhere = [isPrivileged ? undefined : mine, sql`NOT ${window}`].filter(Boolean) as SQL[];
+  const [hidden] = options?.includeDone
+    ? [{ n: 0 }]
+    : await db
+        .select({ n: count() })
+        .from(tasks)
+        .where(and(...hiddenWhere));
 
   // Compute blockedByDeps: count open FS predecessors per task (one query, O(1) round-trips)
   const blockingRows = await db
@@ -418,7 +448,13 @@ export async function getAllTasks() {
     }
   }
 
-  return result.map((t) => ({ ...t, blockedByDeps: blockedCountMap[t.id] ?? 0 }));
+  return {
+    rows: result.map((t) => ({ ...t, blockedByDeps: blockedCountMap[t.id] ?? 0 })),
+    hiddenDone: Number(hidden?.n ?? 0),
+    // A full page is the only signal there is more; the cap is the same number
+    // the screen names, so the two cannot drift.
+    capped: result.length === TASK_LIST_CAP,
+  };
 }
 
 export async function getTasksByTicketId(ticketId: string) {

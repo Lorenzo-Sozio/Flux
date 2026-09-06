@@ -1530,7 +1530,8 @@
       "notifications": "Notifications",
       "logout": "Log out",
       "unknownUser": "Unknown User"
-    }
+    },
+    "openMenu": "Open menu"
   },
   "nextActions": {
     "title": "Needs you",
@@ -3172,7 +3173,12 @@
       "utilizationOf": "{hours}h of {capacity}h",
       "noConflicts": "No overload",
       "legend": "Legend"
-    }
+    },
+    "olderDoneHidden": "{count, plural, =1 {# task completed more than {days} days ago is not shown} other {# tasks completed more than {days} days ago are not shown}}",
+    "showArchive": "Show them",
+    "showingArchive": "Showing every completed task",
+    "backToOpen": "Back to open work",
+    "cappedAt": "Only the {count} most recently created tasks are shown. Narrow the list to see the rest."
   },
   "triage": {
     "title": "What this resembles",

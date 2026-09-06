@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { and, desc, eq, ilike, inArray, ne, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, ne, or, type SQL, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { dispatchWebhook } from "@/actions/webhooks";
@@ -26,6 +26,7 @@ import { computeDocument } from "@/lib/document-totals";
 import { nextOrderNumber } from "@/lib/order-number";
 import { isRecordablePayment } from "@/lib/order-payment";
 import type { OrderStatus } from "@/lib/order-status";
+import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { getDb } from "@/lib/tenant-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -112,36 +113,6 @@ async function recordOrderActivity(
     // that were due to run after it.
     console.error("[orders] Could not record the order activity:", err);
   }
-}
-
-export async function getOrders(search?: string) {
-  await requireCapability("record:read");
-  const db = await getDb();
-  const rows = await db
-    .select({
-      id: orders.id,
-      orderNumber: orders.orderNumber,
-      status: orders.status,
-      totalAmount: orders.totalAmount,
-      orderDate: orders.orderDate,
-      createdAt: orders.createdAt,
-      companyId: orders.companyId,
-      contactId: orders.contactId,
-      ownerId: orders.ownerId,
-      companyName: companies.name,
-      contactFirstName: contacts.firstName,
-      contactLastName: contacts.lastName,
-      contactEmail: contacts.email,
-      ownerName: users.name,
-    })
-    .from(orders)
-    .leftJoin(companies, eq(orders.companyId, companies.id))
-    .leftJoin(contacts, eq(orders.contactId, contacts.id))
-    .leftJoin(users, eq(orders.ownerId, users.id))
-    .where(search ? or(ilike(orders.orderNumber, `%${search}%`), ilike(companies.name, `%${search}%`)) : undefined)
-    .orderBy(desc(orders.createdAt));
-
-  return rows;
 }
 
 export async function getOrderById(id: string) {
@@ -840,4 +811,83 @@ export async function setOrderDelivered(orderId: string, deliveredAt: string | n
     .where(eq(orders.id, orderId));
   revalidatePath(`/dashboard/sales/orders/${orderId}`);
   return { success: true };
+}
+
+// ── One page of orders ────────────────────────────────────────────────────────
+
+/** The columns the list may be sorted by, and nothing else. */
+const ORDER_SORTS = {
+  orderNumber: orders.orderNumber,
+  status: orders.status,
+  totalAmount: orders.totalAmount,
+  orderDate: orders.orderDate,
+  createdAt: orders.createdAt,
+} as const;
+
+/**
+ * One page of orders, with the total that matches the query.
+ *
+ * `getOrders` already selected the right columns and joined the right tables;
+ * what it never had was a limit. It returned every order a workspace had ever
+ * taken, on every visit to the list, and the page rendered all of them — no
+ * paging even in the browser.
+ */
+export async function listOrders(params: ListParams, status?: string) {
+  await requireCapability("record:read");
+  const db = await getDb();
+
+  const term = params.search.trim();
+  const clauses: (SQL | undefined)[] = [
+    status && status !== "all" ? eq(orders.status, status) : undefined,
+    term
+      ? or(
+          ilike(orders.orderNumber, `%${term}%`),
+          ilike(companies.name, `%${term}%`),
+          ilike(contacts.firstName, `%${term}%`),
+          ilike(contacts.lastName, `%${term}%`),
+        )
+      : undefined,
+  ];
+  const where = clauses.filter(Boolean).length ? and(...(clauses.filter(Boolean) as SQL[])) : undefined;
+
+  const sortCol = params.sort ? ORDER_SORTS[params.sort as keyof typeof ORDER_SORTS] : undefined;
+  const order = sortCol ? (params.dir === "asc" ? asc(sortCol) : desc(sortCol)) : desc(orders.createdAt);
+
+  const [rows, [counted]] = await Promise.all([
+    db
+      .select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        status: orders.status,
+        totalAmount: orders.totalAmount,
+        orderDate: orders.orderDate,
+        createdAt: orders.createdAt,
+        companyId: orders.companyId,
+        contactId: orders.contactId,
+        ownerId: orders.ownerId,
+        companyName: companies.name,
+        contactFirstName: contacts.firstName,
+        contactLastName: contacts.lastName,
+        contactEmail: contacts.email,
+        ownerName: users.name,
+      })
+      .from(orders)
+      .leftJoin(companies, eq(orders.companyId, companies.id))
+      .leftJoin(contacts, eq(orders.contactId, contacts.id))
+      .leftJoin(users, eq(orders.ownerId, users.id))
+      .where(where)
+      .orderBy(order)
+      .limit(params.pageSize)
+      .offset(offsetOf(params)),
+    // The same joins as the rows: searching on a company name means the join
+    // decides which orders match.
+    db
+      .select({ n: count() })
+      .from(orders)
+      .leftJoin(companies, eq(orders.companyId, companies.id))
+      .leftJoin(contacts, eq(orders.contactId, contacts.id))
+      .where(where),
+  ]);
+
+  return toPage(rows, Number(counted?.n ?? 0), params);
 }

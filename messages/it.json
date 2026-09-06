@@ -1530,7 +1530,8 @@
       "notifications": "Notifiche",
       "logout": "Esci",
       "unknownUser": "Utente Sconosciuto"
-    }
+    },
+    "openMenu": "Apri il menu"
   },
   "nextActions": {
     "title": "Ti aspetta",
@@ -3172,7 +3173,12 @@
       "utilizationOf": "{hours}h su {capacity}h",
       "noConflicts": "Nessun sovraccarico",
       "legend": "Legenda"
-    }
+    },
+    "olderDoneHidden": "{count, plural, =1 {# attività completata più di {days} giorni fa non è mostrata} other {# attività completate più di {days} giorni fa non sono mostrate}}",
+    "showArchive": "Mostrale",
+    "showingArchive": "Vengono mostrate tutte le attività completate",
+    "backToOpen": "Torna al lavoro aperto",
+    "cappedAt": "Vengono mostrate solo le {count} attività create più di recente. Restringi l'elenco per vedere le altre."
   },
   "triage": {
     "title": "A cosa somiglia",

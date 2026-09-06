@@ -44,6 +44,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DONE_WINDOW_DAYS, TASK_LIST_CAP } from "@/lib/task-window";
 import { cn } from "@/lib/utils";
 
 import { NewTaskDialog } from "./new-task-dialog";
@@ -345,6 +346,12 @@ function TaskCard({
 
 interface Props {
   tasks: Task[];
+  /** Tasks finished too long ago to be listed, and so not in `tasks`. */
+  hiddenDone: number;
+  /** True when the screen's row cap cut the list short. */
+  capped: boolean;
+  /** True when the archive was asked for, and nothing is being held back. */
+  showingAll: boolean;
   users: TaskUser[];
   currentUserId: string;
   leads: { id: string; firstName: string; lastName: string }[];
@@ -357,6 +364,9 @@ interface Props {
 
 export function TasksClient({
   tasks: initialTasks,
+  hiddenDone,
+  capped,
+  showingAll,
   users,
   currentUserId,
   leads,
@@ -383,9 +393,11 @@ export function TasksClient({
       total: tasks.length,
       overdue: tasks.filter(isOverdue).length,
       dueToday: tasks.filter(isDueToday).length,
-      done: tasks.filter((tk) => tk.status === "done").length,
+      // Plus the ones the age window left out: this card counts what the
+      // workspace has finished, not what happens to be on screen.
+      done: tasks.filter((tk) => tk.status === "done").length + hiddenDone,
     }),
-    [tasks],
+    [tasks, hiddenDone],
   );
 
   const filtered = useMemo(() => {
@@ -507,13 +519,18 @@ export function TasksClient({
   return (
     <div className="space-y-6">
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div>
+      {/* ⚠️ A title, a two-way view switch and a create button is more than a
+          343px row holds: the subtitle was squeezed into a five-line column and
+          the create button hung off the right edge. The row wraps, the subtitle
+          steps out below sm — it explains what everyone here already knows —
+          and the switch and the button share the second line. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
-          <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
+          <p className="hidden text-muted-foreground text-sm sm:block">{t("subtitle")}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-0.5 rounded-md border bg-muted/30 p-0.5">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <div className="flex shrink-0 items-center gap-0.5 rounded-md border bg-muted/30 p-0.5">
             <button
               type="button"
               onClick={() => setViewMode("list")}
@@ -539,17 +556,19 @@ export function TasksClient({
               <Kanban className="h-3.5 w-3.5" /> {t("board")}
             </button>
           </div>
-          <NewTaskDialog
-            users={users}
-            tasks={tasks}
-            leads={leads}
-            contacts={contacts}
-            companies={companies}
-            deals={deals}
-            tickets={tickets}
-            currentUserId={currentUserId}
-            onCreated={handleCreated}
-          />
+          <div className="ml-auto">
+            <NewTaskDialog
+              users={users}
+              tasks={tasks}
+              leads={leads}
+              contacts={contacts}
+              companies={companies}
+              deals={deals}
+              tickets={tickets}
+              currentUserId={currentUserId}
+              onCreated={handleCreated}
+            />
+          </div>
         </div>
       </div>
 
@@ -578,17 +597,45 @@ export function TasksClient({
         })}
       </div>
 
-      {/* ── Toolbar ─────────────────────────────────────────────────────────── */}
+      {/* The age window, said out loud. A list that quietly drops rows is worse
+          than a shorter one: the person counts, disagrees, and stops trusting the
+          screen. */}
+      {capped && <p className="text-muted-foreground text-xs">{t("cappedAt", { count: TASK_LIST_CAP })}</p>}
+
+      {(hiddenDone > 0 || showingAll) && (
+        <p className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
+          {showingAll ? (
+            <>
+              {t("showingArchive")}
+              <Link href="/dashboard/tasks" className="font-medium text-primary hover:underline">
+                {t("backToOpen")}
+              </Link>
+            </>
+          ) : (
+            <>
+              {t("olderDoneHidden", { count: hiddenDone, days: DONE_WINDOW_DAYS })}
+              <Link href="/dashboard/tasks?done=all" className="font-medium text-primary hover:underline">
+                {t("showArchive")}
+              </Link>
+            </>
+          )}
+        </p>
+      )}
+
+      {/* ⚠️ Fixed widths of 128 and 144px cut "Tutti gli assegnatari" to "Tutti
+          gli assegnata" — mid-word and with no ellipsis, because the select
+          clamps to one line. Full width below sm, where there is room for the
+          words; the desktop widths are untouched. */}
       <div className="flex flex-wrap items-center gap-2">
         <Input
           placeholder={t("searchPlaceholder")}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="h-8 w-48"
+          className="h-8 w-full sm:w-48"
         />
 
         <Select value={filterStatus} onValueChange={setFilterStatus}>
-          <SelectTrigger className="h-8 w-32 text-xs">
+          <SelectTrigger className="h-8 w-full text-xs sm:w-32">
             <Filter className="mr-1 h-3 w-3" />
             <SelectValue />
           </SelectTrigger>
@@ -601,7 +648,7 @@ export function TasksClient({
         </Select>
 
         <Select value={filterPriority} onValueChange={setFilterPriority}>
-          <SelectTrigger className="h-8 w-32 text-xs">
+          <SelectTrigger className="h-8 w-full text-xs sm:w-32">
             <SelectValue placeholder={t("allPriorities")} />
           </SelectTrigger>
           <SelectContent>
@@ -615,7 +662,7 @@ export function TasksClient({
         </Select>
 
         <Select value={filterAssignee} onValueChange={setFilterAssignee}>
-          <SelectTrigger className="h-8 w-36 text-xs">
+          <SelectTrigger className="h-8 w-full text-xs sm:w-36">
             <SelectValue placeholder={t("allAssignees")} />
           </SelectTrigger>
           <SelectContent>
@@ -835,6 +882,43 @@ export function TasksClient({
                                   {task.description}
                                 </p>
                               )}
+
+                              {/*
+                                ⚠️ Due date, priority and who it is for live in
+                                columns that are hidden below sm and lg — so on a
+                                phone a task list showed the title and nothing
+                                else, which is a list of names, not of work. The
+                                same three facts, under the title, where there is
+                                room for them.
+                              */}
+                              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 lg:hidden">
+                                {task.dueDate && (
+                                  <span
+                                    className={cn(
+                                      "flex items-center gap-1 text-xs sm:hidden",
+                                      overdue
+                                        ? "font-semibold text-destructive"
+                                        : today
+                                          ? "font-semibold text-orange-500"
+                                          : "text-muted-foreground",
+                                    )}
+                                  >
+                                    {overdue && <AlertCircle className="h-3 w-3" />}
+                                    {new Date(task.dueDate).toLocaleDateString(undefined, {
+                                      day: "2-digit",
+                                      month: "short",
+                                    })}
+                                  </span>
+                                )}
+                                <Badge variant="outline" className={cn("h-4 px-1.5 py-0 text-[10px]", priorityClass)}>
+                                  {priorityLabel}
+                                </Badge>
+                                {(task.assigneeName || task.ownerName) && (
+                                  <span className="truncate text-muted-foreground text-xs">
+                                    {task.assigneeName ?? task.ownerName}
+                                  </span>
+                                )}
+                              </div>
                               {(task.progressPct > 0 || done) && (
                                 <div className="mt-1 flex items-center gap-1.5">
                                   <div className="h-1 w-20 overflow-hidden rounded-full bg-muted">
