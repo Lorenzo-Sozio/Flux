@@ -133,7 +133,7 @@ export function PipelineBoard({
   if (!isMounted) return null;
 
   return (
-    <div className="flex h-[calc(100vh-120px)] w-full flex-col overflow-hidden">
+    <div className="flex h-[calc(100dvh-120px)] w-full flex-col overflow-hidden">
       <LostDealDialog
         open={pendingLoss !== null}
         dealName={pendingLoss?.dealName ?? ""}

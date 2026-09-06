@@ -276,7 +276,7 @@ export function ChatClient({ userId }: { userId: string }) {
   });
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-lg border bg-background">
+    <div className="flex h-[calc(100dvh-4rem)] overflow-hidden rounded-lg border bg-background">
       {/* ── Left panel ───────────────────────────────────────────── */}
       <div className="flex w-72 shrink-0 flex-col border-r">
         <div className="flex items-center justify-between border-b px-4 py-3">

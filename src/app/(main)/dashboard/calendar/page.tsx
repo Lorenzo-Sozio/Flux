@@ -195,7 +195,7 @@ export default async function CalendarPage({
           {DAYS.map((d, i) => (
             <div
               key={d}
-              className={`py-3 text-center font-semibold text-xs uppercase tracking-wider ${
+              className={`py-2 text-center font-semibold text-[10px] uppercase tracking-wider md:py-3 md:text-xs ${
                 i >= 5 ? "text-muted-foreground/50" : "text-muted-foreground"
               }`}
             >
@@ -219,7 +219,12 @@ export default async function CalendarPage({
             return (
               <div
                 key={day.toISOString()}
-                className={`flex min-h-[160px] flex-col gap-1 p-2 transition-colors ${
+                // ⚠️ Seven columns on a 343px screen is 49px a day. A month grid
+                // cannot show an appointment's name in 49px, so below md it
+                // shows the count as dots and the day itself is the link to its
+                // agenda — which is where the names are readable. The full grid
+                // comes back from md up, where a cell is 130px or more.
+                className={`flex min-h-[68px] flex-col gap-1 p-1 transition-colors md:min-h-[160px] md:gap-1 md:p-2 ${
                   isToday
                     ? "bg-primary/[0.04] dark:bg-primary/[0.06]"
                     : !inMonth
@@ -244,24 +249,45 @@ export default async function CalendarPage({
                   )}
                 </div>
 
-                {/* Events — task events get quick-complete pill */}
-                {dayEvents
-                  .slice(0, MAX_VISIBLE)
-                  .map((ev) =>
-                    ev.type === "task" ? (
-                      <CalendarTaskPill key={ev.id} event={ev} compact />
-                    ) : (
-                      <EventPill key={ev.id} event={ev} compact />
-                    ),
-                  )}
-                {overflow > 0 && (
+                {/* Phone: one dot per appointment, up to four, and the whole
+                    cell opens that day's agenda. */}
+                {dayEvents.length > 0 && (
                   <Link
                     href={agendaUrl}
-                    className="mt-auto py-0.5 text-center font-medium text-[11px] text-muted-foreground leading-none hover:text-primary"
+                    aria-label={t("more", { count: dayEvents.length })}
+                    className="flex flex-1 flex-wrap content-start items-start gap-0.5 md:hidden"
                   >
-                    {t("more", { count: overflow })}
+                    {dayEvents.slice(0, 4).map((ev) => (
+                      <span key={ev.id} className="size-1.5 rounded-full bg-primary/70" />
+                    ))}
+                    {dayEvents.length > 4 && (
+                      <span className="font-medium text-[9px] text-muted-foreground leading-none">
+                        +{dayEvents.length - 4}
+                      </span>
+                    )}
                   </Link>
                 )}
+
+                {/* Tablet and up: the appointments themselves. */}
+                <div className="hidden flex-1 flex-col gap-1 md:flex">
+                  {dayEvents
+                    .slice(0, MAX_VISIBLE)
+                    .map((ev) =>
+                      ev.type === "task" ? (
+                        <CalendarTaskPill key={ev.id} event={ev} compact />
+                      ) : (
+                        <EventPill key={ev.id} event={ev} compact />
+                      ),
+                    )}
+                  {overflow > 0 && (
+                    <Link
+                      href={agendaUrl}
+                      className="mt-auto py-0.5 text-center font-medium text-[11px] text-muted-foreground leading-none hover:text-primary"
+                    >
+                      {t("more", { count: overflow })}
+                    </Link>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -355,14 +381,19 @@ export default async function CalendarPage({
       return laid;
     });
 
-    const gridCols = "48px repeat(7, minmax(0, 1fr))";
+    // ⚠️ `minmax(0, …)` let a day column fall to 42px on a phone, which is not
+    // enough for the hour of an appointment, never mind its name. A floor of
+    // 116px changes nothing above about 900px — the columns are wider than that
+    // anyway — and below it the grid scrolls sideways a day at a time, which is
+    // how a week is read on a phone.
+    const gridCols = "48px repeat(7, minmax(116px, 1fr))";
 
     return (
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         {/* Single scroll container — headers, all-day strip, and time grid all share identical width */}
         <div
-          className="overflow-y-auto"
-          style={{ maxHeight: "calc(100vh - 280px)", minHeight: "480px", scrollbarGutter: "stable" }}
+          className="overflow-auto"
+          style={{ maxHeight: "calc(100dvh - 280px)", minHeight: "480px", scrollbarGutter: "stable" }}
         >
           {/* Sticky wrapper: day headers + all-day strip pinned together at top */}
           <div className="sticky top-0 z-20">
@@ -641,7 +672,7 @@ export default async function CalendarPage({
           {/* Time grid */}
           <div
             className="relative flex overflow-y-auto"
-            style={{ maxHeight: "calc(100vh - 290px)", minHeight: "400px" }}
+            style={{ maxHeight: "calc(100dvh - 290px)", minHeight: "400px" }}
           >
             {/* Time labels */}
             <div className="relative w-14 shrink-0 select-none border-r" style={{ height: `${TOTAL_HEIGHT}px` }}>

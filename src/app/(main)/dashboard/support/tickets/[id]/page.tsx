@@ -1227,7 +1227,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   return (
     <>
       {/* Cancel parent vertical padding only, fill viewport below the 3rem app header */}
-      <div className="-my-4 md:-my-6 flex flex-col overflow-hidden" style={{ height: "calc(100vh - 3rem)" }}>
+      <div className="-my-4 md:-my-6 flex flex-col overflow-hidden" style={{ height: "calc(100dvh - 3rem)" }}>
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div className="shrink-0 border-b bg-background px-6 pt-5 pb-4">
           {/* Breadcrumb + actions */}

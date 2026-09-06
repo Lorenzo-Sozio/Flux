@@ -37,6 +37,30 @@ const RIGID_CHILD = 200;
 
 const NEWLINE = /\r?\n/;
 
+// ⚠️⚠️ The checker checks itself first.
+//
+// Five of the regexes below once held a literal 0x08, because a backslash-b in
+// a Python string is a backspace and not a word boundary — and the scripts that
+// edit this file are written in Python. Two rules therefore matched nothing,
+// reported nothing, and the run said "clean". A checker that cannot fail is
+// worse than no checker, because the green gets believed.
+//
+// Counted by code point rather than matched by a character class: a check for
+// mangled escapes is the last place to put an escape that can be mangled.
+{
+  const self = readFileSync("scripts/mobile-audit.mjs", "utf8");
+  const control = [...self].filter((ch) => {
+    const code = ch.charCodeAt(0);
+    return code < 32 && code !== 9 && code !== 10 && code !== 13;
+  });
+  if (control.length > 0) {
+    console.error(
+      `mobile-audit: ${control.length} control character(s) in this file's own source — a regex escape was mangled, so its rule is not running.`,
+    );
+    process.exit(2);
+  }
+}
+
 const findings = [];
 
 function report(rule, file, line, detail) {
@@ -226,6 +250,16 @@ for (const file of files.sort()) {
     if (!/overflow-x-auto|overflow-auto/.test(blockBefore(source, line, 6))) {
       report("unscrollable-table", file, line, "a hand-rolled table with no horizontally scrollable parent");
     }
+  }
+
+  // ── A viewport height in an inline style ──────────────────────────────────
+  //
+  // ⚠️ The class rules above read `className` only, so `style={{ maxHeight:
+  // "calc(100vh - 280px)" }}` walked straight past them — and the calendar had
+  // two of them, holding the height of the week and day grids.
+  for (const match of source.matchAll(/style=\{\{[^}]*\b100vh\b/g)) {
+    const line = source.slice(0, match.index ?? 0).split(NEWLINE).length;
+    report("vh-unit", file, line, "100vh in an inline style — use 100dvh");
   }
 
   // ── Hover-only controls ─────────────────────────────────────────────────
