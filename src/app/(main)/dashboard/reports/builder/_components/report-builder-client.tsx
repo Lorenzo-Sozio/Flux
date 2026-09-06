@@ -424,9 +424,12 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
       </div>
 
       {/* Body */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* ⚠️ A 288px config panel beside the canvas leaves 55px for the canvas on
+          a phone. Below lg the two stack and the page scrolls: the panel above,
+          the result under it, which is the order they are used in. */}
+      <div className="flex flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         {/* ── Config panel ── */}
-        <div className="w-72 shrink-0 border-r overflow-y-auto p-4 space-y-5">
+        <div className="w-full shrink-0 space-y-5 border-b p-4 lg:w-72 lg:overflow-y-auto lg:border-r lg:border-b-0">
           {/* Entity */}
           <div className="space-y-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("dataSource")}</p>

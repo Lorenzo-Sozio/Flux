@@ -1193,8 +1193,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     return (
       <div className="flex animate-pulse flex-col gap-0 p-6">
         <div className="mb-6 h-4 w-28 rounded bg-muted" />
-        <div className="mb-3 h-7 w-96 rounded bg-muted" />
-        <div className="mb-6 h-4 w-64 rounded bg-muted" />
+        <div className="mb-3 h-7 w-full max-w-96 rounded bg-muted" />
+        <div className="mb-6 h-4 w-full max-w-64 rounded bg-muted" />
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
           <div className="space-y-3 lg:col-span-2">
             <div className="h-80 rounded-xl bg-muted" />

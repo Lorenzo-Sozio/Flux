@@ -140,8 +140,10 @@ export function WorkloadPanel({ viewDate, onClose }: Props) {
 
   const fmtShort = (d: Date) => d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
 
+  // 320px beside the chart is the whole of a phone. Below lg it is a full-width
+  // strip under the chart instead of a column beside it.
   return (
-    <div className="flex w-80 shrink-0 flex-col border-l bg-background">
+    <div className="flex w-full shrink-0 flex-col border-t bg-background lg:w-80 lg:border-t-0 lg:border-l">
       {/* Header */}
       <div className="flex shrink-0 items-center justify-between border-b px-4 py-3">
         <div className="flex items-center gap-2">
@@ -157,8 +159,6 @@ export function WorkloadPanel({ viewDate, onClose }: Props) {
           <X className="h-3.5 w-3.5" />
         </Button>
       </div>
-
-      {/* Period label */}
       <div className="shrink-0 border-b px-4 py-2 text-[11px] text-muted-foreground">
         {week1Start && periodEnd && (
           <>
@@ -169,8 +169,6 @@ export function WorkloadPanel({ viewDate, onClose }: Props) {
         )}
         <span className="ml-1 opacity-60">· {t("workloadNextDays", { n: VISIBLE_DAYS })}</span>
       </div>
-
-      {/* Column headers: week labels + day initials */}
       <div className="flex shrink-0 items-end border-b py-1.5 pl-3">
         <div className="w-[76px] shrink-0" />
         <div className="flex flex-col gap-0.5">
@@ -206,53 +204,49 @@ export function WorkloadPanel({ viewDate, onClose }: Props) {
           </div>
         </div>
       </div>
-
-      {/* User rows */}
-      {users.length === 0 ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center text-muted-foreground">
-          <BarChart3 className="h-8 w-8 opacity-20" aria-hidden="true" />
-          <p className="text-xs">{t("workloadNoData")}</p>
-        </div>
+      users.length === 0 ? (
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center text-muted-foreground">
+        <BarChart3 className="h-8 w-8 opacity-20" aria-hidden="true" />
+        <p className="text-xs">{t("workloadNoData")}</p>
+      </div>
       ) : (
-        <div className="flex-1 overflow-y-auto py-1">
-          {users.map((user) => (
-            <div key={user.userId} className="flex items-center py-1.5 pl-3">
-              {/* User info — 76px */}
-              <div className="flex w-[76px] shrink-0 items-center gap-1.5 overflow-hidden">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-muted font-bold text-[8px] text-muted-foreground">
-                  {user.initials}
-                </span>
-                <span className="truncate font-medium text-[11px]">{user.name.split(" ")[0]}</span>
-              </div>
-              {/* Day cells — 14px each with 1px gap (14×14+13×1 = 209px) */}
-              <div className="flex gap-px">
-                {visibleDays.map((d) => {
-                  const ds = toDateStr(d);
-                  const hours = user.dayHours[ds] ?? 0;
-                  const isToday = ds === todayStr;
-                  return (
-                    <div
-                      key={ds}
-                      className={cn(
-                        "h-5 w-[14px] shrink-0 rounded-[2px]",
-                        cellBg(hours),
-                        isToday && "ring-1 ring-primary ring-offset-[1px]",
-                      )}
-                      title={
-                        hours > 0
-                          ? `${user.name} · ${d.toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short" })} · ${hours.toFixed(1)}h`
-                          : undefined
-                      }
-                    />
-                  );
-                })}
-              </div>
+      <div className="flex-1 overflow-y-auto py-1">
+        {users.map((user) => (
+          <div key={user.userId} className="flex items-center py-1.5 pl-3">
+            {/* User info — 76px */}
+            <div className="flex w-[76px] shrink-0 items-center gap-1.5 overflow-hidden">
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-muted font-bold text-[8px] text-muted-foreground">
+                {user.initials}
+              </span>
+              <span className="truncate font-medium text-[11px]">{user.name.split(" ")[0]}</span>
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Legend */}
+            {/* Day cells — 14px each with 1px gap (14×14+13×1 = 209px) */}
+            <div className="flex gap-px">
+              {visibleDays.map((d) => {
+                const ds = toDateStr(d);
+                const hours = user.dayHours[ds] ?? 0;
+                const isToday = ds === todayStr;
+                return (
+                  <div
+                    key={ds}
+                    className={cn(
+                      "h-5 w-[14px] shrink-0 rounded-[2px]",
+                      cellBg(hours),
+                      isToday && "ring-1 ring-primary ring-offset-[1px]",
+                    )}
+                    title={
+                      hours > 0
+                        ? `${user.name} · ${d.toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short" })} · ${hours.toFixed(1)}h`
+                        : undefined
+                    }
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      )
       <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-t px-4 py-2">
         {[
           { bg: "bg-emerald-300/70 dark:bg-emerald-600/50", label: "≤50%" },
@@ -267,8 +261,6 @@ export function WorkloadPanel({ viewDate, onClose }: Props) {
           </span>
         ))}
       </div>
-
-      {/* Footer link */}
       <div className="shrink-0 border-t px-4 py-2.5">
         <Link
           href="/dashboard/tasks/workload"

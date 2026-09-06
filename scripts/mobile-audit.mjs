@@ -190,6 +190,20 @@ for (const file of files.sort()) {
         }
       }
 
+      // ── A fixed width on the Tailwind scale, with no escape ───────────────
+      //
+      // The `w-[Npx]` rule above misses `w-72`, which is the same 288px written
+      // the ordinary way — and that is how side panels are written. A 288px
+      // panel beside a canvas leaves 55px of a phone for the canvas.
+      const scaled = cls.match(/^w-(\d{2})$/);
+      if (scaled && Number(scaled[1]) * 4 >= 224 && !hasBreakpoint(cls) && !isUiPrimitive) {
+        const escapes = classes.some((c) => /^(sm|md|lg|xl):w-|^max-w-full$|^hidden$/.test(c));
+        const isPopover = /(Popover|DropdownMenu|Select|Command|HoverCard|Tooltip)Content/.test(lineOf(source, line));
+        if (!escapes && !isPopover) {
+          report("fixed-width", file, line, `${cls} (${Number(scaled[1]) * 4}px) with no narrower alternative`);
+        }
+      }
+
       // ── A fixed height, centred content, and no way to scroll ─────────────
       //
       // ⚠️⚠️ `h-dvh` + `items-center` with no overflow clips the **top** of

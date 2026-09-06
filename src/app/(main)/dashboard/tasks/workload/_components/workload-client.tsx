@@ -698,7 +698,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
 
         {/* Right panel */}
         {panelOpen && (
-          <div className="flex w-80 shrink-0 flex-col overflow-hidden border-l">
+          <div className="flex w-full shrink-0 flex-col overflow-hidden border-t lg:w-80 lg:border-t-0 lg:border-l">
             {/* ── Conflicts panel ─────────────────────────────────────── */}
             {showConflicts && (
               <>

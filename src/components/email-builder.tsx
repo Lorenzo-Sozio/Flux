@@ -1011,9 +1011,14 @@ export function EmailBuilder({
       </div>
 
       {/* ── Main area ── */}
-      <div className="flex flex-1 overflow-hidden">
+      {/* ⚠️ Three columns of 208, flexible and 256 pixels is a layout for a
+          desktop. Below lg they stack and the page scrolls — canvas first,
+          because that is what is being looked at, then the palette and the
+          inspector under it. Not delightful on a phone, but usable, which is
+          more than three columns sharing 343px manage. */}
+      <div className="flex flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         {/* ── Left: Block palette ── */}
-        <div className="w-52 shrink-0 border-r bg-muted/30 overflow-y-auto">
+        <div className="order-2 w-full shrink-0 overflow-y-auto border-t bg-muted/30 lg:order-none lg:w-52 lg:border-t-0 lg:border-r">
           <div className="p-3">
             <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground mb-2">Add Block</p>
             <div className="space-y-1">
@@ -1050,7 +1055,7 @@ export function EmailBuilder({
 
         {/* ── Center: Canvas or Preview ── */}
         {preview ? (
-          <div className="flex-1 bg-muted/40 flex flex-col items-center overflow-y-auto p-6">
+          <div className="order-1 flex flex-1 flex-col items-center overflow-y-auto bg-muted/40 p-4 lg:order-none lg:p-6">
             <p className="text-xs text-muted-foreground mb-4">
               {preview === "mobile" ? "Mobile preview (375px)" : "Desktop preview (600px)"}
             </p>
@@ -1170,7 +1175,7 @@ export function EmailBuilder({
         )}
 
         {/* ── Right: Inspector ── */}
-        <div className="w-64 shrink-0 border-l bg-card overflow-y-auto">
+        <div className="order-3 w-full shrink-0 overflow-y-auto border-t bg-card lg:order-none lg:w-64 lg:border-t-0 lg:border-l">
           {selectedId === "settings" ? (
             <SettingsInspector settings={design.settings} onChange={(s) => setDesign((d) => ({ ...d, settings: s }))} />
           ) : selectedBlock ? (

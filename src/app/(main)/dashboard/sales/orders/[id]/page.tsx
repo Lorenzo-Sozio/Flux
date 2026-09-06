@@ -258,7 +258,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     return (
       <div className="animate-pulse space-y-4">
         <div className="h-5 w-28 rounded bg-muted" />
-        <div className="h-10 w-64 rounded bg-muted" />
+        <div className="h-10 w-full max-w-64 rounded bg-muted" />
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div className="h-64 rounded-xl bg-muted md:col-span-2" />
           <div className="h-64 rounded-xl bg-muted" />
