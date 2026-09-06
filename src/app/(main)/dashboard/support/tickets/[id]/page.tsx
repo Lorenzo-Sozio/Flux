@@ -1227,9 +1227,15 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   return (
     <>
       {/* Cancel parent vertical padding only, fill viewport below the 3rem app header */}
-      <div className="-my-4 md:-my-6 flex flex-col overflow-hidden" style={{ height: "calc(100dvh - 3rem)" }}>
+      {/*
+        ⚠️ The height has to leave room for the bottom bar as well as the
+        header. `100dvh - 3rem` is the whole screen minus the header only, so
+        below md the reply box sat behind the tab bar — the one control the
+        page exists for.
+      */}
+      <div className="-my-4 md:-my-6 flex h-[calc(100dvh-3rem-var(--mobile-nav-height)-var(--safe-bottom))] flex-col overflow-hidden md:h-[calc(100dvh-3rem)]">
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div className="shrink-0 border-b bg-background px-6 pt-5 pb-4">
+        <div className="shrink-0 border-b bg-background px-4 pt-4 pb-3 md:px-6 md:pt-5 md:pb-4">
           {/* Breadcrumb + actions */}
           <div className="mb-3 flex items-center justify-between gap-4">
             <Link
@@ -1300,9 +1306,16 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
         </div>
 
         {/* ── Body grid ───────────────────────────────────────────────────── */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[1fr_300px]">
+        {/*
+          ⚠️ Below lg this stops being a grid and becomes one column that
+          scrolls. As a grid it split a fixed-height page into two rows, each
+          with its own scrollbar — a conversation about 200px tall above a
+          panel about 200px tall, on a screen that had room for one of them
+          done properly. The thread takes the screen; the panel follows it.
+        */}
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:grid lg:grid-cols-[1fr_300px] lg:overflow-hidden">
           {/* ── Left: Conversation ──────────────────────────────────────── */}
-          <div className="flex min-h-0 flex-col border-r">
+          <div className="flex min-h-0 flex-col lg:border-r">
             {/* Typing presence banner */}
             {typingUsers.length > 0 && (
               <div className="flex items-center gap-2 border-b bg-amber-50/80 px-6 py-2 text-amber-700 text-xs dark:border-amber-800/30 dark:bg-amber-950/20 dark:text-amber-400">
@@ -1320,7 +1333,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
             )}
 
             {/* Timeline */}
-            <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+            <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 px-4 py-4 lg:overflow-y-auto lg:px-6 lg:py-5">
               {timeline.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <MessageSquare className="mb-3 h-10 w-10 text-muted-foreground/20" />
@@ -1460,7 +1473,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
           </div>
 
           {/* ── Right: Sidebar ──────────────────────────────────────────── */}
-          <div className="space-y-3 overflow-y-auto p-4">
+          <div className="space-y-3 border-t p-4 lg:overflow-y-auto lg:border-t-0">
             <ContactCard ticket={ticket} />
             {/*
               Where the ticket stands, for whoever is picking it up (audit rilievo

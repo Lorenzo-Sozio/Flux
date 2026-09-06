@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  ArrowLeft,
   BellOff,
   Edit,
   LogOut,
@@ -276,9 +277,16 @@ export function ChatClient({ userId }: { userId: string }) {
   });
 
   return (
-    <div className="flex h-[calc(100dvh-4rem)] overflow-hidden rounded-lg border bg-background">
-      {/* ── Left panel ───────────────────────────────────────────── */}
-      <div className="flex w-72 shrink-0 flex-col border-r">
+    // ⚠️ The height has to clear the bottom bar as well as the header, or the
+    // message box — the only control this page has — sits behind the tabs.
+    <div className="flex h-[calc(100dvh-4rem-var(--mobile-nav-height)-var(--safe-bottom))] overflow-hidden rounded-lg border bg-background md:h-[calc(100dvh-4rem)]">
+      {/*
+        ⚠️ Two panes side by side is a 288px list beside a 55px conversation on
+        a phone. Below md it is **one pane at a time**: the list, and then the
+        conversation with a way back — which is what every messaging app on a
+        phone does, and the only arrangement in which either is readable.
+      */}
+      <div className={cn("flex w-full shrink-0 flex-col border-r md:w-72", activeConv && "hidden md:flex")}>
         <div className="flex items-center justify-between border-b px-4 py-3">
           <h2 className="font-semibold text-base">{t("messages")}</h2>
           <div className="flex items-center gap-1">
@@ -470,7 +478,7 @@ export function ChatClient({ userId }: { userId: string }) {
       </div>
 
       {/* ── Right panel ──────────────────────────────────────────── */}
-      <div className="flex flex-1 flex-col">
+      <div className={cn("flex min-w-0 flex-1 flex-col", !activeConv && "hidden md:flex")}>
         {!activeConv ? (
           <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
             <MessageCircle className="h-12 w-12 opacity-20" />
@@ -486,8 +494,18 @@ export function ChatClient({ userId }: { userId: string }) {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-3 border-b bg-background px-4 py-3">
-              <Avatar className="h-8 w-8">
+            <div className="flex items-center gap-3 border-b bg-background px-3 py-3 md:px-4">
+              {/* The way back to the list, which only exists on a phone. */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="-ml-1 shrink-0 md:hidden"
+                onClick={() => setActiveConv(null)}
+                aria-label={t("messages")}
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
+              <Avatar className="h-8 w-8 shrink-0">
                 <AvatarFallback
                   className={cn(
                     "font-medium text-xs",
