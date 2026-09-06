@@ -229,7 +229,7 @@ export default function EmailSettingsPage() {
               {/* Host and port share a line from sm up; on a phone a 100px
                   port field beside a truncated host is worse than two rows. */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="col-span-2 space-y-1.5">
+                <div className="col-span-1 sm:col-span-2 space-y-1.5">
                   <Label htmlFor="smtp-host">{t("serverHost")}</Label>
                   <Input
                     id="smtp-host"
@@ -265,7 +265,7 @@ export default function EmailSettingsPage() {
                 </Label>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="smtp-user">{t("username")}</Label>
                   <Input
@@ -330,7 +330,7 @@ export default function EmailSettingsPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="from-name">{t("displayName")}</Label>
               <Input

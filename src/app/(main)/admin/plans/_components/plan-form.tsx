@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 
-import { BarChart2, CreditCard, Infinity, Layers, Loader2, Star, Tag, Zap } from "lucide-react";
+import { BarChart2, CreditCard, Infinity as InfinityIcon, Layers, Loader2, Star, Tag, Zap } from "lucide-react";
 import { toast } from "sonner";
 
 import type { UpsertPlanInput } from "@/actions/admin-billing";
@@ -279,7 +279,7 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
           </TabsList>
 
           {/* ─── General ─────────────────────────────────────────────────── */}
-          <TabsContent value="general" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+          <TabsContent value="general" className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 mt-0">
             <F label="Internal name (slug)">
               <Input
                 value={name}
@@ -299,7 +299,7 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
                 required
               />
             </F>
-            <div className="col-span-2">
+            <div className="col-span-1 sm:col-span-2">
               <F label="Description">
                 <Textarea
                   value={description}
@@ -314,7 +314,7 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
               <Input type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} min={0} />
             </F>
             <div /> {/* spacer */}
-            <div className="col-span-2 space-y-2">
+            <div className="col-span-1 sm:col-span-2 space-y-2">
               <ToggleRow
                 label="Active"
                 description="Tenants can subscribe to this plan."
@@ -337,7 +337,7 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
           </TabsContent>
 
           {/* ─── Pricing ─────────────────────────────────────────────────── */}
-          <TabsContent value="pricing" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+          <TabsContent value="pricing" className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 mt-0">
             <F label="Monthly price / user">
               <EuroInput value={priceMonthly} onChange={setPriceMonthly} placeholder="25.00" />
             </F>
@@ -367,12 +367,12 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
               <SuffixInput value={trialDays} onChange={setTrialDays} suffix="days" type="number" min={0} />
             </F>
             {monthlyNum > 0 && annualNum > 0 && (
-              <div className="col-span-2 rounded-md bg-muted px-4 py-2.5 text-sm text-muted-foreground">
+              <div className="col-span-1 sm:col-span-2 rounded-md bg-muted px-4 py-2.5 text-sm text-muted-foreground">
                 Annual billing saves <span className="font-semibold text-foreground">{savings}%</span> — €
                 {((monthlyNum - annualNum) * 12).toFixed(2)} per user per year.
               </div>
             )}
-            <div className="col-span-2">
+            <div className="col-span-1 sm:col-span-2">
               <Separator className="my-1" />
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mt-3 mb-3">User seats</p>
             </div>
@@ -413,7 +413,7 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
             <p className="text-xs text-muted-foreground">
               Select the product modules available on this plan. CRM is the baseline and should always be included.
             </p>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {ALL_MODULES.map((mod) => {
                 const active = modules.has(mod.id);
                 return (
@@ -431,7 +431,12 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
                       }`}
                     >
                       {active && (
-                        <svg viewBox="0 0 10 10" className="h-3 w-3 text-primary-foreground">
+                        <svg
+                          viewBox="0 0 10 10"
+                          className="h-3 w-3 text-primary-foreground"
+                          aria-hidden="true"
+                          role="presentation"
+                        >
                           <path
                             d="M2 5l2.5 2.5L8 3"
                             stroke="currentColor"
@@ -457,7 +462,7 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
           </TabsContent>
 
           {/* ─── Limits ──────────────────────────────────────────────────── */}
-          <TabsContent value="limits" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
+          <TabsContent value="limits" className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 mt-0">
             <LimitField
               label="Max users"
               value={limits.maxUsers}
@@ -518,8 +523,8 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
           </TabsContent>
 
           {/* ─── Features ────────────────────────────────────────────────── */}
-          <TabsContent value="features" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
-            <div className="col-span-2">
+          <TabsContent value="features" className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 mt-0">
+            <div className="col-span-1 sm:col-span-2">
               <F label="Support tier">
                 <Select value={supportTier} onValueChange={setSupportTier}>
                   <SelectTrigger>
@@ -536,7 +541,7 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
                 </Select>
               </F>
             </div>
-            <div className="col-span-2 space-y-2">
+            <div className="col-span-1 sm:col-span-2 space-y-2">
               <ToggleRow
                 label="White Label"
                 description="Custom domain, brand colors, and hidden Flux branding."
@@ -553,11 +558,11 @@ export function PlanForm({ plan, onCancel, onSuccess }: PlanFormProps) {
           </TabsContent>
 
           {/* ─── Stripe ──────────────────────────────────────────────────── */}
-          <TabsContent value="stripe" className="grid grid-cols-2 gap-x-4 gap-y-4 mt-0">
-            <p className="col-span-2 text-xs text-muted-foreground">
+          <TabsContent value="stripe" className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4 mt-0">
+            <p className="col-span-1 sm:col-span-2 text-xs text-muted-foreground">
               Map this plan to Stripe products and prices. Leave blank if not yet configured in Stripe.
             </p>
-            <div className="col-span-2">
+            <div className="col-span-1 sm:col-span-2">
               <F label="Product ID">
                 <Input
                   value={stripeProductId}
@@ -718,7 +723,7 @@ function UnlimitedButton({ active, onClick }: { active: boolean; onClick: () => 
           : "border-border text-muted-foreground hover:bg-muted"
       }`}
     >
-      <Infinity className="h-3 w-3" />
+      <InfinityIcon className="h-3 w-3" />
       Unlimited
     </button>
   );

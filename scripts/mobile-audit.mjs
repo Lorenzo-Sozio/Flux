@@ -106,7 +106,11 @@ for (const file of files.sort()) {
       }
 
       // ── vh, where the browser and the screen disagree ──────────────────────
-      if (/^(min-h|max-h|h)-\[[\d.]+vh\]$/.test(cls)) {
+      //
+      // ⚠️ `h-screen` and `min-h-screen` are `100vh` spelled differently, and
+      // they were the majority of the offenders — eight full-page shells whose
+      // last row sat under the iOS toolbar.
+      if (/^(min-h|max-h|h)-\[[\d.]+vh\]$/.test(cls) || /^(min-h|max-h|h)-screen$/.test(cls)) {
         report("vh-unit", file, line, `${cls} — iOS Safari's vh excludes the address bar; use dvh`);
       }
 
@@ -124,6 +128,30 @@ for (const file of files.sort()) {
         );
         if (!narrower && holdsControls) {
           report("rigid-grid", file, line, `${cls} of form controls, with no narrower fallback`);
+        }
+      }
+
+      // ── Two columns of form fields ────────────────────────────────────────
+      //
+      // 160px a field on a phone: labels wrap onto two lines, placeholders are
+      // cut off mid-word, and a date input has no room for the picker its own
+      // browser draws. One field per row below sm.
+      //
+      // ⚠️ A `col-span-2` inside a one-column grid makes the browser invent a
+      // second column, which is exactly the overlap this rule exists to
+      // prevent — so the span has to carry the same breakpoint.
+      if (cls === "grid-cols-2" && !isUiPrimitive && !classes.some((c) => /^(sm|md|lg|xl):grid-cols-/.test(c))) {
+        const block = blockAfter(source, line + 1, 22);
+        const fields = (block.match(/<Input\b|<SelectTrigger|<Textarea|<FormField/g) ?? []).length;
+        if (fields >= 2) {
+          report("two-column-form", file, line, `${fields} form fields two-across, with no single-column fallback`);
+        }
+      }
+
+      if (cls === "col-span-2" && !isUiPrimitive) {
+        const grid = blockBefore(source, line, 40).match(/grid-cols-(\d+)(?![\s\S]*grid-cols-)/);
+        if (grid && grid[1] === "1") {
+          report("orphan-span", file, line, "col-span-2 under a one-column grid invents a second column");
         }
       }
 
@@ -168,7 +196,7 @@ for (const file of files.sort()) {
     const isPlainBlock = /^\s*<div(\s+className="[^"]*")?>\s*$/.test(next);
     if (!isPlainBlock || /min-w-0|flex-1|truncate/.test(next)) continue;
 
-    const holdsTitle = /<h[123]|CardTitle/.test(blockAfter(source, line + 1, 5));
+    const holdsTitle = /<h[123]\b|CardTitle/.test(blockAfter(source, line + 1, 5));
     const holdsControl = /<Button|DropdownMenuTrigger/.test(blockAfter(source, line + 1, 22));
     if (holdsTitle && holdsControl) {
       report("no-shrink-header", file, line, "title block has no min-w-0, so it pushes the buttons off the screen");
@@ -184,7 +212,7 @@ for (const file of files.sort()) {
   for (const match of source.matchAll(/<TabsList([^>]*)>/g)) {
     const line = source.slice(0, match.index).split(NEWLINE).length;
     const triggers = (blockAfter(source, line, 40).match(/<TabsTrigger/g) ?? []).length;
-    if (triggers >= 4 && /h-\d|overflow-hidden|flex-nowrap/.test(match[1])) {
+    if (triggers >= 4 && /\bh-\d|\boverflow-hidden|\bflex-nowrap/.test(match[1])) {
       report("tabs-overflow", file, line, `${triggers} tabs, and this usage overrides the wrap`);
     }
   }
@@ -226,7 +254,12 @@ const required = [
 ];
 const tabs = readFileSync("src/components/ui/tabs.tsx", "utf8");
 if (!/max-sm:flex-wrap/.test(tabs)) {
-  report("missing-rule", "src/components/ui/tabs.tsx", 0, "tab rows no longer wrap on a phone; the last tabs become unreachable");
+  report(
+    "missing-rule",
+    "src/components/ui/tabs.tsx",
+    0,
+    "tab rows no longer wrap on a phone; the last tabs become unreachable",
+  );
 }
 for (const [needle, what] of required) {
   if (!css.includes(needle)) report("missing-rule", "src/app/globals.css", 0, `${what} is gone (${needle})`);

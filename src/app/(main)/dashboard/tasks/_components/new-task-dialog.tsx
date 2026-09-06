@@ -610,7 +610,7 @@ export function NewTaskDialog({
                   />
                 </F>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <F label={t("dialog.status")}>
                     <Controller
                       control={control}
@@ -692,7 +692,7 @@ export function NewTaskDialog({
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <F label={t("dialog.startDate")}>
                     <Controller
                       control={control}
@@ -747,7 +747,7 @@ export function NewTaskDialog({
                   />
                 </F>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <F label={t("dialog.estimatedHours")} error={e.estimatedHours?.message}>
                     <div className="relative">
                       <Clock className="-translate-y-1/2 absolute top-1/2 left-3 h-3.5 w-3.5 text-muted-foreground" />

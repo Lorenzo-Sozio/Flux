@@ -103,7 +103,7 @@ export function PublicQuoteView({ quote, token }: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-muted/30 py-10 px-4">
+    <div className="min-h-dvh bg-muted/30 py-10 px-4">
       <div className="mx-auto max-w-3xl space-y-6">
         {/* Branding header */}
         <div className="text-center space-y-1">

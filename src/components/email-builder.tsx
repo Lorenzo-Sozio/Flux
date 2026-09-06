@@ -60,6 +60,7 @@ import {
   type TwoColumnProps,
   VARIABLES,
 } from "@/lib/email-builder";
+import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
 
 // ─── Block palette config ─────────────────────────────────────────────────────
 
@@ -108,7 +109,12 @@ function BlockPreview({ block }: { block: Block }) {
             fontSize: p.fontSize,
             lineHeight: p.lineHeight,
           }}
-          dangerouslySetInnerHTML={{ __html: p.html || "<p>Text block</p>" }}
+          // A block's HTML is written by one member of the workspace and previewed
+          // by another, which makes it stored XSS unless something removes what
+          // executes. The same sanitiser the ticket thread uses; the CSP in
+          // src/proxy.ts is the second line behind it.
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: composed email HTML; sanitised
+          dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(p.html || "<p>Text block</p>") }}
         />
       );
     }
@@ -193,11 +199,21 @@ function BlockPreview({ block }: { block: Block }) {
         <div style={{ background: p.backgroundColor, display: "flex", gap: p.gap }}>
           <div
             style={{ flex: 1, background: p.leftBg, padding: 16, fontSize: 13, color: "#374151" }}
-            dangerouslySetInnerHTML={{ __html: p.leftHtml }}
+            // A block's HTML is written by one member of the workspace and previewed
+            // by another, which makes it stored XSS unless something removes what
+            // executes. The same sanitiser the ticket thread uses; the CSP in
+            // src/proxy.ts is the second line behind it.
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: composed email HTML; sanitised
+            dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(p.leftHtml) }}
           />
           <div
             style={{ flex: 1, background: p.rightBg, padding: 16, fontSize: 13, color: "#374151" }}
-            dangerouslySetInnerHTML={{ __html: p.rightHtml }}
+            // A block's HTML is written by one member of the workspace and previewed
+            // by another, which makes it stored XSS unless something removes what
+            // executes. The same sanitiser the ticket thread uses; the CSP in
+            // src/proxy.ts is the second line behind it.
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: composed email HTML; sanitised
+            dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(p.rightHtml) }}
           />
         </div>
       );
@@ -213,12 +229,18 @@ function BlockPreview({ block }: { block: Block }) {
             color: p.textColor,
             fontSize: p.fontSize,
           }}
+          // A block's HTML is written by one member of the workspace and previewed
+          // by another, which makes it stored XSS unless something removes what
+          // executes. The same sanitiser the ticket thread uses; the CSP in
+          // src/proxy.ts is the second line behind it.
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: composed email HTML; sanitised
           dangerouslySetInnerHTML={{
-            __html:
+            __html: sanitizeEmailHtml(
               p.html +
-              (p.showUnsubscribe
-                ? '<p style="margin:8px 0 0 0;"><a href="#" style="color:inherit;">Unsubscribe</a></p>'
-                : ""),
+                (p.showUnsubscribe
+                  ? '<p style="margin:8px 0 0 0;"><a href="#" style="color:inherit;">Unsubscribe</a></p>'
+                  : ""),
+            ),
           }}
         />
       );
@@ -666,6 +688,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
               </Row>
               <Row label="Show Unsubscribe">
                 <button
+                  type="button"
                   onClick={() => set({ showUnsubscribe: !fp.showUnsubscribe } as any)}
                   className={`h-8 w-12 rounded-full transition-colors relative ${fp.showUnsubscribe ? "bg-primary" : "bg-muted"}`}
                 >
@@ -905,7 +928,7 @@ export function EmailBuilder({
   const selectedBlock = design.blocks.find((b) => b.id === selectedId);
 
   return (
-    <div className="h-screen flex flex-col bg-background overflow-hidden">
+    <div className="h-dvh flex flex-col bg-background overflow-hidden">
       {/* ── Top bar ── */}
       <div className="flex items-center gap-3 px-4 py-2 border-b bg-card shrink-0">
         <Button
@@ -996,6 +1019,7 @@ export function EmailBuilder({
             <div className="space-y-1">
               {PALETTE.map((item) => (
                 <button
+                  type="button"
                   key={item.type}
                   onClick={() => addBlock(item.type)}
                   className="w-full flex items-center gap-2.5 p-2 rounded-md text-left hover:bg-primary/10 hover:text-primary transition-colors group"
@@ -1014,6 +1038,7 @@ export function EmailBuilder({
             <Separator className="my-3" />
             <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground mb-2">Design</p>
             <button
+              type="button"
               onClick={() => setSelectedId("settings")}
               className={`w-full flex items-center gap-2 p-2 rounded-md text-left text-xs font-medium transition-colors ${selectedId === "settings" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
             >
@@ -1060,6 +1085,7 @@ export function EmailBuilder({
                       {design.blocks.map((block, index) => (
                         <Draggable key={block.id} draggableId={block.id} index={index}>
                           {(drag, snapshot) => (
+                            // biome-ignore lint/a11y/useSemanticElements: a <button> may neither contain the buttons this block already has nor carry the drag props
                             <div
                               ref={drag.innerRef}
                               {...drag.draggableProps}
@@ -1068,7 +1094,18 @@ export function EmailBuilder({
                                   ? "border-primary"
                                   : "border-transparent hover:border-primary/30"
                               } ${snapshot.isDragging ? "opacity-80 shadow-2xl" : ""}`}
+                              // Selecting a block is the canvas's primary action and it
+                              // was mouse-only. It cannot become a <button> — it carries
+                              // the drag props and contains its own controls — so it gets
+                              // the role, the focus and the keys a button would have.
+                              role="button"
+                              tabIndex={0}
                               onClick={() => setSelectedId(block.id)}
+                              onKeyDown={(event) => {
+                                if (event.key !== "Enter" && event.key !== " ") return;
+                                event.preventDefault();
+                                setSelectedId(block.id);
+                              }}
                             >
                               {/* Block preview */}
                               <BlockPreview block={block} />
@@ -1077,14 +1114,20 @@ export function EmailBuilder({
                               <div
                                 className={`absolute top-0 right-0 flex items-center gap-0.5 p-1 transition-opacity ${selectedId === block.id ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                               >
+                                {/* biome-ignore lint/a11y/noStaticElementInteractions: dragHandleProps supplies the role and the tabIndex; these handlers only stop propagation */}
                                 <div
                                   {...drag.dragHandleProps}
                                   className="h-6 w-6 flex items-center justify-center rounded bg-primary text-primary-foreground cursor-grab active:cursor-grabbing"
+                                  // The handle only stops the click reaching the block
+                                  // behind it; the library supplies its own role, focus
+                                  // and drag keys through dragHandleProps.
                                   onClick={(e) => e.stopPropagation()}
+                                  onKeyDown={(e) => e.stopPropagation()}
                                 >
                                   <GripVertical className="h-3.5 w-3.5" />
                                 </div>
                                 <button
+                                  type="button"
                                   className="h-6 w-6 flex items-center justify-center rounded bg-background border hover:bg-muted"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1095,6 +1138,7 @@ export function EmailBuilder({
                                   <Copy className="h-3 w-3" />
                                 </button>
                                 <button
+                                  type="button"
                                   className="h-6 w-6 flex items-center justify-center rounded bg-background border hover:bg-destructive hover:text-destructive-foreground"
                                   onClick={(e) => {
                                     e.stopPropagation();

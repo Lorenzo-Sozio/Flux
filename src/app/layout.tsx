@@ -85,7 +85,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         {/* Applies theme and layout preferences on load to avoid flicker and unnecessary server rerenders. */}
         <ThemeBootScript nonce={nonce} />
       </head>
-      <body className={`${fontVars} min-h-screen antialiased`}>
+      <body className={`${fontVars} min-h-dvh antialiased`}>
         <SessionProvider>
           <NextIntlClientProvider locale={locale} messages={messages}>
             <TooltipProvider>

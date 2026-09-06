@@ -68,7 +68,7 @@ const TRIGGER_STYLES: Record<string, { icon: React.ReactNode; color: string }> =
 };
 
 /**
- * Estrae il trigger schedulato se presente
+ * Pulls out the scheduled trigger, if there is one.
  * Format: "scheduled:0 8 * * *"
  */
 function getScheduledTrigger(triggerOn: string[] | null): string | null {
@@ -135,8 +135,8 @@ export function AutomationClient({ rules, canEdit }: Props) {
   return (
     <div className="space-y-5">
       {/* ── Page Header ───────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="flex items-center gap-2.5 font-bold text-2xl">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-yellow-100 dark:bg-yellow-900/30">
               <Zap className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />

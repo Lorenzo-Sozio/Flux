@@ -237,8 +237,8 @@ export function DealModal({
               </TabsList>
 
               {/* ── Deal Tab ──────────────────────────────────────────────── */}
-              <TabsContent value="deal" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
-                <div className="col-span-2">
+              <TabsContent value="deal" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                <div className="col-span-1 sm:col-span-2">
                   <F label={t("modal.fieldDealName")} required error={e.name?.message}>
                     <Input {...register("name")} placeholder={t("modal.namePlaceholder")} />
                   </F>
@@ -266,7 +266,7 @@ export function DealModal({
                     )}
                   />
                 </F>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <F label={t("modal.fieldStatus")} error={e.status?.message}>
                     <div className="grid grid-cols-3 gap-2">
                       <Controller
@@ -301,8 +301,8 @@ export function DealModal({
               </TabsContent>
 
               {/* ── Pipeline Tab ──────────────────────────────────────────── */}
-              <TabsContent value="details" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
-                <div className="col-span-2">
+              <TabsContent value="details" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                <div className="col-span-1 sm:col-span-2">
                   <F label={t("modal.fieldStageLabel")} required error={e.stageId?.message}>
                     <Controller
                       control={control}
@@ -336,7 +336,7 @@ export function DealModal({
                 <F label={t("modal.fieldExpectedClose")} error={e.expectedCloseDate?.message}>
                   <Input {...register("expectedCloseDate")} type="date" />
                 </F>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <F label={t("modal.fieldAssignedTo")}>
                     <Controller
                       control={control}

@@ -154,7 +154,7 @@ export function CreateQuoteModal({
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {/* Product selector */}
                     <FormField
                       control={form.control}
@@ -307,7 +307,7 @@ export function CreateQuoteModal({
             {/* Quote-level adjustments */}
             <div className="space-y-3 border-t pt-4">
               <h3 className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Quote Adjustments</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
                   name="discountPercent"

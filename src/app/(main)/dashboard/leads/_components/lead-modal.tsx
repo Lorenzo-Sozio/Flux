@@ -416,7 +416,7 @@ export function LeadModal({
                 </TabsList>
 
                 {/* ── Info Tab ─────────────────────────────────────────────── */}
-                <TabsContent value="info" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
+                <TabsContent value="info" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                   <F label={tc("firstName")} required error={e.firstName?.message}>
                     <Input {...register("firstName")} placeholder="Mario" />
                   </F>
@@ -441,7 +441,7 @@ export function LeadModal({
                   <F label={tc("industry")} error={e.industry?.message}>
                     <Input {...register("industry")} placeholder="Technology, Finance…" />
                   </F>
-                  <div className="col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <F label={tc("website")} error={e.website?.message}>
                       <Input {...register("website")} placeholder="https://acme.com" />
                     </F>
@@ -449,8 +449,8 @@ export function LeadModal({
                 </TabsContent>
 
                 {/* ── CRM Tab ──────────────────────────────────────────────── */}
-                <TabsContent value="crm" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
-                  <div className="col-span-2">
+                <TabsContent value="crm" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                  <div className="col-span-1 sm:col-span-2">
                     <F label={t("form.assignedTo")}>
                       <Controller
                         control={control}
@@ -559,12 +559,12 @@ export function LeadModal({
                       )}
                     />
                   </F>
-                  <div className="col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <F label={t("form.tags")} error={e.tags?.message}>
                       <Input {...register("tags")} placeholder="tech, startup, b2b" />
                     </F>
                   </div>
-                  <div className="col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <Controller
                       control={control}
                       name="marketingConsent"
@@ -582,7 +582,7 @@ export function LeadModal({
                 </TabsContent>
 
                 {/* ── Address Tab ──────────────────────────────────────────── */}
-                <TabsContent value="address" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
+                <TabsContent value="address" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                   <GeoAddressFields
                     control={control}
                     setValue={setValue}

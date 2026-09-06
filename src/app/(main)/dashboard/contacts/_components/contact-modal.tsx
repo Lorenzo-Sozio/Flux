@@ -98,7 +98,7 @@ function F({
 
 function _Section({ title }: { title: string }) {
   return (
-    <p className="col-span-2 mt-2 mb-0.5 border-b pb-1 font-semibold text-[11px] text-muted-foreground/60 uppercase tracking-widest">
+    <p className="col-span-1 sm:col-span-2 mt-2 mb-0.5 border-b pb-1 font-semibold text-[11px] text-muted-foreground/60 uppercase tracking-widest">
       {title}
     </p>
   );
@@ -388,7 +388,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                 </TabsList>
 
                 {/* ── Info Tab ─────────────────────────────────────────────── */}
-                <TabsContent value="info" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
+                <TabsContent value="info" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                   <F label={t("firstName")} required error={e.firstName?.message}>
                     <Input {...register("firstName")} placeholder="Mario" />
                   </F>
@@ -413,7 +413,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                   <F label={t("linkedIn")} error={e.linkedinUrl?.message}>
                     <Input {...register("linkedinUrl")} placeholder="https://linkedin.com/in/…" />
                   </F>
-                  <div className="col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <F label={tc("company")} error={e.companyId?.message}>
                       <Controller
                         control={control}
@@ -442,8 +442,8 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                 </TabsContent>
 
                 {/* ── CRM Tab ──────────────────────────────────────────────── */}
-                <TabsContent value="crm" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
-                  <div className="col-span-2">
+                <TabsContent value="crm" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                  <div className="col-span-1 sm:col-span-2">
                     <F label={t("form.assignedTo")}>
                       <Controller
                         control={control}
@@ -495,7 +495,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                   <F label={t("form.tags")} error={e.tags?.message}>
                     <Input {...register("tags")} placeholder="tech, startup, b2b" />
                   </F>
-                  <div className="col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <Controller
                       control={control}
                       name="marketingConsent"
@@ -513,7 +513,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                 </TabsContent>
 
                 {/* ── Address Tab ──────────────────────────────────────────── */}
-                <TabsContent value="address" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
+                <TabsContent value="address" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                   <GeoAddressFields
                     control={control}
                     setValue={setValue}

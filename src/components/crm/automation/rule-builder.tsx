@@ -950,8 +950,8 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
 
                       {/* ── create_task params ── */}
                       {actionType === "create_task" && (
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                          <div className="col-span-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
+                          <div className="col-span-1 sm:col-span-2">
                             <F label="Task Title" required error={actionErrs?.title?.message}>
                               <Input
                                 className="h-8 bg-background text-sm"
@@ -1008,7 +1008,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                             />
                           </F>
 
-                          <div className="col-span-2">
+                          <div className="col-span-1 sm:col-span-2">
                             <F label="Due in (days)" error={actionErrs?.dueDateDays?.message}>
                               <div className="relative">
                                 <Input
@@ -1026,7 +1026,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                             </F>
                           </div>
 
-                          <div className="col-span-2">
+                          <div className="col-span-1 sm:col-span-2">
                             <F label="Description">
                               <Textarea
                                 rows={2}
@@ -1178,7 +1178,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                               {...register(`actions.${index}.params.to` as any)}
                             />
                           </F>
-                          <div className="grid grid-cols-2 gap-x-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
                             <F label="CC">
                               <Input
                                 className="h-8 bg-background text-sm"
@@ -1248,7 +1248,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                             />
                           </F>
 
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
                             <F label="HTTP Method">
                               <Controller
                                 control={control}
@@ -1296,7 +1296,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
 
                       {/* ── update_field params ── */}
                       {actionType === "update_field" && (
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
                           {/* Field selector — context-aware per entity */}
                           <F label="Field" error={actionErrs?.field?.message}>
                             <Controller

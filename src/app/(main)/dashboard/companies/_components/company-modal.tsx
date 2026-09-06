@@ -411,8 +411,8 @@ export function CompanyModal({
                 </TabsList>
 
                 {/* ── Info Tab ─────────────────────────────────────────────── */}
-                <TabsContent value="info" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
-                  <div className="col-span-2">
+                <TabsContent value="info" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                  <div className="col-span-1 sm:col-span-2">
                     <F label={tc("name")} required error={e.name?.message}>
                       <Input {...register("name")} placeholder="Acme Corp" />
                     </F>
@@ -512,7 +512,7 @@ export function CompanyModal({
                   <F label="LinkedIn URL" error={e.linkedinUrl?.message}>
                     <Input {...register("linkedinUrl")} placeholder="https://linkedin.com/company/…" />
                   </F>
-                  <div className="col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <F label={tc("description")} error={e.description?.message}>
                       <Textarea
                         {...register("description")}
@@ -524,8 +524,8 @@ export function CompanyModal({
                 </TabsContent>
 
                 {/* ── CRM Tab ──────────────────────────────────────────────── */}
-                <TabsContent value="crm" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
-                  <div className="col-span-2">
+                <TabsContent value="crm" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
+                  <div className="col-span-1 sm:col-span-2">
                     <F label={t("form.assignedTo")}>
                       <Controller
                         control={control}
@@ -557,7 +557,7 @@ export function CompanyModal({
                   <F label={t("form.leadScore")} error={e.leadScore?.message}>
                     <Input {...register("leadScore")} type="number" min={0} max={100} placeholder="0" />
                   </F>
-                  <div className="col-span-2">
+                  <div className="col-span-1 sm:col-span-2">
                     <F label={t("form.tags")} error={e.tags?.message}>
                       <Input {...register("tags")} placeholder="tech, enterprise, key-account" />
                     </F>
@@ -565,7 +565,7 @@ export function CompanyModal({
                 </TabsContent>
 
                 {/* ── Address Tab ──────────────────────────────────────────── */}
-                <TabsContent value="address" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
+                <TabsContent value="address" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                   <GeoAddressFields
                     control={control}
                     setValue={setValue}
@@ -582,14 +582,14 @@ export function CompanyModal({
                 </TabsContent>
 
                 {/* ── Billing Tab ──────────────────────────────────────────── */}
-                <TabsContent value="billing" className="mt-0 grid grid-cols-2 gap-x-4 gap-y-4">
+                <TabsContent value="billing" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                   <F label={t("form.vatNumber")} error={e.vatNumber?.message}>
                     <Input {...register("vatNumber")} placeholder="IT01234567890" />
                   </F>
                   <F label={t("form.sdiCode")} error={e.sdiCode?.message}>
                     <Input {...register("sdiCode")} placeholder="XXXXXXX" />
                   </F>
-                  <div className="col-span-2 rounded-md border bg-muted/30 px-4 py-3 text-muted-foreground text-xs">
+                  <div className="col-span-1 sm:col-span-2 rounded-md border bg-muted/30 px-4 py-3 text-muted-foreground text-xs">
                     <p className="mb-1 font-medium text-foreground">Italian e-invoicing</p>
                     <p>
                       The <strong>SDI Code</strong> (Codice Destinatario) is the 7-character code used for electronic

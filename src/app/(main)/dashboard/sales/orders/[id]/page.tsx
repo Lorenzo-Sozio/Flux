@@ -164,7 +164,7 @@ function AddItemDialog({
                   <p className="text-destructive text-xs">{form.formState.errors.productId.message}</p>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>{t("qty")}</Label>
                   <Input type="number" min="1" {...form.register("quantity")} className="h-9" />
@@ -299,7 +299,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <span className="font-mono font-semibold text-muted-foreground text-xs">{order.orderNumber}</span>
           <h1 className="mt-0.5 font-bold text-2xl tracking-tight">{customer ?? "Order Details"}</h1>
           <div className="mt-2 flex items-center gap-2">

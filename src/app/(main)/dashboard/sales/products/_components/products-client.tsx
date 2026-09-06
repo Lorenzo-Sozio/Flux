@@ -163,7 +163,7 @@ function ProductDialog({
             </div>
 
             {/* SKU + Price */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="flex items-center gap-1.5">
                   <Tag className="h-3.5 w-3.5 text-muted-foreground" /> SKU
@@ -183,7 +183,7 @@ function ProductDialog({
             </div>
 
             {/* Category + Tax % */}
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>
                   {t("category")} <span className="font-normal text-muted-foreground">{t("dialog.optional")}</span>
@@ -333,8 +333,8 @@ export function ProductsClient({ products: initial }: Props) {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
           <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>

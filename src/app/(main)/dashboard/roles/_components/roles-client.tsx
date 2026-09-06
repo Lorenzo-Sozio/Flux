@@ -170,7 +170,7 @@ export function RolesClient({ users: initialUsers, currentUserId, currentUserRol
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-bold text-3xl tracking-tight">{t("title")}</h1>
+        <h1 className="font-bold text-2xl tracking-tight sm:text-3xl">{t("title")}</h1>
         <p className="mt-1 text-muted-foreground">{t("subtitle")}</p>
       </div>
 

@@ -161,7 +161,7 @@ export default async function CRMPage() {
     <div className="space-y-8">
       {/* ── Greeting + date ─────────────────────────────────────────── */}
       <div>
-        <h1 className="font-bold text-3xl tracking-tight">
+        <h1 className="font-bold text-2xl tracking-tight sm:text-3xl">
           {t(now.getHours() < 12 ? "greetingMorning" : now.getHours() < 18 ? "greetingAfternoon" : "greetingEvening", {
             name: userName,
           })}{" "}
