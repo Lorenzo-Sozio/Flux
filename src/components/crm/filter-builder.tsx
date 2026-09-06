@@ -697,7 +697,7 @@ export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, 
         */}
         <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-[760px]">
           {/* Header */}
-          <DialogHeader className="shrink-0 border-b px-5 py-4">
+          <DialogHeader className="shrink-0 border-b px-4 md:px-5 py-4">
             <DialogTitle className="flex items-center gap-2.5">
               <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
               {t("title")}
@@ -788,7 +788,7 @@ export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, 
           </div>
 
           {/* Footer */}
-          <DialogFooter className="flex shrink-0 items-center gap-2 border-t px-5 py-3">
+          <DialogFooter className="flex shrink-0 items-center gap-2 border-t px-4 md:px-5 py-3">
             <Button variant="ghost" size="sm" onClick={clearFilters} className="mr-auto gap-1.5">
               <X className="h-3.5 w-3.5" />
               {t("clearAll")}

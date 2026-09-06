@@ -142,7 +142,7 @@ function ProductDialog({
       }}
     >
       <DialogContent className="gap-0 p-0 sm:max-w-[480px]">
-        <DialogHeader className="border-b px-6 pt-6 pb-4">
+        <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-2">
             <Package className="h-4.5 w-4.5 text-primary" />
             {isEdit ? t("dialog.editTitle") : t("dialog.newTitle")}
@@ -230,7 +230,7 @@ function ProductDialog({
             </div>
           </div>
 
-          <DialogFooter className="border-t bg-muted/10 px-6 py-4">
+          <DialogFooter className="border-t bg-muted/10 px-4 md:px-6 py-4">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
               Cancel
             </Button>

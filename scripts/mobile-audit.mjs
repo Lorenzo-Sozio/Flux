@@ -190,6 +190,22 @@ for (const file of files.sort()) {
         }
       }
 
+      // ── A fixed height, centred content, and no way to scroll ─────────────
+      //
+      // ⚠️⚠️ `h-dvh` + `items-center` with no overflow clips the **top** of
+      // anything taller than the viewport, and there is no scrollbar to get it
+      // back — centring pushes the overflow out of both ends and only the
+      // bottom one is reachable. On a phone a form becomes taller than the
+      // viewport the moment the keyboard takes half the screen, so this is the
+      // login page losing its own heading and the first field.
+      if ((cls === "h-dvh" || cls === "h-screen" || /^h-\[calc\(/.test(cls)) && !isUiPrimitive) {
+        const centred = classes.includes("items-center") && classes.includes("flex");
+        const scrolls = classes.some((c) => /^(overflow-y-auto|overflow-auto|overflow-y-scroll)$/.test(c));
+        if (centred && !scrolls) {
+          report("clipped-centre", file, line, `${cls} centres its content with no way to scroll to what overflows`);
+        }
+      }
+
       // ── A popover wider than the screen it opens on ───────────────────────
       const popoverWidth = cls.match(/^w-(\d+)$/);
       if (popoverWidth && Number(popoverWidth[1]) * 4 > NARROWEST_CONTENT && !hasBreakpoint(cls)) {

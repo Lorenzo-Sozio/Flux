@@ -140,7 +140,7 @@ function AddItemDialog({
         }}
       >
         <DialogContent className="gap-0 p-0 sm:max-w-sm">
-          <DialogHeader className="border-b px-5 pt-5 pb-4">
+          <DialogHeader className="border-b px-4 md:px-5 pt-5 pb-4">
             <DialogTitle>{t("addLineItem")}</DialogTitle>
           </DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -175,7 +175,7 @@ function AddItemDialog({
                 </div>
               </div>
             </div>
-            <DialogFooter className="border-t bg-muted/10 px-5 py-4">
+            <DialogFooter className="border-t bg-muted/10 px-4 md:px-5 py-4">
               <Button type="button" variant="ghost" onClick={() => setOpen(false)} disabled={saving}>
                 {tc("cancel")}
               </Button>

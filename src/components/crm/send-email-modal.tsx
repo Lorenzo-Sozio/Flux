@@ -185,7 +185,7 @@ export function SendEmailModal({
       */}
       <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:h-[88dvh] sm:max-w-[820px]">
         {/* ── Header ───────────────────────────────────────────────────────── */}
-        <DialogHeader className="shrink-0 border-b px-6 pt-6 pb-4">
+        <DialogHeader className="shrink-0 border-b px-4 md:px-6 pt-6 pb-4">
           <DialogTitle className="text-lg">{recipientName ? `New Email — ${recipientName}` : "New Email"}</DialogTitle>
           {entity.email && <p className="mt-0.5 font-normal text-muted-foreground text-sm">{entity.email}</p>}
         </DialogHeader>

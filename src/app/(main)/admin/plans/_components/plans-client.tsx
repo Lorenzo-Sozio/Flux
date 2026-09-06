@@ -101,7 +101,7 @@ export function PlansClient({ plans: initialPlans }: PlansClientProps) {
             </Button>
           </DialogTrigger>
           <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[700px]">
-            <DialogHeader className="border-b px-6 pt-6 pb-4">
+            <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
               <DialogTitle className="text-lg">Create Plan</DialogTitle>
             </DialogHeader>
             <PlanForm onCancel={() => setCreateOpen(false)} onSuccess={() => setCreateOpen(false)} />
@@ -189,7 +189,7 @@ export function PlansClient({ plans: initialPlans }: PlansClientProps) {
       {/* Edit dialog */}
       <Dialog open={!!editPlan} onOpenChange={(open) => !open && setEditPlan(null)}>
         <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[700px]">
-          <DialogHeader className="border-b px-6 pt-6 pb-4">
+          <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
             <DialogTitle className="text-lg">Edit Plan — {editPlan?.displayName}</DialogTitle>
           </DialogHeader>
           {editPlan && (

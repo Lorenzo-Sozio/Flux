@@ -9,7 +9,7 @@ export default async function ForgotPasswordPage() {
   const t = await getTranslations("auth.forgotPassword");
 
   return (
-    <div className="flex h-dvh">
+    <div className="flex min-h-dvh">
       <div className="hidden bg-primary lg:block lg:w-1/3">
         <div className="flex h-full flex-col items-center justify-center p-12 text-center">
           <div className="space-y-6">
@@ -22,8 +22,8 @@ export default async function ForgotPasswordPage() {
         </div>
       </div>
 
-      <div className="flex w-full items-center justify-center bg-background p-8 lg:w-2/3">
-        <div className="w-full max-w-md space-y-10 py-24 lg:py-32">
+      <div className="flex w-full items-center justify-center overflow-y-auto bg-background p-4 sm:p-8 lg:w-2/3">
+        <div className="w-full max-w-md space-y-8 py-8 sm:space-y-10 sm:py-24 lg:py-32">
           <div className="space-y-4 text-center">
             <div className="font-medium tracking-tight">{t("formTitle")}</div>
             <div className="mx-auto max-w-xl text-muted-foreground">{t("formSubtitle")}</div>

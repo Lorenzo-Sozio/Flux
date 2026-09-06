@@ -232,7 +232,7 @@ export function ActivityModal(props: Props) {
       </DialogTrigger>
 
       <DialogContent className="gap-0 p-0 sm:max-w-[560px]">
-        <DialogHeader className="border-b px-6 pt-6 pb-4">
+        <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
           <DialogTitle className="text-lg">{title}</DialogTitle>
         </DialogHeader>
 
@@ -432,7 +432,7 @@ export function ActivityModal(props: Props) {
             </div>
           </div>
 
-          <DialogFooter className="border-t bg-muted/10 px-6 py-4">
+          <DialogFooter className="border-t bg-muted/10 px-4 md:px-6 py-4">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
             </Button>

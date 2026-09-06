@@ -150,7 +150,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
     >
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[520px]">
-        <DialogHeader className="border-b px-6 pt-6 pb-4">
+        <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-2">
             <span
               className="inline-flex h-7 w-7 items-center justify-center rounded-full"
@@ -163,7 +163,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 space-y-4 overflow-y-auto px-6 py-4">
+          <div className="flex-1 space-y-4 overflow-y-auto px-4 md:px-6 py-4">
             {/* Name */}
             <div className="flex flex-col gap-1.5">
               <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
@@ -266,7 +266,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
             </div>
           </div>
 
-          <DialogFooter className="flex-row items-center border-t bg-muted/30 px-6 py-4">
+          <DialogFooter className="flex-row items-center border-t bg-muted/30 px-4 md:px-6 py-4">
             {isEditing && (
               <Button
                 type="button"

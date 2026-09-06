@@ -437,7 +437,7 @@ export function CreateTicketModal({
     >
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[580px]">
         {/* Header */}
-        <DialogHeader className="border-b bg-muted/30 px-6 pt-6 pb-5">
+        <DialogHeader className="border-b bg-muted/30 px-4 md:px-6 pt-6 pb-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
               <Headphones className="h-5 w-5 text-primary" />
@@ -452,7 +452,7 @@ export function CreateTicketModal({
         {/* Body */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <div className="max-h-[70dvh] space-y-5 overflow-y-auto px-6 py-5">
+            <div className="max-h-[70dvh] space-y-5 overflow-y-auto px-4 md:px-6 py-5">
               {/* Subject */}
               <FormField
                 control={form.control}

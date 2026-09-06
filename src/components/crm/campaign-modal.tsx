@@ -171,7 +171,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
 
       <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[620px]">
         {/* Header */}
-        <DialogHeader className="border-b px-6 pt-6 pb-4">
+        <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-2.5 text-lg">
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
               <TargetIcon className="h-4 w-4 text-primary" />
@@ -182,7 +182,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
 
         {/* Body */}
         <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto px-6 py-5">
+          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
             <Tabs defaultValue="details">
               <TabsList className="mb-6 w-full">
                 <TabsTrigger value="details" className="relative flex-1 gap-1.5">
@@ -352,7 +352,7 @@ export function CampaignModal({ templates, campaign, onSuccess, children }: Camp
           </div>
 
           {/* Footer */}
-          <DialogFooter className="border-t bg-muted/30 px-6 py-4">
+          <DialogFooter className="border-t bg-muted/30 px-4 md:px-6 py-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>

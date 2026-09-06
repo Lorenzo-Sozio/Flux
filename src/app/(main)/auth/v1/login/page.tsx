@@ -10,7 +10,7 @@ import { GoogleButton } from "../../_components/social-auth/google-button";
 export default async function LoginV1() {
   const t = await getTranslations("auth.login");
   return (
-    <div className="flex h-dvh">
+    <div className="flex min-h-dvh">
       <div className="hidden bg-primary lg:block lg:w-1/3">
         <div className="flex h-full flex-col items-center justify-center p-12 text-center">
           <div className="space-y-6">
@@ -23,8 +23,8 @@ export default async function LoginV1() {
         </div>
       </div>
 
-      <div className="flex w-full items-center justify-center bg-background p-8 lg:w-2/3">
-        <div className="w-full max-w-md space-y-6 py-16 lg:py-24">
+      <div className="flex w-full items-center justify-center overflow-y-auto bg-background p-4 sm:p-8 lg:w-2/3">
+        <div className="w-full max-w-md space-y-6 py-8 sm:py-16 lg:py-24">
           <div className="space-y-2 text-center">
             <div className="font-medium tracking-tight">{t("signIn")}</div>
             <div className="mx-auto max-w-xl text-muted-foreground text-sm">{t("subtitle")}</div>

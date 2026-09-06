@@ -419,7 +419,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
       <DialogTrigger asChild>{children}</DialogTrigger>
 
       <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[700px]">
-        <DialogHeader className="border-b px-6 pt-6 pb-4">
+        <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Zap className="h-5 w-5 text-yellow-500" />
             {isEditing ? `Edit Rule — ${rule.name}` : "New Automation Rule"}
@@ -427,7 +427,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
         </DialogHeader>
 
         <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
             <Tabs defaultValue="details">
               <TabsList className="mb-5 w-full">
                 <TabsTrigger value="details" className="relative flex-1 gap-1.5">
@@ -1393,7 +1393,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
             </Tabs>
           </div>
 
-          <DialogFooter className="border-t bg-muted/30 px-6 py-4">
+          <DialogFooter className="border-t bg-muted/30 px-4 md:px-6 py-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>

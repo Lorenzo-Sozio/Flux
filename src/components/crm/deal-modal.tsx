@@ -194,7 +194,7 @@ export function DealModal({
       </DialogTrigger>
 
       <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[640px]">
-        <DialogHeader className="border-b px-6 pt-6 pb-4">
+        <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
           <div className="flex items-center justify-between gap-2">
             <DialogTitle className="text-lg">
               {isEditing ? t("modal.editTitle", { name: deal.name ?? "" }) : t("modal.newTitle")}
@@ -216,7 +216,7 @@ export function DealModal({
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4">
             <Tabs defaultValue="deal">
               <TabsList className="mb-5 w-full">
                 <TabsTrigger value="deal" className="relative flex-1 gap-1.5">
@@ -408,7 +408,7 @@ export function DealModal({
             </Tabs>
           </div>
 
-          <DialogFooter className="border-t bg-muted/30 px-6 py-4">
+          <DialogFooter className="border-t bg-muted/30 px-4 md:px-6 py-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               {t("modal.cancel")}
             </Button>
