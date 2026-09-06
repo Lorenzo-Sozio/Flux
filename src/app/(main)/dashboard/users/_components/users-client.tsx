@@ -549,7 +549,7 @@ export function UsersClient({
                         group={{ ...g, description: g.description ?? null }}
                         onSaved={() => getUserGroups().then(setGroups)}
                       >
-                        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0">
+                        <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" aria-label={tc("edit")}>
                           <Pencil className="h-3 w-3" />
                         </Button>
                       </GroupModal>

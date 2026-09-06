@@ -853,15 +853,18 @@ export function LeadActions({
   categories?: LookupItem[];
   companyTypes?: LookupItem[];
 }) {
+  // An icon on its own is a target with no name — on a phone there is no
+  // hover to reveal one, and a screen reader is told nothing at all.
+  const tc = useTranslations("common");
   return (
     <div className="flex items-center gap-2">
       <Link href={`/dashboard/leads/${lead.id}`}>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" aria-label={tc("view")}>
           <EyeIcon className="h-4 w-4" />
         </Button>
       </Link>
       <LeadModal lead={lead} categories={categories} companyTypes={companyTypes}>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" aria-label={tc("edit")}>
           <PencilIcon className="h-4 w-4" />
         </Button>
       </LeadModal>

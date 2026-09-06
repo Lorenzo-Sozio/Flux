@@ -649,15 +649,18 @@ export function DeleteContactButton({ id }: { id: string }) {
 
 // biome-ignore lint/suspicious/noExplicitAny: see ContactModal above.
 export function ContactActions({ contact }: { contact: any }) {
+  // An icon on its own is a target with no name — on a phone there is no
+  // hover to reveal one, and a screen reader is told nothing at all.
+  const tc = useTranslations("common");
   return (
     <div className="flex items-center justify-end gap-2">
       <Link href={`/dashboard/contacts/${contact.id}`}>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" aria-label={tc("view")}>
           <EyeIcon className="h-4 w-4" />
         </Button>
       </Link>
       <ContactModal contact={contact}>
-        <Button variant="ghost" size="icon">
+        <Button variant="ghost" size="icon" aria-label={tc("edit")}>
           <PencilIcon className="h-4 w-4" />
         </Button>
       </ContactModal>
