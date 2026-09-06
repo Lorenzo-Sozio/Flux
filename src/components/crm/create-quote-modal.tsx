@@ -226,7 +226,9 @@ export function CreateQuoteModal({
                     )}
                   />
 
-                  <div className="grid grid-cols-3 gap-3">
+                  {/* Three money fields at 111px each wrap every label onto two
+                      lines. Two across on a phone, three from sm up. */}
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {/* Unit Price */}
                     <FormField
                       control={form.control}

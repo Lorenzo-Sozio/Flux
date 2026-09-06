@@ -256,8 +256,8 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
   return (
     <Card className="flex flex-col shadow-sm">
       <CardHeader className="shrink-0 pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
             <CalendarDays className="h-5 w-5 text-primary" />
             <div>
               <CardTitle className="text-base leading-none">Agenda di oggi</CardTitle>

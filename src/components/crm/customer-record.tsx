@@ -123,7 +123,7 @@ export function CustomerRecordPanel({
   return (
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <CardTitle>{t("title")}</CardTitle>
           <CardDescription>{t("subtitle")}</CardDescription>
         </div>

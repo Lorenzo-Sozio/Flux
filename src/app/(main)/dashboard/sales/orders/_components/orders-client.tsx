@@ -271,7 +271,7 @@ export function OrdersClient({ orders: initial, stats: initialStats }: { orders:
             />
           }
           table={
-            <div className="overflow-hidden rounded-md border">
+            <div className="overflow-x-auto rounded-md border">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/40 text-muted-foreground text-xs">

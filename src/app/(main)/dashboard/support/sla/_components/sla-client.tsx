@@ -178,8 +178,8 @@ export function SlaClient({ slas: initial, groups }: Props) {
   return (
     <>
       <Card className="border-0 shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <div>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 gap-3">
+          <div className="min-w-0">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <ShieldAlert className="h-4 w-4 text-primary" />
               {t("policies")}

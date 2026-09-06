@@ -582,113 +582,117 @@ export function WorkloadClient({ matrix, startDate }: Props) {
               <p className="text-xs opacity-60">{t("noTasksHint")}</p>
             </div>
           ) : (
-            <table className="w-full border-collapse text-xs">
-              <thead>
-                {/* Week groups */}
-                <tr>
-                  <th className="sticky left-0 z-10 min-w-[168px] border-r border-b bg-muted/20 px-3 py-2 text-left font-semibold text-[11px] text-muted-foreground uppercase tracking-wide">
-                    {t("teamMember")}
-                  </th>
-                  {weekGroups.map((week, wi) => (
-                    <th
-                      key={week[0].toISOString()}
-                      colSpan={week.length}
-                      className="border-r border-b bg-muted/20 px-2 py-1.5 text-center font-semibold text-[11px] text-muted-foreground"
-                    >
-                      {t("weekLabel", { week: wi + 1 })}
-                      <span className="ml-1.5 font-normal opacity-60">
-                        {week[0].toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}
-                      </span>
+            // A week per column and a person per row: the grid is wider than any
+            // phone by design, so it scrolls sideways inside its card.
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-xs">
+                <thead>
+                  {/* Week groups */}
+                  <tr>
+                    <th className="sticky left-0 z-10 min-w-[168px] border-r border-b bg-muted/20 px-3 py-2 text-left font-semibold text-[11px] text-muted-foreground uppercase tracking-wide">
+                      {t("teamMember")}
                     </th>
-                  ))}
-                </tr>
-                {/* Day headers */}
-                <tr>
-                  <th className="sticky left-0 z-10 border-r border-b bg-background" />
-                  {days.map((d) => {
-                    const ds = d.toISOString().slice(0, 10);
-                    const isToday = ds === TODAY_STR;
-                    return (
+                    {weekGroups.map((week, wi) => (
                       <th
-                        key={ds}
-                        className={cn(
-                          "min-w-[64px] whitespace-nowrap border-r border-b px-1 py-1.5 text-center",
-                          isToday
-                            ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-400"
-                            : "bg-background text-muted-foreground",
-                        )}
+                        key={week[0].toISOString()}
+                        colSpan={week.length}
+                        className="border-r border-b bg-muted/20 px-2 py-1.5 text-center font-semibold text-[11px] text-muted-foreground"
                       >
-                        <div className="flex flex-col items-center gap-0.5">
-                          <span className="text-[9px] uppercase opacity-60">
-                            {d.toLocaleDateString(undefined, { weekday: "short" })}
-                          </span>
-                          <span className="font-medium text-[11px]">
-                            {d.toLocaleDateString(undefined, { day: "2-digit" })}
-                          </span>
-                          {isToday && <span className="h-1 w-1 rounded-full bg-indigo-500" />}
-                        </div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              </thead>
-              <tbody>
-                {currentMatrix.map((row) => (
-                  <tr key={row.userId} className="group">
-                    <td className="sticky left-0 z-10 whitespace-nowrap border-r border-b bg-background px-3 py-2 transition-colors group-hover:bg-muted/20">
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-muted font-bold text-[9px] text-muted-foreground">
-                          {userInitials(row.userName)}
+                        {t("weekLabel", { week: wi + 1 })}
+                        <span className="ml-1.5 font-normal opacity-60">
+                          {week[0].toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}
                         </span>
-                        <span className="font-medium text-[12px]">{row.userName}</span>
-                      </div>
-                    </td>
+                      </th>
+                    ))}
+                  </tr>
+                  {/* Day headers */}
+                  <tr>
+                    <th className="sticky left-0 z-10 border-r border-b bg-background" />
                     {days.map((d) => {
                       const ds = d.toISOString().slice(0, 10);
-                      const cell = row.days[ds] ?? { hours: 0, capacity: 8, tasks: [] };
-                      const pct = cell.capacity > 0 ? cell.hours / cell.capacity : 0;
-                      const isSelected = selected?.userId === row.userId && selected?.date === ds;
                       const isToday = ds === TODAY_STR;
-                      const theme = cellTheme(cell.hours, cell.capacity);
-
                       return (
-                        <td
+                        <th
                           key={ds}
-                          onClick={() => handleCellClick(row, ds, cell)}
-                          onKeyDown={(e) => e.key === "Enter" && handleCellClick(row, ds, cell)}
-                          tabIndex={cell.hours > 0 ? 0 : -1}
-                          title={
-                            cell.hours > 0
-                              ? `${row.userName} · ${ds} · ${cell.hours.toFixed(1)}h / ${cell.capacity}h`
-                              : undefined
-                          }
                           className={cn(
-                            "relative border-r border-b px-1 py-2.5 text-center transition-all",
-                            cell.hours > 0 ? "cursor-pointer" : "cursor-default",
-                            theme.bg,
-                            theme.text,
-                            isToday && "ring-1 ring-indigo-300 ring-inset dark:ring-indigo-700",
-                            isSelected && "ring-2 ring-primary ring-inset",
+                            "min-w-[64px] whitespace-nowrap border-r border-b px-1 py-1.5 text-center",
+                            isToday
+                              ? "bg-indigo-50 text-indigo-700 dark:bg-indigo-950/30 dark:text-indigo-400"
+                              : "bg-background text-muted-foreground",
                           )}
                         >
-                          {cell.hours > 0 && (
-                            <>
-                              <span className="font-semibold text-[11px] tabular-nums">{cell.hours.toFixed(1)}h</span>
-                              <div className="absolute inset-x-1.5 bottom-1 h-0.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
-                                <div
-                                  className="h-full rounded-full transition-all"
-                                  style={{ width: `${Math.min(pct * 100, 100)}%`, backgroundColor: theme.bar }}
-                                />
-                              </div>
-                            </>
-                          )}
-                        </td>
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span className="text-[9px] uppercase opacity-60">
+                              {d.toLocaleDateString(undefined, { weekday: "short" })}
+                            </span>
+                            <span className="font-medium text-[11px]">
+                              {d.toLocaleDateString(undefined, { day: "2-digit" })}
+                            </span>
+                            {isToday && <span className="h-1 w-1 rounded-full bg-indigo-500" />}
+                          </div>
+                        </th>
                       );
                     })}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {currentMatrix.map((row) => (
+                    <tr key={row.userId} className="group">
+                      <td className="sticky left-0 z-10 whitespace-nowrap border-r border-b bg-background px-3 py-2 transition-colors group-hover:bg-muted/20">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-muted font-bold text-[9px] text-muted-foreground">
+                            {userInitials(row.userName)}
+                          </span>
+                          <span className="font-medium text-[12px]">{row.userName}</span>
+                        </div>
+                      </td>
+                      {days.map((d) => {
+                        const ds = d.toISOString().slice(0, 10);
+                        const cell = row.days[ds] ?? { hours: 0, capacity: 8, tasks: [] };
+                        const pct = cell.capacity > 0 ? cell.hours / cell.capacity : 0;
+                        const isSelected = selected?.userId === row.userId && selected?.date === ds;
+                        const isToday = ds === TODAY_STR;
+                        const theme = cellTheme(cell.hours, cell.capacity);
+
+                        return (
+                          <td
+                            key={ds}
+                            onClick={() => handleCellClick(row, ds, cell)}
+                            onKeyDown={(e) => e.key === "Enter" && handleCellClick(row, ds, cell)}
+                            tabIndex={cell.hours > 0 ? 0 : -1}
+                            title={
+                              cell.hours > 0
+                                ? `${row.userName} · ${ds} · ${cell.hours.toFixed(1)}h / ${cell.capacity}h`
+                                : undefined
+                            }
+                            className={cn(
+                              "relative border-r border-b px-1 py-2.5 text-center transition-all",
+                              cell.hours > 0 ? "cursor-pointer" : "cursor-default",
+                              theme.bg,
+                              theme.text,
+                              isToday && "ring-1 ring-indigo-300 ring-inset dark:ring-indigo-700",
+                              isSelected && "ring-2 ring-primary ring-inset",
+                            )}
+                          >
+                            {cell.hours > 0 && (
+                              <>
+                                <span className="font-semibold text-[11px] tabular-nums">{cell.hours.toFixed(1)}h</span>
+                                <div className="absolute inset-x-1.5 bottom-1 h-0.5 overflow-hidden rounded-full bg-black/10 dark:bg-white/10">
+                                  <div
+                                    className="h-full rounded-full transition-all"
+                                    style={{ width: `${Math.min(pct * 100, 100)}%`, backgroundColor: theme.bar }}
+                                  />
+                                </div>
+                              </>
+                            )}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 

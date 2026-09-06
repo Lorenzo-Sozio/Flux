@@ -103,26 +103,30 @@ export function ForecastOwnerTable({ byOwner }: { byOwner: ForecastData["byOwner
 
   if (byOwner.length === 0) return null;
 
+  // Four money columns do not fit a phone; the table scrolls sideways inside
+  // its card rather than pushing the page out of the viewport.
   return (
-    <table className="w-full text-sm">
-      <thead>
-        <tr className="border-b text-xs text-muted-foreground uppercase tracking-wider">
-          <th className="pb-2 text-left font-medium">{t("colOwner")}</th>
-          <th className="pb-2 text-right font-medium">{t("colDeals")}</th>
-          <th className="pb-2 text-right font-medium">{t("colWeightedValue")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {byOwner.map((o, i) => (
-          <tr key={i} className="border-b last:border-0">
-            <td className="py-2.5 font-medium">{o.name}</td>
-            <td className="py-2.5 text-right text-muted-foreground">{o.dealCount}</td>
-            <td className="py-2.5 text-right font-semibold tabular-nums">
-              {formatAmount(o.weighted, { noDecimals: true })}
-            </td>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b text-xs text-muted-foreground uppercase tracking-wider">
+            <th className="pb-2 text-left font-medium">{t("colOwner")}</th>
+            <th className="pb-2 text-right font-medium">{t("colDeals")}</th>
+            <th className="pb-2 text-right font-medium">{t("colWeightedValue")}</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {byOwner.map((o, i) => (
+            <tr key={i} className="border-b last:border-0">
+              <td className="py-2.5 font-medium">{o.name}</td>
+              <td className="py-2.5 text-right text-muted-foreground">{o.dealCount}</td>
+              <td className="py-2.5 text-right font-semibold tabular-nums">
+                {formatAmount(o.weighted, { noDecimals: true })}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

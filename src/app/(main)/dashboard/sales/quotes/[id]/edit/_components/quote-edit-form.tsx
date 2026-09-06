@@ -381,8 +381,8 @@ export function QuoteEditForm({ quote, formData }: Props) {
 
         {/* ── Band two: what is being quoted ─────────────────────────────── */}
         <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-4">
-            <div>
+          <CardHeader className="flex flex-row items-start justify-between gap-3">
+            <div className="min-w-0">
               <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
                 {t("linesTitle")}
               </CardTitle>

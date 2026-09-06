@@ -67,8 +67,8 @@ export function GanttToolbar({
   return (
     <div className="flex shrink-0 flex-col gap-3 border-b px-6 py-4">
       {/* Row 1: back + title | nav + view selector */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="icon" asChild className="h-8 w-8">
             <Link href="/dashboard/tasks">
               <ArrowLeft className="h-4 w-4" />

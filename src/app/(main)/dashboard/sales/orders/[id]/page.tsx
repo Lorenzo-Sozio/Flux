@@ -344,59 +344,65 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   <p className="text-muted-foreground text-sm">{t("noItems")}</p>
                 </div>
               ) : (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b bg-muted/30 text-muted-foreground text-xs">
-                      <th className="px-4 py-2.5 text-left font-medium">{t("product")}</th>
-                      <th className="px-4 py-2.5 text-right font-medium">{t("qty")}</th>
-                      <th className="px-4 py-2.5 text-right font-medium">{t("unitPriceCol")}</th>
-                      <th className="px-4 py-2.5 text-right font-medium">{t("totalCol")}</th>
-                      <th className="w-10 px-4 py-2.5" />
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
-                    {order.items.map((item) => (
-                      <tr key={item.id} className="group hover:bg-muted/20">
-                        <td className="px-4 py-3">
-                          <p className="font-medium">{item.productName ?? item.description ?? "Unknown"}</p>
-                          {item.productSku && (
-                            <span className="font-mono text-[10px] text-muted-foreground">{item.productSku}</span>
-                          )}
-                          {/* What was asked for on this line: the changes the customer
-                              wanted, and what they called it when that is not the
-                              catalogue name. Under the item, where whoever prepares it
-                              reads before touching anything. */}
-                          {item.itemNotes && (
-                            <p className="mt-0.5 whitespace-pre-line text-muted-foreground text-xs">{item.itemNotes}</p>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-right tabular-nums">{item.quantity}</td>
-                        <td className="px-4 py-3 text-right tabular-nums">{formatAmount(Number(item.unitPrice))}</td>
-                        <td className="px-4 py-3 text-right font-semibold tabular-nums">
-                          {formatAmount(Number(item.totalPrice))}
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(item.id)}
-                            className="text-muted-foreground/50 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </td>
+                // Four money columns do not fit a phone; the table scrolls
+                // sideways inside its card rather than pushing the page out.
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/30 text-muted-foreground text-xs">
+                        <th className="px-4 py-2.5 text-left font-medium">{t("product")}</th>
+                        <th className="px-4 py-2.5 text-right font-medium">{t("qty")}</th>
+                        <th className="px-4 py-2.5 text-right font-medium">{t("unitPriceCol")}</th>
+                        <th className="px-4 py-2.5 text-right font-medium">{t("totalCol")}</th>
+                        <th className="w-10 px-4 py-2.5" />
                       </tr>
-                    ))}
-                    <tr className="border-t bg-muted/20">
-                      <td colSpan={3} className="px-4 py-3 text-right font-medium text-muted-foreground text-sm">
-                        {t("totalCol")}
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold text-base tabular-nums">
-                        {formatAmount(Number(order.totalAmount))}
-                      </td>
-                      <td />
-                    </tr>
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y">
+                      {order.items.map((item) => (
+                        <tr key={item.id} className="group hover:bg-muted/20">
+                          <td className="px-4 py-3">
+                            <p className="font-medium">{item.productName ?? item.description ?? "Unknown"}</p>
+                            {item.productSku && (
+                              <span className="font-mono text-[10px] text-muted-foreground">{item.productSku}</span>
+                            )}
+                            {/* What was asked for on this line: the changes the customer
+                                                wanted, and what they called it when that is not the
+                                                catalogue name. Under the item, where whoever prepares it
+                                                reads before touching anything. */}
+                            {item.itemNotes && (
+                              <p className="mt-0.5 whitespace-pre-line text-muted-foreground text-xs">
+                                {item.itemNotes}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-right tabular-nums">{item.quantity}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">{formatAmount(Number(item.unitPrice))}</td>
+                          <td className="px-4 py-3 text-right font-semibold tabular-nums">
+                            {formatAmount(Number(item.totalPrice))}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItem(item.id)}
+                              className="text-muted-foreground/50 opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="border-t bg-muted/20">
+                        <td colSpan={3} className="px-4 py-3 text-right font-medium text-muted-foreground text-sm">
+                          {t("totalCol")}
+                        </td>
+                        <td className="px-4 py-3 text-right font-bold text-base tabular-nums">
+                          {formatAmount(Number(order.totalAmount))}
+                        </td>
+                        <td />
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               )}
             </CardContent>
           </Card>

@@ -154,9 +154,9 @@ export default function TicketsListPage() {
       </div>
 
       {/* Title + View Toggle */}
-      <div className="flex shrink-0 items-start justify-between gap-4">
-        <div>
-          <h1 className="font-bold text-3xl tracking-tight">{t("supportTickets")}</h1>
+      <div className="flex shrink-0 items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-bold text-2xl tracking-tight sm:text-3xl">{t("supportTickets")}</h1>
           <p className="mt-1 text-muted-foreground">
             {t("totalOpen", { total: statusCounts.all, open: statusCounts.open })}
           </p>

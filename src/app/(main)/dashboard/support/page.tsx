@@ -163,8 +163,8 @@ export default function SupportDashboard() {
         <div className="space-y-5 lg:col-span-2">
           {/* Open Tickets */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-              <div>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 gap-3">
+              <div className="min-w-0">
                 <CardTitle className="text-base">{t("openTicketsList")}</CardTitle>
                 <CardDescription className="mt-0.5 text-xs">{t("openTicketsListDesc")}</CardDescription>
               </div>
@@ -236,7 +236,7 @@ export default function SupportDashboard() {
 
           {/* Recently Resolved */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3 gap-3">
               <CardTitle className="text-base">{t("recentlyResolved")}</CardTitle>
               <Button variant="ghost" size="sm" className="h-8 text-xs" asChild>
                 <Link href="/dashboard/support/tickets">{t("seeAll")}</Link>

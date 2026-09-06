@@ -187,7 +187,7 @@ export default async function CRMPage() {
         {/* Tickets */}
         <Card>
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Headphones className="h-4 w-4 text-muted-foreground" />
                 {t("assignedTickets")}
@@ -365,8 +365,8 @@ export default async function CRMPage() {
       {/* ── Top Deals + Recent Activities ────────────────────────────── */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         <Card className="shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
+          <CardHeader className="flex flex-row items-center justify-between gap-3">
+            <div className="min-w-0">
               <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-blue-500" />
                 {t("topDeals")}
@@ -465,8 +465,8 @@ export default async function CRMPage() {
 
       {/* ── Recent Leads ─────────────────────────────────────────────── */}
       <Card className="shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
+          <div className="min-w-0">
             <CardTitle>{t("recentLeads")}</CardTitle>
             <CardDescription>{t("latestCustomers")}</CardDescription>
           </div>

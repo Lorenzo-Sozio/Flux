@@ -197,8 +197,8 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, tenan
       <div className="flex w-full flex-col gap-6 md:w-1/3">
         {/* Quote Details card */}
         <Card>
-          <CardHeader className="flex flex-row items-start justify-between pb-3">
-            <div className="space-y-1">
+          <CardHeader className="flex flex-row items-start justify-between gap-3 pb-3">
+            <div className="min-w-0 space-y-1">
               <CardTitle className="font-mono tracking-tight">{quote.quoteNumber}</CardTitle>
               <Badge variant="outline" className={`font-medium text-xs ${statusCfg.className}`}>
                 {tq(`statuses.${statusCfg.labelKey}`)}

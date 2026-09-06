@@ -20,8 +20,8 @@ export function IncomeReliability({ pipelineByStage }: Props) {
 
   return (
     <Card className="h-full">
-      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
-        <div>
+      <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3 gap-3">
+        <div className="min-w-0">
           <CardTitle className="text-base">{t("pipelineHealth")}</CardTitle>
           <CardDescription className="text-xs mt-0.5">{t("openDealsByStage")}</CardDescription>
         </div>

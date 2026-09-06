@@ -69,7 +69,7 @@ export function OverdueTasksPopover({ tasks: initialTasks }: { tasks: OverdueTas
         </button>
       </PopoverTrigger>
 
-      <PopoverContent className="w-96 p-0 shadow-lg" align="start" sideOffset={8}>
+      <PopoverContent className="w-[min(24rem,calc(100vw-1.5rem))] p-0 shadow-lg" align="start" sideOffset={8}>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-red-50 dark:bg-red-950/20 rounded-t-md">
           <div className="flex items-center gap-2">

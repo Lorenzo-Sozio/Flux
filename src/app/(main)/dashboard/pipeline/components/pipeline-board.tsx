@@ -5,7 +5,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
-import { BarChart2, CalendarIcon, CoinsIcon, PencilIcon, PlusIcon, Settings2, TrendingUp } from "lucide-react";
+import {
+  BarChart2,
+  CalendarIcon,
+  CoinsIcon,
+  MoreHorizontal,
+  PencilIcon,
+  PlusIcon,
+  Settings2,
+  TrendingUp,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { getLossReasons, updateDealStage } from "@/actions/pipeline";
@@ -14,6 +23,12 @@ import { type LossAnswer, type LossReason, LostDealDialog } from "@/components/c
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type Deal = {
   id: string;
@@ -133,34 +148,71 @@ export function PipelineBoard({
         }}
       />
 
-      <div className="mb-6 flex shrink-0 items-center justify-between px-1">
-        <div>
-          <h2 className="font-bold text-xl">{t("title")}</h2>
+      <div className="mb-6 flex shrink-0 items-center justify-between gap-3 px-1">
+        <div className="min-w-0">
+          <h2 className="truncate font-bold text-xl">{t("title")}</h2>
           <p className="text-muted-foreground text-sm">{t("boardSubtitle")}</p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/pipeline/forecast">
-              <TrendingUp className="mr-2 h-4 w-4" /> {t("forecast.title")}
-            </Link>
-          </Button>
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/pipeline/report">
-              <BarChart2 className="mr-2 h-4 w-4" /> {t("report")}
-            </Link>
-          </Button>
-          {canManageStages && (
+        {/*
+          Four buttons and a title in one row is 520px of controls on a screen
+          that has 343. Below md the three ways of *looking* at the pipeline
+          collapse into one menu and only "New deal" — the thing anyone actually
+          comes here to do — keeps its button.
+        */}
+        <div className="flex shrink-0 items-center gap-2">
+          <div className="hidden items-center gap-2 md:flex">
             <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/settings/pipeline">
-                <Settings2 className="mr-2 h-4 w-4" /> {t("manageStages")}
+              <Link href="/dashboard/pipeline/forecast">
+                <TrendingUp className="mr-2 h-4 w-4" /> {t("forecast.title")}
               </Link>
             </Button>
-          )}
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/pipeline/report">
+                <BarChart2 className="mr-2 h-4 w-4" /> {t("report")}
+              </Link>
+            </Button>
+            {canManageStages && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/dashboard/settings/pipeline">
+                  <Settings2 className="mr-2 h-4 w-4" /> {t("manageStages")}
+                </Link>
+              </Button>
+            )}
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild className="md:hidden">
+              <Button variant="outline" size="icon" aria-label={t("report")}>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/pipeline/forecast">
+                  <TrendingUp className="mr-2 h-4 w-4" /> {t("forecast.title")}
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/pipeline/report">
+                  <BarChart2 className="mr-2 h-4 w-4" /> {t("report")}
+                </Link>
+              </DropdownMenuItem>
+              {canManageStages && (
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard/settings/pipeline">
+                    <Settings2 className="mr-2 h-4 w-4" /> {t("manageStages")}
+                  </Link>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {canEdit && (
             <DealModal stages={initialStages} companies={companies} contacts={contacts}>
               <Button size="sm" className="gap-2">
-                <PlusIcon className="h-4 w-4" /> {t("newDeal")}
+                <PlusIcon className="h-4 w-4" />
+                <span className="max-sm:sr-only">{t("newDeal")}</span>
               </Button>
             </DealModal>
           )}
