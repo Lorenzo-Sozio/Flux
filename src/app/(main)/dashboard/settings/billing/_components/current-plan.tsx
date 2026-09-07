@@ -43,9 +43,13 @@ export function CurrentPlan({ entitlements, periodEnd, billingCycle, onManageCli
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-4">
-        <div>
-          <CardTitle className="flex items-center gap-2">
+      {/* ⚠️ A plan name, a status badge and a button that says "Manage billing"
+          and carries two icons is 480px of row. It did not wrap, so the plan
+          name broke onto two lines and the button was cut off at the card's
+          edge — the one control on this card. */}
+      <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <CardTitle className="flex flex-wrap items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
             {entitlements.planName.charAt(0).toUpperCase() + entitlements.planName.slice(1)} Plan
             <Badge variant={statusVariant}>{statusLabel}</Badge>
@@ -66,7 +70,7 @@ export function CurrentPlan({ entitlements, periodEnd, billingCycle, onManageCli
           </CardDescription>
         </div>
         {entitlements.status !== "free" && (
-          <Button variant="outline" size="sm" onClick={onManageClick} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={onManageClick} disabled={loading} className="shrink-0">
             <CreditCard className="mr-2 h-4 w-4" />
             {t("currentPlan.manageBilling")}
             <ExternalLink className="ml-2 h-3 w-3 opacity-60" />

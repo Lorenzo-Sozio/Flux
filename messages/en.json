@@ -1272,7 +1272,8 @@
       },
       "createSuccess": "Template created.",
       "updateSuccess": "Template updated.",
-      "deleteSuccess": "Template deleted."
+      "deleteSuccess": "Template deleted.",
+      "size": "Size"
     },
     "campaigns": {
       "title": "Marketing Campaigns",
@@ -2282,13 +2283,13 @@
     "roleDesc": {
       "owner": "Full control over the workspace. Can manage all settings, users, and data.",
       "admin": "Can manage users, roles, settings, and all CRM data.",
-      "user": "Can create, edit and delete CRM records. Cannot manage users or settings.",
+      "editor": "Can create, edit and delete CRM records. Cannot manage users or settings.",
       "viewer": "Read-only access. Cannot create, edit or delete any records."
     },
     "roleLabel": {
       "owner": "Owner",
       "admin": "Admin",
-      "user": "User",
+      "editor": "Editor",
       "viewer": "Viewer"
     },
     "rolePerms": {
@@ -2305,7 +2306,7 @@
         "Configure settings & custom fields",
         "Manage webhooks and automation"
       ],
-      "user": [
+      "editor": [
         "All viewer permissions",
         "Create and edit records",
         "Delete records",
@@ -2513,7 +2514,8 @@
         "status": "Status",
         "lastDelivery": "Last Delivery",
         "name": "Name",
-        "active": "Active"
+        "active": "Active",
+        "secret": "Secret"
       },
       "createSuccess": "Webhook created.",
       "updateSuccess": "Webhook updated.",

@@ -1272,7 +1272,8 @@
       },
       "createSuccess": "Modello creato.",
       "updateSuccess": "Modello aggiornato.",
-      "deleteSuccess": "Modello eliminato."
+      "deleteSuccess": "Modello eliminato.",
+      "size": "Dimensione"
     },
     "campaigns": {
       "title": "Campagne Marketing",
@@ -2282,13 +2283,13 @@
     "roleDesc": {
       "owner": "Controllo completo del workspace. Gestisce tutte le impostazioni, utenti e dati.",
       "admin": "Può gestire utenti, ruoli, impostazioni e tutti i dati CRM.",
-      "user": "Può creare, modificare ed eliminare record CRM. Non gestisce utenti o impostazioni.",
+      "editor": "Può creare, modificare ed eliminare record CRM. Non gestisce utenti o impostazioni.",
       "viewer": "Accesso in sola lettura. Non può creare, modificare o eliminare record."
     },
     "roleLabel": {
       "owner": "Proprietario",
       "admin": "Amministratore",
-      "user": "Utente",
+      "editor": "Editor",
       "viewer": "Visualizzatore"
     },
     "rolePerms": {
@@ -2305,7 +2306,7 @@
         "Configura impostazioni e campi personalizzati",
         "Gestisci webhook e automazione"
       ],
-      "user": [
+      "editor": [
         "Tutti i permessi visualizzatore",
         "Crea e modifica record",
         "Elimina record",
@@ -2513,7 +2514,8 @@
         "status": "Stato",
         "lastDelivery": "Ultima Consegna",
         "name": "Nome",
-        "active": "Attivo"
+        "active": "Attivo",
+        "secret": "Segreto"
       },
       "createSuccess": "Webhook creato.",
       "updateSuccess": "Webhook aggiornato.",

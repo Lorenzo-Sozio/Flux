@@ -257,6 +257,26 @@ for (const file of files.sort()) {
     }
   }
 
+  // ── A page header that squeezes its own subtitle ──────────────────────────
+  //
+  // ⚠️ The sequel to `no-shrink-header`. `min-w-0` stops the buttons being
+  // pushed off the screen and then the *text* pays instead: a two-line caption
+  // becomes four lines in 140px beside a button that will not move. A header
+  // holding a heading, a paragraph and a control has to wrap on a phone.
+  for (const { line, classes } of classAttributes(source)) {
+    if (!classes.includes("flex") || !classes.includes("justify-between")) continue;
+    if (classes.some((c) => c === "flex-wrap" || c.startsWith("flex-col"))) continue;
+    if (classes.some((c) => /^(sm|md|lg):flex-(wrap|row)$/.test(c))) continue;
+
+    const block = blockAfter(source, line + 1, 14);
+    const hasHeading = /<h1[ >]/.test(block);
+    const hasCaption = /<p className="[^"]*text-(muted-foreground|sm)/.test(block);
+    const hasControl = /<Button|Modal>|Dialog>/.test(block);
+    if (hasHeading && hasCaption && hasControl) {
+      report("squeezed-header", file, line, "a heading, a caption and a control in a row that cannot wrap");
+    }
+  }
+
   // ── A row of tabs that cannot be reached ──────────────────────────────────
   //
   // Handled at the root: the TabsList primitive wraps below sm and scrolls

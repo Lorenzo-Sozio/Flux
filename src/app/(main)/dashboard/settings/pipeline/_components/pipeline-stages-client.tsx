@@ -134,7 +134,11 @@ export function PipelineStagesClient({ stages: initialStages }: { stages: Stage[
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
+      {/* ⚠️ Wrapping, not shrinking. `min-w-0` stopped the button being pushed off
+          the screen, and then the subtitle took its place: three lines of caption
+          squeezed into 140px beside a button. The button drops to its own line on
+          a phone, and the sentence gets the width it was written for. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
           <p className="text-muted-foreground">{t("subtitle")}</p>

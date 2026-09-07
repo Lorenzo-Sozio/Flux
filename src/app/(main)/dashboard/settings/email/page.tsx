@@ -252,7 +252,14 @@ export default function EmailSettingsPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* ⚠️ The box and its words were siblings, so the target was the
+                  18px box — the label beside it points at the input by id, which
+                  works, but only if you hit the words rather than the gap. One
+                  label around both makes the whole row the target. */}
+              <label
+                htmlFor="smtp-secure"
+                className="flex cursor-pointer items-center gap-2 font-normal text-sm leading-none"
+              >
                 <input
                   id="smtp-secure"
                   type="checkbox"
@@ -260,10 +267,8 @@ export default function EmailSettingsPage() {
                   onChange={(e) => set("smtpSecure", e.target.checked)}
                   className="h-4 w-4 rounded border-input"
                 />
-                <Label htmlFor="smtp-secure" className="cursor-pointer font-normal">
-                  {t("useSsl")}
-                </Label>
-              </div>
+                {t("useSsl")}
+              </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">

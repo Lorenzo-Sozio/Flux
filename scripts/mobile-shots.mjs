@@ -41,25 +41,50 @@ const DEVICE = DEVICES[deviceArg] ?? DEVICES.iphone12;
 const ROUTES = [
   { path: "/auth/v1/login", auth: false },
   { path: "/dashboard/crm", auth: true },
-  { path: "/dashboard/contacts", auth: true },
-  { path: "/dashboard/companies", auth: true },
-  { path: "/dashboard/leads", auth: true },
-  { path: "/dashboard/pipeline", auth: true },
-  { path: "/dashboard/calendar", auth: true },
+
+  // ── The lists ─────────────────────────────────────────────────────────────
+  { path: "/dashboard/contacts", auth: true, sample: "/dashboard/contacts/" },
+  { path: "/dashboard/companies", auth: true, sample: "/dashboard/companies/" },
+  { path: "/dashboard/leads", auth: true, sample: "/dashboard/leads/" },
+  { path: "/dashboard/pipeline", auth: true, sample: "/dashboard/pipeline/" },
+  { path: "/dashboard/sales/quotes", auth: true, sample: "/dashboard/sales/quotes/" },
+  { path: "/dashboard/sales/orders", auth: true, sample: "/dashboard/sales/orders/" },
+  { path: "/dashboard/support/tickets", auth: true, sample: "/dashboard/support/tickets/" },
   { path: "/dashboard/tasks", auth: true },
-  { path: "/dashboard/sales/quotes", auth: true },
-  { path: "/dashboard/sales/orders", auth: true },
-  { path: "/dashboard/sales/orders/new", auth: true },
   { path: "/dashboard/sales/products", auth: true },
+  { path: "/dashboard/marketing/campaigns", auth: true, sample: "/dashboard/marketing/campaigns/" },
+  { path: "/dashboard/marketing/templates", auth: true },
+
+  // ── Screens reached from a list, a menu or a link ─────────────────────────
+  { path: "/dashboard/calendar", auth: true },
+  { path: "/dashboard/chat", auth: true },
+  { path: "/dashboard/sales/orders/new", auth: true },
+  { path: "/dashboard/sales/quotes/new", auth: true },
   { path: "/dashboard/sales/finance", auth: true },
-  { path: "/dashboard/support/tickets", auth: true },
   { path: "/dashboard/support", auth: true },
-  { path: "/dashboard/marketing/campaigns", auth: true },
+  { path: "/dashboard/support/sla", auth: true },
   { path: "/dashboard/automation", auth: true },
   { path: "/dashboard/reports", auth: true },
+  { path: "/dashboard/reports/builder", auth: true },
+  { path: "/dashboard/pipeline/funnel", auth: true },
+  { path: "/dashboard/pipeline/targets", auth: true },
+  { path: "/dashboard/pipeline/forecast", auth: true },
+  { path: "/dashboard/pipeline/report", auth: true },
+  { path: "/dashboard/pipeline/win-loss", auth: true },
+  { path: "/dashboard/tasks/gantt", auth: true },
+  { path: "/dashboard/tasks/workload", auth: true },
   { path: "/dashboard/users", auth: true },
-  { path: "/dashboard/settings", auth: true },
   { path: "/dashboard/help", auth: true },
+
+  // ── Settings, which is a section and not a page ───────────────────────────
+  { path: "/dashboard/settings", auth: true },
+  { path: "/dashboard/settings/billing", auth: true },
+  { path: "/dashboard/settings/email", auth: true },
+  { path: "/dashboard/settings/webhooks", auth: true },
+  { path: "/dashboard/settings/custom-fields", auth: true },
+  { path: "/dashboard/settings/pipeline", auth: true },
+  { path: "/dashboard/settings/macros", auth: true },
+  { path: "/dashboard/settings/api", auth: true },
 ];
 
 const CHROME = [
@@ -164,6 +189,11 @@ const OVERFLOW_PROBE = `(() => {
   // failure — which is a checker crying wolf about the fix for the thing it
   // was asked to find.
   const hitArea = (el) => {
+    // A checkbox inside a label is tapped by tapping the label, so the label is
+    // the target and the 18px box is only what it looks like.
+    const wrapper = el.closest("label");
+    if (wrapper && /^(checkbox|radio)$/.test(el.type ?? "")) return wrapper.getBoundingClientRect();
+
     const rect = el.getBoundingClientRect();
     const after = getComputedStyle(el, "::after");
     if (after.content === "none" || after.position !== "absolute") return rect;
@@ -264,9 +294,29 @@ try {
 
   if (WANT_SHOTS) mkdirSync(OUT, { recursive: true });
 
-  for (const route of ROUTES) {
+  /**
+   * ⚠️ Detail pages are where the time goes, and none of them have a fixed URL.
+   * A list page is asked for the first link that looks like one of its own
+   * records, and that becomes an extra route — so `/dashboard/contacts/<id>` is
+   * measured without anybody hard-coding an id that will not exist tomorrow.
+   */
+  const queue = [...ROUTES];
+  for (const route of queue) {
     if (route.auth && !signedIn) continue;
     await goto(BASE + route.path);
+
+    if (route.sample) {
+      const found = await evaluate(
+        `(() => {
+          const prefix = ${JSON.stringify(route.sample)};
+          const link = [...document.querySelectorAll("a[href]")]
+            .map((a) => a.getAttribute("href"))
+            .find((href) => href && href.startsWith(prefix) && href.length > prefix.length && !href.includes("?"));
+          return link ?? "";
+        })()`,
+      );
+      if (found) queue.push({ path: found, auth: true });
+    }
     const report = JSON.parse(await evaluate(OVERFLOW_PROBE));
 
     const overflow = report.scrollWidth - report.clientWidth;

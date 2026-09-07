@@ -341,6 +341,22 @@ body {
     inset: -0.875rem;
   }
 
+  /* ⚠️ And the same for the ones that are not the primitive. A `<input
+   * type="checkbox">` renders at 13px, which is a third of a fingertip — the
+   * report builder's column list and the SMTP settings both use them. A
+   * pseudo-element on a replaced element is not reliable, so the control grows
+   * a little and the label around it grows to a real row. */
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 1.15rem;
+    height: 1.15rem;
+  }
+
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]) {
+    min-height: 2.75rem;
+  }
+
   /* Icon-only controls need the width too, or they stay 36px wide and 44px tall,
    * which is harder to hit than either. */
   button[data-slot="button"][class*="size-9"],
