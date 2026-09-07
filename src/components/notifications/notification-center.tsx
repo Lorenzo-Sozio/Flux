@@ -5,6 +5,7 @@ import { useCallback, useState, useTransition } from "react";
 import Link from "next/link";
 
 import { Bell, CheckCheck, ExternalLink, Settings2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { markAllNotificationsReadAction, markNotificationReadAction } from "@/actions/auth";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +56,10 @@ const POLL_MAX_MS = 5 * 60_000;
 export function NotificationCenter({ notifications: initial }: Props) {
   const [items, setItems] = useState(initial);
   const [serverUnread, setServerUnread] = useState<number | null>(null);
+  // ⚠️ These five strings were hardcoded English in an otherwise translated
+  // product, so an Italian workspace got "Mark all read" in the middle of its
+  // own language — in the panel people open most often.
+  const t = useTranslations("notificationCenter");
   const [isPending, startTransition] = useTransition();
 
   /**
@@ -133,7 +138,7 @@ export function NotificationCenter({ notifications: initial }: Props) {
           would be clipped at one edge. It takes what is there instead. */}
       <DropdownMenuContent align="end" className="w-[min(20rem,calc(100vw-1.5rem))]">
         <DropdownMenuLabel className="flex items-center justify-between py-3">
-          <span>Notifications</span>
+          <span>{t("title")}</span>
           {unreadCount > 0 && (
             <Button
               variant="ghost"
@@ -143,7 +148,7 @@ export function NotificationCenter({ notifications: initial }: Props) {
               disabled={isPending}
             >
               <CheckCheck className="h-3 w-3" />
-              Mark all read
+              {t("markAllRead")}
             </Button>
           )}
         </DropdownMenuLabel>
@@ -152,7 +157,7 @@ export function NotificationCenter({ notifications: initial }: Props) {
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <Bell className="mb-2 h-8 w-8 text-muted-foreground/40" />
-              <p className="text-muted-foreground text-sm">No notifications yet</p>
+              <p className="text-muted-foreground text-sm">{t("empty")}</p>
             </div>
           ) : (
             <div className="divide-y">
@@ -176,7 +181,7 @@ export function NotificationCenter({ notifications: initial }: Props) {
                     type="button"
                     disabled={n.isRead}
                     onClick={() => handleMarkRead(n.id)}
-                    title={n.isRead ? undefined : "Mark as read"}
+                    title={n.isRead ? undefined : t("markRead")}
                     className={cn("min-w-0 flex-1 text-left", !n.isRead && "cursor-pointer")}
                   >
                     <p className={cn("text-sm leading-tight", !n.isRead && "font-medium")}>{n.title}</p>
@@ -209,7 +214,7 @@ export function NotificationCenter({ notifications: initial }: Props) {
           className="flex items-center gap-2 px-3 py-2.5 text-muted-foreground text-xs hover:bg-muted/50 hover:text-foreground"
         >
           <Settings2 className="h-3.5 w-3.5" />
-          Notification settings
+          {t("settings")}
         </Link>
       </DropdownMenuContent>
     </DropdownMenu>

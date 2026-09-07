@@ -78,9 +78,19 @@ export default function SupportDashboard() {
     return m > 0 ? `${h}h ${m}m` : `${h}h`;
   })();
 
-  const calculateSLAMetrics = () => {
-    if (tickets.length === 0) return { onTime: 95, firstResponse: 88, satisfaction: 92 };
-
+  /**
+   * ⚠️ Returns null rather than a number when there is nothing to measure.
+   *
+   * This used to answer 95 and 88 with no tickets at all, and `satisfaction: 92`
+   * unconditionally — a figure this product has no way of knowing, because
+   * nothing anywhere asks a customer whether they were satisfied. All three sat
+   * under a heading reading "SLA performance", which is exactly the kind of
+   * number somebody repeats in a meeting.
+   *
+   * The satisfaction dial is gone rather than fixed. A measurement the product
+   * does not take should not have a place on the screen waiting to be filled.
+   */
+  const calculateSLAMetrics = (): { onTime: number | null; firstResponse: number | null } => {
     let onTimeCount = 0;
     let firstResponseCount = 0;
 
@@ -103,16 +113,14 @@ export default function SupportDashboard() {
     const withFirstResponse = tickets.filter((tk) => tk.firstResponseAt && tk.sla).length;
 
     return {
-      onTime: resolvedWithSLA > 0 ? Math.round((onTimeCount / resolvedWithSLA) * 100) : 95,
-      firstResponse: withFirstResponse > 0 ? Math.round((firstResponseCount / withFirstResponse) * 100) : 88,
-      satisfaction: 92,
+      onTime: resolvedWithSLA > 0 ? Math.round((onTimeCount / resolvedWithSLA) * 100) : null,
+      firstResponse: withFirstResponse > 0 ? Math.round((firstResponseCount / withFirstResponse) * 100) : null,
     };
   };
 
   const metrics = calculateSLAMetrics();
   const onTimeResolution = metrics.onTime;
   const firstResponseTime = metrics.firstResponse;
-  const satisfaction = metrics.satisfaction;
 
   const channels = {
     email: tickets.filter((tk) => tk.channel === "email").length,
@@ -298,9 +306,18 @@ export default function SupportDashboard() {
               <CardDescription className="text-xs">{t("currentMonth")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6 pb-6">
-              <SLAGauge label={t("onTimeResolution")} percentage={onTimeResolution} color="green" />
-              <SLAGauge label={t("firstResponse")} percentage={firstResponseTime} color="green" />
-              <SLAGauge label={t("satisfaction")} percentage={satisfaction} color="green" />
+              <SLAGauge
+                label={t("onTimeResolution")}
+                percentage={onTimeResolution}
+                color="green"
+                emptyLabel={t("noData")}
+              />
+              <SLAGauge
+                label={t("firstResponse")}
+                percentage={firstResponseTime}
+                color="green"
+                emptyLabel={t("noData")}
+              />
             </CardContent>
           </Card>
 

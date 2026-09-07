@@ -2749,7 +2749,8 @@
         "chat": "Chat",
         "phone": "Phone",
         "social": "Social"
-      }
+      },
+      "noData": "n/d"
     },
     "tickets": {
       "title": "Tickets",
@@ -3467,5 +3468,12 @@
     "noServiceWorker": "No service worker is running on this page, so nothing can receive a notification. Reload the page; if it persists, the app is running in development mode, where the worker is deliberately not registered.",
     "lastSuccess": "last received {date}",
     "neverReceived": "nothing received yet"
+  },
+  "notificationCenter": {
+    "title": "Notifications",
+    "markAllRead": "Mark all read",
+    "markRead": "Mark as read",
+    "empty": "No notifications yet",
+    "settings": "Notification settings"
   }
 }

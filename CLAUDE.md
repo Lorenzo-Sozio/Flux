@@ -103,7 +103,7 @@ the OpenNext adapter.
 npm run cf:build     # next build + bundle the Worker into .open-next/
 npm run cf:preview   # build, then run it locally on workerd
 npm run cf:deploy    # build + wrangler deploy
-npm run cf:typegen   # regenerate cloudflare-env.d.ts from the bindings
+npx wrangler types   # regenerate cloudflare-env.d.ts from the bindings
 ```
 
 **Cloudflare Workers Builds** (deploy from the dashboard) must be configured as:
@@ -202,20 +202,9 @@ the failure is in the deploy step of a job whose build succeeded. That is why th
 `DOCUMENTS` block in wrangler.jsonc is still **commented out**, and why the note
 below about how to re-enable it matters more than it looks.
 
-**Steps 1 and 2 are already done.** R2 is enabled on the account and the
-`flux-documents` bucket exists, created on 4 September 2026. Checked against the
-account on 7 September 2026 with `npx wrangler r2 bucket list`.
-
-⚠️⚠️ **Do not uncomment that block as it stands.** wrangler.jsonc already carries a
-*live* `r2_buckets` block further down, binding the same bucket as
-`NEXT_INC_CACHE_R2_BUCKET` for OpenNext's incremental cache. Two keys of the same
-name in one JSON object is not an error anybody reports: the later one wins and
-the earlier one is silently discarded. So uncommenting produces a deploy that
-either loses the page cache or loses document storage, depending on which way the
-parser resolves it, and nothing says which.
-
-The bucket takes both bindings. To turn document storage on, add the `DOCUMENTS`
-binding to the **existing** block rather than creating a second one:
+**This is now configured**, on 7 September 2026. R2 is enabled on the account, the
+`flux-documents` bucket exists (created 4 September, the day after the deploy it
+broke), and wrangler.jsonc binds it twice from a single `r2_buckets` block:
 
 ```jsonc
 "r2_buckets": [
@@ -224,11 +213,17 @@ binding to the **existing** block rather than creating a second one:
 ]
 ```
 
-then delete the commented-out block at the top so nobody uncomments it later.
+⚠️⚠️ **One `r2_buckets` key, and never a second.** A commented-out second block used
+to sit near the top of that file with instructions to uncomment it. Two keys of the
+same name in one JSON object is not an error anybody reports: the later one wins and
+the earlier one is silently discarded, so following those instructions would have
+produced a deploy that lost either the page cache or document storage, with nothing
+on screen to say which. The block is gone; the note in its place says where the real
+one is.
 
-Until that is done uploads fail with a message naming what to configure, and
-everything else works. The alternative to R2 is any S3-compatible store, set as
-Worker secrets.
+⚠️ Uploads reach R2 only from the **next deploy** onward. Before that they fail with
+a message naming what to configure, and everything else works. The alternative to R2
+is any S3-compatible store, set as Worker secrets.
 
 ⚠️ The storage key carries **nothing** from the uploaded filename except an extension
 matched against a strict pattern, and the read path re-checks the key's shape before
