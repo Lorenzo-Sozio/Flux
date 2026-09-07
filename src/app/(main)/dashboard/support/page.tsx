@@ -40,8 +40,13 @@ export default function SupportDashboard() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [ticketData, slaData] = await Promise.all([getTickets({ limit: 100 }), getSLAs()]);
-        setTickets(ticketData);
+        // ⚠️ The figures below describe the last thirty days plus everything
+        // still open, which is what this query now returns. That is a narrower
+        // claim than they used to make and a truer one: before, they were
+        // computed over whichever hundred tickets happened to be newest, an
+        // arbitrary number nothing on the screen mentioned.
+        const [ticketData, slaData] = await Promise.all([getTickets(), getSLAs()]);
+        setTickets(ticketData.rows);
         setSLAs(slaData);
       } catch (error) {
         console.error("Failed to load data:", error);

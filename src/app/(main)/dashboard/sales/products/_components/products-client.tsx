@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { DollarSign, Loader2, Package, Pencil, Plus, Search, Tag, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
@@ -13,6 +13,7 @@ import { z } from "zod";
 
 import { createProduct, deleteProduct, toggleProductActive, updateProduct } from "@/actions/products";
 import { EmptyState } from "@/components/crm/empty-state";
+import { ListToolbar } from "@/components/crm/list-toolbar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
+import type { Page } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -248,18 +250,44 @@ function ProductDialog({
 // ── Main component ────────────────────────────────────────────────────────────
 
 interface Props {
-  products: Product[];
+  page: Page<Product>;
+  stats: { total: number; active: number; inactive: number };
+  filter: string;
 }
 
-export function ProductsClient({ products: initial }: Props) {
+/**
+ * The product catalogue.
+ *
+ * ⚠️ Search, the active/inactive filter and the page are all decided on the
+ * server now. This component used to be handed every product the workspace had
+ * ever sold and narrow them here, which is fine for the forty rows a demo has
+ * and not for the ten thousand a supplier's price list arrives as.
+ */
+export function ProductsClient({ page, stats, filter }: Props) {
   const t = useTranslations("products");
   const te = useTranslations("emptyStates");
   const { formatAmount } = useCurrency();
-  const _router = useRouter();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [, startTransition] = useTransition();
-  const [products, setProducts] = useState(initial);
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
+  const [products, setProducts] = useState(page.rows);
+
+  // A new page arrives as a new prop, and `useState` reads its argument once —
+  // without this, paging or searching left the previous rows on screen.
+  useEffect(() => setProducts(page.rows), [page.rows]);
+
+  const search = searchParams.get("q") ?? "";
+
+  /** Moves the active/inactive filter into the URL, back to page one. */
+  const setFilter = (value: string) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (value === "all") next.delete("filter");
+    else next.set("filter", value);
+    next.delete("page");
+    const query = next.toString();
+    startTransition(() => router.push(query ? `${pathname}?${query}` : pathname));
+  };
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -268,21 +296,6 @@ export function ProductsClient({ products: initial }: Props) {
   // Delete confirm
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   const [deleting, setDeleting] = useState(false);
-
-  // Filtered list
-  const filtered = products.filter((p) => {
-    const q = search.toLowerCase();
-    const matchSearch =
-      !q ||
-      p.name.toLowerCase().includes(q) ||
-      (p.sku ?? "").toLowerCase().includes(q) ||
-      (p.category ?? "").toLowerCase().includes(q);
-    const matchFilter = filter === "all" ? true : filter === "active" ? p.isActive : !p.isActive;
-    return matchSearch && matchFilter;
-  });
-
-  const activeCount = products.filter((p) => p.isActive).length;
-  const inactiveCount = products.filter((p) => !p.isActive).length;
 
   const handleOpenCreate = () => {
     setEditing(undefined);
@@ -351,11 +364,11 @@ export function ProductsClient({ products: initial }: Props) {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: t("total"), value: products.length, active: filter === "all", onClick: () => setFilter("all") },
-          { label: t("active"), value: activeCount, active: filter === "active", onClick: () => setFilter("active") },
+          { label: t("total"), value: stats.total, active: filter === "all", onClick: () => setFilter("all") },
+          { label: t("active"), value: stats.active, active: filter === "active", onClick: () => setFilter("active") },
           {
             label: t("inactive"),
-            value: inactiveCount,
+            value: stats.inactive,
             active: filter === "inactive",
             onClick: () => setFilter("inactive"),
           },
@@ -376,17 +389,14 @@ export function ProductsClient({ products: initial }: Props) {
       </div>
 
       {/* Toolbar */}
-      <div className="flex items-center gap-2">
-        <div className="relative max-w-xs flex-1">
-          <Search className="-translate-y-1/2 absolute top-1/2 left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-          <Input
-            placeholder={t("searchPlaceholder")}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-8 pl-8 text-sm"
-          />
-        </div>
-      </div>
+      <ListToolbar
+        total={page.total}
+        page={page.page}
+        pageCount={page.pageCount}
+        pageSize={page.pageSize}
+        shown={products.length}
+        searchPlaceholder={t("searchPlaceholder")}
+      />
 
       {/* Table */}
       <div className="overflow-x-auto rounded-md border">
@@ -403,7 +413,7 @@ export function ProductsClient({ products: initial }: Props) {
             </tr>
           </thead>
           <tbody className="divide-y">
-            {filtered.length === 0 ? (
+            {products.length === 0 ? (
               <tr>
                 <td colSpan={7} className="p-0">
                   {search || filter !== "all" ? (
@@ -423,7 +433,7 @@ export function ProductsClient({ products: initial }: Props) {
                 </td>
               </tr>
             ) : (
-              filtered.map((product) => (
+              products.map((product) => (
                 <tr key={product.id} className="group transition-colors hover:bg-muted/30">
                   <td className="px-4 py-3">
                     <p className={cn("font-medium", !product.isActive && "text-muted-foreground")}>{product.name}</p>
@@ -494,12 +504,6 @@ export function ProductsClient({ products: initial }: Props) {
           </tbody>
         </table>
       </div>
-
-      {filtered.length > 0 && (
-        <p className="text-right text-muted-foreground text-xs">
-          {t("showingOf", { shown: filtered.length, total: products.length })}
-        </p>
-      )}
 
       {/* Create / Edit dialog */}
       <ProductDialog open={dialogOpen} onOpenChange={setDialogOpen} product={editing} onSaved={handleSaved} />

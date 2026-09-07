@@ -2924,7 +2924,12 @@
       },
       "escalatePriority": "Escala priorità",
       "noTasks": "Nessuna attività",
-      "properties": "Proprietà"
+      "properties": "Proprietà",
+      "olderClosedHidden": "{count, plural, =1 {# ticket chiuso più di {days} giorni fa non è mostrato} other {# ticket chiusi più di {days} giorni fa non sono mostrati}}",
+      "showArchive": "Mostrali",
+      "showingArchive": "Vengono mostrati tutti i ticket, compresi quelli chiusi",
+      "backToOpen": "Torna alla coda",
+      "cappedAt": "Vengono mostrati solo i {count} ticket più recenti. Restringi l'elenco per vedere gli altri."
     },
     "sla": {
       "title": "Gestione SLA",

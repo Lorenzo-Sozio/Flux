@@ -2924,7 +2924,12 @@
       },
       "escalatePriority": "Escalate priority",
       "noTasks": "No tasks",
-      "properties": "Properties"
+      "properties": "Properties",
+      "olderClosedHidden": "{count, plural, =1 {# ticket closed more than {days} days ago is not shown} other {# tickets closed more than {days} days ago are not shown}}",
+      "showArchive": "Show them",
+      "showingArchive": "Showing every ticket, closed ones included",
+      "backToOpen": "Back to the queue",
+      "cappedAt": "Only the {count} most recent tickets are shown. Narrow the list to see the rest."
     },
     "sla": {
       "title": "SLA Management",

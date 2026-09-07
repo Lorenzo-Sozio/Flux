@@ -69,7 +69,7 @@ const sections = [
         a: "Il percorso standard è: Lead → Contatto + Azienda → Deal (Pipeline) → Preventivo → Ordine. Un lead che mostra interesse viene convertito in un contatto qualificato, si apre una deal nella pipeline, si invia un preventivo e una volta accettato si genera l'ordine.",
       },
       {
-        q: "Come funzionano gli elenchi (contatti, lead, aziende, preventivi, ordini)?",
+        q: "Come funzionano gli elenchi (contatti, lead, aziende, preventivi, ordini, prodotti)?",
         a: "Ogni elenco carica una pagina di righe alla volta, 50 per default. Sopra la tabella trovi la casella di ricerca, quante righe stai vedendo sul totale, il selettore per passare a 25, 50, 100 o 200 righe per pagina e le frecce per spostarti. La ricerca e i filtri lavorano sull'intero elenco, non solo sulla pagina a schermo, quindi cercare un cliente lo trova anche se sta a pagina venti. Ricerca, filtri, ordinamento e pagina finiscono nell'indirizzo della pagina: puoi copiarlo e mandarlo a un collega, salvarlo tra i preferiti, e il tasto indietro del browser funziona come ti aspetti.",
       },
       {
@@ -641,6 +641,10 @@ const sections = [
       {
         q: "Come collego un programma esterno a Flux?",
         a: "Impostazioni → Chiavi API, dove generi una chiave del workspace. Si passa come intestazione `Authorization: Bearer <chiave>` e vale solo per questo workspace: quale sia lo dice la chiave stessa, quindi chi integra non deve indicarlo da nessun'altra parte, e non può sbagliare workspace per errore. La chiave si vede una volta sola al momento della creazione: se la perdi ne generi un'altra e la vecchia smette di funzionare. Le rotte disponibili, con corpi e risposte, sono nella documentazione API del pannello di amministrazione.",
+      },
+      {
+        q: "Non trovo più un ticket chiuso mesi fa.",
+        a: "L'elenco dei ticket è una coda di lavoro: mostra sempre tutto ciò che è ancora aperto, in lavorazione o in attesa, a qualunque data, e in più solo ciò che è stato risolto o chiuso negli ultimi 30 giorni. Quando qualcosa resta fuori, sopra le schede di stato compare una riga che dice quanti ticket sono nascosti e un link per vederli tutti. Niente viene cancellato.",
       },
       {
         q: "Come gestisco le risposte rapide per i ticket?",

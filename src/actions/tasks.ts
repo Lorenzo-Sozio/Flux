@@ -21,7 +21,7 @@ import {
 } from "@/db/schema";
 import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
-import { DONE_WINDOW_DAYS, TASK_LIST_CAP } from "@/lib/task-window";
+import { DONE_WINDOW_DAYS, TASK_LIST_CAP } from "@/lib/queue-window";
 import { selectTasksDueToday } from "@/lib/tasks-due";
 import { getDb } from "@/lib/tenant-context";
 

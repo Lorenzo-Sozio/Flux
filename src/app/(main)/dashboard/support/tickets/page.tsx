@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   AlarmClock,
@@ -32,6 +32,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TICKET_LIST_CAP, TICKET_WINDOW_DAYS } from "@/lib/queue-window";
 import { timeLeft } from "@/lib/time-left";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +55,12 @@ export default function TicketsListPage() {
   const tc = useTranslations("common");
   const te = useTranslations("emptyStates");
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // A queue is not an archive. `?closed=all` is how somebody reaches the rest.
+  const includeClosed = searchParams.get("closed") === "all";
   const [tickets, setTickets] = useState<any[]>([]);
+  const [hiddenClosed, setHiddenClosed] = useState(0);
+  const [capped, setCapped] = useState(false);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<ViewMode>("list");
   const [search, setSearch] = useState("");
@@ -66,8 +72,10 @@ export default function TicketsListPage() {
 
   const loadTickets = async () => {
     try {
-      const data = await getTickets({ limit: 200 });
-      setTickets(data);
+      const data = await getTickets({ includeClosed });
+      setTickets(data.rows);
+      setHiddenClosed(data.hiddenClosed);
+      setCapped(data.capped);
     } catch (error) {
       console.error("Failed to load tickets:", error);
     } finally {
@@ -191,6 +199,30 @@ export default function TicketsListPage() {
           </Button>
         </div>
       </div>
+
+      {/* ⚠️ The bounds, said out loud. The status tabs below count only what was
+          loaded, so a queue that silently stopped at the window or the cap would
+          show tab figures a person can check against reality and find wrong. */}
+      {capped && <p className="shrink-0 text-muted-foreground text-xs">{t("cappedAt", { count: TICKET_LIST_CAP })}</p>}
+      {(hiddenClosed > 0 || includeClosed) && (
+        <p className="flex shrink-0 flex-wrap items-center gap-2 text-muted-foreground text-xs">
+          {includeClosed ? (
+            <>
+              {t("showingArchive")}
+              <Link href="/dashboard/support/tickets" className="font-medium text-primary hover:underline">
+                {t("backToOpen")}
+              </Link>
+            </>
+          ) : (
+            <>
+              {t("olderClosedHidden", { count: hiddenClosed, days: TICKET_WINDOW_DAYS })}
+              <Link href="/dashboard/support/tickets?closed=all" className="font-medium text-primary hover:underline">
+                {t("showArchive")}
+              </Link>
+            </>
+          )}
+        </p>
+      )}
 
       {/* Status tabs */}
       <div className="scrollbar-none flex shrink-0 gap-1 overflow-x-auto border-b pb-0">

@@ -43,6 +43,12 @@ const PAGED_LISTS = [
     action: "listOrders",
     file: "src/actions/orders.ts",
   },
+  {
+    name: "products",
+    page: `${DASHBOARD}/sales/products/page.tsx`,
+    action: "listProducts",
+    file: "src/actions/products.ts",
+  },
 ] as const;
 
 /** The body of one exported action, up to the next top-level export. */
@@ -81,6 +87,39 @@ describe.each(PAGED_LISTS)("the $name list", ({ page, action, file }) => {
     const body = bodyOf(file, action);
     expect(body).toContain("count()");
     expect(body).toContain("toPage(");
+  });
+});
+
+describe("the tickets list", () => {
+  // The second exception, for the same reason as tasks: a kanban board cannot be
+  // paged. It also used to take a `limit` and default it to a hundred silently,
+  // with two callers asking for different numbers, so the overview and the list
+  // disagreed about what the workspace contained.
+  const action = bodyOf("src/actions/support.ts", "getTickets");
+
+  it("⚠️ leaves out what was closed long ago", () => {
+    expect(action).toContain("TICKET_WINDOW_DAYS");
+    expect(action).toContain("'resolved', 'closed'");
+  });
+
+  it("⚠️ never reads the whole table, archive included", () => {
+    // The limit itself, not just a mention of the constant: it also appears in
+    // the line that decides `capped`, so a looser check passed while the query
+    // read a thousand rows.
+    expect(action).toContain("limit: TICKET_LIST_CAP");
+    expect(action).toContain("rows.length === TICKET_LIST_CAP");
+  });
+
+  it("⚠️ takes no row limit from its caller", () => {
+    // The silent hundred is the bug. A caller that can choose the bound is a
+    // caller that can choose a different one from the next caller, which is how
+    // two screens came to disagree.
+    expect(action).not.toMatch(/limit\?:\s*number/);
+  });
+
+  it("says how many it left out", () => {
+    expect(action).toContain("hiddenClosed");
+    expect(read(`${DASHBOARD}/support/tickets/page.tsx`)).toContain("olderClosedHidden");
   });
 });
 

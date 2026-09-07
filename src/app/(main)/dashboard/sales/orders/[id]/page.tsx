@@ -35,7 +35,7 @@ import {
   removeOrderItem,
   updateOrderStatus,
 } from "@/actions/orders";
-import { getProducts } from "@/actions/products";
+import { getProductsForSelect } from "@/actions/products";
 import { getTicketsForOrder } from "@/actions/support";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,7 +54,7 @@ import { PaymentsCard } from "./_components/payments-card";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type OrderDetail = Awaited<ReturnType<typeof getOrderById>>;
-type Product = Awaited<ReturnType<typeof getProducts>>[number];
+type Product = Awaited<ReturnType<typeof getProductsForSelect>>[number];
 
 /**
  * Day and time, in the reader's own locale.
@@ -212,12 +212,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([getOrderById(id), getProducts(), getTicketsForOrder(id).catch(() => [])]).then(([o, p, tk]) => {
-      setOrder(o);
-      setProducts(p);
-      setTicketsAbout(tk);
-      setLoading(false);
-    });
+    Promise.all([getOrderById(id), getProductsForSelect(), getTicketsForOrder(id).catch(() => [])]).then(
+      ([o, p, tk]) => {
+        setOrder(o);
+        setProducts(p);
+        setTicketsAbout(tk);
+        setLoading(false);
+      },
+    );
   }, [id]);
 
   const handleStatusChange = (status: OrderStatus) => {

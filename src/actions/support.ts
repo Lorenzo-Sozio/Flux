@@ -5,7 +5,7 @@ import { after } from "next/server";
 
 import crypto from "node:crypto";
 
-import { and, asc, desc, eq, inArray, isNotNull, lt, ne, notInArray, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNotNull, lt, ne, notInArray, or, type SQL, sql } from "drizzle-orm";
 import type { z } from "zod";
 
 import {
@@ -32,6 +32,7 @@ import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { FALLBACK_CALENDAR, loadBusinessCalendar, parseWeek } from "@/lib/business-calendar";
 import { addBusinessMinutes } from "@/lib/business-hours";
 import { sendEmail } from "@/lib/email-provider";
+import { TICKET_LIST_CAP, TICKET_WINDOW_DAYS } from "@/lib/queue-window";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 import { logTicketChange } from "@/lib/ticket-audit";
@@ -227,26 +228,75 @@ export async function getTicketById(ticketId: string) {
   return ticket;
 }
 
-export async function getTickets(options?: { limit?: number; status?: string }) {
+/**
+ * The tickets a support queue is actually about.
+ *
+ * ⚠️ This used to take a `limit` and default it to a hundred, silently. Nothing
+ * on any screen said so, there was no way past it, and the number was arbitrary:
+ * a workspace with four hundred open tickets saw a hundred of them and had no
+ * reason to suspect the other three hundred existed. The list page asked for two
+ * hundred, the overview for a hundred, and the two disagreed about what the
+ * workspace contained.
+ *
+ * A queue is not an archive, so the bound is on age instead: everything not yet
+ * resolved or closed, whatever its date, plus what was closed recently. The
+ * board view is why this is not paging — a column showing "the first fifty" is
+ * not a column — and it is the same treatment the task list gets, from the same
+ * constants.
+ *
+ * `closedAt` and `resolvedAt` are null on tickets closed by older code, so the
+ * window falls back to when the ticket was opened. `includeClosed` is the way
+ * back to everything, and the count below says how much that is.
+ */
+export async function getTickets(options?: {
+  status?: string;
+  includeClosed?: boolean;
+  /** A ticket somebody was linked to opens whatever its age. */
+  alwaysInclude?: string;
+}) {
   const db = await getDb();
   await requireCapability("ticket:read");
   await requirePlanModule("support");
 
-  const ticketList = await db.query.tickets.findMany({
-    orderBy: desc(tickets.createdAt),
-    limit: options?.limit || 100,
-    with: {
-      contact: true,
-      company: true,
-      assignee: true,
-      messages: {
-        limit: 1,
-        orderBy: desc(ticketMessages.createdAt),
-      },
-    },
-  });
+  const cutoff = new Date(Date.now() - TICKET_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const recent = sql`(${tickets.status} NOT IN ('resolved', 'closed')
+    OR coalesce(${tickets.closedAt}, ${tickets.resolvedAt}, ${tickets.createdAt}) >= ${cutoff})`;
+  const window = options?.alwaysInclude ? sql`(${recent} OR ${tickets.id} = ${options.alwaysInclude})` : recent;
 
-  return ticketList;
+  const conditions = [
+    options?.status && options.status !== "all" ? eq(tickets.status, options.status) : undefined,
+    options?.includeClosed ? undefined : window,
+  ].filter(Boolean) as SQL[];
+
+  const [rows, hidden] = await Promise.all([
+    db.query.tickets.findMany({
+      where: conditions.length ? and(...conditions) : undefined,
+      orderBy: desc(tickets.createdAt),
+      limit: TICKET_LIST_CAP,
+      with: {
+        contact: true,
+        company: true,
+        assignee: true,
+        messages: {
+          limit: 1,
+          orderBy: desc(ticketMessages.createdAt),
+        },
+      },
+    }),
+    // What the window left out, so the screen can say so rather than quietly
+    // showing a smaller number than the person remembers.
+    options?.includeClosed
+      ? Promise.resolve([{ n: 0 }])
+      : db.select({ n: count() }).from(tickets).where(sql`NOT ${window}`),
+  ]);
+
+  return {
+    rows,
+    hiddenClosed: Number(hidden[0]?.n ?? 0),
+    // A full page is the only signal there is more, and the cap is the same
+    // number the screen names, so the two cannot drift.
+    capped: rows.length === TICKET_LIST_CAP,
+  };
 }
 
 export async function getTicketsByStatus(status: string) {

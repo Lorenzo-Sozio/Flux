@@ -44,7 +44,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DONE_WINDOW_DAYS, TASK_LIST_CAP } from "@/lib/task-window";
+import { DONE_WINDOW_DAYS, TASK_LIST_CAP } from "@/lib/queue-window";
 import { cn } from "@/lib/utils";
 
 import { NewTaskDialog } from "./new-task-dialog";
