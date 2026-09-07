@@ -117,9 +117,16 @@ describe("the API documentation", () => {
     //
     // Mirrors what a reader sees rather than what the literals say. The component
     // merges shared error sets into /api/crm and /api/cron at render time, minus
-    // the 422 on bulk routes — a rejected row comes back inside a 200 — and the
-    // 429 on opt-out and erasure, which are deliberately unmetered.
+    // the validation 422 on bulk routes — a rejected row comes back inside a 200 —
+    // and the 429 on opt-out and erasure, which are deliberately unmetered.
+    //
+    // ⚠️ A bulk route gains two of its own, both about `Idempotency-Key`: a 409
+    // while the same key is still in flight, and a 422 for the same key sent with
+    // a different body. That second one is the same status the validation error
+    // uses and means something else entirely, which is why the component gives it
+    // its own wording rather than letting it inherit.
     const CRM_COMMON = [400, 401, 404, 422, 429];
+    const BULK_COMMON = [409, 422];
     const CRON_COMMON = [401, 500];
     const UNMETERED = ["/api/crm/opt-out", "/api/crm/erasure"];
     /** Statuses a route answers with through a shared helper rather than inline. */
@@ -141,9 +148,11 @@ describe("the API documentation", () => {
 
       let common: number[] = [];
       if (path.startsWith("/api/crm/")) {
-        common = CRM_COMMON.filter(
-          (c) => !(path.endsWith("/bulk") && c === 422) && !(UNMETERED.includes(path) && c === 429),
-        );
+        const isBulk = path.endsWith("/bulk");
+        common = [
+          ...CRM_COMMON.filter((c) => !(isBulk && c === 422) && !(UNMETERED.includes(path) && c === 429)),
+          ...(isBulk ? BULK_COMMON : []),
+        ];
       } else if (path.startsWith("/api/cron/")) {
         common = CRON_COMMON;
       }

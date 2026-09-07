@@ -22,5 +22,18 @@ export default defineConfig({
   },
   // Native since Vite 7 — resolves the `@/*` alias from tsconfig.json, so the tests import
   // exactly what the application imports. No plugin needed.
-  resolve: { tsconfigPaths: true },
+  resolve: {
+    tsconfigPaths: true,
+    alias: {
+      // ⚠️ `server-only` is a package with no runtime: importing it from a client
+      // bundle is meant to be a build error, and Next resolves it through its own
+      // bundler. Under vitest there is no such resolution, so a module that
+      // declares the guard cannot be imported by a test at all — which would mean
+      // the guard is paid for by not testing the code it protects.
+      //
+      // Aliased to nothing here. The guard still does its job where it matters,
+      // which is the application build.
+      "server-only": new URL("./src/test/server-only-stub.ts", import.meta.url).pathname,
+    },
+  },
 });

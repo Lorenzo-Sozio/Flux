@@ -120,6 +120,34 @@ const CRM_COMMON_RESPONSES: ApiEndpoint["responses"] = [
 ];
 
 /**
+ * The two answers only a bulk route gives, both of them about `Idempotency-Key`.
+ *
+ * ⚠️ A bulk request reports a rejected row inside a 200, row by row — that is the
+ * whole design, and it is why the ordinary validation 422 is kept off these
+ * endpoints. But a key reused with a different body has to be refused, and the
+ * status for that is 422 as well. Same code, entirely different meaning, so it
+ * carries its own description here rather than inheriting the common one.
+ */
+const BULK_IDEMPOTENCY_RESPONSES: ApiEndpoint["responses"] = [
+  {
+    status: 409,
+    description:
+      "Una richiesta con lo stesso `Idempotency-Key` è ancora in corso. Riprova fra poco: non è stato importato niente due volte.",
+    example: JSON.stringify(
+      { error: "A request with this Idempotency-Key is still running. Retry in a moment." },
+      null,
+      2,
+    ),
+  },
+  {
+    status: 422,
+    description:
+      "⚠️ Lo stesso `Idempotency-Key` era già stato usato con un corpo diverso. Non è un errore di validazione delle righe: quelle tornano dentro un 200. Usa una chiave nuova per una richiesta nuova.",
+    example: JSON.stringify({ error: "This Idempotency-Key was already used with a different request body." }, null, 2),
+  },
+];
+
+/**
  * The responses common to every route guarded by `CRON_SECRET`.
  *
  * ⚠️ The 500 is not theoretical: with `CRON_SECRET` unset on the server every job
@@ -141,10 +169,13 @@ const CRON_COMMON_RESPONSES: ApiEndpoint["responses"] = [
 /**
  * An entry's declared responses, plus whichever common ones it does not already have.
  *
- * ⚠️ The bulk variants do not return 422. A rejected row does not fail the request: the
- * answer is 200 and the error sits inside `results`, row by row.
- * Documentare un 422 su di esse manderebbe chi integra a cercare un codice di
- * status that never arrives, instead of inside the body where it actually is.
+ * ⚠️ A bulk variant does not return the *validation* 422. A rejected row does not fail
+ * the request: the answer is 200 and the reason sits inside `results`, row by row.
+ * Documenting that 422 on them would send an integrator looking for a status code
+ * that never arrives, instead of inside the body where it actually is.
+ *
+ * It does return a 422 of its own, and a 409, both about `Idempotency-Key`. Those
+ * come from `BULK_IDEMPOTENCY_RESPONSES` above, with their own wording.
  */
 function responsesFor(endpoint: ApiEndpoint): ApiEndpoint["responses"] {
   const isCrm = endpoint.path.startsWith("/api/crm/");
@@ -158,13 +189,15 @@ function responsesFor(endpoint: ApiEndpoint): ApiEndpoint["responses"] {
   // billing decision.
   const UNMETERED = ["/api/crm/opt-out", "/api/crm/erasure"];
 
+  const isBulk = endpoint.path.endsWith("/bulk");
   const common = isCron
     ? CRON_COMMON_RESPONSES
-    : CRM_COMMON_RESPONSES.filter(
-        (r) =>
-          !(endpoint.path.endsWith("/bulk") && r.status === 422) &&
-          !(UNMETERED.includes(endpoint.path) && r.status === 429),
-      );
+    : [
+        ...CRM_COMMON_RESPONSES.filter(
+          (r) => !(isBulk && r.status === 422) && !(UNMETERED.includes(endpoint.path) && r.status === 429),
+        ),
+        ...(isBulk ? BULK_IDEMPOTENCY_RESPONSES : []),
+      ];
 
   const declared = new Set(endpoint.responses.map((r) => r.status));
   return [...endpoint.responses, ...common.filter((r) => !declared.has(r.status))].sort((a, b) => a.status - b.status);
@@ -1781,7 +1814,7 @@ const GROUPS: ApiGroup[] = [
       "Endpoint REST per l'import programmatico di Lead, Company, Contact e Activity.\n\n" +
       "⚠️ NON si usa un sottodominio per workspace. Il prodotto sta su un dominio solo e il workspace non viene mai dedotto dall'header Host: lo dice la credenziale. Con la chiave del workspace è la chiave stessa a dirlo; con la chiave di piattaforma serve l'header `X-Tenant-ID`; con la sessione viene dal JWT. Chiamare un sottodominio senza credenziale giusta risponde 400 `Tenant context required`, e non c'è nessun parametro nel corpo che possa rimediare.\n\n" +
       "`ownerId` segue la credenziale: con la sessione il record nasce assegnato a chi ha chiamato, con una chiave API nasce senza proprietario, perché una chiave non è una persona.\n\n" +
-      "Ogni endpoint ha una variante bulk, fino a 500 record per richiesta, con `onDuplicate` a scelta fra `skip`, `update` ed `error`. Una richiesta bulk risponde sempre 200 e riporta l'esito riga per riga: le righe rifiutate stanno dentro il corpo, non nel codice di stato.",
+      "Ogni endpoint ha una variante bulk, fino a 500 record per richiesta, con `onDuplicate` a scelta fra `skip`, `update` ed `error`. Una richiesta bulk risponde sempre 200 e riporta l'esito riga per riga: le righe rifiutate stanno dentro il corpo, non nel codice di stato.\n\n⚠️ Manda anche un `Idempotency-Key`, una stringa tua che identifichi la singola importazione. Se la risposta non ti arriva — un timeout, una connessione caduta — non sai che cosa sia entrato, e rimandare lo stesso lotto duplica tutto ciò che quella rotta non sa deduplicare: contatti e lead si confrontano solo sull'email, che è facoltativa, e le attività su niente. Con la chiave puoi rimandare la richiesta identica quante volte vuoi: la prima importa, le successive ti restituiscono la stessa identica risposta, con gli stessi id, senza scrivere niente. La risposta rigiocata porta l'intestazione `Idempotent-Replay: true`. Se la stessa chiave arriva con un corpo diverso è un 422, perché rispondere con il risultato del primo corpo sembrerebbe riuscito. Senza chiave non cambia niente rispetto a prima.",
     endpoints: [
       {
         id: "crm-leads-create",

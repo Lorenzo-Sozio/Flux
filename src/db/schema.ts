@@ -297,6 +297,17 @@ export const orders = pgTable("order", {
   // showed little while orders only came from quotes, and shows now that one can arrive
   // from an assistant that took it in words.
   notes: text("notes"),
+  // Where it came from: `assistant` for one taken in words by the integration, null for
+  // one a person entered here. ⚠️ The comment above has said for a while that an order
+  // "can arrive from an assistant", and nothing recorded that it had — a contact created
+  // that way was marked and the order was not, so the two halves of the same event
+  // disagreed. Reading it from `owner_id IS NULL` would be a meaning taken from an
+  // absence, and it holds until the first order somebody files without an owner.
+  //
+  // ⚠️⚠️ **Null is not "a person".** Rows written before this column existed carry no
+  // answer, and a report that counted them as manual would invent a number for a period
+  // it cannot know.
+  source: text("source"),
   // When it actually reached the customer. `status` says completed, which is a
   // state somebody set; support answering "my order has not arrived" needs a date.
   deliveredAt: timestamp("delivered_at", { mode: "date" }),
@@ -812,6 +823,45 @@ export const notifications = pgTable("notification", {
   isRead: boolean("is_read").default(false).notNull(),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+// --- API IDEMPOTENCY ---
+
+/**
+ * One row per `Idempotency-Key` a caller has used, with the answer we gave it.
+ *
+ * ⚠️ This exists because of what a *lost response* costs. The import routes
+ * report everything a caller needs — created, updated, skipped, and the
+ * field-level reason for each rejected row — but only if the response arrives.
+ * When it does not, the caller knows nothing, and their only recourse is to send
+ * the batch again: contacts and leads deduplicate on email alone, email is
+ * optional for both, and the activity routes deduplicate on nothing. So the
+ * retry duplicates their data.
+ *
+ * The stored `response` is the point. A repeat of a finished request gets the
+ * original answer back, ids and all, rather than a fresh import or a bare
+ * acknowledgement.
+ *
+ * `requestHash` guards the other mistake: the same key sent with a different
+ * body. Answering that with the first body's result would be worse than
+ * duplicating, because it would look like success.
+ */
+export const apiIdempotency = pgTable(
+  "api_idempotency",
+  {
+    /** The caller's own key. Opaque to us. */
+    key: text("key").notNull(),
+    /** Scoped per route, so one key reused across endpoints is not a collision. */
+    endpoint: text("endpoint").notNull(),
+    /** SHA-256 of the request body, hex. */
+    requestHash: text("request_hash").notNull(),
+    /** `in_progress` while the handler runs, `done` once an answer is stored. */
+    status: text("status").default("in_progress").notNull(),
+    response: text("response"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { mode: "date" }),
+  },
+  (t) => [primaryKey({ columns: [t.endpoint, t.key] })],
+);
 
 // --- WEB PUSH ---
 

@@ -4,6 +4,9 @@ export {
   accounts,
   activities,
   activitiesRelations,
+  // Notifications
+  // API idempotency
+  apiIdempotency,
   appointmentAttendees,
   appointmentAttendeesRelations,
   // Appointments
@@ -62,7 +65,6 @@ export {
   leadsRelations,
   marketingCampaigns,
   marketingCampaignsRelations,
-  // Notifications
   notificationPreferences,
   notifications,
   notificationsRelations,

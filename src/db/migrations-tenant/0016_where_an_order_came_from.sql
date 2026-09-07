@@ -1,0 +1,25 @@
+-- Where an order came from, said in a column instead of guessed.
+--
+-- The schema already carried the observation, in a comment next to `notes`: an order
+-- "can arrive from an assistant that took it in words". Nothing recorded that it had.
+-- A contact created by the assistant is marked — `source` has said `assistant` since the
+-- order endpoint learned to create one — and the order itself was not, so the two halves
+-- of the same event disagreed.
+--
+-- The question is the CRM's own, not the integration's: *where did this order come from*
+-- is asked about every order by whoever reconciles a day's takings. Answering it with
+-- `owner_id IS NULL` would be reading a meaning into an absence, which holds until the
+-- first order somebody creates without assigning an owner.
+--
+-- ⚠️ NULL is not "a person". Rows written before this column existed carry no answer, and
+-- a screen that counted them as manual would invent a number for a period it cannot know.
+-- The report says "not recorded" for those, and starts counting from here.
+--
+-- Additive and re-runnable, as every tenant migration has to be: the Neon HTTP driver
+-- holds no session, so a migration that fails halfway leaves the statements before it
+-- applied and records nothing.
+ALTER TABLE "order" ADD COLUMN IF NOT EXISTS "source" text;
+--> statement-breakpoint
+-- The report groups a period by this column, and a workspace accumulates orders for
+-- years. Partial: the rows worth grouping are the ones that have an answer.
+CREATE INDEX IF NOT EXISTS "order_source_idx" ON "order" ("source") WHERE "source" IS NOT NULL;

@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { dispatchWebhook, hasActiveWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { leads } from "@/db/schema";
+import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
 import { chunk, claimTracker, INSERT_CHUNK, LOOKUP_CHUNK } from "@/lib/api-import-batch";
 import {
@@ -52,9 +53,14 @@ export async function POST(req: NextRequest) {
     throw err;
   }
 
+  // ⚠️ Read as text and parsed here rather than through `req.json()`, so the
+  // hash below covers exactly the bytes the caller sent. Re-serialising a parsed
+  // object would make two identical requests hash differently over nothing more
+  // than key order.
+  const rawBody = await req.text();
   let body: unknown;
   try {
-    body = await req.json();
+    body = JSON.parse(rawBody);
   } catch (_err) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -80,104 +86,147 @@ export async function POST(req: NextRequest) {
   const tenant = await getTenantById(authResult.tenantId);
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
+
+  // ── The same request twice ──────────────────────────────────────────────────
+  //
+  // Everything below reports what happened, and all of it depends on the
+  // response arriving. When it does not the caller knows nothing, and sending
+  // the batch again duplicates whatever this route cannot deduplicate. A key
+  // makes that retry safe. No key, and nothing changes.
+  const idempotency = await claim(
+    db,
+    "/api/crm/leads/bulk",
+    req.headers.get("Idempotency-Key"),
+    await hashBody(rawBody),
+  );
+  if (idempotency.kind === "replay") {
+    return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
+  }
+  if (idempotency.kind === "in-flight") {
+    return NextResponse.json(
+      { error: "A request with this Idempotency-Key is still running. Retry in a moment." },
+      { status: 409 },
+    );
+  }
+  if (idempotency.kind === "mismatch") {
+    return NextResponse.json(
+      { error: "This Idempotency-Key was already used with a different request body." },
+      { status: 422 },
+    );
+  }
   // ⚠️ Asked once, not once per row. `dispatchWebhook` reads the webhook
   // table on every call, which for a full batch is five hundred round
   // trips against a subrequest budget of a thousand — spent entirely on
   // learning that a workspace with no webhooks still has no webhooks.
   const notify = await hasActiveWebhook(db);
-  const startMs = Date.now();
-  // Indexed by position, so the three passes below can fill it in any order and
-  // the caller still gets one result per record, in the order they sent them.
-  const results: BulkResult[] = new Array(records.length);
-  let created = 0;
-  let updated = 0;
-  let skipped = 0;
-  let errored = 0;
+  // ⚠️ The key is released if anything below throws. Without that a handler
+  // that dies leaves it held for the whole stale window, and the caller's
+  // obvious next move — retry with the same key — is refused for fifteen
+  // minutes over an import that never happened.
+  try {
+    const startMs = Date.now();
+    // Indexed by position, so the three passes below can fill it in any order and
+    // the caller still gets one result per record, in the order they sent them.
+    const results: BulkResult[] = new Array(records.length);
+    let created = 0;
+    let updated = 0;
+    let skipped = 0;
+    let errored = 0;
 
-  // ── One: validate. No database at all. ──────────────────────────────────────
-  const pending: { index: number; data: NonNullable<ReturnType<typeof validateLeadInput>["data"]> }[] = [];
-  for (let i = 0; i < records.length; i++) {
-    const { errors, data } = validateLeadInput(records[i]);
-    if (errors.length > 0 || !data) {
-      results[i] = { index: i, status: "error", errors };
-      errored++;
-      continue;
-    }
-    pending.push({ index: i, data });
-  }
-
-  // ── Two: every email in the batch, in one statement. ────────────────────────
-  // See src/lib/api-import-batch.ts for why this used to be one per record and
-  // why that was not merely slow.
-  const emails = [...new Set(pending.map((p) => p.data.email).filter((e): e is string => Boolean(e)))];
-  const found: [string, string][] = [];
-  for (const slice of chunk(emails, LOOKUP_CHUNK)) {
-    const rows = await db.select({ id: leads.id, email: leads.email }).from(leads).where(inArray(leads.email, slice));
-    for (const row of rows) if (row.email) found.push([row.email, row.id]);
-  }
-  const taken = claimTracker(found);
-
-  // ── Three: decide. Still no database. ───────────────────────────────────────
-  const toInsert: { id: string; values: ReturnType<typeof buildLeadPayload> }[] = [];
-  const toUpdate: { id: string; values: ReturnType<typeof buildLeadPayload> }[] = [];
-
-  for (const { index, data } of pending) {
-    const existingId = taken.find(data.email);
-
-    if (existingId) {
-      if (onDuplicate === "error") {
-        results[index] = {
-          index,
-          status: "error",
-          errors: [{ field: "email", message: `Duplicate email: ${data.email}` }],
-        };
+    // ── One: validate. No database at all. ──────────────────────────────────────
+    const pending: { index: number; data: NonNullable<ReturnType<typeof validateLeadInput>["data"]> }[] = [];
+    for (let i = 0; i < records.length; i++) {
+      const { errors, data } = validateLeadInput(records[i]);
+      if (errors.length > 0 || !data) {
+        results[i] = { index: i, status: "error", errors };
         errored++;
         continue;
       }
-      if (onDuplicate === "update") {
-        toUpdate.push({ id: existingId, values: buildLeadPayload(data, authResult.userId) });
-        results[index] = { index, status: "updated", id: existingId };
-        updated++;
-        continue;
-      }
-      results[index] = { index, status: "skipped", reason: "duplicate_email", existingId };
-      skipped++;
-      continue;
+      pending.push({ index: i, data });
     }
 
-    // Generated here rather than read back from `RETURNING`, so a multi-row
-    // insert does not have to be trusted to return rows in the order given —
-    // and so the row can be claimed below before it exists.
-    const id = crypto.randomUUID();
-    toInsert.push({ id, values: buildLeadPayload(data, authResult.userId) });
-    taken.claim(data.email, id);
-    results[index] = { index, status: "created", id };
-    created++;
-  }
+    // ── Two: every email in the batch, in one statement. ────────────────────────
+    // See src/lib/api-import-batch.ts for why this used to be one per record and
+    // why that was not merely slow.
+    const emails = [...new Set(pending.map((p) => p.data.email).filter((e): e is string => Boolean(e)))];
+    const found: [string, string][] = [];
+    for (const slice of chunk(emails, LOOKUP_CHUNK)) {
+      const rows = await db.select({ id: leads.id, email: leads.email }).from(leads).where(inArray(leads.email, slice));
+      for (const row of rows) if (row.email) found.push([row.email, row.id]);
+    }
+    const taken = claimTracker(found);
 
-  // ── Four: write. Inserts first, because an update may target one of them. ───
-  for (const slice of chunk(toInsert, INSERT_CHUNK)) {
-    await db.insert(leads).values(slice.map((r) => ({ id: r.id, ...r.values })));
-  }
-  // Each update carries different values, so these stay one statement apiece.
-  for (const row of toUpdate) {
-    await db.update(leads).set(row.values).where(eq(leads.id, row.id));
-  }
+    // ── Three: decide. Still no database. ───────────────────────────────────────
+    const toInsert: { id: string; values: ReturnType<typeof buildLeadPayload> }[] = [];
+    const toUpdate: { id: string; values: ReturnType<typeof buildLeadPayload> }[] = [];
 
-  if (notify) {
-    for (const row of toInsert) dispatchWebhook("lead.created", { leadId: row.id }, API_ORIGIN, db);
-    for (const row of toUpdate) dispatchWebhook("lead.updated", { leadId: row.id }, API_ORIGIN, db);
-  }
+    for (const { index, data } of pending) {
+      const existingId = taken.find(data.email);
 
-  return NextResponse.json({
-    summary: {
-      total: records.length,
-      created,
-      updated,
-      skipped,
-      errors: errored,
-      durationMs: Date.now() - startMs,
-    },
-    results,
-  });
+      if (existingId) {
+        if (onDuplicate === "error") {
+          results[index] = {
+            index,
+            status: "error",
+            errors: [{ field: "email", message: `Duplicate email: ${data.email}` }],
+          };
+          errored++;
+          continue;
+        }
+        if (onDuplicate === "update") {
+          toUpdate.push({ id: existingId, values: buildLeadPayload(data, authResult.userId) });
+          results[index] = { index, status: "updated", id: existingId };
+          updated++;
+          continue;
+        }
+        results[index] = { index, status: "skipped", reason: "duplicate_email", existingId };
+        skipped++;
+        continue;
+      }
+
+      // Generated here rather than read back from `RETURNING`, so a multi-row
+      // insert does not have to be trusted to return rows in the order given —
+      // and so the row can be claimed below before it exists.
+      const id = crypto.randomUUID();
+      toInsert.push({ id, values: buildLeadPayload(data, authResult.userId) });
+      taken.claim(data.email, id);
+      results[index] = { index, status: "created", id };
+      created++;
+    }
+
+    // ── Four: write. Inserts first, because an update may target one of them. ───
+    for (const slice of chunk(toInsert, INSERT_CHUNK)) {
+      await db.insert(leads).values(slice.map((r) => ({ id: r.id, ...r.values })));
+    }
+    // Each update carries different values, so these stay one statement apiece.
+    for (const row of toUpdate) {
+      await db.update(leads).set(row.values).where(eq(leads.id, row.id));
+    }
+
+    if (notify) {
+      for (const row of toInsert) dispatchWebhook("lead.created", { leadId: row.id }, API_ORIGIN, db);
+      for (const row of toUpdate) dispatchWebhook("lead.updated", { leadId: row.id }, API_ORIGIN, db);
+    }
+
+    const payload = {
+      summary: {
+        total: records.length,
+        created,
+        updated,
+        skipped,
+        errors: errored,
+        durationMs: Date.now() - startMs,
+      },
+      results,
+    };
+
+    // Stored before answering, so a retry that arrives while this response is
+    // still in flight replays it rather than importing again.
+    await remember(db, idempotency, payload);
+
+    return NextResponse.json(payload);
+  } catch (error) {
+    await release(db, idempotency);
+    throw error;
+  }
 }

@@ -1,0 +1,44 @@
+[
+  {
+    "file": "src/lib/api-idempotency.ts",
+    "description": "⚠️⚠️ la stessa chiave con un corpo diverso riceve il risultato del primo corpo: una risposta piena di id di record che chi chiama non ha mai mandato, e sembra riuscita",
+    "find": "  if (row.requestHash !== requestHash) return { kind: \"mismatch\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/api-idempotency.ts",
+    "description": "⚠️⚠️ una richiesta ancora in corso viene rilevata subito: l'importazione parte due volte, che e' esattamente cio' che la chiave doveva impedire",
+    "find": "  if (now.getTime() - row.createdAt.getTime() < STALE_AFTER_MS) return { kind: \"in-flight\" };",
+    "replace": "  if (false) return { kind: \"in-flight\" };"
+  },
+  {
+    "file": "src/lib/api-idempotency.ts",
+    "description": "⚠️ una chiave non viene piu' rilevata mai: un gestore morto la blocca per sempre e chi chiama non puo' piu' usarla",
+    "find": "  return { kind: \"stale\" };\n}",
+    "replace": "  return { kind: \"in-flight\" };\n}"
+  },
+  {
+    "file": "src/lib/api-idempotency.ts",
+    "description": "⚠️ una richiesta conclusa che non ha memorizzato niente viene reimportata invece che rigiocata",
+    "find": "    return { kind: \"replay\", body: row.response ? safeParse(row.response) : null };",
+    "replace": "    if (row.response) return { kind: \"replay\", body: safeParse(row.response) };\n    return { kind: \"stale\" };"
+  },
+  {
+    "file": "src/lib/api-idempotency.ts",
+    "description": "⚠️ l'esclusione mutua diventa una lettura seguita da una scrittura: due copie della stessa richiesta leggono entrambe il nulla e importano entrambe",
+    "find": "  if (mine.length > 0) return { kind: \"proceed\", key: trimmed, endpoint };",
+    "replace": "  if (mine.length >= 0) return { kind: \"proceed\", key: trimmed, endpoint };"
+  },
+  {
+    "file": "src/lib/api-idempotency.ts",
+    "description": "⚠️ lo scambio non e' piu' condizionato al momento osservato: due subentri in corsa vincono entrambi",
+    "find": "        eq(apiIdempotency.createdAt, row.createdAt),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/api-idempotency.ts",
+    "description": "⚠️ una riga sparita fra le due istruzioni fa proseguire come se nessuna chiave fosse stata mandata: e' lo stato in cui girano due importazioni",
+    "find": "  if (!row) return { kind: \"in-flight\" };",
+    "replace": "  if (!row) return { kind: \"unkeyed\" };"
+  }
+]

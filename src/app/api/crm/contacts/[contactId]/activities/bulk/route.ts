@@ -3,6 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { dispatchWebhook, hasActiveWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { activities } from "@/db/schema";
+import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
 import { chunk, INSERT_CHUNK } from "@/lib/api-import-batch";
 import { buildActivityPayload, type ValidationError, validateActivityInput } from "@/lib/api-import-validators";
@@ -42,9 +43,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ con
     throw err;
   }
 
+  // ⚠️ Read as text and parsed here rather than through `req.json()`, so the
+  // hash below covers exactly the bytes the caller sent. Re-serialising a parsed
+  // object would make two identical requests hash differently over nothing more
+  // than key order.
+  const rawBody = await req.text();
   let body: unknown;
   try {
-    body = await req.json();
+    body = JSON.parse(rawBody);
   } catch (_err) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -70,58 +76,101 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ con
   const tenant = await getTenantById(authResult.tenantId);
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
+
+  // ── The same request twice ──────────────────────────────────────────────────
+  //
+  // Everything below reports what happened, and all of it depends on the
+  // response arriving. When it does not the caller knows nothing, and sending
+  // the batch again duplicates whatever this route cannot deduplicate. A key
+  // makes that retry safe. No key, and nothing changes.
+  const idempotency = await claim(
+    db,
+    "/api/crm/contacts/{contactId}/activities/bulk",
+    req.headers.get("Idempotency-Key"),
+    await hashBody(rawBody),
+  );
+  if (idempotency.kind === "replay") {
+    return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
+  }
+  if (idempotency.kind === "in-flight") {
+    return NextResponse.json(
+      { error: "A request with this Idempotency-Key is still running. Retry in a moment." },
+      { status: 409 },
+    );
+  }
+  if (idempotency.kind === "mismatch") {
+    return NextResponse.json(
+      { error: "This Idempotency-Key was already used with a different request body." },
+      { status: 422 },
+    );
+  }
   // ⚠️ Asked once, not once per row. `dispatchWebhook` reads the webhook
   // table on every call, which for a full batch is five hundred round
   // trips against a subrequest budget of a thousand — spent entirely on
   // learning that a workspace with no webhooks still has no webhooks.
   const notify = await hasActiveWebhook(db);
-  const startMs = Date.now();
-  // Indexed by position, so a rejected record keeps the place its sender gave it.
-  const results: BulkResult[] = new Array(records.length);
-  const toInsert: { id: string; values: ReturnType<typeof buildActivityPayload> }[] = [];
-  let created = 0;
-  let errored = 0;
+  // ⚠️ The key is released if anything below throws. Without that a handler
+  // that dies leaves it held for the whole stale window, and the caller's
+  // obvious next move — retry with the same key — is refused for fifteen
+  // minutes over an import that never happened.
+  try {
+    const startMs = Date.now();
+    // Indexed by position, so a rejected record keeps the place its sender gave it.
+    const results: BulkResult[] = new Array(records.length);
+    const toInsert: { id: string; values: ReturnType<typeof buildActivityPayload> }[] = [];
+    let created = 0;
+    let errored = 0;
 
-  for (let i = 0; i < records.length; i++) {
-    const record = records[i];
-    const enriched = typeof record === "object" && record !== null ? { ...record, contactId } : { contactId };
-    const { errors, data } = validateActivityInput(enriched);
+    for (let i = 0; i < records.length; i++) {
+      const record = records[i];
+      const enriched = typeof record === "object" && record !== null ? { ...record, contactId } : { contactId };
+      const { errors, data } = validateActivityInput(enriched);
 
-    if (errors.length > 0 || !data) {
-      results[i] = { index: i, status: "error", errors };
-      errored++;
-      continue;
+      if (errors.length > 0 || !data) {
+        results[i] = { index: i, status: "error", errors };
+        errored++;
+        continue;
+      }
+
+      // ⚠️ The id is generated here rather than read back from `RETURNING`, so
+      // a multi-row insert does not have to be trusted to return its rows in
+      // the order they were given.
+      const id = crypto.randomUUID();
+      toInsert.push({ id, values: buildActivityPayload(data, authResult.userId) });
+      results[i] = { index: i, status: "created", id };
+      created++;
     }
 
-    // ⚠️ The id is generated here rather than read back from `RETURNING`, so
-    // a multi-row insert does not have to be trusted to return its rows in
-    // the order they were given.
-    const id = crypto.randomUUID();
-    toInsert.push({ id, values: buildActivityPayload(data, authResult.userId) });
-    results[i] = { index: i, status: "created", id };
-    created++;
-  }
+    // ⚠️ One statement per chunk, not one per record. Every statement on the
+    // Neon HTTP driver is its own request, and a full batch of five hundred was
+    // five hundred of them inside a request with a budget of a thousand.
+    for (const slice of chunk(toInsert, INSERT_CHUNK)) {
+      await db.insert(activities).values(slice.map((r) => ({ id: r.id, ...r.values })));
+    }
 
-  // ⚠️ One statement per chunk, not one per record. Every statement on the
-  // Neon HTTP driver is its own request, and a full batch of five hundred was
-  // five hundred of them inside a request with a budget of a thousand.
-  for (const slice of chunk(toInsert, INSERT_CHUNK)) {
-    await db.insert(activities).values(slice.map((r) => ({ id: r.id, ...r.values })));
-  }
+    if (notify) {
+      for (const row of toInsert) dispatchWebhook("activity.created", { activityId: row.id }, API_ORIGIN, db);
+    }
 
-  if (notify) {
-    for (const row of toInsert) dispatchWebhook("activity.created", { activityId: row.id }, API_ORIGIN, db);
-  }
+    const payload = {
+      summary: {
+        total: records.length,
+        created,
+        updated: 0,
+        skipped: 0,
+        errors: errored,
+        durationMs: Date.now() - startMs,
+      },
+      results,
+    };
 
-  return NextResponse.json({
-    summary: {
-      total: records.length,
-      created,
-      updated: 0,
-      skipped: 0,
-      errors: errored,
-      durationMs: Date.now() - startMs,
-    },
-    results,
-  });
+    // Stored before answering, so a retry that arrives while this response is
+    // still in flight replays it rather than importing again.
+    await remember(db, idempotency, payload);
+
+    return NextResponse.json(payload);
+  } catch (error) {
+    await release(db, idempotency);
+    throw error;
+  }
 }

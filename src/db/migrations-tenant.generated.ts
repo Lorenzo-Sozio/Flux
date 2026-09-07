@@ -354,4 +354,22 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\n-- Every send starts from "which devices does this person have", so that lookup\n-- gets an index rather than a scan of every subscription in the workspace.\nCREATE INDEX IF NOT EXISTS "push_subscription_user_id_idx" ON "push_subscription" ("user_id");\n',
     ],
   },
+  {
+    tag: "0015_the_same_request_twice",
+    folderMillis: 1788980030000,
+    hash: "ada75bc7ab1618aef2b4d93f033d934229781e9b7a0260172de21e8f0110dcd5",
+    sql: [
+      '-- The same request twice, and only one import.\n--\n-- The bulk import routes already tell a caller everything: how many rows were\n-- created, updated and skipped, and the field-level reason for each one that was\n-- rejected. All of it depends on the response arriving. When it does not — a\n-- timeout, a dropped connection — the caller knows nothing at all, and their only\n-- move is to send the batch again. Contacts and leads deduplicate on email alone,\n-- email is optional for both, and the activity routes deduplicate on nothing, so\n-- that second attempt duplicates their data.\n--\n-- One row per `Idempotency-Key`, holding the answer we gave. A repeat of a\n-- finished request gets that answer back, ids and all, instead of importing\n-- anything.\n--\n-- `request_hash` covers the other mistake: the same key sent with a different\n-- body. Replying with the first body\'s result would be worse than duplicating,\n-- because it would look like it worked.\n--\n-- Additive and re-runnable, as every tenant migration has to be: the Neon HTTP\n-- driver holds no session, so a migration that fails halfway leaves the\n-- statements before it applied and records nothing.\nCREATE TABLE IF NOT EXISTS "api_idempotency" (\n\t"key" text NOT NULL,\n\t"endpoint" text NOT NULL,\n\t"request_hash" text NOT NULL,\n\t"status" text DEFAULT \'in_progress\' NOT NULL,\n\t"response" text,\n\t"created_at" timestamp DEFAULT now() NOT NULL,\n\t"completed_at" timestamp,\n\tCONSTRAINT "api_idempotency_endpoint_key_pk" PRIMARY KEY("endpoint","key")\n);\n',
+      '\n-- ⚠️ The primary key is what makes this work without a transaction. The driver\n-- has no session to hold one, so two copies of the same request racing each other\n-- cannot be separated by locking. `INSERT … ON CONFLICT DO NOTHING` on this key\n-- is the whole mutual exclusion: exactly one of them inserts a row and proceeds,\n-- and the other reads what the first is doing.\n--\n-- Sweeping old rows is a job for later; a key is small and a workspace makes one\n-- per import.\nCREATE INDEX IF NOT EXISTS "api_idempotency_created_at_idx" ON "api_idempotency" ("created_at");\n',
+    ],
+  },
+  {
+    tag: "0016_where_an_order_came_from",
+    folderMillis: 1788980040000,
+    hash: "d21ec61d30972104d8ed7bc073de33c496b57e735770a4ba23916dfaa1863886",
+    sql: [
+      '-- Where an order came from, said in a column instead of guessed.\n--\n-- The schema already carried the observation, in a comment next to `notes`: an order\n-- "can arrive from an assistant that took it in words". Nothing recorded that it had.\n-- A contact created by the assistant is marked — `source` has said `assistant` since the\n-- order endpoint learned to create one — and the order itself was not, so the two halves\n-- of the same event disagreed.\n--\n-- The question is the CRM\'s own, not the integration\'s: *where did this order come from*\n-- is asked about every order by whoever reconciles a day\'s takings. Answering it with\n-- `owner_id IS NULL` would be reading a meaning into an absence, which holds until the\n-- first order somebody creates without assigning an owner.\n--\n-- ⚠️ NULL is not "a person". Rows written before this column existed carry no answer, and\n-- a screen that counted them as manual would invent a number for a period it cannot know.\n-- The report says "not recorded" for those, and starts counting from here.\n--\n-- Additive and re-runnable, as every tenant migration has to be: the Neon HTTP driver\n-- holds no session, so a migration that fails halfway leaves the statements before it\n-- applied and records nothing.\nALTER TABLE "order" ADD COLUMN IF NOT EXISTS "source" text;\n',
+      '\n-- The report groups a period by this column, and a workspace accumulates orders for\n-- years. Partial: the rows worth grouping are the ones that have an answer.\nCREATE INDEX IF NOT EXISTS "order_source_idx" ON "order" ("source") WHERE "source" IS NOT NULL;\n',
+    ],
+  },
 ];
