@@ -4,6 +4,7 @@ import { dispatchWebhook, hasActiveWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { activities } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { chunk, INSERT_CHUNK } from "@/lib/api-import-batch";
 import { buildActivityPayload, type ValidationError, validateActivityInput } from "@/lib/api-import-validators";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
@@ -75,7 +76,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ com
   // learning that a workspace with no webhooks still has no webhooks.
   const notify = await hasActiveWebhook(db);
   const startMs = Date.now();
-  const results: BulkResult[] = [];
+  // Indexed by position, so a rejected record keeps the place its sender gave it.
+  const results: BulkResult[] = new Array(records.length);
+  const toInsert: { id: string; values: ReturnType<typeof buildActivityPayload> }[] = [];
   let created = 0;
   let errored = 0;
 
@@ -85,18 +88,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ com
     const { errors, data } = validateActivityInput(enriched);
 
     if (errors.length > 0 || !data) {
-      results.push({ index: i, status: "error", errors });
+      results[i] = { index: i, status: "error", errors };
       errored++;
       continue;
     }
 
-    const [row] = await db
-      .insert(activities)
-      .values(buildActivityPayload(data, authResult.userId))
-      .returning({ id: activities.id });
-    if (notify) dispatchWebhook("activity.created", { activityId: row.id }, API_ORIGIN, db);
-    results.push({ index: i, status: "created", id: row.id });
+    // ⚠️ The id is generated here rather than read back from `RETURNING`, so
+    // a multi-row insert does not have to be trusted to return its rows in
+    // the order they were given.
+    const id = crypto.randomUUID();
+    toInsert.push({ id, values: buildActivityPayload(data, authResult.userId) });
+    results[i] = { index: i, status: "created", id };
     created++;
+  }
+
+  // ⚠️ One statement per chunk, not one per record. Every statement on the
+  // Neon HTTP driver is its own request, and a full batch of five hundred was
+  // five hundred of them inside a request with a budget of a thousand.
+  for (const slice of chunk(toInsert, INSERT_CHUNK)) {
+    await db.insert(activities).values(slice.map((r) => ({ id: r.id, ...r.values })));
+  }
+
+  if (notify) {
+    for (const row of toInsert) dispatchWebhook("activity.created", { activityId: row.id }, API_ORIGIN, db);
   }
 
   return NextResponse.json({

@@ -184,6 +184,76 @@ describe("the import API", () => {
     expect(bad).toEqual([]);
   });
 
+  /**
+   * The body of every `for` loop in a file, found by counting braces.
+   *
+   * ⚠️ Written out rather than approximated. The first version of this check
+   * looked for the record loop and took everything up to the next line closing a
+   * block at indent two — which, once the route grew a separate validation pass,
+   * stopped at the end of *that* loop and examined a region containing no writes
+   * at all. It passed while a write sat in the loop it was meant to be watching.
+   */
+  function loopBodies(src: string): { header: string; body: string }[] {
+    const out: { header: string; body: string }[] = [];
+    for (const m of src.matchAll(/\bfor\s*\(/g)) {
+      // ⚠️ Find the brace that opens the *body*, which means walking past the
+      // header's own closing parenthesis first. Taking the next `{` instead
+      // lands on the destructuring in `for (const { index, data } of pending)`,
+      // and the body examined is then the two words between those braces. That
+      // is not a hypothetical: it is what the first version of this did, and it
+      // reported a loop containing a write as clean.
+      let depth = 0;
+      let i = m.index + m[0].length - 1;
+      for (; i < src.length; i++) {
+        if (src[i] === "(") depth++;
+        else if (src[i] === ")" && --depth === 0) break;
+      }
+      const header = src.slice(m.index, i + 1);
+      const open = src.indexOf("{", i);
+      if (open < 0) continue;
+      depth = 0;
+      let j = open;
+      for (; j < src.length; j++) {
+        if (src[j] === "{") depth++;
+        else if (src[j] === "}" && --depth === 0) break;
+      }
+      out.push({ header, body: src.slice(open, j) });
+    }
+    return out;
+  }
+
+  it("⚠️ writes outside the record loop, not once per row", () => {
+    // Every statement on the Neon HTTP driver is its own request, and a bulk
+    // route is capped at five hundred records inside a request with a subrequest
+    // budget of a thousand. A write in the loop makes the documented maximum the
+    // size that cannot complete — which is not only slow: a timed-out import
+    // cannot be retried safely, because contacts and leads deduplicate on email
+    // alone, email is optional for both, and the activity routes deduplicate on
+    // nothing. The speed is what makes the unsafe retry necessary.
+    //
+    // Two loops may hold a statement, and both are bounded by something other
+    // than the record count: the chunked write, and the per-row update that
+    // `onDuplicate: "update"` opts into because each row carries different
+    // values.
+    const allowed = /chunk\(|of toUpdate\b/;
+    const offenders: string[] = [];
+    for (const file of routes.filter((f) => f.endsWith("/bulk/route.ts"))) {
+      for (const { header, body } of loopBodies(read(file))) {
+        if (allowed.test(header)) continue;
+        if (/await db\./.test(body)) offenders.push(`${file}: for ${header.slice(4, 60).trim()}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
+  it("⚠️ keeps the caller's own ordering on every bulk result", () => {
+    // The index is how somebody maps a rejected row back to the line in their
+    // own file. Filling the array by position rather than pushing is what
+    // survives three passes that do not run in record order.
+    const pushing = routes.filter((f) => f.endsWith("/bulk/route.ts")).filter((f) => /results\.push\(/.test(read(f)));
+    expect(pushing).toEqual([]);
+  });
+
   it("⚠️ never falls back to the platform database", () => {
     // One route did, behind a condition an earlier 400 had already made true.
     // Dead, but sitting where reaching it would write a customer's contact into

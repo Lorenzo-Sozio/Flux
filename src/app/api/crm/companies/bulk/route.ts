@@ -1,11 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { ilike } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 
 import { dispatchWebhook, hasActiveWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { companies } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { chunk, claimTracker, INSERT_CHUNK, LOOKUP_CHUNK } from "@/lib/api-import-batch";
 import {
   buildCompanyPayload,
   type OnDuplicate,
@@ -85,58 +86,99 @@ export async function POST(req: NextRequest) {
   // learning that a workspace with no webhooks still has no webhooks.
   const notify = await hasActiveWebhook(db);
   const startMs = Date.now();
-  const results: BulkResult[] = [];
+  // Indexed by position, so the three passes below can fill it in any order and
+  // the caller still gets one result per record, in the order they sent them.
+  const results: BulkResult[] = new Array(records.length);
   let created = 0;
   let updated = 0;
   let skipped = 0;
   let errored = 0;
 
+  // ── One: validate. No database at all. ──────────────────────────────────────
+  const pending: { index: number; data: NonNullable<ReturnType<typeof validateCompanyInput>["data"]> }[] = [];
   for (let i = 0; i < records.length; i++) {
     const { errors, data } = validateCompanyInput(records[i]);
-
     if (errors.length > 0 || !data) {
-      results.push({ index: i, status: "error", errors });
+      results[i] = { index: i, status: "error", errors };
       errored++;
       continue;
     }
+    pending.push({ index: i, data });
+  }
 
-    const [existing] = await db.select({ id: companies.id }).from(companies).where(ilike(companies.name, data.name));
+  // ── Two: every name in the batch, in one statement. ─────────────────────────
+  //
+  // ⚠️ A company matched on its name without regard to case, one `ILIKE` per
+  // record. `lower(name) IN (…)` is the same comparison asked once — with the
+  // one difference that the folding now happens in two places, Postgres for the
+  // stored side and JavaScript for the incoming side. Where the two disagree, a
+  // name simply fails to match and is treated as new, which is what a name that
+  // did not match did before.
+  const byName = new Map<string, string>();
+  const wanted = [...new Set(pending.map((p) => p.data.name.toLowerCase()))];
+  for (const slice of chunk(wanted, LOOKUP_CHUNK)) {
+    const rows = await db
+      .select({ id: companies.id, name: companies.name })
+      .from(companies)
+      .where(inArray(sql`lower(${companies.name})`, slice));
+    for (const row of rows) if (row.name) byName.set(row.name.toLowerCase(), row.id);
+  }
+  const taken = claimTracker(byName);
 
-    if (existing) {
+  // ── Three: decide. Still no database. ───────────────────────────────────────
+  const toInsert: { id: string; values: ReturnType<typeof buildCompanyPayload> }[] = [];
+  const toUpdate: { id: string; values: ReturnType<typeof buildCompanyPayload> }[] = [];
+
+  for (const { index, data } of pending) {
+    const key = data.name.toLowerCase();
+    const existingId = taken.find(key);
+
+    if (existingId) {
       if (onDuplicate === "error") {
-        results.push({
-          index: i,
+        results[index] = {
+          index,
           status: "error",
           errors: [{ field: "name", message: `Duplicate name: ${data.name}` }],
-        });
+        };
         errored++;
         continue;
       }
-
       if (onDuplicate === "update") {
-        const [row] = await db
-          .update(companies)
-          .set(buildCompanyPayload(data, authResult.userId))
-          .where(ilike(companies.name, data.name))
-          .returning({ id: companies.id });
-        if (notify) dispatchWebhook("company.updated", { companyId: row.id }, API_ORIGIN, db);
-        results.push({ index: i, status: "updated", id: row.id });
+        // ⚠️ By id. The update used to repeat the `ILIKE` as its own `WHERE`, so
+        // two companies whose names differ only in case were both rewritten by
+        // one record, and the response named whichever came back first.
+        toUpdate.push({ id: existingId, values: buildCompanyPayload(data, authResult.userId) });
+        results[index] = { index, status: "updated", id: existingId };
         updated++;
         continue;
       }
-
-      results.push({ index: i, status: "skipped", reason: "duplicate_name", existingId: existing.id });
+      results[index] = { index, status: "skipped", reason: "duplicate_name", existingId };
       skipped++;
       continue;
     }
 
-    const [row] = await db
-      .insert(companies)
-      .values(buildCompanyPayload(data, authResult.userId))
-      .returning({ id: companies.id });
-    if (notify) dispatchWebhook("company.created", { companyId: row.id }, API_ORIGIN, db);
-    results.push({ index: i, status: "created", id: row.id });
+    // Generated here rather than read back from `RETURNING`, so a multi-row
+    // insert does not have to be trusted to return rows in the order given —
+    // and so the row can be claimed below before it exists.
+    const id = crypto.randomUUID();
+    toInsert.push({ id, values: buildCompanyPayload(data, authResult.userId) });
+    taken.claim(key, id);
+    results[index] = { index, status: "created", id };
     created++;
+  }
+
+  // ── Four: write. Inserts first, because an update may target one of them. ───
+  for (const slice of chunk(toInsert, INSERT_CHUNK)) {
+    await db.insert(companies).values(slice.map((r) => ({ id: r.id, ...r.values })));
+  }
+  // Each update carries different values, so these stay one statement apiece.
+  for (const row of toUpdate) {
+    await db.update(companies).set(row.values).where(eq(companies.id, row.id));
+  }
+
+  if (notify) {
+    for (const row of toInsert) dispatchWebhook("company.created", { companyId: row.id }, API_ORIGIN, db);
+    for (const row of toUpdate) dispatchWebhook("company.updated", { companyId: row.id }, API_ORIGIN, db);
   }
 
   return NextResponse.json({

@@ -1,11 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 import { dispatchWebhook, hasActiveWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { leads } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { chunk, claimTracker, INSERT_CHUNK, LOOKUP_CHUNK } from "@/lib/api-import-batch";
 import {
   buildLeadPayload,
   type OnDuplicate,
@@ -85,57 +86,87 @@ export async function POST(req: NextRequest) {
   // learning that a workspace with no webhooks still has no webhooks.
   const notify = await hasActiveWebhook(db);
   const startMs = Date.now();
-  const results: BulkResult[] = [];
+  // Indexed by position, so the three passes below can fill it in any order and
+  // the caller still gets one result per record, in the order they sent them.
+  const results: BulkResult[] = new Array(records.length);
   let created = 0;
   let updated = 0;
   let skipped = 0;
   let errored = 0;
 
+  // ── One: validate. No database at all. ──────────────────────────────────────
+  const pending: { index: number; data: NonNullable<ReturnType<typeof validateLeadInput>["data"]> }[] = [];
   for (let i = 0; i < records.length; i++) {
     const { errors, data } = validateLeadInput(records[i]);
-
     if (errors.length > 0 || !data) {
-      results.push({ index: i, status: "error", errors });
+      results[i] = { index: i, status: "error", errors };
       errored++;
       continue;
     }
+    pending.push({ index: i, data });
+  }
 
-    if (data.email) {
-      const [existing] = await db.select({ id: leads.id }).from(leads).where(eq(leads.email, data.email));
+  // ── Two: every email in the batch, in one statement. ────────────────────────
+  // See src/lib/api-import-batch.ts for why this used to be one per record and
+  // why that was not merely slow.
+  const emails = [...new Set(pending.map((p) => p.data.email).filter((e): e is string => Boolean(e)))];
+  const found: [string, string][] = [];
+  for (const slice of chunk(emails, LOOKUP_CHUNK)) {
+    const rows = await db.select({ id: leads.id, email: leads.email }).from(leads).where(inArray(leads.email, slice));
+    for (const row of rows) if (row.email) found.push([row.email, row.id]);
+  }
+  const taken = claimTracker(found);
 
-      if (existing) {
-        if (onDuplicate === "error") {
-          results.push({
-            index: i,
-            status: "error",
-            errors: [{ field: "email", message: `Duplicate email: ${data.email}` }],
-          });
-          errored++;
-          continue;
-        }
+  // ── Three: decide. Still no database. ───────────────────────────────────────
+  const toInsert: { id: string; values: ReturnType<typeof buildLeadPayload> }[] = [];
+  const toUpdate: { id: string; values: ReturnType<typeof buildLeadPayload> }[] = [];
 
-        if (onDuplicate === "update") {
-          const [row] = await db
-            .update(leads)
-            .set(buildLeadPayload(data, authResult.userId))
-            .where(eq(leads.id, existing.id))
-            .returning({ id: leads.id });
-          if (notify) dispatchWebhook("lead.updated", { leadId: row.id }, API_ORIGIN, db);
-          results.push({ index: i, status: "updated", id: row.id });
-          updated++;
-          continue;
-        }
+  for (const { index, data } of pending) {
+    const existingId = taken.find(data.email);
 
-        results.push({ index: i, status: "skipped", reason: "duplicate_email", existingId: existing.id });
-        skipped++;
+    if (existingId) {
+      if (onDuplicate === "error") {
+        results[index] = {
+          index,
+          status: "error",
+          errors: [{ field: "email", message: `Duplicate email: ${data.email}` }],
+        };
+        errored++;
         continue;
       }
+      if (onDuplicate === "update") {
+        toUpdate.push({ id: existingId, values: buildLeadPayload(data, authResult.userId) });
+        results[index] = { index, status: "updated", id: existingId };
+        updated++;
+        continue;
+      }
+      results[index] = { index, status: "skipped", reason: "duplicate_email", existingId };
+      skipped++;
+      continue;
     }
 
-    const [row] = await db.insert(leads).values(buildLeadPayload(data, authResult.userId)).returning({ id: leads.id });
-    if (notify) dispatchWebhook("lead.created", { leadId: row.id }, API_ORIGIN, db);
-    results.push({ index: i, status: "created", id: row.id });
+    // Generated here rather than read back from `RETURNING`, so a multi-row
+    // insert does not have to be trusted to return rows in the order given —
+    // and so the row can be claimed below before it exists.
+    const id = crypto.randomUUID();
+    toInsert.push({ id, values: buildLeadPayload(data, authResult.userId) });
+    taken.claim(data.email, id);
+    results[index] = { index, status: "created", id };
     created++;
+  }
+
+  // ── Four: write. Inserts first, because an update may target one of them. ───
+  for (const slice of chunk(toInsert, INSERT_CHUNK)) {
+    await db.insert(leads).values(slice.map((r) => ({ id: r.id, ...r.values })));
+  }
+  // Each update carries different values, so these stay one statement apiece.
+  for (const row of toUpdate) {
+    await db.update(leads).set(row.values).where(eq(leads.id, row.id));
+  }
+
+  if (notify) {
+    for (const row of toInsert) dispatchWebhook("lead.created", { leadId: row.id }, API_ORIGIN, db);
+    for (const row of toUpdate) dispatchWebhook("lead.updated", { leadId: row.id }, API_ORIGIN, db);
   }
 
   return NextResponse.json({
