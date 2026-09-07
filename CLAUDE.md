@@ -30,6 +30,15 @@ each break. A green suite proves the code passes the tests; it does not prove th
 would notice if the code were wrong. Adding a test to this surface means adding a
 mutation for it in `scripts/mutations/` — it has already found one dead branch.
 
+⚠️ **It edits the source files in place**, one at a time, restoring each before the
+next. So while it runs, the working tree is a lie, and anything else that reads it
+gets a wrong answer with no sign that it is wrong. In one session this produced a
+test failure in a file nobody had touched, and a security scanner reporting that
+`api-import-auth.ts` compared a role string — the exact line that spec writes in
+to prove the guard is tested. Do not run it beside a build, another test run, a
+scan or a deploy, and do not trust a surprising result from any of those until it
+has finished.
+
 Tests marked `it.fails` are **known gaps**, not failures: they pass while the behaviour
 is still broken and start failing the day someone fixes it, which is exactly when the
 note is worth reading.
