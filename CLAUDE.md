@@ -185,21 +185,41 @@ provides, rather than from a flag that can disagree with reality:
 3. the local disk, development only. On Workers there is no disk, so rather than
    fall back to one that cannot work, `getStorage()` throws and says what to set.
 
-⚠️⚠️ **A binding for a resource the account does not have breaks every deploy.** The
-`r2_buckets` block in wrangler.jsonc is currently **commented out**, because R2 was not
-enabled on the account and wrangler checks bindings against the account at deploy time.
-Declaring `flux-documents` there took production down on 4 September 2026 — the same
-mechanism as the `WORKER_SELF_REFERENCE` error below, and just as quiet: the failure is
-in the deploy step of a job whose build succeeded.
+⚠️⚠️ **A binding for a resource the account does not have breaks every deploy.**
+wrangler checks bindings against the account at deploy time, so declaring
+`flux-documents` before R2 was enabled took production down on 4 September 2026 —
+the same mechanism as the `WORKER_SELF_REFERENCE` error below, and just as quiet:
+the failure is in the deploy step of a job whose build succeeded. That is why the
+`DOCUMENTS` block in wrangler.jsonc is still **commented out**, and why the note
+below about how to re-enable it matters more than it looks.
 
-To turn document storage on, in this order:
+**Steps 1 and 2 are already done.** R2 is enabled on the account and the
+`flux-documents` bucket exists, created on 4 September 2026. Checked against the
+account on 7 September 2026 with `npx wrangler r2 bucket list`.
 
-1. enable R2 in the Cloudflare dashboard (once, for the account);
-2. `npx wrangler r2 bucket create flux-documents`;
-3. uncomment the `r2_buckets` block in wrangler.jsonc and deploy.
+⚠️⚠️ **Do not uncomment that block as it stands.** wrangler.jsonc already carries a
+*live* `r2_buckets` block further down, binding the same bucket as
+`NEXT_INC_CACHE_R2_BUCKET` for OpenNext's incremental cache. Two keys of the same
+name in one JSON object is not an error anybody reports: the later one wins and
+the earlier one is silently discarded. So uncommenting produces a deploy that
+either loses the page cache or loses document storage, depending on which way the
+parser resolves it, and nothing says which.
 
-Until then uploads fail with a message naming what to configure, and everything else
-works. The alternative to R2 is any S3-compatible store, set as Worker secrets.
+The bucket takes both bindings. To turn document storage on, add the `DOCUMENTS`
+binding to the **existing** block rather than creating a second one:
+
+```jsonc
+"r2_buckets": [
+  { "binding": "NEXT_INC_CACHE_R2_BUCKET", "bucket_name": "flux-documents" },
+  { "binding": "DOCUMENTS", "bucket_name": "flux-documents" }
+]
+```
+
+then delete the commented-out block at the top so nobody uncomments it later.
+
+Until that is done uploads fail with a message naming what to configure, and
+everything else works. The alternative to R2 is any S3-compatible store, set as
+Worker secrets.
 
 ⚠️ The storage key carries **nothing** from the uploaded filename except an extension
 matched against a strict pattern, and the read path re-checks the key's shape before
