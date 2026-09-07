@@ -282,8 +282,8 @@ export function ProductsClient({ page, stats, filter }: Props) {
   /** Moves the active/inactive filter into the URL, back to page one. */
   const setFilter = (value: string) => {
     const next = new URLSearchParams(searchParams.toString());
-    if (value === "all") next.delete("filter");
-    else next.set("filter", value);
+    if (value === "all") next.delete("state");
+    else next.set("state", value);
     next.delete("page");
     const query = next.toString();
     startTransition(() => router.push(query ? `${pathname}?${query}` : pathname));

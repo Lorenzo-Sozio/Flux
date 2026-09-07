@@ -247,13 +247,11 @@ export async function getTicketById(ticketId: string) {
  * `closedAt` and `resolvedAt` are null on tickets closed by older code, so the
  * window falls back to when the ticket was opened. `includeClosed` is the way
  * back to everything, and the count below says how much that is.
+ *
+ * There is no "always include this one" escape hatch, unlike the task list: a
+ * link to a ticket opens the ticket's own page, which never goes through here.
  */
-export async function getTickets(options?: {
-  status?: string;
-  includeClosed?: boolean;
-  /** A ticket somebody was linked to opens whatever its age. */
-  alwaysInclude?: string;
-}) {
+export async function getTickets(options?: { status?: string; includeClosed?: boolean }) {
   const db = await getDb();
   await requireCapability("ticket:read");
   await requirePlanModule("support");
@@ -261,11 +259,9 @@ export async function getTickets(options?: {
   const cutoff = new Date(Date.now() - TICKET_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const recent = sql`(${tickets.status} NOT IN ('resolved', 'closed')
     OR coalesce(${tickets.closedAt}, ${tickets.resolvedAt}, ${tickets.createdAt}) >= ${cutoff})`;
-  const window = options?.alwaysInclude ? sql`(${recent} OR ${tickets.id} = ${options.alwaysInclude})` : recent;
-
   const conditions = [
     options?.status && options.status !== "all" ? eq(tickets.status, options.status) : undefined,
-    options?.includeClosed ? undefined : window,
+    options?.includeClosed ? undefined : recent,
   ].filter(Boolean) as SQL[];
 
   const [rows, hidden] = await Promise.all([
@@ -287,7 +283,7 @@ export async function getTickets(options?: {
     // showing a smaller number than the person remembers.
     options?.includeClosed
       ? Promise.resolve([{ n: 0 }])
-      : db.select({ n: count() }).from(tickets).where(sql`NOT ${window}`),
+      : db.select({ n: count() }).from(tickets).where(sql`NOT ${recent}`),
   ]);
 
   return {

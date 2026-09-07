@@ -70,9 +70,15 @@ export default function TicketsListPage() {
   const [sortField, setSortField] = useState<SortField>("createdAt");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
+  // ⚠️ Selecting the resolved or closed tab has to reach past the window too.
+  // Without this the tab shows only what closed in the last thirty days and its
+  // own count agrees with it, so nothing on screen looks wrong.
+  const needsArchive = includeClosed || statusFilter === "resolved" || statusFilter === "closed";
+
   const loadTickets = async () => {
+    setLoading(true);
     try {
-      const data = await getTickets({ includeClosed });
+      const data = await getTickets({ includeClosed: needsArchive });
       setTickets(data.rows);
       setHiddenClosed(data.hiddenClosed);
       setCapped(data.capped);
@@ -83,12 +89,17 @@ export default function TicketsListPage() {
     }
   };
 
-  // `loadTickets` is redefined on every render, so depending on it would fetch
-  // the list again on every render, for ever.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: once, on mount
+  // ⚠️ `needsArchive` is the dependency, and leaving it out was a real bug: the
+  // archive link is a soft navigation to the same route, so the component stays
+  // mounted, the banner flipped to "showing everything" and the list underneath
+  // never changed.
+  //
+  // `loadTickets` itself stays out: it is redefined on every render, so
+  // depending on it would fetch the list again on every render, for ever.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: loadTickets is not stable
   useEffect(() => {
     loadTickets();
-  }, []);
+  }, [needsArchive]);
 
   const statusCounts = useMemo(
     () => ({

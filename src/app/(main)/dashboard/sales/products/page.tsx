@@ -8,7 +8,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   // The list state lives in the URL, so a search or a filter is shareable and the
   // back button works (audit rilievo B-08).
   const listParams = parseListParams(params);
-  const filter = params.filter ?? "all";
+  // ⚠️ `state`, not `filter`. `parseListParams` already claims `filter` for the
+  // encoded filter tree the FilterBuilder writes, so a catalogue using the same
+  // key would hand `decodeFilter` the word "active" the day anybody adds a
+  // filter builder here. Quotes and orders use `status` for the same reason.
+  const filter = params.state ?? "all";
 
   // The three figures are counted over the whole catalogue, not over the page:
   // they double as the filter buttons, and a button labelled "inactive 3" that

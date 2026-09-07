@@ -10,11 +10,11 @@
  *
  * The scheduler should pass the header: Authorization: Bearer <CRON_SECRET>
  */
-import { eq } from "drizzle-orm";
+import { and, eq, gte } from "drizzle-orm";
 
 import { getActivitiesDueToday } from "@/actions/activities";
 import { createNotificationAction } from "@/actions/auth";
-import { users } from "@/db/schema";
+import { notifications, users } from "@/db/schema";
 import { runCronJob } from "@/lib/cron-runner";
 import { sendActivityReminderEmail, sendTaskDueEmail } from "@/lib/email";
 import { selectTasksDueToday } from "@/lib/tasks-due";
@@ -32,6 +32,35 @@ async function runForTenant(db: TenantDb) {
   const dueTasks = await selectTasksDueToday(db);
   let notified = 0;
 
+  // ⚠️⚠️ **This job runs every fifteen minutes and had no memory.**
+  //
+  // Every task due today produced a notification *and an email* on every run:
+  // ninety-six of each, per task, per person, per day. Nobody reported it
+  // because the bell only accumulates and the mail looked like the same
+  // reminder arriving again — but wiring push notifications to the same rows
+  // turns it into ninety-six buzzes on a phone, which is how a browser revokes
+  // the permission and a person switches the whole feature off.
+  //
+  // The other reminder job that repeats, ticket-sla-check, remembers on the
+  // ticket itself (`sla_breached_at`, `sla_warn_level`). Tasks have no such
+  // column, so the memory is the notification already written: one reminder per
+  // person per thing per day, read back from what today has already produced.
+  //
+  // Keyed on the title rather than an id because the same key has to cover both
+  // loops below, and a task and an activity have no identifier in common. Two
+  // things with the same title for the same person on the same day collapse into
+  // one reminder, which is the right answer anyway.
+  const midnight = new Date();
+  midnight.setHours(0, 0, 0, 0);
+  const toldToday = new Set(
+    (
+      await db
+        .select({ userId: notifications.userId, title: notifications.title })
+        .from(notifications)
+        .where(and(eq(notifications.type, "task_due"), gte(notifications.createdAt, midnight)))
+    ).map((n) => `${n.userId}\u0000${n.title}`),
+  );
+
   for (const task of dueTasks) {
     const userId = task.assigneeId ?? task.ownerId;
     if (!userId) continue;
@@ -46,11 +75,17 @@ async function runForTenant(db: TenantDb) {
     else if (task.leadId) link = `/dashboard/leads/${task.leadId}`;
     else if (task.companyId) link = `/dashboard/companies/${task.companyId}`;
 
+    const title = `Task due today: "${task.title}"`;
+    const key = `${userId}\u0000${title}`;
+    // Already reminded on this run or an earlier one today.
+    if (toldToday.has(key)) continue;
+    toldToday.add(key);
+
     // In-app notification
     await createNotificationAction({
       userId,
       type: "task_due",
-      title: `Task due today: "${task.title}"`,
+      title,
       message: "This task is due today. Don't forget to complete it.",
       link,
     });
@@ -87,10 +122,15 @@ async function runForTenant(db: TenantDb) {
     else if (activity.leadId) link = `/dashboard/leads/${activity.leadId}`;
     else if (activity.companyId) link = `/dashboard/companies/${activity.companyId}`;
 
+    const title = `${typeLabel} today: "${description}"`;
+    const key = `${activity.ownerId}\u0000${title}`;
+    if (toldToday.has(key)) continue;
+    toldToday.add(key);
+
     await createNotificationAction({
       userId: activity.ownerId,
       type: "task_due",
-      title: `${typeLabel} today: "${description}"`,
+      title,
       message: `You have a ${typeLabel.toLowerCase()} scheduled today.`,
       link,
       // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
