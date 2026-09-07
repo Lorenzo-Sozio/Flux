@@ -4,7 +4,7 @@ import { useCallback, useState, useTransition } from "react";
 
 import Link from "next/link";
 
-import { Bell, CheckCheck, ExternalLink } from "lucide-react";
+import { Bell, CheckCheck, ExternalLink, Settings2 } from "lucide-react";
 
 import { markAllNotificationsReadAction, markNotificationReadAction } from "@/actions/auth";
 import { Badge } from "@/components/ui/badge";
@@ -198,6 +198,19 @@ export function NotificationCenter({ notifications: initial }: Props) {
             </div>
           )}
         </ScrollArea>
+        <DropdownMenuSeparator />
+        {/* ⚠️ Without this the setting is unreachable in practice. Push
+            notifications are off until somebody grants permission, and nobody
+            goes looking through Settings for a feature they were never told
+            exists. The bell is where a person already is when they think about
+            notifications. */}
+        <Link
+          href="/dashboard/settings/notifications"
+          className="flex items-center gap-2 px-3 py-2.5 text-muted-foreground text-xs hover:bg-muted/50 hover:text-foreground"
+        >
+          <Settings2 className="h-3.5 w-3.5" />
+          Notification settings
+        </Link>
       </DropdownMenuContent>
     </DropdownMenu>
   );

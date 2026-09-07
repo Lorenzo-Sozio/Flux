@@ -158,6 +158,7 @@ export async function deliver(
   }
 
   const dead: string[] = [];
+  const alive: string[] = [];
   let sent = 0;
   let failed = 0;
 
@@ -176,8 +177,10 @@ export async function deliver(
           tag: row.link ?? row.type,
         };
         const outcome = await sendPush(device, JSON.stringify(message), keys);
-        if (outcome.status === "sent") sent++;
-        else if (outcome.status === "gone") dead.push(device.id);
+        if (outcome.status === "sent") {
+          sent++;
+          alive.push(device.id);
+        } else if (outcome.status === "gone") dead.push(device.id);
         else failed++;
       }),
     ),
@@ -195,7 +198,32 @@ export async function deliver(
     }
   }
 
+  await touch(db, alive);
+
   return { sent, gone: new Set(dead).size, failed };
+}
+
+/**
+ * Marks the devices a push service just accepted something for.
+ *
+ * ⚠️ The only signal there is. A device that quietly stopped working — permission
+ * revoked in the browser's settings, a phone that was wiped and restored — keeps
+ * a row that looks exactly like a working one, and the person is left with
+ * "I don't get notifications any more" and nowhere to look. A date on the
+ * settings screen turns that into something visible.
+ *
+ * Accepted by a push service is not delivered to a screen, and the wording on
+ * that screen has to say so.
+ */
+export async function touch(db: TenantDb, subscriptionIds: string[]): Promise<void> {
+  const ids = [...new Set(subscriptionIds)];
+  if (ids.length === 0) return;
+  try {
+    await db.update(pushSubscriptions).set({ lastSuccessAt: new Date() }).where(inArray(pushSubscriptions.id, ids));
+  } catch (error) {
+    // Bookkeeping. The notification went out, which is the part that mattered.
+    console.error("[push] Could not record a successful delivery:", error);
+  }
 }
 
 /**

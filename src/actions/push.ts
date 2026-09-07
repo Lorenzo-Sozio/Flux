@@ -6,7 +6,7 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { notificationPreferences, pushSubscriptions } from "@/db/schema";
-import { devicesOf, subscriptionsFor, vapidKeys } from "@/lib/push-send";
+import { devicesOf, subscriptionsFor, touch, vapidKeys } from "@/lib/push-send";
 import { isPushType, type PushType, parseOverrides, resolveAll, serialiseOverrides } from "@/lib/push-types";
 import { getDb } from "@/lib/tenant-context";
 import { sendPush } from "@/lib/web-push";
@@ -220,6 +220,11 @@ export async function sendTestPush() {
     await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, dead));
     revalidatePath(SETTINGS_PATH);
   }
+
+  await touch(
+    db,
+    results.filter((r) => r.outcome.status === "sent").map((r) => r.device.id),
+  );
 
   const sent = results.filter((r) => r.outcome.status === "sent").length;
   const failures = results

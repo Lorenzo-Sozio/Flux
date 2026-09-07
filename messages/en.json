@@ -3459,6 +3459,8 @@
         "help": "Somebody names you in a note on a record."
       }
     },
-    "noServiceWorker": "No service worker is running on this page, so nothing can receive a notification. Reload the page; if it persists, the app is running in development mode, where the worker is deliberately not registered."
+    "noServiceWorker": "No service worker is running on this page, so nothing can receive a notification. Reload the page; if it persists, the app is running in development mode, where the worker is deliberately not registered.",
+    "lastSuccess": "last received {date}",
+    "neverReceived": "nothing received yet"
   }
 }

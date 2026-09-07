@@ -335,6 +335,13 @@ export function PushSettingsClient({ settings }: { settings: PushSettings }) {
                     </p>
                     <p className="text-muted-foreground text-xs">
                       {t("addedOn", { date: new Date(device.createdAt).toLocaleDateString() })}
+                      {" · "}
+                      {/* A device that silently stopped working looks exactly like
+                          one that does; this date is the only thing that tells
+                          them apart. */}
+                      {device.lastSuccessAt
+                        ? t("lastSuccess", { date: new Date(device.lastSuccessAt).toLocaleDateString() })
+                        : t("neverReceived")}
                     </p>
                   </div>
                   <Button

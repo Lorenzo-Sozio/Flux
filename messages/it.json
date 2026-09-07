@@ -3459,6 +3459,8 @@
         "help": "Qualcuno ti nomina in una nota su una scheda."
       }
     },
-    "noServiceWorker": "Su questa pagina non è attivo nessun service worker, quindi niente può ricevere una notifica. Ricarica la pagina; se persiste, l'applicazione è in modalità sviluppo, dove il worker non viene registrato di proposito."
+    "noServiceWorker": "Su questa pagina non è attivo nessun service worker, quindi niente può ricevere una notifica. Ricarica la pagina; se persiste, l'applicazione è in modalità sviluppo, dove il worker non viene registrato di proposito.",
+    "lastSuccess": "ultima ricevuta il {date}",
+    "neverReceived": "non ha ancora ricevuto niente"
   }
 }
