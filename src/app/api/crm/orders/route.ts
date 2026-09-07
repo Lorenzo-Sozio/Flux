@@ -254,6 +254,9 @@ export async function POST(req: NextRequest) {
       totalAmount: String(totali.total),
       status: "draft",
       notes: note || null,
+      // ⚠️ The same word the contact gets when this endpoint creates one. Two halves of
+      // one event that disagreed until now: the person was marked, the order was not.
+      source: "assistant",
       orderDate: now,
     })
     .returning({ id: orders.id, orderNumber: orders.orderNumber });

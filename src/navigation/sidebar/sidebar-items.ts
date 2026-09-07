@@ -1,6 +1,7 @@
 import {
   Banknote,
   BarChart3,
+  Bot,
   Building2,
   Calendar,
   ChartBar,
@@ -165,6 +166,11 @@ export const sidebarItems: NavGroup[] = [
       },
       { titleKey: "quotes", url: "/dashboard/sales/quotes", icon: FileText, module: "sales" },
       { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, module: "sales" },
+      // Next to the orders it counts, not in a reports corner: the question it answers —
+      // how much of this month came in on its own — is asked while looking at the day's
+      // orders. It reads only this database, so it opens with the assistant switched off
+      // and simply shows nothing brought in, which is the truth.
+      { titleKey: "assistantContribution", url: "/dashboard/sales/assistant", icon: Bot, module: "sales" },
       { titleKey: "products", url: "/dashboard/sales/products", icon: Package, module: "sales" },
     ],
   },
