@@ -14,6 +14,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -73,6 +74,8 @@ const ACCEPT = [
 const MAX_SIZE_MB = 10;
 
 export function DocumentPanel({ entityType, entityId }: Props) {
+  const t = useTranslations("documents");
+  const tc = useTranslations("common");
   const [docs, setDocs] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -137,9 +140,9 @@ export function DocumentPanel({ entityType, entityId }: Props) {
               fetchDocs();
               return;
             }
-            toast.error(data.error ?? "Upload failed.");
+            toast.error(data.error ?? t("uploadFailed"));
           } catch {
-            toast.error("Upload failed.");
+            toast.error(t("uploadFailed"));
           }
         } else {
           try {
@@ -159,7 +162,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
 
       xhr.send(formData);
     },
-    [entityType, entityId, fetchDocs],
+    [entityType, entityId, fetchDocs, t],
   );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -213,7 +216,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <CardTitle className="flex items-center gap-2 text-base">
           <Paperclip className="h-4 w-4" />
-          Documents
+          {t("title")}
           {docs.length > 0 && (
             <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs font-normal text-muted-foreground">
               {docs.length}
@@ -228,7 +231,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
           onClick={() => inputRef.current?.click()}
         >
           {uploading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
-          Upload
+          {t("upload")}
         </Button>
         <input ref={inputRef} type="file" accept={ACCEPT} className="hidden" onChange={handleFileChange} />
       </CardHeader>
@@ -238,7 +241,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
         {uploading && (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Uploading…</span>
+              <span>{t("uploading")}</span>
               <span>{progress}%</span>
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
@@ -247,23 +250,26 @@ export function DocumentPanel({ entityType, entityId }: Props) {
           </div>
         )}
 
-        {/* Drop zone */}
-        <div
+        {/* Drop zone. A button, because tapping or pressing it opens the file
+            picker — as a div it was mouse-only and unreachable by keyboard. */}
+        <button
+          type="button"
+          disabled={uploading}
           onDragEnter={onDragEnter}
           onDragLeave={onDragLeave}
           onDragOver={onDragOver}
           onDrop={onDrop}
           onClick={() => !uploading && inputRef.current?.click()}
-          className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors ${
+          className={`flex w-full cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors ${
             dragging
               ? "border-primary bg-primary/5 text-primary"
               : "border-border/60 text-muted-foreground hover:border-muted-foreground/40 hover:bg-muted/30"
           }`}
         >
           <Upload className={`h-5 w-5 ${dragging ? "text-primary" : "text-muted-foreground/60"}`} />
-          <p className="text-xs font-medium">{dragging ? "Drop to upload" : "Drag & drop or click to browse"}</p>
-          <p className="text-[11px] text-muted-foreground/60">PDF, Word, Excel, images — max {MAX_SIZE_MB} MB</p>
-        </div>
+          <p className="text-xs font-medium">{dragging ? t("dropToUpload") : t("dropzone")}</p>
+          <p className="text-[11px] text-muted-foreground/60">{t("accepted", { mb: MAX_SIZE_MB })}</p>
+        </button>
 
         {/* Document list */}
         {loading ? (
@@ -271,7 +277,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : docs.length === 0 ? (
-          <p className="text-center text-xs text-muted-foreground py-2">No documents attached yet.</p>
+          <p className="py-2 text-center text-muted-foreground text-xs">{t("empty")}</p>
         ) : (
           <ul className="space-y-1.5">
             {docs.map((doc) => (
@@ -314,7 +320,8 @@ export function DocumentPanel({ entityType, entityId }: Props) {
                   <Download className="h-3.5 w-3.5" />
                 </a>
                 <button
-                  title="Delete"
+                  type="button"
+                  title={tc("delete")}
                   disabled={deletingId === doc.id}
                   onClick={() => handleDelete(doc)}
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"

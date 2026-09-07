@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CodeIcon, EyeIcon, Loader2Icon, MailIcon, PencilIcon, SendIcon, XIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -45,6 +46,7 @@ export function SendEmailModal({
   templates?: { id: string; name: string; subject: string; body: string }[];
   ownerId?: string;
 }) {
+  const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [mode, setMode] = useState<Mode>("preview");
@@ -174,7 +176,7 @@ export function SendEmailModal({
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
           <MailIcon className="h-4 w-4" />
-          Send Email
+          {tc("sendEmail")}
         </Button>
       </DialogTrigger>
 

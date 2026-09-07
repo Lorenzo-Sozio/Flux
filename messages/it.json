@@ -537,6 +537,7 @@
     "select": "Seleziona",
     "selectAll": "Seleziona tutto",
     "send": "Invia",
+    "sendEmail": "Invia email",
     "sent": "Inviato",
     "show": "Mostra",
     "showing": "Visualizzazione {from}–{to} di {total}",
@@ -3345,5 +3346,27 @@
     "installDismiss": "Non ora",
     "iosInstallBody": "Tocca Condividi, poi Aggiungi a Home.",
     "offlineBanner": "Nessuna connessione. Le modifiche non possono essere salvate."
+  },
+  "errorPage": {
+    "backToDashboard": "Torna alla dashboard",
+    "entitlementHint": "Tutto il resto continua a funzionare. Passare a un piano superiore lo sblocca subito.",
+    "entitlementTitle": "Il tuo piano non comprende questo",
+    "forbiddenHint": "Il tuo ruolo in questo spazio di lavoro non lo comprende. Un amministratore può cambiarlo.",
+    "forbiddenTitle": "Non hai accesso a questo",
+    "tryAgain": "Riprova",
+    "unknownHint": "È un problema nostro, non tuo. Riprovare spesso funziona.",
+    "unknownTitle": "Qualcosa è andato storto nel caricare questa pagina",
+    "viewPlans": "Vedi i piani"
+  },
+  "documents": {
+    "accepted": "PDF, Word, Excel, immagini — max {mb} MB",
+    "dropToUpload": "Rilascia per caricare",
+    "dropzone": "Trascina qui o tocca per scegliere",
+    "empty": "Ancora nessun documento allegato.",
+    "title": "Documenti",
+    "tooLarge": "File troppo grande (max {mb} MB).",
+    "upload": "Carica",
+    "uploadFailed": "Caricamento non riuscito.",
+    "uploading": "Caricamento…"
   }
 }

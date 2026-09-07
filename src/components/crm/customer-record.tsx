@@ -122,13 +122,17 @@ export function CustomerRecordPanel({
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div className="min-w-0">
+      {/* ⚠️ Two buttons that will not shrink beside a title that will: the
+          heading came out one word per line in a 40px column while the buttons
+          overflowed the card. The row wraps, so the buttons take their own line
+          on a phone and the sentence gets the width it was written for. */}
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
           <CardTitle>{t("title")}</CardTitle>
           <CardDescription>{t("subtitle")}</CardDescription>
         </div>
         {record.modules.sales && (
-          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 max-sm:w-full max-sm:justify-start">
             <Button asChild variant="outline" size="sm">
               <Link href={`/dashboard/sales/quotes/new${query}`}>{t("newQuote")}</Link>
             </Button>

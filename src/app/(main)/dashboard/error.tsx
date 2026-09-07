@@ -17,6 +17,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 
 import { AlertTriangle, ArrowLeft, Lock, RefreshCw, Sparkles } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 
@@ -38,22 +39,15 @@ function classify(message: string): Kind {
   return "unknown";
 }
 
-const COPY: Record<Kind, { icon: typeof Lock; title: string; hint: string }> = {
-  forbidden: {
-    icon: Lock,
-    title: "You don't have access to this",
-    hint: "Your role in this workspace doesn't include it. A workspace admin can change that.",
-  },
-  entitlement: {
-    icon: Sparkles,
-    title: "Your plan doesn't include this",
-    hint: "Everything else keeps working. Upgrading unlocks it immediately.",
-  },
-  unknown: {
-    icon: AlertTriangle,
-    title: "Something went wrong loading this page",
-    hint: "This is on our side, not yours. Retrying often works.",
-  },
+/**
+ * ⚠️ Keys, not sentences. This page said "Something went wrong loading this
+ * page" in English to every workspace, and it is the screen somebody reads
+ * precisely when they are already confused.
+ */
+const ICONS: Record<Kind, typeof Lock> = {
+  forbidden: Lock,
+  entitlement: Sparkles,
+  unknown: AlertTriangle,
 };
 
 export default function DashboardError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
@@ -61,8 +55,11 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
     console.error("[dashboard]", error);
   }, [error]);
 
+  const t = useTranslations("errorPage");
   const kind = classify(error.message ?? "");
-  const { icon: Icon, title, hint } = COPY[kind];
+  const Icon = ICONS[kind];
+  const title = t(`${kind}Title` as never);
+  const hint = t(`${kind}Hint` as never);
 
   return (
     <div className="flex min-h-[60dvh] items-center justify-center">
@@ -82,18 +79,18 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
           {kind === "unknown" && (
             <Button onClick={reset} variant="default">
               <RefreshCw className="mr-2 size-4" />
-              Try again
+              {t("tryAgain")}
             </Button>
           )}
           {kind === "entitlement" && (
             <Button asChild>
-              <Link href="/dashboard/settings/billing">View plans</Link>
+              <Link href="/dashboard/settings/billing">{t("viewPlans")}</Link>
             </Button>
           )}
           <Button asChild variant="outline">
             <Link href="/dashboard/crm">
               <ArrowLeft className="mr-2 size-4" />
-              Back to dashboard
+              {t("backToDashboard")}
             </Link>
           </Button>
         </div>

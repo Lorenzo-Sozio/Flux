@@ -537,6 +537,7 @@
     "select": "Select",
     "selectAll": "Select all",
     "send": "Send",
+    "sendEmail": "Send email",
     "sent": "Sent",
     "show": "Show",
     "showing": "Showing {from}–{to} of {total}",
@@ -3345,5 +3346,27 @@
     "installDismiss": "Not now",
     "iosInstallBody": "Tap Share, then Add to Home Screen.",
     "offlineBanner": "No connection. Changes cannot be saved."
+  },
+  "errorPage": {
+    "backToDashboard": "Back to dashboard",
+    "entitlementHint": "Everything else keeps working. Upgrading unlocks it immediately.",
+    "entitlementTitle": "Your plan doesn't include this",
+    "forbiddenHint": "Your role in this workspace doesn't include it. A workspace admin can change that.",
+    "forbiddenTitle": "You don't have access to this",
+    "tryAgain": "Try again",
+    "unknownHint": "This is on our side, not yours. Retrying often works.",
+    "unknownTitle": "Something went wrong loading this page",
+    "viewPlans": "View plans"
+  },
+  "documents": {
+    "accepted": "PDF, Word, Excel, images — max {mb} MB",
+    "dropToUpload": "Drop to upload",
+    "dropzone": "Drag & drop or click to browse",
+    "empty": "No documents attached yet.",
+    "title": "Documents",
+    "tooLarge": "File too large (max {mb} MB).",
+    "upload": "Upload",
+    "uploadFailed": "Upload failed.",
+    "uploading": "Uploading…"
   }
 }
