@@ -294,7 +294,7 @@ export async function POST(req: NextRequest) {
         newData: { id: contactId },
       });
     }
-    dispatchWebhook("order.created", { order: { ...ordine, contactId } }, API_ORIGIN);
+    dispatchWebhook("order.created", { order: { ...ordine, contactId } }, API_ORIGIN, db);
     // ⚠️⚠️ **The bell, and until now an order rang nothing.** Five parts of this CRM create
     // notifications — internal chat, lead assignment, pipeline, quotes, activity reminders —
     // and orders created none. Somebody had to be looking at the orders list to know one had

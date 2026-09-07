@@ -131,3 +131,64 @@ describe("entry points without a tenant header", () => {
     expect(stale).toEqual([]);
   });
 });
+
+/**
+ * The API-key surface has the same problem and was not in the list above.
+ *
+ * ⚠️ `PUBLIC_PREFIXES` is the proxy's list of routes it deliberately leaves
+ * alone. `/api/crm/*` is not on it — but the proxy only injects `x-tenant-id`
+ * when `isLoggedIn && activeTenantId`, and a request carrying an API key has no
+ * session at all. Its own comment says so: *"API-key authenticated requests have
+ * no JWT session, so no tenant header is set here."* So those routes are exactly
+ * as tenant-less as the public ones, and the guard above never looked at them.
+ *
+ * What that cost: every one of the twenty `dispatchWebhook` calls in the import
+ * API omitted the database, so each fell through to `getDb()` and rejected. None
+ * of them is awaited, so the rejection was swallowed. An integrator importing
+ * five hundred contacts got five hundred rows and not one webhook, and nothing
+ * anywhere said why.
+ *
+ * An import-graph check cannot express this: `dispatchWebhook` still *contains*
+ * `getDb()` as its fallback, and always will. What matters is the call, so the
+ * call is what is checked.
+ */
+describe("the import API", () => {
+  const routes = allFiles("src/app/api/crm").filter((f) => f.endsWith("/route.ts"));
+
+  it("is a set somebody has thought about", () => {
+    expect(routes.length).toBeGreaterThan(10);
+  });
+
+  it("⚠️ hands dispatchWebhook the workspace, every time", () => {
+    // Without it the call resolves `getDb()`, which throws here, and the webhook
+    // is silently never sent.
+    const bad: string[] = [];
+    for (const file of routes) {
+      for (const call of read(file).matchAll(/dispatchWebhook\([\s\S]*?\);/g)) {
+        if (!/,\s*db\s*\)/.test(call[0])) bad.push(`${file}: ${call[0].slice(0, 60).replace(/\s+/g, " ")}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("⚠️ marks those events as written by a machine", () => {
+    // `via: "api"` is what stops an integrator receiving its own import back and
+    // reacting to it, for ever. Eighteen of the twenty call sites left it unset,
+    // so the events went out looking like a person had made them.
+    const bad: string[] = [];
+    for (const file of routes) {
+      for (const call of read(file).matchAll(/dispatchWebhook\([\s\S]*?\);/g)) {
+        if (!call[0].includes("API_ORIGIN")) bad.push(`${file}: ${call[0].slice(0, 60).replace(/\s+/g, " ")}`);
+      }
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it("⚠️ never falls back to the platform database", () => {
+    // One route did, behind a condition an earlier 400 had already made true.
+    // Dead, but sitting where reaching it would write a customer's contact into
+    // the platform registry instead of their own database.
+    const offenders = routes.filter((f) => /:\s*platformDb\b|\?\?\s*platformDb\b/.test(read(f)));
+    expect(offenders).toEqual([]);
+  });
+});

@@ -92,7 +92,7 @@ export async function POST(req: NextRequest) {
           .set(buildLeadPayload(data, authResult.userId))
           .where(eq(leads.id, existing.id))
           .returning();
-        dispatchWebhook("lead.updated", { lead: updated }, API_ORIGIN);
+        dispatchWebhook("lead.updated", { lead: updated }, API_ORIGIN, db);
         return NextResponse.json({ status: "updated", id: updated.id, data: updated });
       }
 
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
   }
 
   const [created] = await db.insert(leads).values(buildLeadPayload(data, authResult.userId)).returning();
-  dispatchWebhook("lead.created", { lead: created }, API_ORIGIN);
+  dispatchWebhook("lead.created", { lead: created }, API_ORIGIN, db);
 
   return NextResponse.json({ status: "created", id: created.id, data: created }, { status: 201 });
 }

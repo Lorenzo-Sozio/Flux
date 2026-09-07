@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { dispatchWebhook } from "@/actions/webhooks";
+import { dispatchWebhook, hasActiveWebhook } from "@/actions/webhooks";
 import { createTenantDb } from "@/db";
 import { activities } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
@@ -8,6 +8,10 @@ import { buildActivityPayload, type ValidationError, validateActivityInput } fro
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
+
+/** Marks the event as written by a machine, so an integrator does not
+ *  receive its own import back and react to it. */
+const API_ORIGIN = { via: "api" as const, actor: null };
 
 const MAX_BATCH = 500;
 
@@ -65,6 +69,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ con
   const tenant = await getTenantById(authResult.tenantId);
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
+  // ⚠️ Asked once, not once per row. `dispatchWebhook` reads the webhook
+  // table on every call, which for a full batch is five hundred round
+  // trips against a subrequest budget of a thousand — spent entirely on
+  // learning that a workspace with no webhooks still has no webhooks.
+  const notify = await hasActiveWebhook(db);
   const startMs = Date.now();
   const results: BulkResult[] = [];
   let created = 0;
@@ -85,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ con
       .insert(activities)
       .values(buildActivityPayload(data, authResult.userId))
       .returning({ id: activities.id });
-    dispatchWebhook("activity.created", { activityId: row.id });
+    if (notify) dispatchWebhook("activity.created", { activityId: row.id }, API_ORIGIN, db);
     results.push({ index: i, status: "created", id: row.id });
     created++;
   }

@@ -9,6 +9,10 @@ import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
+/** Marks the event as written by a machine, so an integrator does not
+ *  receive its own import back and react to it. */
+const API_ORIGIN = { via: "api" as const, actor: null };
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ leadId: string }> }) {
   const authResult = await authenticateApiRequest(req);
   if (!authResult) {
@@ -50,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ lea
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
   const [created] = await db.insert(activities).values(buildActivityPayload(data, authResult.userId)).returning();
-  dispatchWebhook("activity.created", { activity: created });
+  dispatchWebhook("activity.created", { activity: created }, API_ORIGIN, db);
 
   return NextResponse.json({ status: "created", id: created.id, data: created }, { status: 201 });
 }

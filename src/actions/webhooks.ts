@@ -201,3 +201,22 @@ export async function dispatchWebhook(
     }),
   );
 }
+
+/**
+ * Whether this workspace has any active webhook at all.
+ *
+ * ⚠️ For loops. `dispatchWebhook` reads the webhook table on every call, which is
+ * one round trip per row in a bulk import — five hundred of them for a full
+ * batch, on a driver where every statement is its own request, against a
+ * Cloudflare subrequest budget of a thousand per request. Asking once before the
+ * loop and skipping the calls entirely when the answer is no costs one statement
+ * instead of five hundred, and no workspace notices a webhook it never
+ * configured not being dispatched.
+ *
+ * It does not make the loop cheap when webhooks *are* configured. That cost is
+ * inherent to one event per record and belongs to whoever configured them.
+ */
+export async function hasActiveWebhook(db: WebhookDispatchDb): Promise<boolean> {
+  const [row] = await db.select({ id: webhooks.id }).from(webhooks).where(eq(webhooks.isActive, true)).limit(1);
+  return Boolean(row);
+}

@@ -11,6 +11,10 @@ import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
+/** Marks the event as written by a machine, so an integrator does not
+ *  receive its own import back and react to it. */
+const API_ORIGIN = { via: "api" as const, actor: null };
+
 export async function POST(req: NextRequest) {
   const authResult = await authenticateApiRequest(req);
   if (!authResult) {
@@ -66,7 +70,7 @@ export async function POST(req: NextRequest) {
         .set(buildCompanyPayload(data, authResult.userId))
         .where(ilike(companies.name, data.name))
         .returning();
-      dispatchWebhook("company.updated", { company: updated });
+      dispatchWebhook("company.updated", { company: updated }, API_ORIGIN, db);
       return NextResponse.json({ status: "updated", id: updated.id, data: updated });
     }
 
@@ -74,7 +78,7 @@ export async function POST(req: NextRequest) {
   }
 
   const [created] = await db.insert(companies).values(buildCompanyPayload(data, authResult.userId)).returning();
-  dispatchWebhook("company.created", { company: created });
+  dispatchWebhook("company.created", { company: created }, API_ORIGIN, db);
 
   return NextResponse.json({ status: "created", id: created.id, data: created }, { status: 201 });
 }
