@@ -1,0 +1,38 @@
+[
+  {
+    "file": "src/app/api/crm/contacts/bulk/route.ts",
+    "description": "⚠️⚠️ la riga che sta per essere creata non viene piu' prenotata: lo stesso indirizzo due volte nello stesso file crea due contatti, e onDuplicate smette di significare quello che dice",
+    "find": "    taken.claim(data.email, id);",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/contacts/bulk/route.ts",
+    "description": "⚠️ un doppione dentro al lotto non viene piu' riconosciuto: la ricerca vede solo cio' che c'era prima della richiesta",
+    "find": "    const existingId = taken.find(data.email);",
+    "replace": "    const existingId = undefined as string | undefined;"
+  },
+  {
+    "file": "src/app/api/crm/contacts/bulk/route.ts",
+    "description": "⚠️ l'inserimento torna a essere una istruzione per riga: cinquecento record tornano a cinquecento richieste, che e' il tetto che rendeva impossibile il lotto massimo documentato",
+    "find": "  for (const slice of chunk(toInsert, INSERT_CHUNK)) {",
+    "replace": "  for (const slice of chunk(toInsert, 1)) {"
+  },
+  {
+    "file": "src/lib/api-import-batch.ts",
+    "description": "⚠️ una istruzione sola porta l'intero lotto: i parametri superano il limite di Postgres e l'errore non nomina niente di tutto questo",
+    "find": "export const INSERT_CHUNK = 200;",
+    "replace": "export const INSERT_CHUNK = 100000;"
+  },
+  {
+    "file": "src/app/api/crm/contacts/bulk/route.ts",
+    "description": "⚠️ l'esito di una riga rifiutata non tiene piu' la sua posizione: chi importa non puo' risalire dalla riga rifiutata alla riga del proprio file",
+    "find": "      results[i] = { index: i, status: \"error\", errors };",
+    "replace": "      results.push({ index: i, status: \"error\", errors });"
+  },
+  {
+    "file": "src/lib/api-import-batch.ts",
+    "description": "⚠️ i blocchi si sovrappongono invece di susseguirsi: ogni riga viene scritta piu' volte",
+    "find": "  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));",
+    "replace": "  for (let i = 0; i < items.length; i += 1) out.push(items.slice(i, i + size));"
+  }
+]
