@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { CreditCard, GitMerge, KeyRound, Mail, MessageSquareQuote, Settings2, Webhook } from "lucide-react";
+import { BellRing, CreditCard, GitMerge, KeyRound, Mail, MessageSquareQuote, Settings2, Webhook } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,15 @@ export default async function SettingsPage() {
   // sidebar AND from this index, so configuring the pipeline — the first thing
   // anyone does when adopting a CRM — meant typing the path by hand.
   const cards: { href: string; icon: typeof CreditCard; title: string; description: string; need: Capability }[] = [
+    {
+      // Personal, not administrative: gated on the capability every role has, so
+      // a viewer can still decide what reaches their own phone.
+      href: "/dashboard/settings/notifications",
+      icon: BellRing,
+      title: t("notifications.title"),
+      description: t("notifications.description"),
+      need: "record:read",
+    },
     {
       href: "/dashboard/settings/billing",
       icon: CreditCard,

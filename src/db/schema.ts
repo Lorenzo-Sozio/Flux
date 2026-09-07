@@ -813,6 +813,55 @@ export const notifications = pgTable("notification", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// --- WEB PUSH ---
+
+/**
+ * One row per browser installation that agreed to be notified.
+ *
+ * ⚠️ Per device, not per person. A phone and a laptop are two subscriptions for
+ * the same user, and the same phone reinstalled is a third — the browser mints a
+ * new endpoint and forgets the old one, which then answers 410 forever. The
+ * endpoint is unique so re-subscribing updates the row it already has instead of
+ * accumulating duplicates that all deliver the same notification.
+ *
+ * The keys here are the subscriber's, not ours: they encrypt a message so that
+ * only that browser can open it, and the push service in the middle carries a
+ * body it cannot read.
+ */
+export const pushSubscriptions = pgTable("push_subscription", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  // Only to tell one device from another on the settings screen. A person with
+  // three subscriptions needs to know which one to remove.
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  lastSuccessAt: timestamp("last_success_at", { mode: "date" }),
+});
+
+/**
+ * What one person chose to be woken for.
+ *
+ * `overrides` holds only the switches actually touched, as JSON — see
+ * `src/lib/push-types.ts` for why it is not the complete list. A user with no
+ * row here has made no choices and gets the defaults, so the absence of a row is
+ * a valid, expected state rather than something to backfill.
+ */
+export const notificationPreferences = pgTable("notification_preference", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  pushEnabled: boolean("push_enabled").default(true).notNull(),
+  overrides: text("overrides").default("{}").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // --- CUSTOM FIELD DEFINITIONS ---
 export const customFieldDefinitions = pgTable("custom_field_definition", {
   id: text("id")

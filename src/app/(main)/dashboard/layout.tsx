@@ -13,6 +13,7 @@ import { RecentlyVisited } from "@/components/crm/recently-visited";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { OfflineBanner } from "@/components/pwa/offline-banner";
+import { PushSubscriptionKeeper } from "@/components/pwa/push-subscription-keeper";
 import { CurrencySwitcher } from "@/components/ui/currency-switcher";
 import { LocaleSwitcher } from "@/components/ui/locale-switcher";
 import { Separator } from "@/components/ui/separator";
@@ -107,6 +108,10 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
 
   return (
     <CurrencyProvider>
+      {/* ⚠️ Here and not in the root layout: it calls a server action that needs
+          a session and a workspace, and the root layout also wraps the login
+          page and the public quote page, where `getDb()` throws by design. */}
+      <PushSubscriptionKeeper />
       <SidebarProvider defaultOpen={defaultOpen}>
         <AppSidebar user={user} navAccess={navAccess} variant={variant} collapsible={collapsible} />
         <SidebarInset

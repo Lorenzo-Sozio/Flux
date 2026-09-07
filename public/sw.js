@@ -28,7 +28,7 @@
  * of what "feels like an app" actually means.
  */
 
-const VERSION = "v1";
+const VERSION = "v2";
 const SHELL_CACHE = `flux-shell-${VERSION}`;
 const ASSET_CACHE = `flux-assets-${VERSION}`;
 const OFFLINE_URL = "/offline";
@@ -71,6 +71,108 @@ self.addEventListener("activate", (event) => {
 /** The page asks for the update when it is safe to take one. */
 self.addEventListener("message", (event) => {
   if (event.data === "SKIP_WAITING") self.skipWaiting();
+});
+
+// ── Notifications ────────────────────────────────────────────────────────────
+//
+// The one thing this worker does that the page cannot: it runs when no tab is
+// open. A notification arrives encrypted, addressed to this installation, and is
+// decrypted by the browser before it gets here — so `event.data` is already
+// plain text and the push service in the middle never saw it.
+//
+// ⚠️ Every branch has to end in a shown notification. A push received with the
+// `userVisibleOnly` permission and *not* shown is a broken promise to the
+// browser: Chrome shows its own "This site has been updated in the background"
+// message instead, and repeated often enough the browser revokes the permission
+// altogether. So a malformed payload still produces something.
+
+const FALLBACK_TITLE = "Flux";
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    // Not our format. Show the raw text rather than nothing at all.
+    data = { body: event.data ? event.data.text() : "" };
+  }
+
+  const title = typeof data.title === "string" && data.title ? data.title : FALLBACK_TITLE;
+  const link = typeof data.link === "string" && data.link.startsWith("/") ? data.link : "/dashboard";
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body: typeof data.body === "string" ? data.body : "",
+      icon: "/icons/icon-192.png",
+      badge: "/icons/badge-72.png",
+      // Two reminders about the same task replace each other instead of filling
+      // the tray with the same sentence four times.
+      tag: typeof data.tag === "string" && data.tag ? data.tag : link,
+      renotify: true,
+      timestamp: Date.now(),
+      data: { link },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const link = (event.notification.data && event.notification.data.link) || "/dashboard";
+  const target = new URL(link, self.location.origin).href;
+
+  event.waitUntil(
+    (async () => {
+      // ⚠️ Focus a tab that is already open rather than opening another one.
+      // Opening a second window on every notification is how a phone ends up with
+      // eleven copies of the same app, each with its own unsaved form.
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of clients) {
+        if (new URL(client.url).origin !== self.location.origin) continue;
+        await client.focus();
+        // `navigate` is not available on every platform, and failing to move an
+        // already-focused tab is better than failing to focus anything.
+        if ("navigate" in client) {
+          try {
+            await client.navigate(target);
+          } catch {
+            /* The tab stays where it was, focused. */
+          }
+        }
+        return;
+      }
+      await self.clients.openWindow(target);
+    })(),
+  );
+});
+
+// A subscription can be rotated by the browser without anyone touching it, and
+// the old endpoint stops working the moment it happens.
+//
+// ⚠️ There is no session in here, so the worker cannot tell the server about the
+// new one — a write has to be authenticated and the page is what holds the
+// cookie. So the worker does the half it can: it re-subscribes immediately, with
+// the same application key the old subscription carried, and tells any open page
+// to send the result. If no page is open, PushSubscriptionKeeper picks it up on
+// the next load. Until then pushes to this device are lost, which is the whole
+// reason the notification itself lives in the database rather than in the push.
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      const key =
+        event.oldSubscription && event.oldSubscription.options
+          ? event.oldSubscription.options.applicationServerKey
+          : null;
+      if (key) {
+        try {
+          await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+        } catch {
+          // Nothing here can fix it. The settings page still offers the button.
+        }
+      }
+      const clients = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of clients) client.postMessage({ type: "PUSH_SUBSCRIPTION_CHANGED" });
+    })(),
+  );
 });
 
 /** Keeps the asset cache from growing without bound across deploys. */

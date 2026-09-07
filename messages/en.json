@@ -2705,6 +2705,10 @@
           "uncollectible": "Uncollectible"
         }
       }
+    },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Choose what reaches your phone, and which devices it reaches."
     }
   },
   "support": {
@@ -3368,5 +3372,93 @@
     "upload": "Upload",
     "uploadFailed": "Upload failed.",
     "uploading": "Uploading…"
+  },
+  "pushNotifications": {
+    "title": "Notifications on this device",
+    "subtitle": "Be told when something needs you, even with Flux closed.",
+    "thisDevice": "This device",
+    "thisDeviceHelp": "Permission is granted per browser and per device, so a phone and a laptop are asked separately.",
+    "enableHere": "Turn on for this device",
+    "disableHere": "Turn off for this device",
+    "enabledHere": "Notifications are on for this device.",
+    "deviceRemoved": "Device removed.",
+    "permissionRefused": "The browser did not grant permission.",
+    "sendTest": "Send a test",
+    "testSent": "{count, plural, =1 {Sent to # device} other {Sent to # devices}}. It should arrive in a moment.",
+    "testFailed": "The push service did not accept the message.",
+    "noDevices": "No device is signed up yet.",
+    "notConfigured": "Push notifications are not configured on this installation.",
+    "notConfiguredBody": "The signing keys are missing, so no device can be signed up. Whoever operates this Flux has to set them. Everything else on this page still works, and the notification bell is unaffected.",
+    "whatToSend": "What to be notified about",
+    "whatToSendHelp": "This applies to every device. The bell inside Flux always shows everything.",
+    "masterSwitch": "All notifications on this account",
+    "devices": "Devices signed up",
+    "devicesHelp": "Remove one that no longer exists, or that belongs to a phone you no longer use.",
+    "unknownDevice": "Unrecognised browser",
+    "current": "this one",
+    "addedOn": "Added on {date}",
+    "unsupported": {
+      "title": "This browser cannot receive notifications",
+      "body": "It does not offer the push interface, or the page is not being served over a secure connection. Try a recent Chrome, Edge, Firefox or Safari."
+    },
+    "needsInstall": {
+      "title": "On iPhone and iPad, install Flux first",
+      "body": "Apple delivers notifications only to an app added to the home screen, never to an ordinary Safari tab.\n\nOpen the share menu and choose Add to Home Screen, then open Flux from the icon and come back to this page."
+    },
+    "denied": {
+      "title": "Notifications are blocked for this site",
+      "body": "The browser was told no once and will not ask again. Allow notifications for this site in the browser's own settings, then reload this page."
+    },
+    "types": {
+      "lead_assigned": {
+        "label": "A lead is assigned to me",
+        "help": "Somebody hands you a lead to follow up."
+      },
+      "task_due": {
+        "label": "A task of mine is due",
+        "help": "A reminder the day a task is due, and again when it is late."
+      },
+      "sla_breach": {
+        "label": "A ticket has missed its SLA",
+        "help": "The promised response or resolution time has passed."
+      },
+      "sla_warning": {
+        "label": "A ticket is close to its SLA",
+        "help": "There is still time, but not much."
+      },
+      "deal_won": {
+        "label": "A deal is won",
+        "help": "A deal you own is marked as won."
+      },
+      "quote_approval_requested": {
+        "label": "A quote needs my approval",
+        "help": "Somebody sent a quote up for approval."
+      },
+      "quote_approved": {
+        "label": "My quote was approved",
+        "help": "A quote you wrote may now be sent."
+      },
+      "quote_rejected": {
+        "label": "My quote was rejected",
+        "help": "A quote you wrote came back with a note."
+      },
+      "chat_message": {
+        "label": "A message in a channel",
+        "help": "Every message in a channel you are in. Noisy."
+      },
+      "direct": {
+        "label": "A direct message",
+        "help": "Somebody writes to you privately."
+      },
+      "group": {
+        "label": "A message in a group",
+        "help": "Every message in a group conversation."
+      },
+      "note": {
+        "label": "A mention in a note",
+        "help": "Somebody names you in a note on a record."
+      }
+    },
+    "noServiceWorker": "No service worker is running on this page, so nothing can receive a notification. Reload the page; if it persists, the app is running in development mode, where the worker is deliberately not registered."
   }
 }

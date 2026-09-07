@@ -54,6 +54,11 @@ const ICONS = [
   // one is a full-bleed square with the glyph inset for the corner radius.
   { file: "apple-touch-icon.png", size: 180, inset: 0.26, radius: 0, background: BRAND },
   { file: "icon-32.png", size: 32, inset: 0.16, radius: 6, background: BRAND },
+  // ⚠️ The notification badge is a *mask*, not a picture. Android keeps only the
+  // alpha channel and paints the result in the status bar's own colour, so a
+  // brand-coloured square would arrive as a solid brand-coloured blob. Hence the
+  // transparent background: what shows is the glyph's silhouette and nothing else.
+  { file: "badge-72.png", size: 72, inset: 0.14, radius: 0, background: "none" },
 ];
 
 await mkdir(OUT, { recursive: true });

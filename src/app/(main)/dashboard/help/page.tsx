@@ -658,11 +658,27 @@ const sections = [
     subtitle: "Avvisi e aggiornamenti in tempo reale",
     href: null,
     description:
-      "Il sistema di notifiche in-app ti tiene aggiornato sugli eventi rilevanti senza lasciare la piattaforma. L'icona campanella nell'header mostra il conteggio degli avvisi non letti.",
+      "La campanella nell'header mostra gli avvisi non letti mentre sei dentro Flux. Le notifiche push, se le attivi, ti raggiungono anche quando Flux è chiuso, come farebbe un'app installata.",
     topics: [
       {
         q: "Quali eventi generano una notifica?",
         a: "Quando un task assegnato a te sta per scadere o è scaduto, quando una tua trattativa viene chiusa come vinta, quando ti viene assegnato un lead, quando parte una campagna che hai avviato. Sui ticket: quando una promessa SLA ha consumato metà del tempo e poi l'80%, così puoi ancora farci qualcosa, e alla violazione — che avvisa anche le persone del gruppo indicato nella politica, ciascuna una volta sola. Le automazioni possono aggiungerne altre.",
+      },
+      {
+        q: "Posso ricevere le notifiche anche con Flux chiuso?",
+        a: "Sì. Vai su Impostazioni → Notifiche e attiva le notifiche su questo dispositivo: il browser ti chiede il permesso una volta, e da quel momento gli avvisi arrivano come quelli di un'applicazione installata. Il permesso vale per un browser e un dispositivo alla volta, quindi telefono e computer vanno attivati separatamente, e nella stessa pagina vedi l'elenco dei dispositivi registrati per toglierne uno che non usi più. C'è anche un pulsante per inviarti una prova e verificare subito che funzioni.",
+      },
+      {
+        q: "Su iPhone non trovo il pulsante per attivarle.",
+        a: "Apple recapita le notifiche solo alle app aggiunte alla schermata home, mai a una scheda di Safari. Apri il menu di condivisione, scegli 'Aggiungi a Home', poi apri Flux dall'icona: da lì il pulsante compare. Su Android e su computer non serve installare nulla.",
+      },
+      {
+        q: "Ricevo troppe notifiche. Posso scegliere quali?",
+        a: "Sì, in Impostazioni → Notifiche c'è un interruttore per ogni tipo di evento. Di default arrivano solo le quattro cose che richiedono una persona subito: un lead assegnato a te, una tua attività in scadenza, un ticket vicino allo SLA e un ticket che lo ha superato. Tutto il resto — messaggi in chat, menzioni nelle note, preventivi, trattative vinte — è spento finché non lo accendi tu. C'è anche un interruttore generale che le sospende tutte senza perdere le singole scelte. La campanella dentro Flux continua a mostrare tutto in ogni caso.",
+      },
+      {
+        q: "Ho detto di no al browser e ora non me lo chiede più.",
+        a: "È il comportamento normale: un browser a cui è stato detto di no non richiede il permesso una seconda volta. Devi riaprirlo dalle impostazioni del sito nel browser — di solito dall'icona a sinistra dell'indirizzo — consentire le notifiche per Flux e ricaricare la pagina.",
       },
       {
         q: "Come segno le notifiche come lette?",

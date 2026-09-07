@@ -12,6 +12,7 @@ import { appUrl } from "@/lib/app-url";
 import { requireActor, requireCapability } from "@/lib/auth-guard";
 import { sendInvitationEmail, sendPasswordResetEmail } from "@/lib/email";
 import { assignableRoles, normalizeTenantRole, outranks } from "@/lib/permissions";
+import { announce } from "@/lib/push-send";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
@@ -520,6 +521,9 @@ export async function createNotificationAction(data: {
 }) {
   const db = await getDb();
   await db.insert(notifications).values(data);
+  // The row is the record; this is the doorbell. It happens after the response
+  // and cannot fail this call — see src/lib/push-send.ts.
+  announce(db, [data]);
 }
 
 export async function createNotificationsBatch(
@@ -528,6 +532,7 @@ export async function createNotificationsBatch(
   if (rows.length === 0) return;
   const db = await getDb();
   await db.insert(notifications).values(rows);
+  announce(db, rows);
 }
 
 // ─── Change Own Password ──────────────────────────────────────────────────────

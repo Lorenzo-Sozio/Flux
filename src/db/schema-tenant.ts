@@ -63,6 +63,7 @@ export {
   marketingCampaigns,
   marketingCampaignsRelations,
   // Notifications
+  notificationPreferences,
   notifications,
   notificationsRelations,
   orderItems,
@@ -73,6 +74,8 @@ export {
   pipelineStagesRelations,
   // Products / orders / quotes
   products,
+  // Web push
+  pushSubscriptions,
   quoteActivities,
   quoteActivitiesRelations,
   quoteItems,

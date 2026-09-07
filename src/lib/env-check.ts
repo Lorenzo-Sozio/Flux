@@ -59,6 +59,14 @@ const REQUIRED: EnvSpec[] = [
     breaks: "campaign open and click links cannot be signed or verified",
   },
   {
+    name: "PUSH_VAPID_PUBLIC_KEY",
+    alternatives: ["PUSH_VAPID_PRIVATE_KEY"],
+    breaks:
+      "no browser can sign up for push notifications, so a lead assigned or an SLA " +
+      "breached at three in the morning is written down and reaches nobody until " +
+      "somebody next opens Flux (generate a pair with: npm run generate:vapid)",
+  },
+  {
     name: "S3_BUCKET",
     alternatives: ["S3_ENDPOINT"],
     breaks:

@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/lib/web-push.ts",
+    "description": "⚠️⚠️ le due chiavi pubbliche entrano nella derivazione in ordine inverso: ogni push viene cifrato correttamente, accettato con 201 e nessun browser al mondo riesce ad aprirlo",
+    "find": "  const keyInfo = concat(encoder.encode(WEBPUSH_INFO_PREFIX), new Uint8Array([0]), uaPublic, asPublic);",
+    "replace": "  const keyInfo = concat(encoder.encode(WEBPUSH_INFO_PREFIX), new Uint8Array([0]), asPublic, uaPublic);"
+  },
+  {
+    "file": "src/lib/web-push.ts",
+    "description": "⚠️⚠️ manca il NUL che chiude il contesto della chiave: la derivazione cambia, il corpo resta valido e indecifrabile",
+    "find": "const CEK_INFO = \"Content-Encoding: aes128gcm\\0\";",
+    "replace": "const CEK_INFO = \"Content-Encoding: aes128gcm\";"
+  },
+  {
+    "file": "src/lib/web-push.ts",
+    "description": "⚠️ il delimitatore dice che seguono altri record: il browser aspetta un record che non arriva mai",
+    "find": "  const record = concat(message, new Uint8Array([2]));",
+    "replace": "  const record = concat(message, new Uint8Array([1]));"
+  },
+  {
+    "file": "src/lib/web-push.ts",
+    "description": "⚠️ il sale non cambia piu' tra un messaggio e l'altro: chiave e nonce si ripetono, che e' esattamente cio' che AES-GCM non tollera",
+    "find": "  const salt = overrides?.salt ?? crypto.getRandomValues(new Uint8Array(16));",
+    "replace": "  const salt = overrides?.salt ?? new Uint8Array(16);"
+  },
+  {
+    "file": "src/lib/web-push.ts",
+    "description": "⚠️ il token VAPID viene firmato per l'endpoint intero invece che per l'origine: 401 dal servizio push, e solo in produzione",
+    "find": "  const audience = new URL(endpoint).origin;",
+    "replace": "  const audience = endpoint;"
+  },
+  {
+    "file": "src/lib/web-push.ts",
+    "description": "⚠️ una sottoscrizione morta non viene piu' riconosciuta come tale: resta in tabella e trasforma ogni notifica futura in una richiesta fallita garantita",
+    "find": "  if (response.status === 404 || response.status === 410) return { status: \"gone\" };",
+    "replace": "  if (response.status === 404) return { status: \"gone\" };"
+  },
+  {
+    "file": "src/lib/push-types.ts",
+    "description": "⚠️ l'interruttore generale non conta piu': chi ha spento tutto continua a ricevere notifiche",
+    "find": "  if (!prefs.enabled) return false;",
+    "replace": "  if (false) return false;"
+  },
+  {
+    "file": "src/lib/push-types.ts",
+    "description": "⚠️ un tipo mai catalogato passa comunque: il telefono suona per qualcosa che nessuno ha deciso dovesse suonare",
+    "find": "  if (!isPushType(type)) return false;",
+    "replace": "  if (isPushType(type)) return prefs.overrides[type as PushType] ?? PUSH_TYPES[type as PushType].defaultOn;"
+  }
+]

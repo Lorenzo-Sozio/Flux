@@ -346,6 +346,84 @@ offers the reload instead. Registration is production-only.
 `VERSION` in sw.js purges every older `flux-*` cache on activate; bump it when the
 worker's own logic changes.
 
+#### Web push: the one thing the worker does when no tab is open
+
+```bash
+npm run generate:vapid    # a VAPID keypair, once, for the whole deployment
+```
+
+The notification bell polls: every 30 seconds while a tab is in front of
+somebody, every five minutes while it is not, and never once it is closed. So an
+SLA breach at 3am was written down faithfully and reached nobody. Web push closes
+that: `createNotificationAction` and `createNotificationsBatch` write the row and
+then call `announce()` from [src/lib/push-send.ts](src/lib/push-send.ts), which
+runs behind `after()` and delivers to whatever devices the person signed up.
+
+Hooking it into those two functions rather than into each of the twelve callers
+is deliberate — a second list of "events that push" is exactly the thing that
+drifts from the first.
+
+**The row in the database stays the record; a push is the doorbell.** Delivery is
+best-effort, unordered, and nothing on this path may throw: it runs behind a
+server action, and an exception here would surface to somebody as a failed save
+of something that in fact saved.
+
+⚠️ **Not the `web-push` npm package.** [src/lib/web-push.ts](src/lib/web-push.ts)
+implements RFC 8291 payload encryption and RFC 8292 VAPID against Web Crypto,
+because `web-push` reaches for Node's `crypto` and `https` and this repository
+also runs on Workers. The failure mode of a half-working polyfill here is the
+worst one available: the send returns, nothing is logged, and no notification
+ever arrives.
+
+⚠️⚠️ **Every mistake in that file is silent.** A wrong info string, the two public
+keys in the wrong order, `0x01` instead of `0x02` as the record delimiter — all of
+them produce a body that encrypts, sends, and comes back **201**, because the push
+service is not the thing that decrypts it. `src/lib/web-push.test.ts` decrypts
+what we send with the RFC's byte strings *typed in by hand*, so a round-trip
+cannot pass by sharing a mistake with the encryptor. `scripts/mutations/web-push.json`
+breaks each one in turn.
+
+⚠️ **Not every notification pushes.** The catalogue is in
+[src/lib/push-types.ts](src/lib/push-types.ts): `lead_assigned`, `task_due`,
+`sla_warning` and `sla_breach` default to on, the other eight default to off, and
+a person changes any of them at `/dashboard/settings/notifications`. A type not in
+that catalogue never pushes — it still reaches the bell. Preferences are stored as
+*overrides* rather than as a list of enabled types, so a thirteenth type added
+later does not arrive silently switched off for everyone who ever opened the
+screen.
+
+⚠️ **A 410 means gone forever.** A reinstalled browser or a revoked permission
+answers 410 on every future send, so the subscription row is deleted the moment
+one appears. Left in place, the table only grows and every notification for that
+person becomes a fan-out of guaranteed failures.
+
+⚠️ **On iPhone and iPad push only works for an app added to the home screen.**
+`PushManager` exists in a Safari tab and `subscribe()` throws, so feature
+detection alone is not enough; the settings screen checks `display-mode:
+standalone` and explains, because otherwise the switch looks broken.
+
+⚠️ **The VAPID public key is served by a server action, not `NEXT_PUBLIC_*`.**
+Next inlines those at build time, and the Cloudflare build does not have the
+runtime variables — an empty key compiled into the bundle would make
+`pushManager.subscribe` fail on every device, long after anybody was looking at
+the build.
+
+⚠️ **Generate the keypair once.** Rotating it does not re-key anything: existing
+subscriptions hold endpoints the new private key cannot write to, they answer 403
+forever, and everyone has to turn notifications on again. `PUSH_VAPID_PUBLIC_KEY`
+and `PUSH_VAPID_PRIVATE_KEY` are Worker secrets on Cloudflare. Without them the
+product behaves exactly as before and the settings screen says so — push is
+optional, and its absence is not an error.
+
+⚠️ **Every push must show a notification.** The subscription is taken with
+`userVisibleOnly: true`; receiving one and staying silent makes Chrome display
+its own "site updated in the background" message and, repeated, revokes the
+permission. Hence the fallback branch in the worker's `push` handler.
+
+The devices table is tenant-scoped (`push_subscription`, `notification_preference`,
+migration `0014_a_phone_can_be_told`), so it arrives through the same
+auto-migration as everything else.
+
 #### Below `md` the layout is different, not narrower
 
 - **A bottom tab bar** ([mobile-tab-bar.tsx](src/app/(main)/dashboard/_components/sidebar/mobile-tab-bar.tsx)),

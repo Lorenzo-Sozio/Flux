@@ -2705,6 +2705,10 @@
           "uncollectible": "Inesigibile"
         }
       }
+    },
+    "notifications": {
+      "title": "Notifiche",
+      "description": "Scegli che cosa arriva sul telefono, e su quali dispositivi."
     }
   },
   "support": {
@@ -3368,5 +3372,93 @@
     "upload": "Carica",
     "uploadFailed": "Caricamento non riuscito.",
     "uploading": "Caricamento…"
+  },
+  "pushNotifications": {
+    "title": "Notifiche su questo dispositivo",
+    "subtitle": "Farti avvisare quando qualcosa ti riguarda, anche con Flux chiuso.",
+    "thisDevice": "Questo dispositivo",
+    "thisDeviceHelp": "Il permesso vale per un browser e un dispositivo alla volta: telefono e computer vanno autorizzati separatamente.",
+    "enableHere": "Attiva su questo dispositivo",
+    "disableHere": "Disattiva su questo dispositivo",
+    "enabledHere": "Le notifiche sono attive su questo dispositivo.",
+    "deviceRemoved": "Dispositivo rimosso.",
+    "permissionRefused": "Il browser non ha concesso il permesso.",
+    "sendTest": "Invia una prova",
+    "testSent": "{count, plural, =1 {Inviata a # dispositivo} other {Inviata a # dispositivi}}. Dovrebbe arrivare tra un istante.",
+    "testFailed": "Il servizio push non ha accettato il messaggio.",
+    "noDevices": "Nessun dispositivo è ancora registrato.",
+    "notConfigured": "Le notifiche push non sono configurate su questa installazione.",
+    "notConfiguredBody": "Mancano le chiavi di firma, quindi nessun dispositivo può registrarsi. Deve impostarle chi amministra questo Flux. Tutto il resto di questa pagina funziona, e la campanella dentro Flux non è toccata.",
+    "whatToSend": "Di che cosa farti avvisare",
+    "whatToSendHelp": "Vale per tutti i dispositivi. La campanella dentro Flux continua a mostrare tutto.",
+    "masterSwitch": "Tutte le notifiche di questo account",
+    "devices": "Dispositivi registrati",
+    "devicesHelp": "Rimuovi quelli che non esistono più, o che stanno su un telefono che non usi.",
+    "unknownDevice": "Browser non riconosciuto",
+    "current": "questo",
+    "addedOn": "Aggiunto il {date}",
+    "unsupported": {
+      "title": "Questo browser non può ricevere notifiche",
+      "body": "Non offre l'interfaccia push, oppure la pagina non arriva su connessione sicura. Prova con una versione recente di Chrome, Edge, Firefox o Safari."
+    },
+    "needsInstall": {
+      "title": "Su iPhone e iPad, installa prima Flux",
+      "body": "Apple recapita le notifiche solo a un'app aggiunta alla schermata home, mai a una scheda di Safari.\n\nApri il menu di condivisione, scegli Aggiungi a Home, poi apri Flux dall'icona e torna su questa pagina."
+    },
+    "denied": {
+      "title": "Le notifiche sono bloccate per questo sito",
+      "body": "Al browser è stato detto di no una volta e non lo richiederà. Consenti le notifiche per questo sito dalle impostazioni del browser, poi ricarica questa pagina."
+    },
+    "types": {
+      "lead_assigned": {
+        "label": "Mi viene assegnato un lead",
+        "help": "Qualcuno ti affida un lead da seguire."
+      },
+      "task_due": {
+        "label": "Scade una mia attività",
+        "help": "Un promemoria il giorno della scadenza, e di nuovo se è in ritardo."
+      },
+      "sla_breach": {
+        "label": "Un ticket ha superato lo SLA",
+        "help": "Il tempo di risposta o di risoluzione promesso è passato."
+      },
+      "sla_warning": {
+        "label": "Un ticket è vicino allo SLA",
+        "help": "C'è ancora tempo, ma poco."
+      },
+      "deal_won": {
+        "label": "Una trattativa è vinta",
+        "help": "Una trattativa di cui sei titolare passa a vinta."
+      },
+      "quote_approval_requested": {
+        "label": "Un preventivo attende la mia approvazione",
+        "help": "Qualcuno ha mandato un preventivo in approvazione."
+      },
+      "quote_approved": {
+        "label": "Il mio preventivo è approvato",
+        "help": "Un preventivo che hai scritto si può inviare."
+      },
+      "quote_rejected": {
+        "label": "Il mio preventivo è rifiutato",
+        "help": "Un preventivo che hai scritto è tornato indietro con una nota."
+      },
+      "chat_message": {
+        "label": "Un messaggio in un canale",
+        "help": "Ogni messaggio nei canali di cui fai parte. Rumoroso."
+      },
+      "direct": {
+        "label": "Un messaggio diretto",
+        "help": "Qualcuno ti scrive in privato."
+      },
+      "group": {
+        "label": "Un messaggio in un gruppo",
+        "help": "Ogni messaggio in una conversazione di gruppo."
+      },
+      "note": {
+        "label": "Una menzione in una nota",
+        "help": "Qualcuno ti nomina in una nota su una scheda."
+      }
+    },
+    "noServiceWorker": "Su questa pagina non è attivo nessun service worker, quindi niente può ricevere una notifica. Ricarica la pagina; se persiste, l'applicazione è in modalità sviluppo, dove il worker non viene registrato di proposito."
   }
 }

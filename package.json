@@ -16,6 +16,7 @@
     "mobile:audit": "node scripts/mobile-audit.mjs",
     "mobile:shots": "node scripts/mobile-shots.mjs",
     "generate:icons": "node scripts/generate-pwa-icons.mjs",
+    "generate:vapid": "node scripts/generate-vapid.mjs",
     "lint": "biome lint",
     "format": "biome format --write",
     "check": "biome check",
