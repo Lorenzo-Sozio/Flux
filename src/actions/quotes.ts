@@ -7,7 +7,6 @@ import crypto from "node:crypto";
 import { and, asc, count, desc, eq, ilike, inArray, or, type SQL, sql } from "drizzle-orm";
 import type { z } from "zod";
 
-import { createNotificationAction, createNotificationsBatch } from "@/actions/auth";
 import { CreateQuoteSchema, UpdateQuoteSchema } from "@/actions/quotes-validation";
 import { companies, contacts, deals, products, quoteActivities, quoteItems, quotes, users } from "@/db/schema";
 import { appUrl } from "@/lib/app-url";
@@ -16,6 +15,7 @@ import { computeDocument } from "@/lib/document-totals";
 import { sendEmail } from "@/lib/email-provider";
 import { getExchangeRates } from "@/lib/exchange-rates";
 import { getTenantById } from "@/lib/get-tenant";
+import { notify, notifyMany } from "@/lib/notify";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { can } from "@/lib/permissions";
 import { announceQuoteDecision, announceQuoteSent, hasAlreadyLeft } from "@/lib/quote-events";
@@ -526,7 +526,7 @@ export async function requestApprovalAction(quoteId: string) {
   await Promise.all([
     db.update(quotes).set({ status: "pending_approval", updatedAt: new Date() }).where(eq(quotes.id, quoteId)),
     logQuoteActivity(quoteId, "approval_requested", actor.userId),
-    createNotificationsBatch(
+    notifyMany(
       admins
         .filter((u) => u.id !== actor.userId)
         .map((u) => ({
@@ -570,7 +570,7 @@ export async function approveQuoteAction(quoteId: string) {
   ]);
 
   if (quote.ownerId && quote.ownerId !== actor.userId) {
-    await createNotificationAction({
+    await notify({
       userId: quote.ownerId,
       type: "quote_approved",
       title: "Quote approved",
@@ -603,7 +603,7 @@ export async function rejectQuoteAction(quoteId: string, note: string) {
   ]);
 
   if (quote.ownerId && quote.ownerId !== actor.userId) {
-    await createNotificationAction({
+    await notify({
       userId: quote.ownerId,
       type: "quote_rejected",
       title: "Quote sent back",

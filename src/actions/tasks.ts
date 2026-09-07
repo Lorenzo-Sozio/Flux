@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import { and, count, desc, eq, isNotNull, isNull, type SQL, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 
-import { createNotificationAction } from "@/actions/auth";
 import { dispatchWebhook } from "@/actions/webhooks";
 import {
   activities,
@@ -20,6 +19,7 @@ import {
   users,
 } from "@/db/schema";
 import { requireCapability, requireWriteAccess } from "@/lib/auth-guard";
+import { notify } from "@/lib/notify";
 import { can } from "@/lib/permissions";
 import { DONE_WINDOW_DAYS, TASK_LIST_CAP } from "@/lib/queue-window";
 import { selectTasksDueToday } from "@/lib/tasks-due";
@@ -283,7 +283,7 @@ export async function updateTaskStatus(id: string, status: string, revalidatePat
     // In-app notification to assignee (if different from owner)
     const notifyUserId = task.assigneeId ?? task.ownerId;
     if (notifyUserId) {
-      await createNotificationAction({
+      await notify({
         userId: notifyUserId,
         type: "task_due",
         title: "Task completed",

@@ -7,7 +7,6 @@ import { and, asc, count, desc, eq, getTableColumns, ilike, isNull, ne, or, type
 import type { AnyPgColumn, AnyPgTable } from "drizzle-orm/pg-core";
 import { getTranslations } from "next-intl/server";
 
-import { createNotificationAction } from "@/actions/auth";
 import {
   CompanySchema,
   CompanyUpdateSchema,
@@ -46,6 +45,7 @@ import {
 import { decodeFilter } from "@/lib/filter-types";
 import { computeLeadScore } from "@/lib/lead-score";
 import { COMPANY_CHILDREN, CONTACT_CHILDREN, childColumn, LEAD_CHILDREN, type MergeChild } from "@/lib/merge-children";
+import { notify } from "@/lib/notify";
 import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { getDb } from "@/lib/tenant-context";
 
@@ -225,7 +225,7 @@ export async function updateLead(id: string, data: unknown) {
         .from(leads)
         .where(eq(leads.id, id));
       if (cur && cur.ownerId !== validated.ownerId) {
-        createNotificationAction({
+        notify({
           userId: validated.ownerId,
           type: "lead_assigned",
           title: "Lead assigned to you",
@@ -501,7 +501,7 @@ export async function updateContact(id: string, data: unknown) {
         .from(contacts)
         .where(eq(contacts.id, id));
       if (cur && cur.ownerId !== validated.ownerId) {
-        createNotificationAction({
+        notify({
           userId: validated.ownerId,
           type: "lead_assigned",
           title: "Contact assigned to you",
@@ -612,7 +612,7 @@ export async function updateCompany(id: string, data: unknown) {
         .from(companies)
         .where(eq(companies.id, id));
       if (cur && cur.ownerId !== validated.ownerId) {
-        createNotificationAction({
+        notify({
           userId: validated.ownerId,
           type: "lead_assigned",
           title: "Company assigned to you",

@@ -7,9 +7,9 @@
 
 import { and, eq, isNotNull, lt } from "drizzle-orm";
 
-import { createNotificationAction } from "@/actions/auth";
 import { taskDependencies, tasks } from "@/db/schema";
 import { runCronJob } from "@/lib/cron-runner";
+import { notify } from "@/lib/notify";
 import type { TenantDb } from "@/lib/tenant-resolve";
 
 // Runs once per workspace. It used to run once for no workspace at all: getDb()
@@ -41,7 +41,7 @@ async function runForTenant(db: TenantDb) {
     const notifyUserId = task.ownerId;
     if (!notifyUserId) continue;
 
-    await createNotificationAction({
+    await notify({
       userId: notifyUserId,
       type: "task_due",
       title: `Task "${task.title}" is overdue`,

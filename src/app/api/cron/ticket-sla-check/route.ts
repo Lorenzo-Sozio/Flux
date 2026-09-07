@@ -1,9 +1,9 @@
 import { and, eq, inArray, isNotNull, isNull, lt } from "drizzle-orm";
 
-import { createNotificationsBatch } from "@/actions/auth";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { slas, tickets, userGroupMembers } from "@/db/schema";
 import { runCronJob } from "@/lib/cron-runner";
+import { notifyMany } from "@/lib/notify";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import type { getDb } from "@/lib/tenant-context";
 
@@ -146,7 +146,7 @@ export async function GET(req: Request) {
         }));
       });
 
-      if (breachRows.length > 0) await createNotificationsBatch(breachRows).catch(() => undefined);
+      if (breachRows.length > 0) await notifyMany(breachRows).catch(() => undefined);
     }
 
     // ── Approaching the deadline ─────────────────────────────────────────────
@@ -235,7 +235,7 @@ export async function GET(req: Request) {
         }));
       });
 
-      if (rows.length > 0) await createNotificationsBatch(rows).catch(() => undefined);
+      if (rows.length > 0) await notifyMany(rows).catch(() => undefined);
     }
 
     return { breached: active.length, warned: warnings.length };

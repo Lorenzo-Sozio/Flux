@@ -133,20 +133,17 @@ describe("a job that repeats within a day", () => {
   });
 });
 
-describe("known gaps", () => {
-  // ⚠️ Marked `it.fails`: it passes while the behaviour is still wrong and starts
-  // failing the day somebody fixes it, which is exactly when this note is worth
-  // reading.
-  it.fails("the email worker remembers which activity reminders it has sent", () => {
-    // `getActivitiesWithPendingReminder` asks for reminders due in the next two
-    // minutes and the worker runs every minute, so each one matches on two
-    // consecutive runs: two notifications and two emails where there should be
-    // one. Twice is not ninety-six times, which is why this is a note and not a
-    // fix, but it is the same shape of bug.
-    //
-    // Fixing it properly needs somewhere to record that a reminder went out —
-    // a `reminder_sent_at` on the activity — which is a tenant migration, and a
-    // migration is not something to slip into a bug fix.
-    expect(read(routeFile("/api/cron/email-worker"))).toContain("reminderSentAt");
+describe("the activity reminder", () => {
+  it("⚠️ is not sent twice because the window is wider than the schedule", () => {
+    // `getActivitiesWithPendingReminder` looks two minutes ahead and the worker
+    // runs every minute, so each reminder matched on two consecutive runs. The
+    // wide window is deliberate: it is what stops a missed run losing a reminder
+    // altogether. So the answer is memory, and the memory is what today has
+    // already produced.
+    const source = read(routeFile("/api/cron/email-worker"));
+    const guardAt = source.indexOf("toldToday.has(key)");
+    const notifyAt = source.indexOf("await notify({");
+    expect(guardAt).toBeGreaterThan(-1);
+    expect(notifyAt).toBeGreaterThan(guardAt);
   });
 });

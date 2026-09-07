@@ -13,10 +13,10 @@
 import { and, eq, gte } from "drizzle-orm";
 
 import { getActivitiesDueToday } from "@/actions/activities";
-import { createNotificationAction } from "@/actions/auth";
 import { notifications, users } from "@/db/schema";
 import { runCronJob } from "@/lib/cron-runner";
 import { sendActivityReminderEmail, sendTaskDueEmail } from "@/lib/email";
+import { notify } from "@/lib/notify";
 import { selectTasksDueToday } from "@/lib/tasks-due";
 import type { TenantDb } from "@/lib/tenant-resolve";
 
@@ -82,7 +82,7 @@ async function runForTenant(db: TenantDb) {
     toldToday.add(key);
 
     // In-app notification
-    await createNotificationAction({
+    await notify({
       userId,
       type: "task_due",
       title,
@@ -127,7 +127,7 @@ async function runForTenant(db: TenantDb) {
     if (toldToday.has(key)) continue;
     toldToday.add(key);
 
-    await createNotificationAction({
+    await notify({
       userId: activity.ownerId,
       type: "task_due",
       title,

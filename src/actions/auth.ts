@@ -12,7 +12,6 @@ import { appUrl } from "@/lib/app-url";
 import { requireActor, requireCapability } from "@/lib/auth-guard";
 import { sendInvitationEmail, sendPasswordResetEmail } from "@/lib/email";
 import { assignableRoles, normalizeTenantRole, outranks } from "@/lib/permissions";
-import { announce } from "@/lib/push-send";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import { decryptDbUrl } from "@/lib/tenant-db";
 
@@ -512,28 +511,13 @@ export async function markAllNotificationsReadAction() {
   revalidatePath("/dashboard");
 }
 
-export async function createNotificationAction(data: {
-  userId: string;
-  type: string;
-  title: string;
-  message?: string;
-  link?: string;
-}) {
-  const db = await getDb();
-  await db.insert(notifications).values(data);
-  // The row is the record; this is the doorbell. It happens after the response
-  // and cannot fail this call — see src/lib/push-send.ts.
-  announce(db, [data]);
-}
-
-export async function createNotificationsBatch(
-  rows: { userId: string; type: string; title: string; message?: string; link?: string }[],
-) {
-  if (rows.length === 0) return;
-  const db = await getDb();
-  await db.insert(notifications).values(rows);
-  announce(db, rows);
-}
+// ⚠️ `createNotificationAction` and `createNotificationsBatch` used to live here.
+// They are `notify` and `notifyMany` in src/lib/notify.ts now, because a
+// `"use server"` module registers every export as an endpoint the browser can
+// call, and those two had no authorisation check while taking the recipient from
+// their caller. Guarding them was not possible: every caller is a scheduled job
+// or another server action, and half run with no session. So they stopped being
+// actions.
 
 // ─── Change Own Password ──────────────────────────────────────────────────────
 // Platform DB: credentials are checked against the platform account, so writing

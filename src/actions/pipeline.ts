@@ -5,7 +5,6 @@ import { after } from "next/server";
 
 import { and, count, eq, gte, inArray } from "drizzle-orm";
 
-import { createNotificationAction } from "@/actions/auth";
 import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import {
@@ -22,6 +21,7 @@ import {
 import { DEFAULT_STAGES } from "@/db/seed-workspace";
 import { requireAdminAccess, requireCapability, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
 import { convertToEur, getExchangeRates } from "@/lib/exchange-rates";
+import { notify } from "@/lib/notify";
 import { getDb } from "@/lib/tenant-context";
 
 export async function getPipelineData() {
@@ -268,7 +268,7 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
       () => {},
     );
     if (updatedDeal.ownerId) {
-      createNotificationAction({
+      notify({
         userId: updatedDeal.ownerId,
         type: "deal_won",
         title: "Deal won! 🏆",

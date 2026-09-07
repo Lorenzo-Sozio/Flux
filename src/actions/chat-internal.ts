@@ -2,9 +2,9 @@
 
 import { and, desc, eq, gt, inArray, lt, ne, sql } from "drizzle-orm";
 
-import { createNotificationAction } from "@/actions/auth";
 import { auth } from "@/auth";
 import { dmConversationMembers, dmConversations, dmMessages, users } from "@/db/schema";
+import { notify } from "@/lib/notify";
 import { getDb } from "@/lib/tenant-context";
 
 type SessionUser = { id: string; name?: string | null; email?: string | null };
@@ -216,7 +216,7 @@ export async function sendMessage(conversationId: string, content: string) {
   const preview = trimmed.length > 60 ? `${trimmed.slice(0, 60)}…` : trimmed;
 
   for (const { userId } of otherMembers) {
-    createNotificationAction({
+    notify({
       userId,
       type: "chat_message",
       title: `New message from ${senderName}`,

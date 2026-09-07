@@ -9,14 +9,14 @@
  * Retry: up to 3 attempts with exponential backoff (5 min, 30 min).
  */
 
-import { and, eq, lte, sql } from "drizzle-orm";
+import { and, eq, gte, lte, sql } from "drizzle-orm";
 
 import { getActivitiesWithPendingReminder } from "@/actions/activities";
-import { createNotificationAction } from "@/actions/auth";
-import { campaignLogs, emailJobs, marketingCampaigns, users } from "@/db/schema";
+import { campaignLogs, emailJobs, marketingCampaigns, notifications, users } from "@/db/schema";
 import { runCronJob } from "@/lib/cron-runner";
 import { sendActivityReminderEmail } from "@/lib/email";
 import { getEmailConfig, sendEmail } from "@/lib/email-provider";
+import { notify } from "@/lib/notify";
 import type { TenantDb } from "@/lib/tenant-resolve";
 
 const BATCH_SIZE = Number.parseInt(process.env.EMAILS_PER_WORKER_RUN ?? "30", 10);
@@ -129,6 +129,26 @@ async function dispatchActivityReminders(db: TenantDb): Promise<number> {
   const pendingReminders = await getActivitiesWithPendingReminder(2);
   let remindersDispatched = 0;
 
+  // ⚠️ The window is two minutes wide and this job runs every minute, so every
+  // reminder matched on two consecutive runs: two notifications and two emails
+  // where one was meant. The wide window is deliberate — it is what stops a
+  // missed run losing a reminder altogether — so the fix is memory, not a
+  // narrower window.
+  //
+  // Same memory as `task-reminders`: what today has already produced. No column
+  // to add, and one reminder per person per thing per day is the right answer
+  // even if the window were to change again.
+  const midnight = new Date();
+  midnight.setHours(0, 0, 0, 0);
+  const toldToday = new Set(
+    (
+      await db
+        .select({ userId: notifications.userId, title: notifications.title })
+        .from(notifications)
+        .where(and(eq(notifications.type, "task_due"), gte(notifications.createdAt, midnight)))
+    ).map((n) => `${n.userId}\u0000${n.title}`),
+  );
+
   for (const activity of pendingReminders) {
     if (!activity.ownerId || !activity.date) continue;
 
@@ -147,10 +167,16 @@ async function dispatchActivityReminders(db: TenantDb): Promise<number> {
     else if (activity.leadId) link = `/dashboard/leads/${activity.leadId}`;
     else if (activity.companyId) link = `/dashboard/companies/${activity.companyId}`;
 
-    await createNotificationAction({
+    const title = `Upcoming ${typeLabel}: "${description}"`;
+    const key = `${activity.ownerId}\u0000${title}`;
+    // Already sent on this run or an earlier one today.
+    if (toldToday.has(key)) continue;
+    toldToday.add(key);
+
+    await notify({
       userId: activity.ownerId,
       type: "task_due",
-      title: `Upcoming ${typeLabel}: "${description}"`,
+      title,
       message: `Scheduled for ${activity.date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`,
       link,
       // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
