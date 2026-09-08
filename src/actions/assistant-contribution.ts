@@ -4,6 +4,7 @@ import { and, gte, lte, sql } from "drizzle-orm";
 
 import { contacts, orders } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
+import { SORGENTE_ASSISTENTE } from "@/lib/order-source";
 import { getDb } from "@/lib/tenant-context";
 
 /**
@@ -29,8 +30,6 @@ import { getDb } from "@/lib/tenant-context";
  * reported separately as *not recorded* — and the honest total of "how many were the
  * assistant's" is only the period since the column exists.
  */
-export const SORGENTE_ASSISTENTE = "assistant";
-
 export interface ContributoAssistente {
   /** Contacts this workspace has, whose record was created by the assistant. */
   contattiDallAssistente: number;

@@ -51,7 +51,11 @@ vi.mock("drizzle-orm", () => ({
     pezzi.reduce((acc, p, i) => acc + p + (i < valori.length ? String(valori[i]) : ""), ""),
 }));
 
-const { contributoDellAssistente, SORGENTE_ASSISTENTE } = await import("@/actions/assistant-contribution");
+const { contributoDellAssistente } = await import("@/actions/assistant-contribution");
+// ⚠️ The constant moved out of that module: a `"use server"` file may export
+// nothing but async functions, and a plain `const` there fails the production
+// build rather than lint.
+const { SORGENTE_ASSISTENTE } = await import("@/lib/order-source");
 
 beforeEach(() => {
   interrogazioni.length = 0;
