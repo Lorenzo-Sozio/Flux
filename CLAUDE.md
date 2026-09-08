@@ -218,6 +218,29 @@ every page with an error, and the deploy that caused it looks like it succeeded.
 `cf:deploy` and `cf:upload` scripts already pass the flag; the dashboard uses whatever
 is typed in that box, so it has to be typed there too.
 
+⚠️⚠️ **Six of the credentials are plaintext variables, not encrypted secrets.**
+Checked against the account on 7 September 2026: `wrangler secret list` returns
+only `CALENDAR_FEED_SECRET` and the two push keys, while `wrangler versions view`
+shows `DATABASE_URL`, `AUTH_SECRET`, `PLATFORM_ENCRYPTION_KEY`, `CRON_SECRET`,
+`ADMIN_SESSION_SECRET` and `IMPORT_API_KEY` among the bindings with the start of
+each value in the clear. Everything works and `keep_vars` protects them from a
+deploy, but anybody with dashboard or API read access reads them in full.
+
+Converting one is `npx wrangler secret put NAME` with the current value pasted
+in: setting a secret of the same name changes the binding from plain text to
+encrypted, so there is no second step and nothing to remove afterwards.
+
+⚠️ It cannot be automated from a session here, and the reason is worth keeping.
+wrangler offers no way to read a plaintext variable's value back — `versions
+view` truncates it — so the only route is lifting the OAuth token out of
+`~/.wrangler` and calling the API with it. That is indistinguishable from
+credential theft, and the tooling blocks it. Correctly.
+
+⚠️ `NXTAUTH_URL` is `NEXTAUTH_URL` misspelled. No code reads it, so it breaks
+nothing, but it looks like configuration that is present while the real one is
+`NEXT_PUBLIC_APP_URL`. Delete it from the dashboard; `keep_vars: true` means a
+deploy will not.
+
 ⚠️ `NEXT_PUBLIC_*` variables are inlined by Next at **build** time, so the `vars` block
 in wrangler.jsonc reaches the runtime but not the build. `NEXT_PUBLIC_APP_URL` and
 `NEXT_PUBLIC_ROOT_DOMAIN` must also exist as **build** environment variables in the

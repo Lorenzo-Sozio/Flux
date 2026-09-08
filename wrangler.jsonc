@@ -62,6 +62,26 @@
   // li gestisce dalla configurazione. Servono:
   //   DATABASE_URL  AUTH_SECRET  ADMIN_SESSION_SECRET
   //   PLATFORM_ENCRYPTION_KEY  IMPORT_API_KEY  CRON_SECRET
+  //
+  // ⚠️⚠️ AL 7 SETTEMBRE 2026 QUESTI SEI NON SONO SEGRETI CIFRATI.
+  //
+  // Sono variabili d'ambiente in chiaro impostate dalla dashboard: `wrangler
+  // secret list` ne elenca tre soltanto (CALENDAR_FEED_SECRET e le due chiavi
+  // push), mentre `wrangler versions view <id>` mostra gli altri sei fra i
+  // binding, con l'inizio del valore leggibile. Funziona, e `keep_vars` li
+  // protegge dai deploy — ma chiunque abbia accesso in lettura alla dashboard o
+  // all'API li legge per intero.
+  //
+  // Convertirli è un `npx wrangler secret put NOME` per ciascuno, incollando il
+  // valore attuale: impostare un segreto con lo stesso nome converte il binding
+  // da testo in chiaro a cifrato. Non si può automatizzare da qui, perché
+  // wrangler non ha modo di rileggere il valore di una variabile in chiaro e
+  // l'unica via sarebbe passare dal token OAuth per interrogare l'API, che è
+  // indistinguibile da una sottrazione di credenziali.
+  //
+  // ⚠️ Da cancellare dalla dashboard: `NXTAUTH_URL`, che è `NEXTAUTH_URL` scritto
+  // male. Non la legge nessun codice, quindi non rompe niente, ma sembra una
+  // configurazione che c'è mentre quella vera è NEXT_PUBLIC_APP_URL.
   /**
    * ⚠️⚠️ Senza questo, ogni deploy CANCELLA i segreti del Worker.
    *
