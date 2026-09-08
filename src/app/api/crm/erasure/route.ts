@@ -2,9 +2,16 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { createTenantDb } from "@/db";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { logApiWrite } from "@/lib/api-write-log";
 import { countByContactPoint, eraseByContactPoint } from "@/lib/erasure";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
+
+/**
+ * The route's own name, written once: the idempotency ledger and the write log both
+ * record it, and two literals that have to agree are one literal too many.
+ */
+const ENDPOINT = "/api/crm/erasure";
 
 /**
  * GDPR art. 17 — erase the person reachable at a contact point.
@@ -53,7 +60,13 @@ export async function POST(req: NextRequest) {
       // from different conditions can describe an operation that will not happen.
       return NextResponse.json({ status: "preview", found: await countByContactPoint(db, contactPoint) });
     }
-    return NextResponse.json({ status: "erased", report: await eraseByContactPoint(db, contactPoint) });
+    const report = await eraseByContactPoint(db, contactPoint);
+    // ⚠️⚠️ **No `recordId` here, and it is not an omission.** Naming the lead or the contact
+    // just erased would leave, in a table erasure does not visit, a way back to the person
+    // who asked to disappear — which is the one criterion this endpoint exists to meet. The
+    // preview branch above logs nothing at all: it writes nothing.
+    await logApiWrite(db, authResult, { entity: "erasure", endpoint: ENDPOINT, recordId: null });
+    return NextResponse.json({ status: "erased", report });
   } catch (err) {
     // ⚠️ A failure is reported as a failure. Answering 200 to an erasure that did not
     // happen is the one outcome that turns a technical problem into a false statement to

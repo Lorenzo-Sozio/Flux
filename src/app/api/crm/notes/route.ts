@@ -4,10 +4,17 @@ import { createTenantDb } from "@/db";
 import { activities } from "@/db/schema";
 import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint, whereToNote } from "@/lib/contact-point";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
+
+/**
+ * The route's own name, written once: the idempotency ledger and the write log both
+ * record it, and two literals that have to agree are one literal too many.
+ */
+const ENDPOINT = "/api/crm/notes";
 
 /**
  * Write down, on the person's own timeline, something an integration did.
@@ -107,7 +114,7 @@ export async function POST(req: NextRequest) {
   // A caller whose response never arrived does not know whether this landed, and
   // sending it again creates a second copy of whatever this route cannot match
   // on. A key makes that retry safe. No key, and nothing changes.
-  const idempotency = await claim(db, "/api/crm/notes", req.headers.get("Idempotency-Key"), await hashBody(rawBody));
+  const idempotency = await claim(db, ENDPOINT, req.headers.get("Idempotency-Key"), await hashBody(rawBody));
   if (idempotency.kind === "replay") {
     return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
   }
@@ -149,6 +156,10 @@ export async function POST(req: NextRequest) {
       // ⚠️ No webhook here, deliberately. This note exists because an integration told us what
       // it did: announcing it back would hand that integration its own event, and one that
       // filters its own writes would drop it while one that does not would loop.
+      //
+      // The write log is a different thing and does fire: it goes nowhere, it only says that
+      // this happened and who did it.
+      await logApiWrite(db, authResult, { entity: "note", endpoint: ENDPOINT, recordId: created.id });
       return NextResponse.json({ status: "created", id: created.id }, { status: 201 });
     })();
   } catch (error) {

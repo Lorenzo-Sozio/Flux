@@ -16,6 +16,8 @@ let definizioni: { id: string; slug: string; entityType: string }[] = [];
 /** I valori scritti, per `fieldId`. */
 let valori: { id: string; fieldId: string; value: string }[] = [];
 const creati: { name: string; slug: string; entityType: string; fieldType: string }[] = [];
+/** The lines saying who called the route. */
+const scritture: Record<string, unknown>[] = [];
 let person: { leadIds: string[]; contactIds: string[] } = { leadIds: ["l1"], contactIds: [] };
 
 vi.mock("@/lib/billing/usage", () => ({
@@ -66,6 +68,13 @@ vi.mock("@/db", () => ({
         // drizzle exposes its own name is its business, and a double that leaned on it
         // appoggiasse smetterebbe di distinguere le due tabelle al primo aggiornamento —
         // silenziosamente, mandando le definizioni fra i valori.
+        // Who called: a third table, told apart like the other two. Letting it fall through
+        // would file it among the collected values, and the test that counts them would go
+        // red for a reason that has nothing to do with custom fields.
+        if ("via" in riga) {
+          scritture.push(riga);
+          return { returning: async () => [] };
+        }
         if ("slug" in riga) {
           creati.push(riga as never);
           const id = `def-${riga.slug}`;
@@ -101,6 +110,7 @@ function richiesta(body: unknown) {
 beforeEach(() => {
   regole.length = 0;
   creati.length = 0;
+  scritture.length = 0;
   definizioni = [];
   valori = [];
   person = { leadIds: ["l1"], contactIds: [] };
@@ -115,6 +125,22 @@ describe("what happens to the collected values", () => {
     expect(risposta.status).toBe(200);
     expect(valori).toHaveLength(1);
     expect(valori[0].value).toBe("8000");
+  });
+
+  it("⚠️ dice che è stata un'integrazione a scriverli", async () => {
+    // The whole point of collecting these values is that something did it unattended.
+    // Without this line the report cannot say so, and a missing line is invisible.
+    await POST(richiesta({ contactPoint: "+39 333 111 2223", fields: { budget: "8000" } }));
+
+    expect(scritture).toHaveLength(1);
+    expect(scritture[0]).toMatchObject({
+      entity: "custom-field",
+      endpoint: "/api/crm/custom-fields",
+      recordId: "l1",
+      rows: 1,
+      via: "apikey",
+      actor: null,
+    });
   });
 
   it("⚠️ creates the definition the owner already declared in the assistant", async () => {

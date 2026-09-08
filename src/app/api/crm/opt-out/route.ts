@@ -6,9 +6,16 @@ import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { createTenantDb } from "@/db";
 import { contacts, leads } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { logApiWrite } from "@/lib/api-write-log";
 import { findByContactPoint, readContactPoint } from "@/lib/contact-point";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
+
+/**
+ * The route's own name, written once: the idempotency ledger and the write log both
+ * record it, and two literals that have to agree are one literal too many.
+ */
+const ENDPOINT = "/api/crm/opt-out";
 
 /**
  * Record that a person told an integration they do not want to be contacted any more.
@@ -147,6 +154,16 @@ export async function POST(req: NextRequest) {
       }),
     );
   }
+
+  // ⚠️ Nothing silenced, nothing logged — and that is the same decision as the `200` below,
+  // read from the other side: the answer is «already so», and a line here would report a
+  // change that did not happen. `rows: 0` is refused by the log for exactly this reason.
+  await logApiWrite(db, authResult, {
+    entity: "consent",
+    endpoint: ENDPOINT,
+    recordId: zittiti.length === 1 ? zittiti[0] : null,
+    rows: zittiti.length,
+  });
 
   // ⚠️ `200` even when nothing changed: the person is here and is not subscribed, which is
   // the state that was asked for. A `404` would say «not here», which is a different fact

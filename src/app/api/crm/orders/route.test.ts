@@ -306,3 +306,58 @@ describe("la campanella dell'ordine", () => {
     expect(inseriti.some((r) => r.tabella === "order")).toBe(true);
   });
 });
+
+describe("chi ha scritto, e da dove arriva il cliente", () => {
+  const riga = (tabella: string) => inseriti.find((r) => r.tabella === tabella)?.valori ?? {};
+
+  it("⚠️⚠️ `source` porta il canale del cliente, non il nome di chi scrive", async () => {
+    // The literal `assistant` used to go in here, on the order and on the contact it
+    // creates. That answered «who wrote this row» in a column that means «where the
+    // customer came from» — two questions in one field, and the first caller using it for
+    // its real meaning makes the report lie.
+    await POST(richiesta({ ...ORDINE, source: "whatsapp", contactPoint: "nuova@example.it" }));
+
+    expect(riga("order").source).toBe("whatsapp");
+  });
+
+  it("⚠️ senza un canale dichiarato non ne inventa uno", async () => {
+    await POST(richiesta(ORDINE));
+
+    // Null reads as «not recorded», which is true. `assistant` would read as a commercial
+    // origin nobody stated.
+    expect(riga("order").source).toBeNull();
+  });
+
+  it("il contatto creato per l'ordine porta lo stesso canale", async () => {
+    contatti = [];
+
+    await POST(richiesta({ ...ORDINE, source: "whatsapp" }));
+
+    // One customer, one origin: two halves of the same event must not disagree.
+    expect(riga("contact").source).toBe("whatsapp");
+  });
+
+  it("⚠️ un canale lunghissimo è un rifiuto, non un troncamento", async () => {
+    const risposta = await POST(richiesta({ ...ORDINE, source: "x".repeat(101) }));
+
+    expect(risposta.status).toBe(422);
+    expect(inseriti.some((r) => r.tabella === "order")).toBe(false);
+  });
+
+  it("⚠️⚠️ registra che a scrivere è stata un'integrazione", async () => {
+    await POST(richiesta(ORDINE));
+
+    // This is the line the report reads. Without it the order is written and nothing says
+    // it was taken unattended — invisible by construction, which is why it is pinned here
+    // and not only in the inventory.
+    const traccia = riga("api_write_log");
+    expect(traccia).toMatchObject({
+      entity: "order",
+      endpoint: "/api/crm/orders",
+      recordId: "order-1",
+      rows: 1,
+      via: "apikey",
+      actor: null,
+    });
+  });
+});

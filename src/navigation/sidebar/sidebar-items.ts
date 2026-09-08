@@ -166,11 +166,6 @@ export const sidebarItems: NavGroup[] = [
       },
       { titleKey: "quotes", url: "/dashboard/sales/quotes", icon: FileText, module: "sales" },
       { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, module: "sales" },
-      // Next to the orders it counts, not in a reports corner: the question it answers —
-      // how much of this month came in on its own — is asked while looking at the day's
-      // orders. It reads only this database, so it opens with the assistant switched off
-      // and simply shows nothing brought in, which is the truth.
-      { titleKey: "assistantContribution", url: "/dashboard/sales/assistant", icon: Bot, module: "sales" },
       { titleKey: "products", url: "/dashboard/sales/products", icon: Package, module: "sales" },
     ],
   },
@@ -220,6 +215,15 @@ export const sidebarItems: NavGroup[] = [
       // spending breakdown, not a thing you write. It also keeps this group
       // above one entry, which is the line between a heading and a label.
       { titleKey: "finance", url: "/dashboard/sales/finance", icon: Banknote, module: "sales" },
+      // ⚠️ Here rather than beside the orders, where it used to sit: it is not a sales
+      // number. It says what the thing writing into this CRM has been doing — leads,
+      // notes, activities, custom fields, orders — and the orders were only one of them.
+      //
+      // ⚠️ And **not** under `/dashboard/reports`, which is behind the reporting module:
+      // whoever connects an assistant needs to see what it does whether or not they bought
+      // a reports package. It reads only this database, so it opens with no assistant
+      // connected and shows nothing, which is the truth.
+      { titleKey: "assistantContribution", url: "/dashboard/assistant", icon: Bot, need: "report:read" },
       {
         titleKey: "reports",
         url: "/dashboard/reports",

@@ -7,6 +7,7 @@ import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
 import { chunk, INSERT_CHUNK } from "@/lib/api-import-batch";
 import { buildActivityPayload, type ValidationError, validateActivityInput } from "@/lib/api-import-validators";
+import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
@@ -20,6 +21,12 @@ const MAX_BATCH = 500;
 type BulkResult =
   | { index: number; status: "created"; id: string }
   | { index: number; status: "error"; errors: ValidationError[] };
+
+/**
+ * The route's own name, written once: the idempotency ledger and the write log both
+ * record it, and two literals that have to agree are one literal too many.
+ */
+const ENDPOINT = "/api/crm/contacts/{contactId}/activities/bulk";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ contactId: string }> }) {
   const authResult = await authenticateApiRequest(req);
@@ -83,12 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ con
   // response arriving. When it does not the caller knows nothing, and sending
   // the batch again duplicates whatever this route cannot deduplicate. A key
   // makes that retry safe. No key, and nothing changes.
-  const idempotency = await claim(
-    db,
-    "/api/crm/contacts/{contactId}/activities/bulk",
-    req.headers.get("Idempotency-Key"),
-    await hashBody(rawBody),
-  );
+  const idempotency = await claim(db, ENDPOINT, req.headers.get("Idempotency-Key"), await hashBody(rawBody));
   if (idempotency.kind === "replay") {
     return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
   }
@@ -163,6 +165,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ con
       },
       results,
     };
+
+    // ⚠️ One line for the request, not one per record: a batch of five hundred is a single
+    // thing that happened, and `rows` says how big it was. Rows that were skipped or
+    // rejected are not counted — nothing was written for them, and counting them would
+    // make the report flatter whoever sent the batch.
+    await logApiWrite(db, authResult, {
+      entity: "activity",
+      endpoint: ENDPOINT,
+      rows: payload.summary.created + payload.summary.updated,
+    });
 
     // Stored before answering, so a retry that arrives while this response is
     // still in flight replays it rather than importing again.

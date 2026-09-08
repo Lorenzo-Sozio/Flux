@@ -8,6 +8,7 @@ import { createTenantDb } from "@/db";
 import { contacts, notifications, orderItems, orders, users } from "@/db/schema";
 import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint, whereToNote } from "@/lib/contact-point";
 import { computeDocument } from "@/lib/document-totals";
@@ -61,6 +62,12 @@ interface RigaIn {
   /** The line this one belongs to, for extras and variants priced separately. */
   appliesTo?: string;
 }
+
+/**
+ * The route's own name, written once: the idempotency ledger and the write log both
+ * record it, and two literals that have to agree are one literal too many.
+ */
+const ENDPOINT = "/api/crm/orders";
 
 /**
  * Record an order an assistant took from a customer, in words, on the phone or in chat.
@@ -156,7 +163,18 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // ⚠️⚠️ **Where the customer came from, and nothing else.**
+  //
+  // This used to be written as the literal `assistant` on both the contact and the order,
+  // which read as «the assistant wrote this row». That is a different question — it is
+  // answered by the write log now — and putting it here made `source` mean two things at
+  // once: the first caller to use the column for its real meaning would have made the
+  // report lie. So the value comes from the caller, who knows the channel, exactly as the
+  // lead import already works. Absent, it stays null: «not recorded» is an answer, and
+  // inventing one is not.
+  const source = typeof dati.source === "string" ? dati.source.trim() : "";
   const errors: { field: string; message: string }[] = [];
+  if (source.length > 100) errors.push({ field: "source", message: "source is too long" });
   if (!contactPoint) errors.push({ field: "contactPoint", message: "contactPoint is required" });
   if (righe.length === 0 || righe.length !== grezze.length) {
     errors.push({
@@ -211,7 +229,7 @@ export async function POST(req: NextRequest) {
   // A caller whose response never arrived does not know whether this landed, and
   // sending it again creates a second copy of whatever this route cannot match
   // on. A key makes that retry safe. No key, and nothing changes.
-  const idempotency = await claim(db, "/api/crm/orders", req.headers.get("Idempotency-Key"), await hashBody(rawBody));
+  const idempotency = await claim(db, ENDPOINT, req.headers.get("Idempotency-Key"), await hashBody(rawBody));
   if (idempotency.kind === "replay") {
     return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
   }
@@ -253,7 +271,7 @@ export async function POST(req: NextRequest) {
             // The digits are what matching uses; the number as typed is what a person
             // reads, so that is what gets stored.
             phone: parsed.digits ? contactPoint : undefined,
-            source: "assistant",
+            source: source || undefined,
           })
           .returning({ id: contacts.id });
         contactId = nuovo.id;
@@ -289,9 +307,9 @@ export async function POST(req: NextRequest) {
           totalAmount: String(totali.total),
           status: "draft",
           notes: note || null,
-          // ⚠️ The same word the contact gets when this endpoint creates one. Two halves of
-          // one event that disagreed until now: the person was marked, the order was not.
-          source: "assistant",
+          // The same value the contact gets, when this endpoint creates one: one customer,
+          // one origin, said the same way on both halves of the event.
+          source: source || null,
           orderDate: now,
         })
         .returning({ id: orders.id, orderNumber: orders.orderNumber });
@@ -372,6 +390,8 @@ export async function POST(req: NextRequest) {
           console.error("order notification not delivered", err);
         }
       });
+
+      await logApiWrite(db, authResult, { entity: "order", endpoint: ENDPOINT, recordId: ordine.id });
 
       return NextResponse.json(
         { status: "created", id: ordine.id, orderNumber: ordine.orderNumber, total: totali.total },

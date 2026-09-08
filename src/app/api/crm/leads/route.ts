@@ -8,6 +8,7 @@ import { leads } from "@/db/schema";
 import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
 import { buildLeadPayload, digitsForMatching, parseOnDuplicate, validateLeadInput } from "@/lib/api-import-validators";
+import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
@@ -20,6 +21,12 @@ import { decryptDbUrl } from "@/lib/tenant-db";
  * change is its own it reacts to itself — and does not stop.
  */
 const API_ORIGIN = { via: "api" as const, actor: null };
+
+/**
+ * The route's own name, written once: the idempotency ledger and the write log both
+ * record it, and two literals that have to agree are one literal too many.
+ */
+const ENDPOINT = "/api/crm/leads";
 
 export async function POST(req: NextRequest) {
   const authResult = await authenticateApiRequest(req);
@@ -71,7 +78,7 @@ export async function POST(req: NextRequest) {
   // A caller whose response never arrived does not know whether this landed, and
   // sending it again creates a second copy of whatever this route cannot match
   // on. A key makes that retry safe. No key, and nothing changes.
-  const idempotency = await claim(db, "/api/crm/leads", req.headers.get("Idempotency-Key"), await hashBody(rawBody));
+  const idempotency = await claim(db, ENDPOINT, req.headers.get("Idempotency-Key"), await hashBody(rawBody));
   if (idempotency.kind === "replay") {
     return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
   }
@@ -133,6 +140,7 @@ export async function POST(req: NextRequest) {
               .where(eq(leads.id, existing.id))
               .returning();
             dispatchWebhook("lead.updated", { lead: updated }, API_ORIGIN, db);
+            await logApiWrite(db, authResult, { entity: "lead", endpoint: ENDPOINT, recordId: updated.id });
             return NextResponse.json({ status: "updated", id: updated.id, data: updated });
           }
 
@@ -146,6 +154,7 @@ export async function POST(req: NextRequest) {
 
       const [created] = await db.insert(leads).values(buildLeadPayload(data, authResult.userId)).returning();
       dispatchWebhook("lead.created", { lead: created }, API_ORIGIN, db);
+      await logApiWrite(db, authResult, { entity: "lead", endpoint: ENDPOINT, recordId: created.id });
 
       return NextResponse.json({ status: "created", id: created.id, data: created }, { status: 201 });
     })();

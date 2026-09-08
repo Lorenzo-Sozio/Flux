@@ -297,16 +297,17 @@ export const orders = pgTable("order", {
   // showed little while orders only came from quotes, and shows now that one can arrive
   // from an assistant that took it in words.
   notes: text("notes"),
-  // Where it came from: `assistant` for one taken in words by the integration, null for
-  // one a person entered here. ⚠️ The comment above has said for a while that an order
-  // "can arrive from an assistant", and nothing recorded that it had — a contact created
-  // that way was marked and the order was not, so the two halves of the same event
-  // disagreed. Reading it from `owner_id IS NULL` would be a meaning taken from an
-  // absence, and it holds until the first order somebody files without an owner.
+  // Where the customer came from, the same commercial attribute `lead`, `contact` and
+  // `company` carry: a channel, a campaign, a referral. The API takes it from the caller,
+  // who knows it, and leaves it null when nobody said.
   //
-  // ⚠️⚠️ **Null is not "a person".** Rows written before this column existed carry no
-  // answer, and a report that counted them as manual would invent a number for a period
-  // it cannot know.
+  // ⚠️⚠️ **Not "who wrote the row".** A first version wrote the literal `assistant` here,
+  // which put two questions in one field: the first caller using it for its real meaning
+  // would have made the report lie. Who wrote a row is `api_write_log`.
+  //
+  // ⚠️ Null means "not recorded" and never "a person": rows written before this column
+  // existed carry no answer, and counting them as manual would invent a number for a
+  // period this database cannot know.
   source: text("source"),
   // When it actually reached the customer. `status` says completed, which is a
   // state somebody set; support answering "my order has not arrived" needs a date.
@@ -845,6 +846,41 @@ export const notifications = pgTable("notification", {
  * body. Answering that with the first body's result would be worse than
  * duplicating, because it would look like success.
  */
+/**
+ * Who wrote this: a person at a keyboard, or an integration with a key.
+ *
+ * Every write to `/api/crm/*` already knew — `authenticateApiRequest` returns
+ * `via: "session" | "apikey"` — and nothing kept it, so "what has the assistant been doing
+ * in my CRM" had no answer.
+ *
+ * ⚠️⚠️ **`source` is not that answer.** On lead, contact and company it means *where the
+ * customer came from*, and the assistant already writes the channel into it. Reading
+ * provenance out of that column puts two questions in one field, and the first caller to
+ * use it for its real meaning makes the report lie.
+ *
+ * ⚠️ One row per successful **request**, not per row written: a bulk import of five hundred
+ * contacts is one thing that happened, and `rows` says how big it was.
+ *
+ * ⚠️ `via` says person or integration and **not which** integration: a key identifies a
+ * tenant, not a caller. The screen says so rather than claiming more than the data does.
+ */
+export const apiWriteLog = pgTable("api_write_log", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  /** What was written, in the CRM's own words: lead, contact, note, order… */
+  entity: text("entity").notNull(),
+  /** The route, because two routes write the same thing: a note on a lead, a note on a deal. */
+  endpoint: text("endpoint").notNull(),
+  /** The single record, when there was one. Null for a bulk request. */
+  recordId: text("record_id"),
+  rows: integer("rows").default(1).notNull(),
+  via: text("via").notNull(),
+  /** The user, when a person did it. Null for an integration, which has none. */
+  actor: text("actor"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 export const apiIdempotency = pgTable(
   "api_idempotency",
   {

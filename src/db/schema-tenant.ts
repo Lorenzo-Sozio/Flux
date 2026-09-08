@@ -7,6 +7,8 @@ export {
   // Notifications
   // API idempotency
   apiIdempotency,
+  // Who wrote through the API
+  apiWriteLog,
   appointmentAttendees,
   appointmentAttendeesRelations,
   // Appointments

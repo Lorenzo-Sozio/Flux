@@ -23,6 +23,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Every row written, in order, with the table it went to. */
 const inserted: { table: string; rows: Record<string, unknown>[] }[] = [];
+
+/**
+ * The contact rows only.
+ *
+ * ⚠️ The route also writes one line saying who called it, into a different table. Counting
+ * that among the contacts would make every assertion here off by one — and, worse, an
+ * assertion that merely counts inserts stops being about contacts at all the moment the
+ * route learns to write anything else.
+ */
+const righeContatto = () => inserted.filter((i) => i.table === "contact").flatMap((i) => i.rows);
 const updated: { id: unknown; values: Record<string, unknown> }[] = [];
 /** Every `select().from().where()` the route performed. */
 let selectCount = 0;
@@ -114,7 +124,7 @@ describe("a bulk contact import", () => {
     expect(body.results[1]).toMatchObject({ status: "skipped", reason: "duplicate_email" });
     // And the skipped row points at the one that was actually written.
     expect(body.results[1].existingId).toBe(body.results[0].id);
-    expect(inserted.flatMap((i) => i.rows)).toHaveLength(1);
+    expect(righeContatto()).toHaveLength(1);
   });
 
   it("⚠️ an in-batch duplicate can update the row this same request is creating", async () => {
@@ -124,7 +134,7 @@ describe("a bulk contact import", () => {
     const body = await res.json();
 
     expect(body.summary).toMatchObject({ created: 1, updated: 1 });
-    expect(inserted.flatMap((i) => i.rows)).toHaveLength(1);
+    expect(righeContatto()).toHaveLength(1);
     expect(updated).toHaveLength(1);
     // ⚠️ The update targets a row that did not exist when the batch started, so
     // the inserts have to run first. If they did not, this update would silently
@@ -141,8 +151,9 @@ describe("a bulk contact import", () => {
     await POST(request({ records }));
 
     expect(selectCount).toBe(1);
-    expect(inserted).toHaveLength(1);
-    expect(inserted[0].rows).toHaveLength(20);
+    const contatti = inserted.filter((i) => i.table === "contact");
+    expect(contatti).toHaveLength(1);
+    expect(contatti[0].rows).toHaveLength(20);
   });
 
   it("splits a large insert rather than sending one enormous statement", async () => {
@@ -153,9 +164,10 @@ describe("a bulk contact import", () => {
 
     await POST(request({ records }));
 
-    expect(inserted.length).toBeGreaterThan(1);
-    expect(Math.max(...inserted.map((i) => i.rows.length))).toBeLessThanOrEqual(200);
-    expect(inserted.flatMap((i) => i.rows)).toHaveLength(450);
+    const contatti = inserted.filter((i) => i.table === "contact");
+    expect(contatti.length).toBeGreaterThan(1);
+    expect(Math.max(...contatti.map((i) => i.rows.length))).toBeLessThanOrEqual(200);
+    expect(righeContatto()).toHaveLength(450);
   });
 
   it("skips what the workspace already holds, and says which row it matched", async () => {
@@ -165,7 +177,7 @@ describe("a bulk contact import", () => {
 
     expect(body.summary).toMatchObject({ created: 1, skipped: 1 });
     expect(body.results[0]).toMatchObject({ status: "skipped", existingId: "existing-1" });
-    expect(inserted.flatMap((i) => i.rows)).toHaveLength(1);
+    expect(righeContatto()).toHaveLength(1);
   });
 
   it("⚠️ a rejected record costs no write and keeps its place", async () => {
@@ -177,13 +189,13 @@ describe("a bulk contact import", () => {
     expect(body.summary).toMatchObject({ total: 3, created: 1, errors: 2 });
     expect(body.results[1]).toMatchObject({ index: 1, status: "error" });
     expect(body.results[2]).toMatchObject({ index: 2, status: "error" });
-    expect(inserted.flatMap((i) => i.rows)).toHaveLength(1);
+    expect(righeContatto()).toHaveLength(1);
   });
 
   it("looks nothing up when no record carries an address", async () => {
     await POST(request({ records: [person(1), person(2)] }));
 
     expect(selectCount).toBe(0);
-    expect(inserted.flatMap((i) => i.rows)).toHaveLength(2);
+    expect(righeContatto()).toHaveLength(2);
   });
 });

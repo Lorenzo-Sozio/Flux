@@ -186,6 +186,38 @@ does not close. It closes the common case: a completed request tells the caller
 everything, and a repeated one tells them again. What has no answer is
 reconciling weeks later against what the CRM actually holds.
 
+#### Who wrote a row, and where that is NOT recorded
+
+Every route here records one line per successful request in `api_write_log`
+(migration `0017_who_wrote_this`): the entity, the route, the record, how many
+rows, and `via` — `session` or `apikey`, straight from `authenticateApiRequest`,
+which already knew and used to throw the answer away.
+[src/lib/api-write-log.ts](src/lib/api-write-log.ts) is the only place that
+writes it, and `src/lib/api-write-log.inventory.test.ts` reads all twenty-two
+route files to check they still call it. A guarantee twenty-two routes have to
+*remember* is one the twenty-third would not have, and a missing line is
+invisible by construction.
+
+⚠️⚠️ **`source` is not that answer.** On lead, contact, company and order it means
+*where the customer came from* — and the engine writes the channel into it on
+every lead it files. An earlier version of the assistant report read provenance
+out of that column, which put two questions in one field: the first workspace to
+use it for its real meaning would have made the report lie, plausibly. The order
+endpoint now takes `source` from the caller and leaves it null when nobody said.
+
+⚠️ One line per **request**, not per row: a batch of five hundred is one thing
+that happened and `rows` carries the size. A batch in which everything was
+rejected writes nothing at all — counting it would flatter exactly the thing
+being measured.
+
+⚠️⚠️ **`/api/crm/erasure` records no `recordId`.** An identifier there would leave,
+in the one table the erasure does not sweep, a way back to somebody who asked to
+disappear.
+
+`/dashboard/assistant` reads it. Not under `/dashboard/reports`, which is behind
+the reporting module: whoever connects an integration needs to see what it does
+whether or not they bought a reports package.
+
 ### Deploy: Vercel e Cloudflare Workers
 
 The app deploys to either. Vercel is configured by [vercel.json](vercel.json); Cloudflare

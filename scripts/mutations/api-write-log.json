@@ -1,0 +1,68 @@
+[
+  {
+    "file": "src/lib/api-write-log.ts",
+    "description": "⚠️⚠️ un'integrazione lascia il nome di una persona: le sue scritture compaiono nel rapporto come lavoro di qualcuno",
+    "find": "      actor: auth.via === \"session\" ? auth.userId : null,",
+    "replace": "      actor: auth.userId,"
+  },
+  {
+    "file": "src/lib/api-write-log.ts",
+    "description": "⚠️⚠️ un lotto interamente rifiutato viene contato fra le cose fatte: il rapporto gonfia proprio la cosa che sta misurando",
+    "find": "  if (rows <= 0) return;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/api-write-log.ts",
+    "description": "⚠️⚠️ un registro che non si scrive fa cadere la scrittura del cliente: un'importazione riuscita torna 500 in cambio di una riga di rapporto",
+    "find": "  } catch (e) {\n    console.error(\"[api-write-log] not recorded\", e);\n  }",
+    "replace": "  } finally {\n    void 0;\n  }"
+  },
+  {
+    "file": "src/actions/assistant-activity.ts",
+    "description": "⚠️⚠️ il rapporto conta anche le chiamate fatte da una persona connessa: sovrastima esattamente il numero che si sta vendendo",
+    "find": "    .where(and(periodo, sql`${apiWriteLog.via} = ${DA_INTEGRAZIONE}`))",
+    "replace": "    .where(periodo)"
+  },
+  {
+    "file": "src/actions/assistant-activity.ts",
+    "description": "⚠️ il raggruppamento non e' piu' quello che le rotte hanno scritto: un verbo nuovo del motore sparisce dalla pagina senza che niente lo dica",
+    "find": "    .groupBy(apiWriteLog.entity)",
+    "replace": "    .groupBy(apiWriteLog.via)"
+  },
+  {
+    "file": "src/actions/assistant-activity.ts",
+    "description": "⚠️ il periodo si applica solo dall'inizio: un mese comprende tutto quello che e' stato scritto da li' in poi",
+    "find": "  const periodo = and(gte(apiWriteLog.createdAt, da), lte(apiWriteLog.createdAt, a));",
+    "replace": "  const periodo = gte(apiWriteLog.createdAt, da);"
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "⚠️⚠️ `source` torna a dire chi ha scritto la riga invece di da dove arriva il cliente: due domande in una colonna, e il primo che la usa per il suo significato vero fa mentire il rapporto",
+    "find": "          source: source || null,",
+    "replace": "          source: \"assistant\","
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "⚠️ un canale piu' lungo della colonna non e' piu' un rifiuto: arriva troncato dal database",
+    "find": "  if (source.length > 100) errors.push({ field: \"source\", message: \"source is too long\" });",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/orders/route.ts",
+    "description": "⚠️ l'ordine non registra piu' chi lo ha scritto: la riga manca e una riga che manca e' invisibile",
+    "find": "      await logApiWrite(db, authResult, { entity: \"order\", endpoint: ENDPOINT, recordId: ordine.id });",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/crm/custom-fields/route.ts",
+    "description": "⚠️ i valori raccolti non dicono piu' su quale scheda sono finiti: il rapporto elenca un lavoro che nessuno puo' aprire",
+    "find": "    recordId: entityId,",
+    "replace": "    recordId: null,"
+  },
+  {
+    "file": "src/app/api/crm/erasure/route.ts",
+    "description": "⚠️⚠️ la cancellazione lascia in una tabella che non visita l'identificativo della persona che ha chiesto di sparire",
+    "find": "    await logApiWrite(db, authResult, { entity: \"erasure\", endpoint: ENDPOINT, recordId: null });",
+    "replace": "    await logApiWrite(db, authResult, { entity: \"erasure\", endpoint: ENDPOINT, recordId: contactPoint });"
+  }
+]

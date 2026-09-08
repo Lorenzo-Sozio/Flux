@@ -6,10 +6,17 @@ import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { createTenantDb } from "@/db";
 import { customFieldDefinitions, customFieldValues } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint, whereToNote } from "@/lib/contact-point";
 import { getTenantById } from "@/lib/get-tenant";
 import { decryptDbUrl } from "@/lib/tenant-db";
+
+/**
+ * The route's own name, written once: the idempotency ledger and the write log both
+ * record it, and two literals that have to agree are one literal too many.
+ */
+const ENDPOINT = "/api/crm/custom-fields";
 
 /**
  * Record, on a person's own record, values an integration collected from them.
@@ -212,6 +219,16 @@ export async function POST(req: NextRequest) {
       newData: { id: entityId, customFields: dopo },
     }),
   );
+
+  // ⚠️ `recordId` is the record the fields hang from, not a row id of their own: a custom
+  // field value has an id nobody would recognise, and «which lead was enriched» is the
+  // question a reader of this log actually has.
+  await logApiWrite(db, authResult, {
+    entity: "custom-field",
+    endpoint: ENDPOINT,
+    recordId: entityId,
+    rows: Object.keys(campi).length,
+  });
 
   return NextResponse.json({ status: "updated", entity: entityType, id: entityId, fields: dopo }, { status: 200 });
 }

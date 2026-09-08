@@ -6,6 +6,7 @@ import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { createTenantDb } from "@/db";
 import { deals } from "@/db/schema";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
+import { logApiWrite } from "@/lib/api-write-log";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint } from "@/lib/contact-point";
 import { getTenantById } from "@/lib/get-tenant";
@@ -46,6 +47,12 @@ const CHIUDONO: Record<string, string> = {
   NON_RAGGIUNTO: "L'assistente ha chiuso: il processo non è arrivato a destinazione",
 };
 const LASCIA_APERTO = "RAGGIUNTO";
+
+/**
+ * The route's own name, written once: the idempotency ledger and the write log both
+ * record it, and two literals that have to agree are one literal too many.
+ */
+const ENDPOINT = "/api/crm/close";
 
 export async function POST(req: NextRequest) {
   const authResult = await authenticateApiRequest(req);
@@ -177,6 +184,15 @@ export async function POST(req: NextRequest) {
       }),
     );
   }
+
+  // One deal is the usual case and is worth naming; several are one request that closed
+  // several, and picking one of them to name would be arbitrary.
+  await logApiWrite(db, authResult, {
+    entity: "deal",
+    endpoint: ENDPOINT,
+    recordId: chiusi.length === 1 ? chiusi[0] : null,
+    rows: chiusi.length,
+  });
 
   return NextResponse.json({ status: "closed", ids: chiusi }, { status: 200 });
 }
