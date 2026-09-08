@@ -93,6 +93,92 @@ ticket-autoclose     daily at 03:00    closes resolved tickets
 at-most-once. Without it a lost event is lost, and whoever was waiting for it has no
 way of knowing.
 
+### The import API
+
+`/api/crm/*` is the machine-to-machine surface: twenty-two routes, **all of them
+POST**. It writes into the CRM and has no way to read out of it, which is a real
+gap and a deliberate one to notice rather than a thing to fix casually — see the
+end of this section.
+
+**A bulk request always answers 200.** The summary carries total, created,
+updated, skipped, errors and duration; `results` carries one entry per record
+with its index, its status, the new id, or the field-level reasons it was
+rejected. A rejected row does not fail the request. Documenting the ordinary
+validation 422 on these endpoints would send an integrator looking for a status
+that never arrives instead of into the body where the answer is.
+
+⚠️ **A request with no session gets no workspace.** The proxy injects
+`x-tenant-id` only when `isLoggedIn && activeTenantId`, so an API-key request has
+none and `getDb()` throws. Every route here resolves the tenant itself with
+`createTenantDb` — and anything it calls must be *handed* that database.
+
+That is not theoretical. All twenty `dispatchWebhook` calls in this API omitted
+it, fell through to `getDb()`, and rejected; none is awaited, so every rejection
+was swallowed. An integrator importing five hundred contacts got five hundred
+rows and not one `contact.created`, while the same records typed into the
+dashboard fired theirs, and there was nothing to see. Eighteen also left the
+origin unset — `API_ORIGIN` marks an event as written by a machine, which is what
+stops an integrator receiving its own import back and reacting to it.
+`src/lib/public-entry-points.test.ts` holds both lines.
+
+⚠️⚠️ **Nothing writes inside the record loop.** Every statement on the Neon HTTP
+driver is its own request, and a batch is capped at 500 inside a Cloudflare
+request whose subrequest budget is 1000 — so one lookup and one write per record
+made the documented maximum exactly the size that could not complete. Each route
+is three passes: validate with no database, look the whole batch up in one
+statement, write in chunks of `INSERT_CHUNK` (see
+[src/lib/api-import-batch.ts](src/lib/api-import-batch.ts)). Five hundred records
+is four statements. `onDuplicate: "update"` is the one mode still costing a
+statement per record, because each row carries different values.
+
+⚠️ **A row the batch is *going* to create counts as existing for the rows after
+it.** The one-statement-per-row version got that for free: the second record
+carrying an address found the first, because it was in the table by then.
+`claimTracker` reserves a row before it exists, and the inserts run before the
+updates so an update can target one. Without it `onDuplicate: "skip"` quietly
+stops meaning what it says and a list containing the same address twice creates
+the contact twice.
+
+Ids are generated in the route rather than read back from `RETURNING`, so a
+multi-row insert is never trusted to return rows in the order it was given — and
+so a row can be claimed before it exists.
+
+#### `Idempotency-Key` is what makes a retry safe
+
+All of the above only reaches the caller if the response does. When it does not —
+a timeout, a dropped connection — they know nothing, and sending the batch again
+duplicates whatever the route cannot deduplicate: contacts and leads match on
+email alone, email is optional for both, and the activity routes match on
+nothing.
+
+Send the header and the first request imports while every identical repeat gets
+the same answer back, same ids, having written nothing, marked
+`Idempotent-Replay: true`. No header, no row, and the route behaves as it always
+did. Same key with a different body is a 422 — replying with the first body's
+result would be worse than duplicating, because it arrives as a 200 full of ids
+the caller never sent. Same key still in flight is a 409.
+
+⚠️⚠️ **The write is the mutual exclusion.** The driver holds no session, so there
+is no transaction and no lock to separate two copies of one request arriving
+together. `INSERT … ON CONFLICT DO NOTHING … RETURNING` says the one thing a read
+cannot: whether *this* statement created the row. Reading first and inserting
+after lets both copies read nothing and both import. Taking over a key whose
+handler died is the same problem, hence a compare-and-swap on the timestamp.
+[src/lib/api-idempotency.ts](src/lib/api-idempotency.ts), table
+`api_idempotency`, migration `0015_the_same_request_twice`.
+
+The decision — replay, refuse, or take over — is a pure function returning
+`stale` rather than a `Claim`, because "no living request is behind this row" is a
+reason to *try* for the key, not permission to act as though it were held.
+
+⚠️ Only the **bulk** routes take the header. The single-record POSTs have the same
+problem and are not covered yet.
+
+⚠️ Reading a *list* back is still impossible, and that is the gap the response
+does not close. It closes the common case: a completed request tells the caller
+everything, and a repeated one tells them again. What has no answer is
+reconciling weeks later against what the CRM actually holds.
+
 ### Deploy: Vercel e Cloudflare Workers
 
 The app deploys to either. Vercel is configured by [vercel.json](vercel.json); Cloudflare
