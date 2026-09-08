@@ -226,15 +226,30 @@ shows `DATABASE_URL`, `AUTH_SECRET`, `PLATFORM_ENCRYPTION_KEY`, `CRON_SECRET`,
 each value in the clear. Everything works and `keep_vars` protects them from a
 deploy, but anybody with dashboard or API read access reads them in full.
 
-Converting one is `npx wrangler secret put NAME` with the current value pasted
-in: setting a secret of the same name changes the binding from plain text to
-encrypted, so there is no second step and nothing to remove afterwards.
+⚠️⚠️ **They cannot be converted from the command line.** Tested on 8 September
+2026:
 
-⚠️ It cannot be automated from a session here, and the reason is worth keeping.
-wrangler offers no way to read a plaintext variable's value back — `versions
-view` truncates it — so the only route is lifting the OAuth token out of
-`~/.wrangler` and calling the API with it. That is indistinguishable from
-credential theft, and the tooling blocks it. Correctly.
+```
+npx wrangler secret put IMPORT_API_KEY
+→ Binding name 'IMPORT_API_KEY' already in use. [code: 10053]
+```
+
+The API refuses a secret carrying the name of an existing variable, so the
+plaintext one has to go first — and removing it is not something wrangler can do.
+There is no command to delete a var, and `keep_vars: true` exists precisely so a
+deploy does not touch them. A deploy *without* `--keep-vars` would remove them,
+and would take the three real secrets with it, including `CALENDAR_FEED_SECRET`
+whose value is written down nowhere. That is not a route.
+
+It is a dashboard operation: Workers → flux → Settings → Variables and Secrets,
+which offers to encrypt each variable in place. In place is what matters —
+deleting and then running `wrangler secret put` works too, but between the two
+steps the Worker runs without that variable.
+
+⚠️ Reading the values back is separately impossible here. `versions view`
+truncates them, so the only route would be lifting the OAuth token out of
+`~/.wrangler` and calling the API with it, which is indistinguishable from
+credential theft and is blocked. Correctly.
 
 ⚠️ `NXTAUTH_URL` is `NEXTAUTH_URL` misspelled. No code reads it, so it breaks
 nothing, but it looks like configuration that is present while the real one is

@@ -72,12 +72,24 @@
   // protegge dai deploy — ma chiunque abbia accesso in lettura alla dashboard o
   // all'API li legge per intero.
   //
-  // Convertirli è un `npx wrangler secret put NOME` per ciascuno, incollando il
-  // valore attuale: impostare un segreto con lo stesso nome converte il binding
-  // da testo in chiaro a cifrato. Non si può automatizzare da qui, perché
-  // wrangler non ha modo di rileggere il valore di una variabile in chiaro e
-  // l'unica via sarebbe passare dal token OAuth per interrogare l'API, che è
-  // indistinguibile da una sottrazione di credenziali.
+  // ⚠️ NON si convertono da riga di comando. Provato l'8 settembre 2026:
+  //
+  //   npx wrangler secret put IMPORT_API_KEY
+  //   → Binding name 'IMPORT_API_KEY' already in use. [code: 10053]
+  //
+  // L'API rifiuta un segreto che porta il nome di una variabile esistente, quindi
+  // il valore in chiaro va rimosso PRIMA. E rimuoverlo non è una cosa che wrangler
+  // sappia fare: non esiste un comando per cancellare una var, e `keep_vars: true`
+  // esiste apposta perché un deploy non le tocchi.
+  //
+  // Un deploy SENZA `--keep-vars` le cancellerebbe, e insieme a loro cancellerebbe
+  // i tre segreti veri — compreso CALENDAR_FEED_SECRET, il cui valore non è
+  // scritto da nessuna parte. Non è una strada.
+  //
+  // Si fa dalla dashboard, che per ogni variabile offre di cifrarla sul posto:
+  // Workers → flux → Settings → Variables and Secrets. Cifrare in loco non lascia
+  // finestre scoperte. Cancellare e poi `wrangler secret put` funziona altrettanto
+  // ma fra i due passi il Worker gira senza quella variabile.
   //
   // ⚠️ Da cancellare dalla dashboard: `NXTAUTH_URL`, che è `NEXTAUTH_URL` scritto
   // male. Non la legge nessun codice, quindi non rompe niente, ma sembra una
