@@ -60,6 +60,38 @@ function realEndpoints(): { method: string; path: string }[] {
   return out;
 }
 
+/** The paths the documentation claims accept `Idempotency-Key`. */
+function idempotentPaths(): string[] {
+  const block = read(API_DOCS).match(/const IDEMPOTENT_PATHS = \[([\s\S]*?)\] as const;/);
+  if (!block) throw new Error("IDEMPOTENT_PATHS not found in the API documentation");
+  return [...block[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+}
+
+/** The paths that actually read the header, from the routes themselves. */
+function routesThatClaim(): string[] {
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+        continue;
+      }
+      if (entry.name !== "route.ts") continue;
+      if (!read(full).includes(String.raw`req.headers.get("Idempotency-Key")`)) continue;
+      out.push(
+        `/api/${full
+          .slice(API_ROOT.length + 1)
+          .replace(/\\/g, "/")
+          .replace(/\/route\.ts$/, "")
+          .replace(/\[(\w+)\]/g, "{$1}")}`,
+      );
+    }
+  };
+  walk(API_ROOT);
+  return out;
+}
+
 describe("the Help Centre", () => {
   it("⚠️ links only to pages that exist", () => {
     // A dead link here was `/dashboard/settings/targets`, and the same wrong path
@@ -83,6 +115,14 @@ describe("the Help Centre", () => {
 });
 
 describe("the API documentation", () => {
+  it("⚠️ names exactly the routes that accept an idempotency key", () => {
+    // The list in the component decides which endpoints show a 409 and the
+    // key-reuse 422. Kept by hand it stops matching the code quietly, and the
+    // failure is a status an integrator meets for the first time halfway through
+    // an import they cannot safely repeat.
+    expect(idempotentPaths().sort()).toEqual(routesThatClaim().sort());
+  });
+
   it("⚠️ documents no endpoint the app does not serve", () => {
     // The opposite of a missing page: an entry that survives the route being
     // renamed, so somebody integrates against a 404 and blames their own code.
@@ -126,7 +166,8 @@ describe("the API documentation", () => {
     // uses and means something else entirely, which is why the component gives it
     // its own wording rather than letting it inherit.
     const CRM_COMMON = [400, 401, 404, 422, 429];
-    const BULK_COMMON = [409, 422];
+    const IDEMPOTENCY_COMMON = [409, 422];
+    const IDEMPOTENT = idempotentPaths();
     const CRON_COMMON = [401, 500];
     const UNMETERED = ["/api/crm/opt-out", "/api/crm/erasure"];
     /** Statuses a route answers with through a shared helper rather than inline. */
@@ -151,7 +192,7 @@ describe("the API documentation", () => {
         const isBulk = path.endsWith("/bulk");
         common = [
           ...CRM_COMMON.filter((c) => !(isBulk && c === 422) && !(UNMETERED.includes(path) && c === 429)),
-          ...(isBulk ? BULK_COMMON : []),
+          ...(IDEMPOTENT.includes(path) ? IDEMPOTENCY_COMMON : []),
         ];
       } else if (path.startsWith("/api/cron/")) {
         common = CRON_COMMON;

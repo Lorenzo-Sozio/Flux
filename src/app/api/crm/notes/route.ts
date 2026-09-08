@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { createTenantDb } from "@/db";
 import { activities } from "@/db/schema";
+import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint, whereToNote } from "@/lib/contact-point";
@@ -48,8 +49,13 @@ export async function POST(req: NextRequest) {
     throw err;
   }
   let body: unknown;
+  let rawBody = "";
   try {
-    body = await req.json();
+    // Read as text and parsed here, so the hash below covers exactly the bytes
+    // the caller sent: re-serialising a parsed object would make two identical
+    // requests hash differently over nothing but key order.
+    rawBody = await req.text();
+    body = JSON.parse(rawBody);
   } catch (_err) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -96,23 +102,71 @@ export async function POST(req: NextRequest) {
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
 
-  const dove = whereToNote(await findByContactPoint(db, parsed.email, parsed.digits));
-  if (!dove) {
-    return NextResponse.json({ error: "No person reachable at that contact point" }, { status: 404 });
+  // ── The same request twice ──────────────────────────────────────────────────
+  //
+  // A caller whose response never arrived does not know whether this landed, and
+  // sending it again creates a second copy of whatever this route cannot match
+  // on. A key makes that retry safe. No key, and nothing changes.
+  const idempotency = await claim(db, "/api/crm/notes", req.headers.get("Idempotency-Key"), await hashBody(rawBody));
+  if (idempotency.kind === "replay") {
+    return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
+  }
+  if (idempotency.kind === "in-flight") {
+    return NextResponse.json(
+      { error: "A request with this Idempotency-Key is still running. Retry in a moment." },
+      { status: 409 },
+    );
+  }
+  if (idempotency.kind === "mismatch") {
+    return NextResponse.json(
+      { error: "This Idempotency-Key was already used with a different request body." },
+      { status: 422 },
+    );
   }
 
-  const occurredAt =
-    typeof dati.occurredAt === "string" && !Number.isNaN(Date.parse(dati.occurredAt))
-      ? new Date(dati.occurredAt)
-      : new Date();
+  // ⚠️ Every exit goes through here. A success is remembered, so a repeat
+  // replays it; anything else releases the key, so a caller who corrects
+  // their request may send it again under the same one. Without the release
+  // a rejected request would hold its key for the whole stale window.
+  let response: Response;
+  try {
+    response = await (async () => {
+      const dove = whereToNote(await findByContactPoint(db, parsed.email, parsed.digits));
+      if (!dove) {
+        return NextResponse.json({ error: "No person reachable at that contact point" }, { status: 404 });
+      }
 
-  const [created] = await db
-    .insert(activities)
-    .values({ type: "note", content: text, date: occurredAt, ...dove })
-    .returning();
+      const occurredAt =
+        typeof dati.occurredAt === "string" && !Number.isNaN(Date.parse(dati.occurredAt))
+          ? new Date(dati.occurredAt)
+          : new Date();
 
-  // ⚠️ No webhook here, deliberately. This note exists because an integration told us what
-  // it did: announcing it back would hand that integration its own event, and one that
-  // filters its own writes would drop it while one that does not would loop.
-  return NextResponse.json({ status: "created", id: created.id }, { status: 201 });
+      const [created] = await db
+        .insert(activities)
+        .values({ type: "note", content: text, date: occurredAt, ...dove })
+        .returning();
+
+      // ⚠️ No webhook here, deliberately. This note exists because an integration told us what
+      // it did: announcing it back would hand that integration its own event, and one that
+      // filters its own writes would drop it while one that does not would loop.
+      return NextResponse.json({ status: "created", id: created.id }, { status: 201 });
+    })();
+  } catch (error) {
+    await release(db, idempotency);
+    throw error;
+  }
+
+  if (response.ok) {
+    try {
+      await remember(db, idempotency, await response.clone().json());
+    } catch {
+      // An answer we cannot read back is an answer we cannot replay. The
+      // import happened; leaving the key held would only refuse the retry.
+      await release(db, idempotency);
+    }
+  } else {
+    await release(db, idempotency);
+  }
+
+  return response;
 }

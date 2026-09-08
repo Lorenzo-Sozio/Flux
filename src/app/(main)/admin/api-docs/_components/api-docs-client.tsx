@@ -120,15 +120,47 @@ const CRM_COMMON_RESPONSES: ApiEndpoint["responses"] = [
 ];
 
 /**
- * The two answers only a bulk route gives, both of them about `Idempotency-Key`.
+ * Every route that accepts `Idempotency-Key`.
+ *
+ * ⚠️ Generated from the routes that actually call `claim`, and checked against
+ * them by `src/lib/docs-alignment.test.ts`. A list like this kept by hand is a
+ * list that quietly stops matching the code, and the failure is a status an
+ * integrator meets for the first time halfway through an import.
+ *
+ * The ones deliberately absent are the ones a repeat cannot hurt: closing a deal
+ * that is already closed, an opt-out, an erasure.
+ */
+const IDEMPOTENT_PATHS = [
+  "/api/crm/activities/bulk",
+  "/api/crm/activities",
+  "/api/crm/companies/{companyId}/activities/bulk",
+  "/api/crm/companies/{companyId}/activities",
+  "/api/crm/companies/bulk",
+  "/api/crm/companies",
+  "/api/crm/contacts/{contactId}/activities/bulk",
+  "/api/crm/contacts/{contactId}/activities",
+  "/api/crm/contacts/bulk",
+  "/api/crm/contacts",
+  "/api/crm/deals/{dealId}/activities/bulk",
+  "/api/crm/deals/{dealId}/activities",
+  "/api/crm/leads/{leadId}/activities/bulk",
+  "/api/crm/leads/{leadId}/activities",
+  "/api/crm/leads/bulk",
+  "/api/crm/leads",
+  "/api/crm/notes",
+  "/api/crm/orders",
+] as const;
+
+/**
+ * The two answers a route gives about `Idempotency-Key` itself.
  *
  * ⚠️ A bulk request reports a rejected row inside a 200, row by row — that is the
- * whole design, and it is why the ordinary validation 422 is kept off these
+ * whole design, and it is why the ordinary validation 422 is kept off those
  * endpoints. But a key reused with a different body has to be refused, and the
  * status for that is 422 as well. Same code, entirely different meaning, so it
  * carries its own description here rather than inheriting the common one.
  */
-const BULK_IDEMPOTENCY_RESPONSES: ApiEndpoint["responses"] = [
+const IDEMPOTENCY_RESPONSES: ApiEndpoint["responses"] = [
   {
     status: 409,
     description:
@@ -174,8 +206,9 @@ const CRON_COMMON_RESPONSES: ApiEndpoint["responses"] = [
  * Documenting that 422 on them would send an integrator looking for a status code
  * that never arrives, instead of inside the body where it actually is.
  *
- * It does return a 422 of its own, and a 409, both about `Idempotency-Key`. Those
- * come from `BULK_IDEMPOTENCY_RESPONSES` above, with their own wording.
+ * A route that accepts `Idempotency-Key` also answers 409, and 422 for a key
+ * reused with a different body. Those come from `IDEMPOTENCY_RESPONSES` above,
+ * with their own wording.
  */
 function responsesFor(endpoint: ApiEndpoint): ApiEndpoint["responses"] {
   const isCrm = endpoint.path.startsWith("/api/crm/");
@@ -190,13 +223,14 @@ function responsesFor(endpoint: ApiEndpoint): ApiEndpoint["responses"] {
   const UNMETERED = ["/api/crm/opt-out", "/api/crm/erasure"];
 
   const isBulk = endpoint.path.endsWith("/bulk");
+  const isIdempotent = (IDEMPOTENT_PATHS as readonly string[]).includes(endpoint.path);
   const common = isCron
     ? CRON_COMMON_RESPONSES
     : [
         ...CRM_COMMON_RESPONSES.filter(
           (r) => !(isBulk && r.status === 422) && !(UNMETERED.includes(endpoint.path) && r.status === 429),
         ),
-        ...(isBulk ? BULK_IDEMPOTENCY_RESPONSES : []),
+        ...(isIdempotent ? IDEMPOTENCY_RESPONSES : []),
       ];
 
   const declared = new Set(endpoint.responses.map((r) => r.status));

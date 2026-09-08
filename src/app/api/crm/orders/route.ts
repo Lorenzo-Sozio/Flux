@@ -6,6 +6,7 @@ import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
 import { createTenantDb } from "@/db";
 import { contacts, notifications, orderItems, orders, users } from "@/db/schema";
+import { claim, hashBody, release, remember } from "@/lib/api-idempotency";
 import { authenticateApiRequest } from "@/lib/api-import-auth";
 import { checkAndTrackApiCall, EntitlementError } from "@/lib/billing/usage";
 import { findByContactPoint, readContactPoint, whereToNote } from "@/lib/contact-point";
@@ -121,8 +122,13 @@ export async function POST(req: NextRequest) {
     throw err;
   }
   let body: unknown;
+  let rawBody = "";
   try {
-    body = await req.json();
+    // Read as text and parsed here, so the hash below covers exactly the bytes
+    // the caller sent: re-serialising a parsed object would make two identical
+    // requests hash differently over nothing but key order.
+    rawBody = await req.text();
+    body = JSON.parse(rawBody);
   } catch (_err) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
@@ -200,146 +206,194 @@ export async function POST(req: NextRequest) {
   if (!tenant) return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
   const db = createTenantDb(tenant.id, decryptDbUrl(tenant.dbUrl));
 
-  const person = await findByContactPoint(db, parsed.email, parsed.digits);
-  const dove = whereToNote(person);
-  let contactId = dove?.contactId ?? null;
-  let creato = false;
-  if (!contactId) {
-    const nome = typeof dati.name === "string" ? dati.name.trim() : "";
-    const [nuovo] = await db
-      .insert(contacts)
-      .values({
-        // ⚠️ The name is **not split in two**. Guessing where a first name ends gets every
-        // compound surname wrong, and a full field beside an empty one beats two wrong ones —
-        // the same rule the lead import already follows.
-        firstName: nome || contactPoint,
-        lastName: "",
-        email: parsed.email ?? undefined,
-        // The digits are what matching uses; the number as typed is what a person
-        // reads, so that is what gets stored.
-        phone: parsed.digits ? contactPoint : undefined,
-        source: "assistant",
-      })
-      .returning({ id: contacts.id });
-    contactId = nuovo.id;
-    creato = true;
-  }
-
-  // ⚠️⚠️ **What is needed to prepare it, where whoever prepares it looks.** Collection or
-  // delivery, for when, to what address: without it the order appears with the right lines
-  // and nobody knows whether to deliver it. A note on the contact would be "somewhere
-  // else", which is exactly what whoever works an order must not have to do.
+  // ── The same request twice ──────────────────────────────────────────────────
   //
-  // ⚠️ These are the **customer's own words**, not normalised fields: "around half eight"
-  // is what they said, and rewriting it as a time would invent a precision they never gave.
-  // The code supplies the labels; the content stays theirs.
-  const note = [
-    ["Consegna", typeof dati.fulfillment === "string" ? dati.fulfillment.trim() : ""],
-    ["Per quando", typeof dati.when === "string" ? dati.when.trim() : ""],
-    ["Indirizzo", typeof dati.address === "string" ? dati.address.trim() : ""],
-  ]
-    .filter(([, valore]) => valore)
-    .map(([etichetta, valore]) => `${etichetta}: ${valore}`)
-    .join(SEPARATORE);
-
-  const numero = await nextOrderNumber(db);
-  const now = new Date();
-  const [ordine] = await db
-    .insert(orders)
-    .values({
-      orderNumber: numero,
-      contactId,
-      subtotal: String(totali.subtotal),
-      taxAmount: String(totali.taxAmount),
-      totalAmount: String(totali.total),
-      status: "draft",
-      notes: note || null,
-      // ⚠️ The same word the contact gets when this endpoint creates one. Two halves of
-      // one event that disagreed until now: the person was marked, the order was not.
-      source: "assistant",
-      orderDate: now,
-    })
-    .returning({ id: orders.id, orderNumber: orders.orderNumber });
-
-  for (let i = 0; i < righe.length; i++) {
-    const r = righe[i];
-    const linea = totali.lines[i];
-    await db.insert(orderItems).values({
-      orderId: ordine.id,
-      // ⚠️⚠️ **The line says what to prepare; the note says what was asked.** They used
-      // to share one field, with the customer's words in brackets after the item — which
-      // reads worst exactly when both are there, and gives nowhere to record the second
-      // thing below. `description` stays the catalogue entry: it is what the price belongs
-      // to, and what somebody looks up on the menu.
-      description: r.description,
-      notes: notaDiRiga(r) || null,
-      quantity: r.quantity,
-      unitPrice: String(r.unitPrice),
-      taxPercent: "0",
-      taxAmount: "0",
-      totalPrice: String(linea.net),
-    });
+  // A caller whose response never arrived does not know whether this landed, and
+  // sending it again creates a second copy of whatever this route cannot match
+  // on. A key makes that retry safe. No key, and nothing changes.
+  const idempotency = await claim(db, "/api/crm/orders", req.headers.get("Idempotency-Key"), await hashBody(rawBody));
+  if (idempotency.kind === "replay") {
+    return NextResponse.json(idempotency.body, { headers: { "Idempotent-Replay": "true" } });
+  }
+  if (idempotency.kind === "in-flight") {
+    return NextResponse.json(
+      { error: "A request with this Idempotency-Key is still running. Retry in a moment." },
+      { status: 409 },
+    );
+  }
+  if (idempotency.kind === "mismatch") {
+    return NextResponse.json(
+      { error: "This Idempotency-Key was already used with a different request body." },
+      { status: 422 },
+    );
   }
 
-  after(() => {
-    // ⚠️ No automations on the order: `order` is not one of this CRM's target entities, and
-    // inventing one here would be deciding a product question from an integration route.
-    // A contact created by an assistant is a contact created, and the rules that watch for
-    // one must fire — otherwise the owner's «tell me about new customers» rule would be
-    // blind exactly to the customers the assistant brings in.
-    if (creato && contactId) {
-      runAutomations({
-        entityType: "contact",
-        entityId: contactId,
-        event: "onCreate",
-        // Nothing came before a creation, and saying so is what `onCreate` means.
-        oldData: {},
-        newData: { id: contactId },
+  // ⚠️ Every exit goes through here. A success is remembered, so a repeat
+  // replays it; anything else releases the key, so a caller who corrects
+  // their request may send it again under the same one. Without the release
+  // a rejected request would hold its key for the whole stale window.
+  let response: Response;
+  try {
+    response = await (async () => {
+      const person = await findByContactPoint(db, parsed.email, parsed.digits);
+      const dove = whereToNote(person);
+      let contactId = dove?.contactId ?? null;
+      let creato = false;
+      if (!contactId) {
+        const nome = typeof dati.name === "string" ? dati.name.trim() : "";
+        const [nuovo] = await db
+          .insert(contacts)
+          .values({
+            // ⚠️ The name is **not split in two**. Guessing where a first name ends gets every
+            // compound surname wrong, and a full field beside an empty one beats two wrong ones —
+            // the same rule the lead import already follows.
+            firstName: nome || contactPoint,
+            lastName: "",
+            email: parsed.email ?? undefined,
+            // The digits are what matching uses; the number as typed is what a person
+            // reads, so that is what gets stored.
+            phone: parsed.digits ? contactPoint : undefined,
+            source: "assistant",
+          })
+          .returning({ id: contacts.id });
+        contactId = nuovo.id;
+        creato = true;
+      }
+
+      // ⚠️⚠️ **What is needed to prepare it, where whoever prepares it looks.** Collection or
+      // delivery, for when, to what address: without it the order appears with the right lines
+      // and nobody knows whether to deliver it. A note on the contact would be "somewhere
+      // else", which is exactly what whoever works an order must not have to do.
+      //
+      // ⚠️ These are the **customer's own words**, not normalised fields: "around half eight"
+      // is what they said, and rewriting it as a time would invent a precision they never gave.
+      // The code supplies the labels; the content stays theirs.
+      const note = [
+        ["Consegna", typeof dati.fulfillment === "string" ? dati.fulfillment.trim() : ""],
+        ["Per quando", typeof dati.when === "string" ? dati.when.trim() : ""],
+        ["Indirizzo", typeof dati.address === "string" ? dati.address.trim() : ""],
+      ]
+        .filter(([, valore]) => valore)
+        .map(([etichetta, valore]) => `${etichetta}: ${valore}`)
+        .join(SEPARATORE);
+
+      const numero = await nextOrderNumber(db);
+      const now = new Date();
+      const [ordine] = await db
+        .insert(orders)
+        .values({
+          orderNumber: numero,
+          contactId,
+          subtotal: String(totali.subtotal),
+          taxAmount: String(totali.taxAmount),
+          totalAmount: String(totali.total),
+          status: "draft",
+          notes: note || null,
+          // ⚠️ The same word the contact gets when this endpoint creates one. Two halves of
+          // one event that disagreed until now: the person was marked, the order was not.
+          source: "assistant",
+          orderDate: now,
+        })
+        .returning({ id: orders.id, orderNumber: orders.orderNumber });
+
+      for (let i = 0; i < righe.length; i++) {
+        const r = righe[i];
+        const linea = totali.lines[i];
+        await db.insert(orderItems).values({
+          orderId: ordine.id,
+          // ⚠️⚠️ **The line says what to prepare; the note says what was asked.** They used
+          // to share one field, with the customer's words in brackets after the item — which
+          // reads worst exactly when both are there, and gives nowhere to record the second
+          // thing below. `description` stays the catalogue entry: it is what the price belongs
+          // to, and what somebody looks up on the menu.
+          description: r.description,
+          notes: notaDiRiga(r) || null,
+          quantity: r.quantity,
+          unitPrice: String(r.unitPrice),
+          taxPercent: "0",
+          taxAmount: "0",
+          totalPrice: String(linea.net),
+        });
+      }
+
+      after(() => {
+        // ⚠️ No automations on the order: `order` is not one of this CRM's target entities, and
+        // inventing one here would be deciding a product question from an integration route.
+        // A contact created by an assistant is a contact created, and the rules that watch for
+        // one must fire — otherwise the owner's «tell me about new customers» rule would be
+        // blind exactly to the customers the assistant brings in.
+        if (creato && contactId) {
+          runAutomations({
+            entityType: "contact",
+            entityId: contactId,
+            event: "onCreate",
+            // Nothing came before a creation, and saying so is what `onCreate` means.
+            oldData: {},
+            newData: { id: contactId },
+          });
+        }
+        dispatchWebhook("order.created", { order: { ...ordine, contactId } }, API_ORIGIN, db);
+        // ⚠️⚠️ **The bell, and until now an order rang nothing.** Five parts of this CRM create
+        // notifications — internal chat, lead assignment, pipeline, quotes, activity reminders —
+        // and orders created none. Somebody had to be looking at the orders list to know one had
+        // arrived.
+        //
+        // ⚠️ **Admins and owners, the same choice quotes already makes.** An order is not
+        // assigned to anyone: there is no owner field to read, and picking a single user would
+        // mean inventing a rule. These are the people who run the business.
+        //
+        // ⚠️ **It does not replace the assistant's own alert.** That one leaves the product and
+        // reaches a phone; this one is in the panel, and a kitchen at eight in the evening does
+        // not have the panel open. Complementary, not alternative.
       });
-    }
-    dispatchWebhook("order.created", { order: { ...ordine, contactId } }, API_ORIGIN, db);
-    // ⚠️⚠️ **The bell, and until now an order rang nothing.** Five parts of this CRM create
-    // notifications — internal chat, lead assignment, pipeline, quotes, activity reminders —
-    // and orders created none. Somebody had to be looking at the orders list to know one had
-    // arrived.
-    //
-    // ⚠️ **Admins and owners, the same choice quotes already makes.** An order is not
-    // assigned to anyone: there is no owner field to read, and picking a single user would
-    // mean inventing a rule. These are the people who run the business.
-    //
-    // ⚠️ **It does not replace the assistant's own alert.** That one leaves the product and
-    // reaches a phone; this one is in the panel, and a kitchen at eight in the evening does
-    // not have the panel open. Complementary, not alternative.
-  });
 
-  // ⚠️ Its own `after`, and awaited inside: a fire-and-forget closure would make the bell
-  // untestable — the test double would never see the rows, and the `catch` below would hide
-  // a feature that was broken from the first line. It cost one measurement to find that out.
-  after(async () => {
-    try {
-      const destinatari = await db
-        .select({ id: users.id })
-        .from(users)
-        .where(inArray(users.role, ["admin", "owner"]));
-      if (destinatari.length === 0) return;
-      await db.insert(notifications).values(
-        destinatari.map((u) => ({
-          userId: u.id,
-          type: "order_created",
-          title: `New order ${ordine.orderNumber}`,
-          message: `${totali.total} — ${righe.length} line${righe.length === 1 ? "" : "s"}.`,
-          link: `/dashboard/sales/orders/${ordine.id}`,
-        })),
+      // ⚠️ Its own `after`, and awaited inside: a fire-and-forget closure would make the bell
+      // untestable — the test double would never see the rows, and the `catch` below would hide
+      // a feature that was broken from the first line. It cost one measurement to find that out.
+      after(async () => {
+        try {
+          const destinatari = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(inArray(users.role, ["admin", "owner"]));
+          if (destinatari.length === 0) return;
+          await db.insert(notifications).values(
+            destinatari.map((u) => ({
+              userId: u.id,
+              type: "order_created",
+              title: `New order ${ordine.orderNumber}`,
+              message: `${totali.total} — ${righe.length} line${righe.length === 1 ? "" : "s"}.`,
+              link: `/dashboard/sales/orders/${ordine.id}`,
+            })),
+          );
+        } catch (err) {
+          // A bell that fails must not fail the order: it is already written, and the assistant
+          // has already told the customer it was taken.
+          console.error("order notification not delivered", err);
+        }
+      });
+
+      return NextResponse.json(
+        { status: "created", id: ordine.id, orderNumber: ordine.orderNumber, total: totali.total },
+        { status: 201 },
       );
-    } catch (err) {
-      // A bell that fails must not fail the order: it is already written, and the assistant
-      // has already told the customer it was taken.
-      console.error("order notification not delivered", err);
-    }
-  });
+    })();
+  } catch (error) {
+    await release(db, idempotency);
+    throw error;
+  }
 
-  return NextResponse.json(
-    { status: "created", id: ordine.id, orderNumber: ordine.orderNumber, total: totali.total },
-    { status: 201 },
-  );
+  if (response.ok) {
+    try {
+      await remember(db, idempotency, await response.clone().json());
+    } catch {
+      // An answer we cannot read back is an answer we cannot replay. The
+      // import happened; leaving the key held would only refuse the retry.
+      await release(db, idempotency);
+    }
+  } else {
+    await release(db, idempotency);
+  }
+
+  return response;
 }
