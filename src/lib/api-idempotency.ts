@@ -208,9 +208,28 @@ export async function release(db: TenantDb, claimed: Claim): Promise<void> {
   }
 }
 
-/** Old keys, for whoever adds the sweep. Here so the shape lives in one place. */
-export function expiredBefore(now: Date, days = 30) {
-  return lt(apiIdempotency.createdAt, new Date(now.getTime() - days * 24 * 60 * 60 * 1000));
+/**
+ * How long a key is worth remembering.
+ *
+ * Far past any retry a client library makes on its own, and past the point where
+ * somebody re-running yesterday's file would still call it the same import.
+ */
+export const KEY_LIFETIME_DAYS = 30;
+
+/**
+ * Forgets keys nobody is going to send again, and reports how many.
+ *
+ * ⚠️ Not optional housekeeping. Every keyed request stores its **whole
+ * response** — that is what makes a repeat replay rather than re-import — so a
+ * five-hundred-record answer is tens of kilobytes, written once a day for ever
+ * by any workspace that imports daily, in a database the customer pays for.
+ */
+export async function sweepIdempotencyKeys(db: TenantDb, now = new Date()): Promise<number> {
+  const gone = await db
+    .delete(apiIdempotency)
+    .where(lt(apiIdempotency.createdAt, new Date(now.getTime() - KEY_LIFETIME_DAYS * 24 * 60 * 60 * 1000)))
+    .returning({ key: apiIdempotency.key });
+  return gone.length;
 }
 
 function safeParse(raw: string): unknown {

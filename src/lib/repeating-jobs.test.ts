@@ -85,6 +85,17 @@ describe("the cron schedules", () => {
     expect([...declared].filter((s) => !handled.has(s))).toEqual([]);
   });
 
+  it("⚠️ are all listed in CLAUDE.md", () => {
+    // A job missing from that table is a job somebody concludes does not exist,
+    // and the table went stale the first time a job was added after it — which is
+    // the same day this check was written.
+    const table = read("CLAUDE.md");
+    const missing = scheduledJobs()
+      .map((j) => j.route.split("/").pop() as string)
+      .filter((name) => !table.includes(name));
+    expect([...new Set(missing)]).toEqual([]);
+  });
+
   it("point at routes that exist", () => {
     const missing = scheduledJobs()
       .map((j) => j.route)

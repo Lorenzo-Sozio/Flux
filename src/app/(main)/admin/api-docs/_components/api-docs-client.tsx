@@ -1810,6 +1810,32 @@ const GROUPS: ApiGroup[] = [
         ],
       },
       {
+        id: "cron-idempotency-sweep",
+        method: "GET",
+        path: "/api/cron/idempotency-sweep",
+        summary: "Pulizia chiavi di idempotenza",
+        description:
+          "Dimentica le chiavi `Idempotency-Key` più vecchie di 30 giorni, insieme alle risposte memorizzate per rigiocarle. Serve perché ogni richiesta con chiave conserva la propria risposta per intero: è ciò che permette a una ripetizione di ricevere la stessa risposta invece di reimportare, ed è anche il motivo per cui la tabella non può essere lasciata crescere. Una risposta da cinquecento record sono decine di kilobyte, scritte una al giorno da qualunque workspace che importa ogni giorno. Trenta giorni sono ben oltre qualsiasi ritentativo automatico e oltre il punto in cui rimandare il file di ieri sarebbe ancora la stessa importazione. Eseguito una volta al giorno, sulla stessa schedule dell'auto-chiusura ticket.",
+        auth: "cron",
+        parameters: [
+          {
+            name: "Authorization",
+            in: "header",
+            required: true,
+            type: "string",
+            description: "Bearer token `CRON_SECRET`.",
+            example: "Bearer sk_cron_abc123xyz",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "Quante chiavi sono state dimenticate",
+            example: JSON.stringify({ forgotten: 143 }, null, 2),
+          },
+        ],
+      },
+      {
         id: "cron-ticket-sla",
         method: "GET",
         path: "/api/cron/ticket-sla-check",

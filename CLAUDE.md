@@ -87,7 +87,14 @@ task-reminders       every 15 minutes  reminds about tasks
 ticket-sla-check     every 15 minutes  flags tickets past their SLA
 task-overdue-check   daily at 06:00    flags overdue tasks
 ticket-autoclose     daily at 03:00    closes resolved tickets
+idempotency-sweep    daily at 03:00    forgets Idempotency-Keys older than 30 days
 ```
+
+⚠️ Two jobs share `0 3 * * *` because the Free plan allows five cron *triggers*
+per account and all five are spoken for. Another job on an existing schedule is
+free; a sixth schedule is not. `src/lib/repeating-jobs.test.ts` checks this table
+against custom-worker.ts, because a table that quietly stops listing a job is how
+somebody concludes the job does not exist.
 
 ⚠️ `webhook-retry` is what makes outgoing events at-least-once instead of
 at-most-once. Without it a lost event is lost, and whoever was waiting for it has no

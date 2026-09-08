@@ -37,7 +37,10 @@ const CRON_JOBS: Record<string, readonly string[]> = {
   "*/5 * * * *": ["/api/cron/webhook-retry", "/api/cron/campaign-scheduler"],
   "*/15 * * * *": ["/api/cron/task-reminders", "/api/cron/ticket-sla-check"],
   "0 6 * * *": ["/api/cron/task-overdue-check"],
-  "0 3 * * *": ["/api/cron/ticket-autoclose"],
+  // Two jobs on one schedule: the Free plan allows five cron triggers per account
+  // and all five are spoken for, so a sixth *schedule* needs Workers Paid while
+  // another job on an existing one is free.
+  "0 3 * * *": ["/api/cron/ticket-autoclose", "/api/cron/idempotency-sweep"],
 };
 
 /**
