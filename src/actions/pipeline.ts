@@ -20,6 +20,7 @@ import {
 } from "@/db/schema";
 import { DEFAULT_STAGES } from "@/db/seed-workspace";
 import { requireAdminAccess, requireCapability, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
+import { dealReach } from "@/lib/deal-reach";
 import { convertToEur, getExchangeRates } from "@/lib/exchange-rates";
 import { notify } from "@/lib/notify";
 import { getDb } from "@/lib/tenant-context";
@@ -186,11 +187,16 @@ export async function updateDealStage(dealId: string, newStageId: string, loss?:
   // A deal closed by a drag is closed for the same reasons as one closed from the
   // form, and integrations must hear about it either way.
   if (closing && oldDeal?.status !== closing) {
+    // ⚠️⚠️ Who the deal was about travels with the event. Without it a subscriber hears
+    // "won" and has no idea whose: our ids mean nothing outside this database, and the
+    // assistant on the other side matches people by telephone number and email.
+    const reach = await dealReach(db, updatedDeal.contactId);
     dispatchWebhook(closing === "won" ? "deal.won" : "deal.lost", {
       id: updatedDeal.id,
       name: updatedDeal.name,
       amount: updatedDeal.amount,
       currency: updatedDeal.currency,
+      ...reach,
       // Why it was lost travels with the event, or there is no win/loss analysis
       // downstream either.
       ...(closing === "lost"
@@ -263,10 +269,17 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
   // event and re-notified the owner, so an integration saw the same deal won
   // several times.
   if (data.status === "won" && isClosing) {
-    dispatchWebhook("deal.won", { id: updatedDeal.id, name: updatedDeal.name, amount: updatedDeal.amount }).catch(
+    // ⚠️⚠️ Who the deal was about travels with the event. Without it a subscriber hears
+    // "won" and has no idea whose: our ids mean nothing outside this database, and the
+    // assistant on the other side matches people by telephone number and email.
+    const reach = await dealReach(db, updatedDeal.contactId);
+    dispatchWebhook("deal.won", {
+      id: updatedDeal.id,
+      name: updatedDeal.name,
+      amount: updatedDeal.amount,
+      ...reach,
       // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
-      () => {},
-    );
+    }).catch(() => {});
     if (updatedDeal.ownerId) {
       notify({
         userId: updatedDeal.ownerId,
@@ -278,10 +291,12 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
       }).catch(() => {});
     }
   } else if (data.status === "lost" && isClosing) {
+    const reach = await dealReach(db, updatedDeal.contactId);
     dispatchWebhook("deal.lost", {
       id: updatedDeal.id,
       name: updatedDeal.name,
       amount: updatedDeal.amount,
+      ...reach,
       // Why it was lost travels with the event: without it there is no win/loss
       // analysis anywhere, here or downstream.
       reason: updatedDeal.lostReason,
@@ -723,11 +738,13 @@ export async function loseDeal(dealId: string, loss: LossDetails) {
     .where(eq(deals.id, dealId))
     .returning();
 
+  const reach = await dealReach(db, updated.contactId);
   dispatchWebhook("deal.lost", {
     id: updated.id,
     name: updated.name,
     amount: updated.amount,
     currency: updated.currency,
+    ...reach,
     lossReasonId: updated.lossReasonId,
     competitor: updated.lostCompetitor,
     note: updated.lostReason,

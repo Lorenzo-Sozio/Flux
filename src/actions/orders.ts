@@ -22,6 +22,7 @@ import {
   users,
 } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
+import { dealReach } from "@/lib/deal-reach";
 import { computeDocument } from "@/lib/document-totals";
 import { nextOrderNumber } from "@/lib/order-number";
 import { isRecordablePayment } from "@/lib/order-payment";
@@ -573,6 +574,11 @@ export async function convertQuoteToOrderAction(quoteId: string) {
 
   // The deal is won the moment the customer's order exists. Leaving it open is how
   // closed business kept weighing on the forecast for ever (rilievo C-06).
+  //
+  // ⚠️⚠️ Read first, because the write below is conditional and a batch does not say
+  // whether it did anything. Whether *this* conversion is what won the deal decides
+  // whether an event goes out, and a deal already won must not announce itself twice.
+  const [dealPrima] = quote.dealId ? await db.select().from(deals).where(eq(deals.id, quote.dealId)) : [undefined];
   if (quote.dealId) {
     writes.push(
       db
@@ -591,6 +597,22 @@ export async function convertQuoteToOrderAction(quoteId: string) {
     currency: quote.currency,
     fromQuoteId: quote.id,
   });
+
+  // ⚠️⚠️ Turning an accepted quote into an order is the commonest way a deal is won in a
+  // quote-driven business, and it was the one way that announced nothing: the pipeline
+  // moved and every subscriber stayed on the previous state. An integration counting won
+  // business was therefore missing exactly the deals that came through a quote.
+  if (dealPrima && dealPrima.status !== "won") {
+    const reach = await dealReach(db, dealPrima.contactId);
+    dispatchWebhook("deal.won", {
+      id: dealPrima.id,
+      name: dealPrima.name,
+      amount: dealPrima.amount,
+      currency: dealPrima.currency,
+      ...reach,
+      // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
+    }).catch(() => {});
+  }
 
   revalidatePath("/dashboard/sales/quotes");
   revalidatePath(`/dashboard/sales/quotes/${quoteId}`);
