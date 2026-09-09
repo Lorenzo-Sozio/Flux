@@ -95,6 +95,14 @@ export async function announceQuoteSent(quote: typeof quotes.$inferSelect, actor
       // ⚠️ What the recipient sees instead of a preview. Without it an attachment arrives
       // nameless, which looks a lot like something not to open.
       nome: `Preventivo ${quote.quoteNumber}.pdf`,
+      // ⚠️⚠️ **When the price stops being ours.** An assistant that chases the customer
+      // about a quote is chasing them about a figure, and a figure that has expired is one
+      // the owner may no longer honour. Without this date the receiver cannot tell the
+      // difference and keeps asking — politely, on our behalf, about a price that is gone.
+      //
+      // Omitted rather than sent as null when the quote has no expiry: a quote that never
+      // expires and one whose expiry we failed to include must not look the same.
+      ...(quote.expiresAt ? { expiresAt: quote.expiresAt.toISOString() } : {}),
     },
     // A person pressed send. Marking this `api` would make an integration that filters its
     // own writes ignore the one event it is waiting for.

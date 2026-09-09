@@ -89,6 +89,27 @@ describe("il preventivo che parte", () => {
     expect(emessi[0].carico.phone).toBe("+393330000001");
   });
 
+  it("⚠️⚠️ porta la scadenza, o chi riceve insegue un prezzo che non c'e' piu'", async () => {
+    // Un assistente che chiede «hai visto il preventivo?» sta chiedendo di una **cifra**, e
+    // una cifra scaduta e' una che il titolare puo' non voler piu' onorare. Senza questa
+    // data chi riceve l'evento non puo' distinguere, e continua a sollecitare per conto
+    // nostro su un prezzo che non esiste.
+    await announceQuoteSent(
+      { ...PREVENTIVO, expiresAt: new Date("2026-10-15T00:00:00.000Z") } as typeof PREVENTIVO,
+      "u7",
+    );
+
+    expect(emessi[0].carico.expiresAt).toBe("2026-10-15T00:00:00.000Z");
+  });
+
+  it("⚠️ un preventivo SENZA scadenza non ne annuncia una vuota", async () => {
+    // Un preventivo che non scade e uno la cui scadenza abbiamo dimenticato di allegare non
+    // devono somigliarsi: il primo si insegue per sempre, il secondo va corretto.
+    await announceQuoteSent(PREVENTIVO, "u7");
+
+    expect(emessi[0].carico).not.toHaveProperty("expiresAt");
+  });
+
   it("⚠️⚠️ ripiega sul cellulare, che prima non faceva", async () => {
     // Il difetto vero che la fusione delle due copie ha corretto: questa lettura non
     // guardava il cellulare, quindi un contatto raggiungibile **solo** lì partiva senza
