@@ -22,7 +22,7 @@ import {
   users,
 } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
-import { dealReach } from "@/lib/deal-reach";
+import { contactReach } from "@/lib/contact-reach";
 import { computeDocument } from "@/lib/document-totals";
 import { nextOrderNumber } from "@/lib/order-number";
 import { isRecordablePayment } from "@/lib/order-payment";
@@ -603,7 +603,7 @@ export async function convertQuoteToOrderAction(quoteId: string) {
   // moved and every subscriber stayed on the previous state. An integration counting won
   // business was therefore missing exactly the deals that came through a quote.
   if (dealPrima && dealPrima.status !== "won") {
-    const reach = await dealReach(db, dealPrima.contactId);
+    const reach = await contactReach(db, dealPrima.contactId);
     dispatchWebhook("deal.won", {
       id: dealPrima.id,
       name: dealPrima.name,

@@ -20,7 +20,7 @@ import {
 } from "@/db/schema";
 import { DEFAULT_STAGES } from "@/db/seed-workspace";
 import { requireAdminAccess, requireCapability, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
-import { dealReach } from "@/lib/deal-reach";
+import { contactReach } from "@/lib/contact-reach";
 import { convertToEur, getExchangeRates } from "@/lib/exchange-rates";
 import { notify } from "@/lib/notify";
 import { getDb } from "@/lib/tenant-context";
@@ -190,7 +190,7 @@ export async function updateDealStage(dealId: string, newStageId: string, loss?:
     // ⚠️⚠️ Who the deal was about travels with the event. Without it a subscriber hears
     // "won" and has no idea whose: our ids mean nothing outside this database, and the
     // assistant on the other side matches people by telephone number and email.
-    const reach = await dealReach(db, updatedDeal.contactId);
+    const reach = await contactReach(db, updatedDeal.contactId);
     dispatchWebhook(closing === "won" ? "deal.won" : "deal.lost", {
       id: updatedDeal.id,
       name: updatedDeal.name,
@@ -272,7 +272,7 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
     // ⚠️⚠️ Who the deal was about travels with the event. Without it a subscriber hears
     // "won" and has no idea whose: our ids mean nothing outside this database, and the
     // assistant on the other side matches people by telephone number and email.
-    const reach = await dealReach(db, updatedDeal.contactId);
+    const reach = await contactReach(db, updatedDeal.contactId);
     dispatchWebhook("deal.won", {
       id: updatedDeal.id,
       name: updatedDeal.name,
@@ -291,7 +291,7 @@ export async function updateDeal(dealId: string, data: Partial<typeof deals.$inf
       }).catch(() => {});
     }
   } else if (data.status === "lost" && isClosing) {
-    const reach = await dealReach(db, updatedDeal.contactId);
+    const reach = await contactReach(db, updatedDeal.contactId);
     dispatchWebhook("deal.lost", {
       id: updatedDeal.id,
       name: updatedDeal.name,
@@ -738,7 +738,7 @@ export async function loseDeal(dealId: string, loss: LossDetails) {
     .where(eq(deals.id, dealId))
     .returning();
 
-  const reach = await dealReach(db, updated.contactId);
+  const reach = await contactReach(db, updated.contactId);
   dispatchWebhook("deal.lost", {
     id: updated.id,
     name: updated.name,

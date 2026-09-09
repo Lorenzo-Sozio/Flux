@@ -1,8 +1,7 @@
-import { eq } from "drizzle-orm";
-
 import { dispatchWebhook, type WebhookDispatchDb } from "@/actions/webhooks";
-import { contacts, type quotes } from "@/db/schema";
+import type { quotes } from "@/db/schema";
 import { getAppUrlOrNull } from "@/lib/app-url";
+import { contactReach } from "@/lib/contact-reach";
 import { getDb } from "@/lib/tenant-context";
 
 /**
@@ -16,25 +15,17 @@ import { getDb } from "@/lib/tenant-context";
 type EventDb = WebhookDispatchDb | undefined;
 
 /**
- * Tell the integrations that a quote has left, with an address they can hand to the person.
- *
- * ⚠️⚠️ No fallback base URL, on purpose. A localhost default here would not fail: it would
- * send a real customer a link to a machine that is not theirs, which is a successful
- * delivery to the wrong place — the shape nobody goes looking for. Without the base the
- * event still goes out, carrying everything except the address, and the receiver says so
- * on its own side.
+ * Who this quote is about.
  *
  * ⚠️ The contact's phone and email travel because that is the only thing both systems have
- * in common: our id for this person means nothing on the other side.
+ * in common: our id for this person means nothing on the other side. The lookup itself is
+ * `contactReach`, shared with the deal events — it used to be a copy here, and the copy had
+ * already drifted: it never fell back to the mobile, so a contact reachable only on a
+ * mobile left this event without a telephone number.
  */
 async function reachOf(quote: typeof quotes.$inferSelect, explicitDb?: EventDb) {
   const db = explicitDb ?? (await getDb());
-  const contact = quote.contactId
-    ? await db.query.contacts.findFirst({ where: eq(contacts.id, quote.contactId) })
-    : null;
-  // ⚠️ The contact's phone and email travel because that is the only thing both systems
-  // have in common: our id for this person means nothing on the other side.
-  return { email: contact?.email ?? undefined, phone: contact?.phone ?? undefined };
+  return contactReach(db as Parameters<typeof contactReach>[0], quote.contactId);
 }
 
 /**

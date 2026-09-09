@@ -16,10 +16,22 @@ vi.mock("@/actions/webhooks", () => ({
     emessi.push({ evento, carico, origin });
   },
 }));
-vi.mock("@/db/schema", () => ({ contacts: { id: "id" }, quotes: {} }));
+vi.mock("@/db/schema", () => ({
+  contacts: { id: "id", phone: "phone", mobile: "mobile", email: "email" },
+  quotes: {},
+}));
 vi.mock("drizzle-orm", () => ({ eq: () => "eq" }));
+// ⚠️ Il doppio **dichiara** che cosa restituisce, e ha la forma della query vera: la
+// ricerca del contatto è passata dall'API relazionale al costruttore `select`, quando le
+// due copie di questa lettura — una per i preventivi, una per le trattative — sono
+// diventate una sola. Un doppio che eredita il ripiego renderebbe verdi test che non
+// esercitano niente.
 vi.mock("@/lib/tenant-context", () => ({
-  getDb: async () => ({ query: { contacts: { findFirst: async () => contatto } } }),
+  getDb: async () => ({
+    select: () => ({
+      from: () => ({ where: () => ({ limit: async () => (contatto ? [contatto] : []) }) }),
+    }),
+  }),
 }));
 
 const { announceQuoteDecision, announceQuoteSent, hasAlreadyLeft } = await import("@/lib/quote-events");
@@ -37,7 +49,7 @@ const BASE = process.env.NEXTAUTH_URL;
 
 beforeEach(() => {
   emessi.length = 0;
-  contatto = { email: "mario@example.it", phone: "+393330000001" };
+  contatto = { email: "mario@example.it", phone: "+393330000001", mobile: null };
   process.env.NEXTAUTH_URL = "https://flux.example.test";
 });
 afterEach(() => {
@@ -75,6 +87,19 @@ describe("il preventivo che parte", () => {
 
     expect(emessi[0].carico.email).toBe("mario@example.it");
     expect(emessi[0].carico.phone).toBe("+393330000001");
+  });
+
+  it("⚠️⚠️ ripiega sul cellulare, che prima non faceva", async () => {
+    // Il difetto vero che la fusione delle due copie ha corretto: questa lettura non
+    // guardava il cellulare, quindi un contatto raggiungibile **solo** lì partiva senza
+    // numero di telefono — e se non aveva nemmeno un'email, chi riceve l'evento non poteva
+    // collegarlo a nessuno e lo lasciava cadere. Il preventivo risultava mandato e non
+    // arrivava a nessuno.
+    contatto = { email: null, phone: null, mobile: "+393339998877" };
+
+    await announceQuoteSent(PREVENTIVO, "u7");
+
+    expect(emessi[0].carico.phone).toBe("+393339998877");
   });
 
   it("⚠️ dichiara l'origine «persona», perche' qualcuno ha premuto invia", async () => {
