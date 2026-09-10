@@ -3682,6 +3682,60 @@ const GROUPS: ApiGroup[] = [
         ],
       },
       {
+        id: "crm-lead-stage",
+        method: "POST",
+        path: "/api/crm/leads/stage",
+        summary: "Sposta un lead allo stadio a cui l'assistente l'ha portato",
+        description:
+          "Cambia **solo** lo stadio del lead raggiungibile a quel recapito, senza toccare " +
+          "nient'altro della sua scheda.\n\n" +
+          '⚠️ Non è l\'importazione con `onDuplicate: "update"`: quella **sostituisce** il ' +
+          "lead con quello che le mandi, quindi un telefono e uno stadio azzererebbero " +
+          "email, azienda e note. Importare è sostituire; dire «questo si è mosso» è " +
+          "un'altra frase.\n\n" +
+          "⚠️ Serve a questo: un assistente che ha raccolto quello che serve al preventivo " +
+          "e passa la mano lo diceva **in prosa**, con una nota sulla cronologia. Una prosa " +
+          "non è una coda. Spostando il lead, la richiesta compare dove il commerciale " +
+          "guarda ogni mattina — l'elenco dei lead, filtrato per stadio.",
+        auth: "session",
+        parameters: [
+          {
+            name: "contactPoint",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Telefono o email della persona",
+            example: "+39 333 111 2223",
+          },
+          {
+            name: "status",
+            in: "body",
+            required: true,
+            type: "string",
+            description: "Lo stadio: new, contacting, engaged, qualified, unqualified",
+            example: "qualified",
+          },
+        ],
+        requestBody: {
+          contentType: "application/json",
+          example: JSON.stringify({ contactPoint: "+39 333 111 2223", status: "qualified" }, null, 2),
+        },
+        responses: [
+          {
+            status: 200,
+            description:
+              "Spostato. `moved: false` con `already_a_contact` quando la persona è già " +
+              "stata convertita: non c'è più uno stadio da muovere, e non è un errore",
+            example: JSON.stringify({ status: "moved", moved: true, id: "led_31ka9" }, null, 2),
+          },
+          {
+            status: 404,
+            description: "Nessun lead è raggiungibile a quel recapito",
+            example: JSON.stringify({ error: "No lead reachable at that contact point" }, null, 2),
+          },
+        ],
+      },
+      {
         id: "crm-orders",
         method: "POST",
         path: "/api/crm/orders",

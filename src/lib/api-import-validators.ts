@@ -175,7 +175,7 @@ export interface LeadInput {
   tags: string[];
 }
 
-const LEAD_STATUSES = ["new", "contacting", "engaged", "qualified", "unqualified"] as const;
+export const LEAD_STATUSES = ["new", "contacting", "engaged", "qualified", "unqualified"] as const;
 const LEAD_RATINGS = ["hot", "warm", "cold"] as const;
 
 export function validateLeadInput(body: unknown): { errors: ValidationError[]; data: LeadInput | null } {
@@ -185,9 +185,7 @@ export function validateLeadInput(body: unknown): { errors: ValidationError[]; d
   const b = body as Record<string, unknown>;
 
   const errors = collect(
-    identifica(b)
-      ? null
-      : mkErr("identity", "a lead needs at least one of firstName, lastName, email or phone"),
+    identifica(b) ? null : mkErr("identity", "a lead needs at least one of firstName, lastName, email or phone"),
     chkStr(b.firstName, "firstName", 200),
     chkStr(b.lastName, "lastName", 200),
     chkStr(b.jobTitle, "jobTitle", 200),
