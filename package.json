@@ -27,6 +27,7 @@
     "migrate:condition-expression": "node src/scripts/migrate-condition-expression.mjs",
     "migrate:tenants": "npx tsx scripts/migrate-all-tenants.ts",
     "migrate:tenants:dry": "npx tsx scripts/migrate-all-tenants.ts --dry-run",
+    "rotate:platform-key": "npx tsx scripts/rotate-platform-key.ts",
     "generate:postman": "npx tsx scripts/generate-postman-collection.ts",
     "generate:tenant-migrations": "drizzle-kit generate --config=drizzle.tenant.config.ts && node scripts/generate-embedded-migrations.mjs",
     "generate:migrations": "node scripts/generate-embedded-migrations.mjs"

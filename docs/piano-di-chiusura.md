@@ -29,6 +29,7 @@ Ogni riga è verificata con suite, build e, dove indicato, mutazioni intercettat
 | P6 | Thread paginato a 100 elementi con "carica precedenti". Il riepilogo di presa in carico ora è calcolato sul server sull'intero thread: da una pagina sola avrebbe indicato il messaggio di apertura sbagliato senza nessun segno. Pagina caricata dal server. 5 mutazioni su 5. | `7b0795b` · `def0c3e` |
 | — | **Fuori piano:** il contatore messaggi di elenco e kanban ticket valeva sempre al massimo 1, perché la query carica un solo messaggio per l'anteprima. | `fda6ad2` |
 | O6 | Il provider Google era registrato con le variabili vuote. Ora solo se configurato. L'unico pulsante Google era in un modulo di login che nessuno importava, eliminato. | `7cfcc00` |
+| O4 | La chiave cifra tre campi, tutti nel database di piattaforma. La rotazione aveva un buco: in qualunque ordine, per un momento la produzione non avrebbe letto nessun workspace. Ora la decifratura accetta `PLATFORM_ENCRYPTION_KEY_PREVIOUS`, e lo script `npm run rotate:platform-key` parte in prova a secco, blocca tutto se un solo valore è illeggibile, fa il backup dei testi cifrati, scrive solo valori non cambiati nel frattempo, rilegge e verifica, e ha il ripristino. **Non è stato eseguito contro un database**: l'unico configurato è la produzione. Verificati i cinque percorsi di errore con un indirizzo inesistente, e l'SQL della scrittura condizionata. 14 + 8 + 3 test, 12 mutazioni. | `cb8ffe3` · commit successivo |
 
 ### Prossimi passi, in quest'ordine
 
@@ -36,7 +37,7 @@ Nessuno richiede decisioni. Ciascuno si chiude con test, mutazioni dove un error
 
 | # | ID | Attività | Perché in questa posizione |
 |---|---|---|---|
-| 1 | O4 | Procedura di rotazione di `PLATFORM_ENCRYPTION_KEY` | La chiave è stata esposta in conversazione e oggi non si può ruotare senza rendere illeggibile ogni workspace. |
+| 1 | S3 | **Nuova.** Cifrare le credenziali email del workspace | Trovata durante O4: la chiave Resend e la password SMTP di ogni cliente sono salvate in chiaro nel suo database, mentre quelle di piattaforma sono cifrate. Sicurezza prima delle funzionalità. Lo script di rotazione copre già quei campi. |
 | 2 | L1 | Assegnazione automatica dei lead a rotazione | Autonoma, e serve a L5. |
 | 3 | L4 | Territori | Autonoma, e serve a L5. |
 | 4 | L5 | Assegnazione per regola | Dipende da L1 e L4, entrambe prima. |
@@ -47,7 +48,7 @@ Nessuno richiede decisioni. Ciascuno si chiude con test, mutazioni dove un error
 
 - **O1** verificare che il deploy arrivi dopo il prossimo push. Al 15 settembre il `main` locale è avanti di 8 commit rispetto al remoto.
 - **O2** cifrare le sei variabili in chiaro. Da riga di comando non si può: l'API rifiuta un secret con il nome di una variabile esistente.
-- **O3** ruotare subito `CRON_SECRET`, `IMPORT_API_KEY`, `ADMIN_SESSION_SECRET`; `AUTH_SECRET` e la password Neon in una finestra concordata; `PLATFORM_ENCRYPTION_KEY` solo dopo O4.
+- **O3** ruotare subito `CRON_SECRET`, `IMPORT_API_KEY`, `ADMIN_SESSION_SECRET`; `AUTH_SECRET` e la password Neon in una finestra concordata; `PLATFORM_ENCRYPTION_KEY` seguendo la procedura in cima a `scripts/rotate-platform-key.ts`, dopo il deploy che contiene `cb8ffe3`.
 - **O5** cancellare `NXTAUTH_URL`.
 
 ### In attesa di decisioni

@@ -1,0 +1,14 @@
+[
+  {
+    "file": "src/lib/key-rotation-db.ts",
+    "description": "⚠️⚠️ la connessione di un workspace viene riscritta anche se nel frattempo e' cambiata: la rotazione sovrascrive un valore nuovo con la copia cifrata di quello vecchio",
+    "find": "      .where(and(eq(tenants.id, where.id), eq(tenants.dbUrl, from)))",
+    "replace": "      .where(eq(tenants.id, where.id))"
+  },
+  {
+    "file": "src/lib/key-rotation-db.ts",
+    "description": "⚠️⚠️ una credenziale email salvata durante la rotazione viene sovrascritta con quella vecchia",
+    "find": "    .where(and(eq(emailSettings.id, where.id), eq(column, from)))",
+    "replace": "    .where(eq(emailSettings.id, where.id))"
+  }
+]

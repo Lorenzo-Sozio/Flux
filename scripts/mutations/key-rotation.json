@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/lib/key-rotation.ts",
+    "description": "⚠️⚠️ un valore illeggibile non blocca piu' la rotazione: si riscrive il resto e resta un database che nessuna chiave sola sa leggere",
+    "find": "    unreadable: planned.filter((p) => p.action === \"unreadable\").map((p) => p.field),",
+    "replace": "    unreadable: [],"
+  },
+  {
+    "file": "src/lib/key-rotation.ts",
+    "description": "⚠️⚠️ un valore gia' ruotato viene cifrato di nuovo: una rotazione interrotta e rilanciata lo rende illeggibile anche con la chiave nuova",
+    "find": "    if (underNew !== null) return { field, action: \"already-rotated\", plaintext: underNew };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/key-rotation.ts",
+    "description": "⚠️ un valore in chiaro viene trattato come cifrato: la rotazione lo segna illeggibile e si blocca su un segreto scritto prima della cifratura",
+    "find": "    if (!looksEncrypted(field.stored)) return { field, action: \"plaintext\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/key-rotation.ts",
+    "description": "⚠️ la stessa chiave come vecchia e nuova viene accettata: la rotazione riscrive tutto per niente e dichiara di essere riuscita",
+    "find": "  if (oldKey.equals(newKey)) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/key-rotation.ts",
+    "description": "⚠️ un valore che la vecchia chiave non apre viene riscritto comunque: il testo nuovo cifra una stringa vuota al posto della connessione",
+    "find": "    if (plaintext === null) return { field, action: \"unreadable\" };",
+    "replace": ""
+  }
+]
