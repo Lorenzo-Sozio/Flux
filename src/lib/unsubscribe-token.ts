@@ -1,8 +1,18 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
+/**
+ * ⚠️⚠️ This read `NEXTAUTH_SECRET` and nothing else. Auth.js v5 names it
+ * `AUTH_SECRET`, which is what every environment of this product sets and what
+ * env-check asks for; `NEXTAUTH_SECRET` was set nowhere. So generating the link
+ * threw, and every campaign send stopped at its first recipient — with a queued
+ * log row and no email, which reads as a campaign still sending.
+ *
+ * Same secrets, in the same order, as the tracking links in the same email. No
+ * link was ever signed with the old name, so none stops working.
+ */
 function getSecret(): string {
-  const secret = process.env.NEXTAUTH_SECRET;
-  if (!secret) throw new Error("NEXTAUTH_SECRET is not set");
+  const secret = process.env.TRACKING_SECRET || process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) throw new Error("TRACKING_SECRET or AUTH_SECRET must be set");
   return secret;
 }
 

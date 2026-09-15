@@ -1,0 +1,14 @@
+[
+  {
+    "file": "src/lib/unsubscribe-token.ts",
+    "description": "⚠️⚠️ il link di disiscrizione torna a leggere solo NEXTAUTH_SECRET: ogni invio di campagna si ferma al primo destinatario",
+    "find": "  const secret = process.env.TRACKING_SECRET || process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;",
+    "replace": "  const secret = process.env.NEXTAUTH_SECRET;"
+  },
+  {
+    "file": "src/lib/unsubscribe-token.ts",
+    "description": "⚠️⚠️ la firma non viene verificata: chiunque disiscrive qualunque indirizzo",
+    "find": "    if (!timingSafeEqual(sigBuf, expectedBuf)) return null;",
+    "replace": ""
+  }
+]
