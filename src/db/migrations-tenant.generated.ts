@@ -422,4 +422,14 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nCREATE INDEX IF NOT EXISTS "email_job_message_id_idx" ON "email_job" ("message_id");\n',
     ],
   },
+  {
+    tag: "0022_who_sends_the_invoice",
+    folderMillis: 1789560000000,
+    hash: "4d0a2d99c793e1b74b39761f56dabefa10b28202499dffca772a09f142341711",
+    sql: [
+      '-- Who issues the invoices, and what a customer needs to receive one.\n--\n-- Additive and re-runnable, as every tenant migration has to be. Nothing here is\n-- NOT NULL on existing rows: the checks that matter run when an invoice is issued.\nALTER TABLE "company" ADD COLUMN IF NOT EXISTS "fiscal_code" text;\n',
+      '\nALTER TABLE "company" ADD COLUMN IF NOT EXISTS "pec" text;\n',
+      '\nCREATE TABLE IF NOT EXISTS "invoice_issuer" (\n\t"id" text PRIMARY KEY DEFAULT \'workspace\' NOT NULL,\n\t"legal_name" text,\n\t"vat_number" text,\n\t"fiscal_code" text,\n\t"tax_regime" text DEFAULT \'RF01\',\n\t"street" text,\n\t"zip_code" text,\n\t"city" text,\n\t"province" text,\n\t"country" text DEFAULT \'IT\',\n\t"rea_office" text,\n\t"rea_number" text,\n\t"share_capital" numeric(15, 2),\n\t"sole_shareholder" text,\n\t"liquidation_status" text,\n\t"email" text,\n\t"phone" text,\n\t"iban" text,\n\t"bank_name" text,\n\t"updated_by" text,\n\t"updated_at" timestamp DEFAULT now() NOT NULL\n);\n',
+    ],
+  },
 ];

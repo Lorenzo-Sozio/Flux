@@ -2303,6 +2303,22 @@ const GROUPS: ApiGroup[] = [
             example: "XXXXXXX",
           },
           {
+            name: "fiscalCode",
+            in: "body",
+            required: false,
+            type: "string",
+            description: "Codice fiscale (16 caratteri per una persona, 11 cifre per un'azienda)",
+            example: "02345678901",
+          },
+          {
+            name: "pec",
+            in: "body",
+            required: false,
+            type: "string (email)",
+            description: "PEC per la fatturazione elettronica, in alternativa al codice SDI",
+            example: "fatture@pec.acme.it",
+          },
+          {
             name: "source",
             in: "body",
             required: false,

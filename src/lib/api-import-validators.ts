@@ -291,6 +291,8 @@ export interface CompanyInput {
   source: string | null;
   vatNumber: string | null;
   sdiCode: string | null;
+  fiscalCode: string | null;
+  pec: string | null;
   tags: string[];
 }
 
@@ -321,6 +323,8 @@ export function validateCompanyInput(body: unknown): { errors: ValidationError[]
     chkStr(b.source, "source", 100),
     chkStr(b.vatNumber, "vatNumber", 50),
     chkStr(b.sdiCode, "sdiCode", 10),
+    chkStr(b.fiscalCode, "fiscalCode", 16),
+    chkEmail(b.pec, "pec"),
   );
 
   if (errors.length > 0) return { errors, data: null };
@@ -347,6 +351,8 @@ export function validateCompanyInput(body: unknown): { errors: ValidationError[]
       source: str(b.source),
       vatNumber: str(b.vatNumber),
       sdiCode: str(b.sdiCode),
+      fiscalCode: str(b.fiscalCode),
+      pec: str(b.pec)?.toLowerCase() ?? null,
       tags: parseTags(b.tags),
     },
   };
@@ -373,6 +379,8 @@ export function buildCompanyPayload(data: CompanyInput, ownerId: string | null) 
     source: data.source ?? "api",
     vatNumber: data.vatNumber,
     sdiCode: data.sdiCode,
+    fiscalCode: data.fiscalCode,
+    pec: data.pec,
     tags: data.tags,
     ownerId: ownerId ?? undefined,
   };

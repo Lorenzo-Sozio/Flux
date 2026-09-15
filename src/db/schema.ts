@@ -188,6 +188,10 @@ export const companies = pgTable("company", {
   groupId: text("group_id").references(() => userGroups.id, { onDelete: "set null" }),
   vatNumber: text("vat_number"),
   sdiCode: text("sdi_code"),
+  // Codice fiscale and PEC: with the partita IVA and codice destinatario, what an
+  // invoice needs to reach this customer. Checked when issuing, not when saving.
+  fiscalCode: text("fiscal_code"),
+  pec: text("pec"),
   tags: text("tags").array(),
   sourceLeadId: text("source_lead_id"), // FK set via migration → lead.id (set null)
   companyCategoryId: text("company_category_id").references(() => companyCategories.id, { onDelete: "set null" }),
@@ -857,6 +861,39 @@ export const notifications = pgTable("notification", {
 export const documentCounters = pgTable("document_counter", {
   scope: text("scope").primaryKey(),
   lastValue: integer("last_value").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// --- INVOICING ---
+
+/**
+ * Who issues this workspace's invoices: the CedentePrestatore of a FatturaPA.
+ *
+ * One row, keyed `workspace`. Stored as typed but normalised by
+ * src/lib/invoice-issuer.ts; `issuerGaps` in src/lib/fiscal-ids.ts says what still
+ * stops an invoice being issued.
+ */
+export const invoiceIssuers = pgTable("invoice_issuer", {
+  id: text("id").primaryKey().default("workspace"),
+  legalName: text("legal_name"),
+  vatNumber: text("vat_number"),
+  fiscalCode: text("fiscal_code"),
+  taxRegime: text("tax_regime").default("RF01"),
+  street: text("street"),
+  zipCode: text("zip_code"),
+  city: text("city"),
+  province: text("province"),
+  country: text("country").default("IT"),
+  reaOffice: text("rea_office"),
+  reaNumber: text("rea_number"),
+  shareCapital: numeric("share_capital", { precision: 15, scale: 2 }),
+  soleShareholder: text("sole_shareholder"), // SU | SM
+  liquidationStatus: text("liquidation_status"), // LS | LN
+  email: text("email"),
+  phone: text("phone"),
+  iban: text("iban"),
+  bankName: text("bank_name"),
+  updatedBy: text("updated_by"),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 

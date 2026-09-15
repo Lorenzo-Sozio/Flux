@@ -660,7 +660,9 @@
       "countryPlaceholder": "Paese…",
       "notesPlaceholder": "Note su questa azienda…",
       "selectIndustry": "Seleziona settore",
-      "selectSize": "Seleziona dimensione"
+      "selectSize": "Seleziona dimensione",
+      "fiscalCode": "Codice fiscale",
+      "pec": "PEC"
     },
     "createSuccess": "Azienda creata.",
     "updateSuccess": "Azienda aggiornata.",
@@ -1519,7 +1521,8 @@
       "territories": "Territori",
       "territoryReport": "Per territorio",
       "contracts": "Contratti",
-      "sequences": "Sequenze"
+      "sequences": "Sequenze",
+      "invoicing": "Fatturazione elettronica"
     },
     "quickCreate": {
       "title": "Crea Rapido",
@@ -2778,6 +2781,10 @@
       "deleteDescription": "I record non vengono toccati: smettono solo di ricadere in questo territorio.",
       "delete": "Elimina",
       "failed": "Operazione non riuscita."
+    },
+    "invoicing": {
+      "title": "Fatturazione elettronica",
+      "description": "Denominazione, partita IVA, regime fiscale e sede di chi emette le fatture."
     }
   },
   "support": {
@@ -3701,5 +3708,62 @@
     "enroll": "Iscrivi",
     "enrolledToast": "Iscritto alla sequenza.",
     "close": "Chiudi"
+  },
+  "invoicing": {
+    "title": "Fatturazione elettronica",
+    "subtitle": "I dati di chi emette le fatture di questo workspace. Puoi salvarli incompleti: una fattura si emette solo quando sono tutti in regola.",
+    "ready": "Pronto per emettere fatture.",
+    "notReady": "Prima di emettere una fattura manca:",
+    "sections": {
+      "identity": "Anagrafica",
+      "address": "Sede",
+      "rea": "Registro imprese (facoltativo)",
+      "payment": "Pagamenti",
+      "contacts": "Contatti"
+    },
+    "problems": {
+      "missing": "da inserire",
+      "invalid": "non valido"
+    },
+    "fields": {
+      "legalName": "Denominazione",
+      "vatNumber": "Partita IVA",
+      "fiscalCode": "Codice fiscale",
+      "taxRegime": "Regime fiscale",
+      "street": "Indirizzo",
+      "zipCode": "CAP",
+      "city": "Comune",
+      "province": "Provincia (sigla)",
+      "country": "Nazione",
+      "reaOffice": "Ufficio REA (sigla provincia)",
+      "reaNumber": "Numero REA",
+      "shareCapital": "Capitale sociale",
+      "soleShareholder": "Socio unico",
+      "liquidationStatus": "Stato di liquidazione",
+      "email": "Email",
+      "phone": "Telefono",
+      "iban": "IBAN",
+      "bankName": "Banca",
+      "name": "Ragione sociale",
+      "sdiCode": "Codice destinatario (SDI)",
+      "pec": "PEC"
+    },
+    "soleShareholderOptions": {
+      "none": "Non indicato",
+      "SU": "Socio unico",
+      "SM": "Più soci"
+    },
+    "liquidationOptions": {
+      "none": "Non indicato",
+      "LN": "Non in liquidazione",
+      "LS": "In liquidazione"
+    },
+    "save": "Salva",
+    "saving": "Salvataggio…",
+    "saved": "Dati di fatturazione salvati.",
+    "failed": "Salvataggio non riuscito.",
+    "billingTitle": "Fatturazione",
+    "customerReady": "Dati completi per ricevere una fattura elettronica.",
+    "customerNotReady": "Per emettere una fattura a questo cliente manca:"
   }
 }

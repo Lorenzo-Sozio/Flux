@@ -71,6 +71,8 @@ export {
   geoCities,
   // Geo reference
   geoCountries,
+  // Invoicing
+  invoiceIssuers,
   leads,
   leadsRelations,
   marketingCampaigns,

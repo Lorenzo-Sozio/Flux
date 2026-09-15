@@ -76,6 +76,8 @@ const companySchema = z.object({
   country: z.string().optional(),
   vatNumber: z.string().optional(),
   sdiCode: z.string().optional(),
+  fiscalCode: z.string().optional(),
+  pec: z.string().optional(),
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
@@ -177,6 +179,8 @@ export function CompanyModal({
       country: company?.country || "",
       vatNumber: company?.vatNumber || "",
       sdiCode: company?.sdiCode || "",
+      fiscalCode: company?.fiscalCode || "",
+      pec: company?.pec || "",
     },
   });
 
@@ -237,6 +241,8 @@ export function CompanyModal({
         country: company.country || "",
         vatNumber: company.vatNumber || "",
         sdiCode: company.sdiCode || "",
+        fiscalCode: company.fiscalCode || "",
+        pec: company.pec || "",
       });
     }
   }, [open, company, form.reset]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -257,7 +263,7 @@ export function CompanyModal({
     ),
     crm: !!(e.source || e.leadScore || e.tags),
     address: !!(e.street || e.city || e.state || e.zipCode || e.country),
-    billing: !!(e.vatNumber || e.sdiCode),
+    billing: !!(e.vatNumber || e.sdiCode || e.fiscalCode || e.pec),
   };
 
   const saveCompany = async (payload: Record<string, unknown>) => {
@@ -588,6 +594,12 @@ export function CompanyModal({
                   </F>
                   <F label={t("form.sdiCode")} error={e.sdiCode?.message}>
                     <Input {...register("sdiCode")} placeholder="XXXXXXX" />
+                  </F>
+                  <F label={t("form.fiscalCode")} error={e.fiscalCode?.message}>
+                    <Input {...register("fiscalCode")} placeholder="01234567890" />
+                  </F>
+                  <F label={t("form.pec")} error={e.pec?.message}>
+                    <Input {...register("pec")} type="email" placeholder="fatture@pec.azienda.it" />
                   </F>
                   <div className="col-span-1 sm:col-span-2 rounded-md border bg-muted/30 px-4 py-3 text-muted-foreground text-xs">
                     <p className="mb-1 font-medium text-foreground">Italian e-invoicing</p>

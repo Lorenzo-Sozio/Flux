@@ -1,0 +1,74 @@
+[
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️⚠️ la cifra di controllo della partita IVA non raddoppia le posizioni pari",
+    "find": "    if (i % 2 === 1) {",
+    "replace": "    if (i % 2 === 0) {"
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️⚠️ la partita IVA non verifica la cifra di controllo",
+    "find": "  return (10 - (sum % 10)) % 10 === Number(v[10]);",
+    "replace": "  return true;"
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️ il prefisso IT fa rifiutare una partita IVA valida",
+    "find": ".toUpperCase().replace(/^IT/, \"\");",
+    "replace": ".toUpperCase();"
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️⚠️ il codice fiscale non verifica la lettera di controllo",
+    "find": "  return String.fromCharCode(65 + (sum % 26)) === v[15];",
+    "replace": "  return true;"
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️⚠️ le posizioni dispari del codice fiscale usano la tabella sbagliata",
+    "find": "    sum += i % 2 === 0 ? ODD[c]",
+    "replace": "    sum += i % 2 === 1 ? ODD[c]"
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️ l'IBAN non verifica il mod 97",
+    "find": "  return remainder === 1;",
+    "replace": "  return true;"
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️⚠️ una provincia scritta per esteso passa, e SDI scarta la fattura",
+    "find": "    else if (!isItalianProvinceCode(a.province ?? \"\")) gaps.push({ field: \"province\", problem: \"invalid\" });",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️⚠️ un'azienda senza codice destinatario ne' PEC risulta pronta per la fattura",
+    "find": "  if (!hasSdi && !hasPec && hasVat) gaps.push({ field: \"sdiCode\", problem: \"missing\" });",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️⚠️ un cliente italiano senza partita IVA ne' codice fiscale risulta pronto",
+    "find": "  if (!hasVat && !hasCf) gaps.push({ field: \"vatNumber\", problem: \"missing\" });",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️ al cliente estero vengono chiesti gli identificativi italiani",
+    "find": "  if (countryCode(c.country) !== \"IT\") return gaps;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️ il blocco REA incompleto passa",
+    "find": "    if (p.liquidationStatus !== \"LS\" && p.liquidationStatus !== \"LN\") {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/fiscal-ids.ts",
+    "description": "⚠️ un regime fiscale ritirato (RF03) viene accettato",
+    "find": "  else if (!Object.hasOwn(TAX_REGIMES, p.taxRegime ?? \"\")) gaps.push({ field: \"taxRegime\", problem: \"invalid\" });",
+    "replace": ""
+  }
+]

@@ -174,6 +174,8 @@ export const CompanySchema = z.object({
   ...ownershipFields,
   vatNumber: optionalText,
   sdiCode: optionalText,
+  fiscalCode: optionalText,
+  pec: optionalEmail,
   tags: tagList,
   companyCategoryId: optionalId,
   companyTypeId: optionalId,

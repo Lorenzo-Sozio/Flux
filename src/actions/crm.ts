@@ -929,6 +929,8 @@ type CompanyMergeFields = {
   country?: string | null;
   vatNumber?: string | null;
   sdiCode?: string | null;
+  fiscalCode?: string | null;
+  pec?: string | null;
   linkedinUrl?: string | null;
   source?: string | null;
   ownerId?: string | null;

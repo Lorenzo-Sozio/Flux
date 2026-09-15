@@ -660,7 +660,9 @@
       "countryPlaceholder": "Country…",
       "notesPlaceholder": "Notes about this company…",
       "selectIndustry": "Select industry",
-      "selectSize": "Select size"
+      "selectSize": "Select size",
+      "fiscalCode": "Tax code",
+      "pec": "PEC"
     },
     "createSuccess": "Company created.",
     "updateSuccess": "Company updated.",
@@ -1519,7 +1521,8 @@
       "territories": "Territories",
       "territoryReport": "By territory",
       "contracts": "Contracts",
-      "sequences": "Sequences"
+      "sequences": "Sequences",
+      "invoicing": "E-invoicing"
     },
     "quickCreate": {
       "title": "Quick Create",
@@ -2778,6 +2781,10 @@
       "deleteDescription": "Records are not changed: they simply stop falling in this territory.",
       "delete": "Delete",
       "failed": "Something went wrong."
+    },
+    "invoicing": {
+      "title": "E-invoicing",
+      "description": "Legal name, VAT number, tax regime and office of whoever issues the invoices."
     }
   },
   "support": {
@@ -3701,5 +3708,62 @@
     "enroll": "Enroll",
     "enrolledToast": "Enrolled in the sequence.",
     "close": "Close"
+  },
+  "invoicing": {
+    "title": "E-invoicing",
+    "subtitle": "Who issues this workspace's invoices. You can save it incomplete: an invoice can only be issued once everything is valid.",
+    "ready": "Ready to issue invoices.",
+    "notReady": "Before an invoice can be issued:",
+    "sections": {
+      "identity": "Identity",
+      "address": "Registered office",
+      "rea": "Company register (optional)",
+      "payment": "Payment",
+      "contacts": "Contacts"
+    },
+    "problems": {
+      "missing": "missing",
+      "invalid": "not valid"
+    },
+    "fields": {
+      "legalName": "Legal name",
+      "vatNumber": "VAT number (partita IVA)",
+      "fiscalCode": "Tax code (codice fiscale)",
+      "taxRegime": "Tax regime",
+      "street": "Address",
+      "zipCode": "Postal code",
+      "city": "City",
+      "province": "Province (code)",
+      "country": "Country",
+      "reaOffice": "REA office (province code)",
+      "reaNumber": "REA number",
+      "shareCapital": "Share capital",
+      "soleShareholder": "Sole shareholder",
+      "liquidationStatus": "Liquidation status",
+      "email": "Email",
+      "phone": "Phone",
+      "iban": "IBAN",
+      "bankName": "Bank",
+      "name": "Company name",
+      "sdiCode": "Recipient code (SDI)",
+      "pec": "PEC"
+    },
+    "soleShareholderOptions": {
+      "none": "Not stated",
+      "SU": "Sole shareholder",
+      "SM": "Several shareholders"
+    },
+    "liquidationOptions": {
+      "none": "Not stated",
+      "LN": "Not in liquidation",
+      "LS": "In liquidation"
+    },
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Invoicing details saved.",
+    "failed": "Could not save.",
+    "billingTitle": "Billing",
+    "customerReady": "Complete for receiving an e-invoice.",
+    "customerNotReady": "Before an invoice can be issued to this customer:"
   }
 }

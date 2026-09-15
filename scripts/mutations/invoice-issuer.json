@@ -1,0 +1,44 @@
+[
+  {
+    "file": "src/lib/invoice-issuer.ts",
+    "description": "⚠️⚠️ la partita IVA si salva con prefisso e spazi: SDI scarta la fattura",
+    "find": "    vatNumber: normaliseVat(input.vatNumber) || null,",
+    "replace": "    vatNumber: text(input.vatNumber, 30),"
+  },
+  {
+    "file": "src/lib/invoice-issuer.ts",
+    "description": "⚠️⚠️ la provincia si salva in minuscolo",
+    "find": "    province: code(input.province, 2),",
+    "replace": "    province: text(input.province, 2),"
+  },
+  {
+    "file": "src/lib/invoice-issuer.ts",
+    "description": "⚠️ l'IBAN si salva con gli spazi",
+    "find": "    iban: code(input.iban, 34),",
+    "replace": "    iban: text(input.iban, 34),"
+  },
+  {
+    "file": "src/lib/invoice-issuer.ts",
+    "description": "⚠️ il capitale sociale con la virgola diventa non valido",
+    "find": "Number(String(input.shareCapital).replace(\",\", \".\"))",
+    "replace": "Number(String(input.shareCapital))"
+  },
+  {
+    "file": "src/lib/invoice-issuer.ts",
+    "description": "⚠️ la denominazione supera la lunghezza del tracciato",
+    "find": "    legalName: text(input.legalName, 80),",
+    "replace": "    legalName: text(input.legalName, 1000),"
+  },
+  {
+    "file": "src/lib/invoice-issuer.ts",
+    "description": "un campo vuoto si salva come stringa vuota",
+    "find": "  return t ? t.slice(0, max) : null;\n};\nconst code",
+    "replace": "  return t.slice(0, max);\n};\nconst code"
+  },
+  {
+    "file": "src/actions/invoicing.ts",
+    "description": "⚠️⚠️ chiunque puo' cambiare partita IVA e IBAN dell'emittente",
+    "find": "  const actor = await requireCapability(\"invoicing:manage\");",
+    "replace": "  const actor = { userId: \"x\" };"
+  }
+]

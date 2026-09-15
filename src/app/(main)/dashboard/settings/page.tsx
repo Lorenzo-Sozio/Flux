@@ -8,6 +8,7 @@ import {
   Mail,
   MapPin,
   MessageSquareQuote,
+  Receipt,
   Settings2,
   Webhook,
 } from "lucide-react";
@@ -56,6 +57,13 @@ export default async function SettingsPage() {
       title: t("territories.title"),
       description: t("territories.description"),
       need: "territory:manage",
+    },
+    {
+      href: "/dashboard/settings/invoicing",
+      icon: Receipt,
+      title: t("invoicing.title"),
+      description: t("invoicing.description"),
+      need: "invoicing:manage",
     },
     {
       href: "/dashboard/settings/custom-fields",

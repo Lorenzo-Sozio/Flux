@@ -40,6 +40,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { companies } from "@/db/schema";
+import { customerGaps } from "@/lib/fiscal-ids";
 import { getDb } from "@/lib/tenant-context";
 
 const TYPE_STYLES: Record<string, string> = {
@@ -82,8 +83,10 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const ownerName = allUsers.find((u) => u.id === company.ownerId)?.name ?? null;
   const initial = company.name?.[0]?.toUpperCase() ?? "C";
   const hasAddressInfo = !!(company.street || company.city || company.state || company.zipCode || company.country);
-  const hasBillingInfo = !!(company.vatNumber || company.sdiCode);
   const hasContactInfo = !!(company.mainEmail || company.mainPhone || company.website);
+  const tI = await getTranslations("invoicing");
+  // The province travels in `state`, the field the address form already has.
+  const invoiceGaps = customerGaps({ ...company, province: company.state });
 
   async function handleAddActivity(formData: FormData) {
     "use server";
@@ -289,28 +292,51 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
           )}
 
           {/* Billing */}
-          {hasBillingInfo && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <ReceiptIcon className="h-4 w-4 text-muted-foreground" />
-                  Billing
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {company.vatNumber && (
-                  <InfoRow label={tD("fieldVatNumber")}>
-                    <span className="font-mono">{company.vatNumber}</span>
-                  </InfoRow>
-                )}
-                {company.sdiCode && (
-                  <InfoRow label={tD("fieldSdiCode")}>
-                    <span className="font-mono">{company.sdiCode}</span>
-                  </InfoRow>
-                )}
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ReceiptIcon className="h-4 w-4 text-muted-foreground" />
+                {tI("billingTitle")}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {company.vatNumber && (
+                <InfoRow label={tD("fieldVatNumber")}>
+                  <span className="font-mono">{company.vatNumber}</span>
+                </InfoRow>
+              )}
+              {company.fiscalCode && (
+                <InfoRow label={tI("fields.fiscalCode")}>
+                  <span className="font-mono">{company.fiscalCode}</span>
+                </InfoRow>
+              )}
+              {company.sdiCode && (
+                <InfoRow label={tD("fieldSdiCode")}>
+                  <span className="font-mono">{company.sdiCode}</span>
+                </InfoRow>
+              )}
+              {company.pec && (
+                <InfoRow label={tI("fields.pec")}>
+                  <span className="break-all">{company.pec}</span>
+                </InfoRow>
+              )}
+              {/* What an invoice to this customer still needs, before anyone tries to issue one. */}
+              {invoiceGaps.length === 0 ? (
+                <p className="text-emerald-700 text-xs dark:text-emerald-400">{tI("customerReady")}</p>
+              ) : (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs dark:border-amber-800 dark:bg-amber-950/30">
+                  <p className="mb-1 font-medium">{tI("customerNotReady")}</p>
+                  <ul className="list-disc space-y-0.5 pl-4">
+                    {invoiceGaps.map((g) => (
+                      <li key={`${g.field}-${g.problem}`}>
+                        {tI(`fields.${g.field}` as "fields.vatNumber")} — {tI(`problems.${g.problem}`)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Tags */}
           {company.tags && company.tags.length > 0 && (

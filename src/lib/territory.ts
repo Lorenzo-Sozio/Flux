@@ -273,6 +273,11 @@ for (const [region, aliases] of Object.entries(REGION_ALIASES)) {
 /** Number of Italian provinces known, for the test that holds the table complete. */
 export const ITALIAN_PROVINCE_COUNT = PROVINCES.length;
 
+/** Whether a two-letter code is an Italian province sigla, as an invoice address requires. */
+export function isItalianProvinceCode(code: string): boolean {
+  return PROVINCES.some(([sigla]) => sigla === code.trim().toUpperCase());
+}
+
 /**
  * Every key a typed state stands for.
  *
