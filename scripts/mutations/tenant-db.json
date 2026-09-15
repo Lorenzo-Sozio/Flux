@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/lib/tenant-db.ts",
+    "description": "⚠️⚠️ la chiave precedente non viene mai provata: durante la rotazione ogni workspace non ancora riscritto diventa irraggiungibile",
+    "find": "    if (previous && !previous.equals(key)) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/lib/tenant-db.ts",
+    "description": "⚠️⚠️ la cifratura usa la chiave precedente invece della corrente: finita la rotazione, i valori scritti nel frattempo diventano illeggibili",
+    "find": "  return encryptWithKey(plaintext, currentKey());",
+    "replace": "  return encryptWithKey(plaintext, previousKey() ?? currentKey());"
+  },
+  {
+    "file": "src/lib/tenant-db.ts",
+    "description": "⚠️⚠️ il tag di autenticazione non viene controllato: una chiave sbagliata restituisce byte plausibili invece di fallire",
+    "find": "  decipher.setAuthTag(Buffer.from(authTagHex, \"hex\"));",
+    "replace": "  decipher.setAutoPadding(true);"
+  },
+  {
+    "file": "src/lib/tenant-db.ts",
+    "description": "⚠️ il vettore di inizializzazione e' fisso: lo stesso valore cifra sempre allo stesso testo, e GCM con IV ripetuto perde la riservatezza",
+    "find": "  const iv = randomBytes(16);",
+    "replace": "  const iv = Buffer.alloc(16);"
+  },
+  {
+    "file": "src/lib/tenant-db.ts",
+    "description": "⚠️ una variabile precedente svuotata viene letta come chiave: l'errore di un valore illeggibile parla della variabile vuota invece che della decifratura, e manda chi indaga nel posto sbagliato",
+    "find": "  if (!raw?.trim()) return null;",
+    "replace": "  if (raw === undefined) return null;"
+  }
+]
