@@ -820,7 +820,11 @@
     "urgentLabel": "{count} Urgenti",
     "viewAll": "Vedi tutti",
     "viewPipeline": "Vedi Pipeline",
-    "wonDealsThisMonth": "Trattative Vinte Questo Mese"
+    "wonDealsThisMonth": "Trattative Vinte Questo Mese",
+    "contracts_mrr": "Ricavo ricorrente",
+    "contracts_mrrDesc": "Al mese, dai contratti in vigore",
+    "contracts_renewalsDue": "Rinnovi da decidere",
+    "contracts_renewalsDueDesc": "Contratti vicini alla data limite del preavviso"
   },
   "currency": {
     "switchCurrency": "Cambia valuta",
@@ -1513,7 +1517,8 @@
       "winLoss": "Vinte / Perse",
       "workload": "Carico Lavoro",
       "territories": "Territori",
-      "territoryReport": "Per territorio"
+      "territoryReport": "Per territorio",
+      "contracts": "Contratti"
     },
     "quickCreate": {
       "title": "Crea Rapido",
@@ -3528,6 +3533,10 @@
       "note": {
         "label": "Una menzione in una nota",
         "help": "Qualcuno ti nomina in una nota su una scheda."
+      },
+      "contract_renewal": {
+        "label": "Un mio contratto entra nel preavviso",
+        "help": "Il giorno in cui si apre il periodo per decidere se rinnovare o disdire."
       }
     },
     "noServiceWorker": "Su questa pagina non è attivo nessun service worker, quindi niente può ricevere una notifica. Ricarica la pagina; se persiste, l'applicazione è in modalità sviluppo, dove il worker non viene registrato di proposito.",
@@ -3540,5 +3549,78 @@
     "markRead": "Segna come letta",
     "empty": "Nessuna notifica",
     "settings": "Impostazioni notifiche"
+  },
+  "contracts": {
+    "title": "Contratti",
+    "subtitle": "Accordi ricorrenti con i clienti: valore, durata, rinnovo e preavviso.",
+    "newContract": "Nuovo contratto",
+    "edit": "Modifica contratto",
+    "delete": "Elimina",
+    "mrr": "Ricavo ricorrente mensile",
+    "mrrDesc": "{count, plural, one {# contratto in vigore} other {# contratti in vigore}}",
+    "arr": "Ricavo ricorrente annuo",
+    "arrDesc": "Il mensile per dodici, sui contratti in vigore oggi.",
+    "renewalsDue": "Rinnovi da decidere",
+    "renewalsDueDesc": "Entro un mese dalla data limite del preavviso, o già oltre.",
+    "views": {
+      "all": "Tutti",
+      "renewal_due": "Da decidere",
+      "active": "In vigore",
+      "expired": "Scaduti",
+      "cancelled": "Disdetti"
+    },
+    "phases": {
+      "active": "In vigore",
+      "renewal_due": "Da decidere",
+      "expired": "Scaduto",
+      "upcoming": "Non ancora iniziato",
+      "draft": "Bozza",
+      "cancelled": "Disdetto"
+    },
+    "statuses": {
+      "draft": "Bozza",
+      "active": "Attivo",
+      "cancelled": "Disdetto"
+    },
+    "periods": {
+      "monthly": "mese",
+      "quarterly": "trimestre",
+      "semiannual": "semestre",
+      "annual": "anno"
+    },
+    "empty": "Nessun contratto in questa vista.",
+    "contract": "Contratto",
+    "status": "Stato",
+    "amount": "Importo",
+    "monthly": "Al mese",
+    "termEnd": "Scadenza",
+    "noticeBy": "Disdetta entro",
+    "noCompany": "Azienda eliminata",
+    "autoRenews": "si rinnova da solo",
+    "titleLabel": "Titolo",
+    "titlePlaceholder": "es. Assistenza e manutenzione 2026",
+    "company": "Azienda",
+    "chooseCompany": "Scegli l'azienda…",
+    "owner": "Titolare",
+    "ownerDefault": "Tu, se non scegli",
+    "amountLabel": "Importo ricorrente",
+    "period": "Ogni",
+    "currency": "Valuta",
+    "startDate": "Inizio",
+    "endDate": "Fine del periodo (vuoto: senza scadenza)",
+    "noticeDays": "Giorni di preavviso",
+    "statusLabel": "Stato",
+    "autoRenewLabel": "Si rinnova automaticamente per",
+    "renewalMonths": "mesi",
+    "notes": "Note",
+    "cancel": "Annulla",
+    "save": "Salva",
+    "saving": "Salvataggio…",
+    "saved": "Contratto salvato.",
+    "deleted": "Contratto eliminato.",
+    "failed": "Operazione non riuscita.",
+    "deleteTitle": "Eliminare il contratto?",
+    "deleteDescription": "Sparisce anche dal ricavo ricorrente. Per un cliente che ha disdetto, imposta lo stato «Disdetto»: resta nello storico.",
+    "footnote": "Stato calcolato al {on} dalle date del contratto. Chi ne è titolare riceve una notifica un mese prima della data limite del preavviso. Gli importi sono sommati senza conversione di valuta."
   }
 }

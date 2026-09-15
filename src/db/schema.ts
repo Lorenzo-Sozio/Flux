@@ -1,4 +1,15 @@
-import { boolean, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, unique } from "drizzle-orm/pg-core";
+import {
+  boolean,
+  date,
+  integer,
+  jsonb,
+  numeric,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  unique,
+} from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
 export const users = pgTable("user", {
@@ -837,6 +848,49 @@ export const notifications = pgTable("notification", {
 export const documentCounters = pgTable("document_counter", {
   scope: text("scope").primaryKey(),
   lastValue: integer("last_value").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+// --- CONTRACTS ---
+
+/**
+ * A recurring agreement with a customer: what it is worth per period, when it
+ * runs, whether it renews itself, and how much notice a decision needs.
+ *
+ * ⚠️⚠️ There is no "expired" or "renewal due" status column. Where a contract
+ * stands changes with the calendar, so it is computed from the dates by
+ * src/lib/contract-terms.ts; `status` holds only what a person decided — still a
+ * draft, or cancelled.
+ *
+ * Dates are `date` columns read as `YYYY-MM-DD` strings: a term ends on a calendar
+ * day, not at an instant in some time zone.
+ */
+export const contracts = pgTable("contract", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  title: text("title").notNull(),
+  companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+  contactId: text("contact_id").references(() => contacts.id, { onDelete: "set null" }),
+  dealId: text("deal_id").references(() => deals.id, { onDelete: "set null" }),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  status: text("status").default("active").notNull(), // draft, active, cancelled
+  amount: numeric("amount", { precision: 12, scale: 2 }).default("0").notNull(),
+  currency: text("currency").default("EUR").notNull(),
+  billingPeriod: text("billing_period").default("annual").notNull(), // monthly, quarterly, semiannual, annual
+  startDate: date("start_date", { mode: "string" }).notNull(),
+  endDate: date("end_date", { mode: "string" }),
+  autoRenew: boolean("auto_renew").default(false).notNull(),
+  renewalTermMonths: integer("renewal_term_months"),
+  noticeDays: integer("notice_days").default(30).notNull(),
+  // The term end whose renewal notice has gone out. Keyed on the date rather than a
+  // flag, so the next term of a self-renewing contract gets its own notice, and an
+  // edited end date gets a fresh one.
+  noticeSentFor: date("notice_sent_for", { mode: "string" }),
+  notes: text("notes"),
+  cancelledAt: timestamp("cancelled_at", { mode: "date" }),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 

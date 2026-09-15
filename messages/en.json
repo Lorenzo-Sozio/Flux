@@ -820,7 +820,11 @@
     "urgentLabel": "{count} Urgent",
     "viewAll": "View All",
     "viewPipeline": "View Pipeline",
-    "wonDealsThisMonth": "Won Deals This Month"
+    "wonDealsThisMonth": "Won Deals This Month",
+    "contracts_mrr": "Recurring revenue",
+    "contracts_mrrDesc": "Per month, from contracts in force",
+    "contracts_renewalsDue": "Renewals to decide",
+    "contracts_renewalsDueDesc": "Contracts near their notice deadline"
   },
   "currency": {
     "switchCurrency": "Switch currency",
@@ -1513,7 +1517,8 @@
       "winLoss": "Win / Loss",
       "workload": "Workload",
       "territories": "Territories",
-      "territoryReport": "By territory"
+      "territoryReport": "By territory",
+      "contracts": "Contracts"
     },
     "quickCreate": {
       "title": "Quick Create",
@@ -3528,6 +3533,10 @@
       "note": {
         "label": "A mention in a note",
         "help": "Somebody names you in a note on a record."
+      },
+      "contract_renewal": {
+        "label": "A contract of mine reaches its notice period",
+        "help": "The day the window to renew or cancel opens."
       }
     },
     "noServiceWorker": "No service worker is running on this page, so nothing can receive a notification. Reload the page; if it persists, the app is running in development mode, where the worker is deliberately not registered.",
@@ -3540,5 +3549,78 @@
     "markRead": "Mark as read",
     "empty": "No notifications yet",
     "settings": "Notification settings"
+  },
+  "contracts": {
+    "title": "Contracts",
+    "subtitle": "Recurring agreements with customers: value, term, renewal and notice.",
+    "newContract": "New contract",
+    "edit": "Edit contract",
+    "delete": "Delete",
+    "mrr": "Monthly recurring revenue",
+    "mrrDesc": "{count, plural, one {# contract in force} other {# contracts in force}}",
+    "arr": "Annual recurring revenue",
+    "arrDesc": "Twelve times the monthly figure, on contracts in force today.",
+    "renewalsDue": "Renewals to decide",
+    "renewalsDueDesc": "Within a month of the notice deadline, or past it.",
+    "views": {
+      "all": "All",
+      "renewal_due": "To decide",
+      "active": "In force",
+      "expired": "Expired",
+      "cancelled": "Cancelled"
+    },
+    "phases": {
+      "active": "In force",
+      "renewal_due": "To decide",
+      "expired": "Expired",
+      "upcoming": "Not started",
+      "draft": "Draft",
+      "cancelled": "Cancelled"
+    },
+    "statuses": {
+      "draft": "Draft",
+      "active": "Active",
+      "cancelled": "Cancelled"
+    },
+    "periods": {
+      "monthly": "month",
+      "quarterly": "quarter",
+      "semiannual": "half-year",
+      "annual": "year"
+    },
+    "empty": "No contracts in this view.",
+    "contract": "Contract",
+    "status": "Status",
+    "amount": "Amount",
+    "monthly": "Per month",
+    "termEnd": "Term ends",
+    "noticeBy": "Notice by",
+    "noCompany": "Company deleted",
+    "autoRenews": "renews itself",
+    "titleLabel": "Title",
+    "titlePlaceholder": "e.g. Support and maintenance 2026",
+    "company": "Company",
+    "chooseCompany": "Choose the company…",
+    "owner": "Owner",
+    "ownerDefault": "You, unless you choose",
+    "amountLabel": "Recurring amount",
+    "period": "Every",
+    "currency": "Currency",
+    "startDate": "Start",
+    "endDate": "End of term (empty: no end)",
+    "noticeDays": "Notice days",
+    "statusLabel": "Status",
+    "autoRenewLabel": "Renews itself for",
+    "renewalMonths": "months",
+    "notes": "Notes",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Contract saved.",
+    "deleted": "Contract deleted.",
+    "failed": "Something went wrong.",
+    "deleteTitle": "Delete this contract?",
+    "deleteDescription": "It also disappears from recurring revenue. For a customer who cancelled, set the status to Cancelled instead: it stays in the history.",
+    "footnote": "Status computed on {on} from the contract dates. Its owner is notified a month before the notice deadline. Amounts are added without currency conversion."
   }
 }

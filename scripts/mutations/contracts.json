@@ -1,0 +1,56 @@
+[
+  {
+    "file": "src/lib/contract-notices.ts",
+    "description": "⚠️⚠️ l'avviso non viene segnato come inviato: arriva ogni mattina per un mese",
+    "find": "    if (!end || row.noticeSentFor === end) continue;",
+    "replace": "    if (!end) continue;"
+  },
+  {
+    "file": "src/lib/contract-notices.ts",
+    "description": "⚠️⚠️ la presa non e' condizionale: due esecuzioni in parallelo avvisano due volte",
+    "find": "      .where(and(eq(contracts.id, row.id), or(isNull(contracts.noticeSentFor), ne(contracts.noticeSentFor, end))))",
+    "replace": "      .where(eq(contracts.id, row.id))"
+  },
+  {
+    "file": "src/lib/contract-notices.ts",
+    "description": "⚠️⚠️ se la notifica fallisce la presa resta: il rinnovo passa in silenzio",
+    "find": "        .set({ noticeSentFor: row.noticeSentFor })",
+    "replace": "        .set({ noticeSentFor: end })"
+  },
+  {
+    "file": "src/lib/contract-notices.ts",
+    "description": "⚠️ un contratto senza nessuno da avvisare viene segnato come avvisato",
+    "find": "    const recipient = row.ownerId ?? row.createdBy;\n    if (!recipient) {\n      unowned++;\n      continue;\n    }",
+    "replace": "    const recipient = row.ownerId ?? row.createdBy ?? \"\";"
+  },
+  {
+    "file": "src/lib/contract-notices.ts",
+    "description": "⚠️ l'avviso parte anche per i contratti non ancora in scadenza",
+    "find": "    if (contractPhase(terms, on) !== \"renewal_due\") continue;",
+    "replace": "    if (contractPhase(terms, on) === \"cancelled\") continue;"
+  },
+  {
+    "file": "src/lib/contract-notices.ts",
+    "description": "il creatore non viene avvisato quando manca il titolare",
+    "find": "    const recipient = row.ownerId ?? row.createdBy;",
+    "replace": "    const recipient = row.ownerId;"
+  },
+  {
+    "file": "src/actions/contracts.ts",
+    "description": "⚠️⚠️ la creazione non controlla il permesso",
+    "find": "  const actor = await requireCapability(\"contract:write\");",
+    "replace": "  const actor = { userId: \"x\" };"
+  },
+  {
+    "file": "src/actions/contracts.ts",
+    "description": "⚠️⚠️ l'eliminazione chiede solo il permesso di scrittura",
+    "find": "  await requireCapability(\"contract:delete\");",
+    "replace": "  await requireCapability(\"contract:write\");"
+  },
+  {
+    "file": "src/actions/contracts.ts",
+    "description": "⚠️⚠️ la modifica salva un contratto rifiutato dalla validazione",
+    "find": "  await requireCapability(\"contract:write\");\n  await requirePlanModule(\"sales\");\n  const cleaned = cleanContract(input);\n  if (!cleaned.ok) return cleaned;\n\n  const db = await getDb();\n  const [existing]",
+    "replace": "  await requireCapability(\"contract:write\");\n  await requirePlanModule(\"sales\");\n  const cleaned = cleanContract(input);\n\n  const db = await getDb();\n  const [existing]"
+  }
+]

@@ -85,7 +85,7 @@ email-worker         every minute      sends queued emails
 campaign-scheduler   every 5 minutes   starts due campaigns
 task-reminders       every 15 minutes  reminds about tasks
 ticket-sla-check     every 15 minutes  flags tickets past their SLA
-task-overdue-check   daily at 06:00    flags overdue tasks
+task-overdue-check   daily at 06:00    flags overdue tasks; tells owners of contracts due for renewal
 ticket-autoclose     daily at 03:00    closes resolved tickets
 idempotency-sweep    daily at 03:00    forgets Idempotency-Keys older than 30 days
 ```

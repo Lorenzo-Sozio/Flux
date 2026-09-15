@@ -39,6 +39,7 @@ const TYPE_ICONS: Record<string, string> = {
   chat_message: "💬",
   sla_warning: "⏳",
   sla_breach: "⏰",
+  contract_renewal: "📄",
   system: "ℹ️",
 };
 

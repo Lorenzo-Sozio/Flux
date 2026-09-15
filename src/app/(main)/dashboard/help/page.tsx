@@ -295,6 +295,10 @@ const sections = [
       "Il modulo Preventivi gestisce l'intero processo di offerta commerciale: dalla redazione interna con workflow di approvazione, all'invio via email al cliente con link di visualizzazione, fino all'accettazione o al declino.",
     topics: [
       {
+        q: "Come gestisco contratti ricorrenti e rinnovi?",
+        a: "In Vendite → Contratti registri gli accordi ricorrenti: azienda, importo per mese, trimestre, semestre o anno, data di inizio, fine del periodo, giorni di preavviso e, se previsto, il rinnovo automatico con la sua durata. Lo stato non si imposta a mano ma è calcolato dalle date: 'In vigore', 'Da decidere', 'Scaduto', 'Non ancora iniziato'. A mano si scelgono solo 'Bozza' e 'Disdetto'. Un contratto diventa 'Da decidere' un mese prima della data limite del preavviso (la fine del periodo meno i giorni di preavviso), così resta il tempo per rinnovare o disdire; quel giorno il titolare riceve una notifica, anche push, una sola volta per periodo. Un contratto a rinnovo automatico non scade mai: la sua scadenza avanza di un periodo alla volta e l'avviso si ripete prima di ogni rinnovo. In cima alla pagina e sul cruscotto trovi il ricavo ricorrente mensile, calcolato solo sui contratti in vigore oggi. Un contratto firmato che parte il mese prossimo, o uno scaduto, non ci entrano. Per un cliente che disdice, imposta 'Disdetto' invece di eliminare: resta nello storico.",
+      },
+      {
         q: "Come creo un nuovo preventivo?",
         a: "Vai su Preventivi → 'Nuovo Preventivo'. Seleziona l'azienda, il contatto di riferimento e la deal collegata. Aggiungi le righe di prodotto/servizio dal catalogo (o inserendo dati liberi), imposta eventuali sconti, l'IVA e la data di scadenza. Il sistema calcola automaticamente subtotale, sconti, IVA e totale finale.",
       },

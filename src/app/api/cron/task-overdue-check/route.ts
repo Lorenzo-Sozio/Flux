@@ -8,6 +8,7 @@
 import { and, eq, isNotNull, lt } from "drizzle-orm";
 
 import { taskDependencies, tasks } from "@/db/schema";
+import { sendContractNotices } from "@/lib/contract-notices";
 import { runCronJob } from "@/lib/cron-runner";
 import { notify } from "@/lib/notify";
 import type { TenantDb } from "@/lib/tenant-resolve";
@@ -53,5 +54,9 @@ async function runForTenant(db: TenantDb) {
     notified++;
   }
 
-  return { overdueWithDeps: overdueTasks.length, notified };
+  // Contracts entering their renewal window ride on this job rather than a new
+  // trigger: the Free plan allows five and all five are taken.
+  const contracts = await sendContractNotices(db);
+
+  return { overdueWithDeps: overdueTasks.length, notified, contracts };
 }

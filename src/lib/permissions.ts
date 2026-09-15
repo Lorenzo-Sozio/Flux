@@ -73,6 +73,8 @@ export const CAPABILITIES = {
   "quote:approve": "admin",
   "order:write": "editor",
   "order:delete": "admin",
+  "contract:write": "editor",
+  "contract:delete": "admin",
   "product:manage": "admin",
 
   // Support

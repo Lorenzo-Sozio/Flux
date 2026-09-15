@@ -397,4 +397,13 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '-- Territories: named areas a workspace routes and reports records by.\n--\n-- ⚠️ No column is added to lead, contact or company. Which territory a record is\n-- in is computed from its address at read time (src/lib/territory.ts), so a\n-- change to a territory applies to every record at once and no write path has to\n-- remember to keep a stored answer current.\n--\n-- Additive and re-runnable, as every tenant migration has to be.\nCREATE TABLE IF NOT EXISTS "territory" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"name" text NOT NULL,\n\t"description" text,\n\t-- ISO 3166-1 alpha-2 codes.\n\t"countries" text[] DEFAULT \'{}\' NOT NULL,\n\t-- Provinces, regions or states as typed; matched after normalisation.\n\t"states" text[] DEFAULT \'{}\' NOT NULL,\n\t"postal_prefixes" text[] DEFAULT \'{}\' NOT NULL,\n\t"created_by" text,\n\t"created_at" timestamp DEFAULT now() NOT NULL,\n\t"updated_at" timestamp DEFAULT now() NOT NULL,\n\tCONSTRAINT "territory_name_uniq" UNIQUE("name")\n);\n',
     ],
   },
+  {
+    tag: "0020_what_keeps_coming_back",
+    folderMillis: 1789520000000,
+    hash: "643fe3707db77b7eb586adfa0a76f454499334f3612f5f2e3f8bdc9adfa2edc3",
+    sql: [
+      '-- Contracts: recurring agreements, their terms and their renewals.\n--\n-- ⚠️ No status for "expired" or "renewal due": those change with the calendar and\n-- are computed from the dates (src/lib/contract-terms.ts). `status` holds only a\n-- person\'s decision — draft, active, cancelled.\n--\n-- Additive and re-runnable, as every tenant migration has to be.\nCREATE TABLE IF NOT EXISTS "contract" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"title" text NOT NULL,\n\t"company_id" text REFERENCES "company"("id") ON DELETE SET NULL,\n\t"contact_id" text REFERENCES "contact"("id") ON DELETE SET NULL,\n\t"deal_id" text REFERENCES "deal"("id") ON DELETE SET NULL,\n\t"owner_id" text REFERENCES "user"("id") ON DELETE SET NULL,\n\t"status" text DEFAULT \'active\' NOT NULL,\n\t"amount" numeric(12, 2) DEFAULT \'0\' NOT NULL,\n\t"currency" text DEFAULT \'EUR\' NOT NULL,\n\t"billing_period" text DEFAULT \'annual\' NOT NULL,\n\t"start_date" date NOT NULL,\n\t"end_date" date,\n\t"auto_renew" boolean DEFAULT false NOT NULL,\n\t"renewal_term_months" integer,\n\t"notice_days" integer DEFAULT 30 NOT NULL,\n\t-- The term end whose renewal notice has been sent; see the daily job.\n\t"notice_sent_for" date,\n\t"notes" text,\n\t"cancelled_at" timestamp,\n\t"created_by" text,\n\t"created_at" timestamp DEFAULT now() NOT NULL,\n\t"updated_at" timestamp DEFAULT now() NOT NULL\n);\n',
+      '\nCREATE INDEX IF NOT EXISTS "contract_company_id_idx" ON "contract" ("company_id");\n',
+    ],
+  },
 ];

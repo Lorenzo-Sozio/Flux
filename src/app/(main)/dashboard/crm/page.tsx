@@ -12,6 +12,8 @@ import {
   MailIcon,
   MessageSquareIcon,
   PhoneIcon,
+  RepeatIcon,
+  ScrollTextIcon,
   TargetIcon,
   TrendingUp,
   TrendingUpIcon,
@@ -19,6 +21,7 @@ import {
 } from "lucide-react";
 import { getLocale, getTranslations } from "next-intl/server";
 
+import { getRecurringRevenueSummary } from "@/actions/contracts";
 import { getRecentLeads } from "@/actions/crm";
 import { getDashboardStats, getRecentActivities, getTopDeals } from "@/actions/dashboard";
 import { getNextActions } from "@/actions/next-actions";
@@ -93,41 +96,45 @@ export default async function CRMPage() {
 
   // ── All fetches in parallel ──────────────────────────────────────────────────
 
-  const [stats, rawLeads, topDeals, recentActivities, myTarget, wonThisMonth, nextActions, today] = await Promise.all([
-    getDashboardStats(),
-    getRecentLeads(5),
-    getTopDeals(5),
-    getRecentActivities(10),
+  const [stats, rawLeads, topDeals, recentActivities, myTarget, wonThisMonth, nextActions, today, recurring] =
+    await Promise.all([
+      getDashboardStats(),
+      getRecentLeads(5),
+      getTopDeals(5),
+      getRecentActivities(10),
 
-    // Current month target for this user
-    userId
-      ? db
-          .select({ targetAmount: salesTargets.targetAmount, currency: salesTargets.currency })
-          .from(salesTargets)
-          .where(and(eq(salesTargets.userId, userId), eq(salesTargets.period, currentPeriod)))
-          .limit(1)
-          .then((rows) => rows[0] ?? null)
-      : Promise.resolve(null),
+      // Current month target for this user
+      userId
+        ? db
+            .select({ targetAmount: salesTargets.targetAmount, currency: salesTargets.currency })
+            .from(salesTargets)
+            .where(and(eq(salesTargets.userId, userId), eq(salesTargets.period, currentPeriod)))
+            .limit(1)
+            .then((rows) => rows[0] ?? null)
+        : Promise.resolve(null),
 
-    // Won deals this month for this user
-    userId
-      ? db
-          .select({ total: sum(deals.amount) })
-          .from(deals)
-          .where(and(eq(deals.status, "won"), eq(deals.ownerId, userId), gte(deals.updatedAt, monthStart)))
-          .then((rows) => parseFloat(rows[0]?.total ?? "0"))
-      : Promise.resolve(0 as number),
+      // Won deals this month for this user
+      userId
+        ? db
+            .select({ total: sum(deals.amount) })
+            .from(deals)
+            .where(and(eq(deals.status, "won"), eq(deals.ownerId, userId), gte(deals.updatedAt, monthStart)))
+            .then((rows) => parseFloat(rows[0]?.total ?? "0"))
+        : Promise.resolve(0 as number),
 
-    // What needs doing, rather than what exists (audit rilievo S-02). Failing to
-    // build the work list must not take the whole dashboard down with it: an
-    // empty list reads as "nothing waiting", which is the safe way to be wrong.
-    getNextActions(8).catch(() => null),
+      // What needs doing, rather than what exists (audit rilievo S-02). Failing to
+      // build the work list must not take the whole dashboard down with it: an
+      // empty list reads as "nothing waiting", which is the safe way to be wrong.
+      getNextActions(8).catch(() => null),
 
-    // The day's agenda. This page used to assemble it from three queries of its
-    // own and a hundred and thirty lines of mapping; the "today" screen needs the
-    // same list, and two copies of it would have drifted apart within a month.
-    getTodayView(),
-  ]);
+      // The day's agenda. This page used to assemble it from three queries of its
+      // own and a hundred and thirty lines of mapping; the "today" screen needs the
+      // same list, and two copies of it would have drifted apart within a month.
+      getTodayView(),
+
+      // Contracts are optional; a failure here reads as none rather than taking the page down.
+      getRecurringRevenueSummary().catch(() => ({ mrr: 0, earning: 0, renewalsDue: 0 })),
+    ]);
 
   const agendaItems = today.agenda;
 
@@ -239,7 +246,7 @@ export default async function CRMPage() {
       {/* ── Metric Cards ─────────────────────────────────────────────── */}
       {/* Two across on a phone. Each card is a label and a number; one per row
           made the dashboard six screens long before the first chart. */}
-      <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-4">
         <Link href="/dashboard/pipeline" className="group">
           <Card className="cursor-pointer border-l-4 border-l-blue-500 shadow-sm transition-shadow group-hover:shadow-md">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -312,6 +319,32 @@ export default async function CRMPage() {
                   {t("openQuotesCount", { count: stats.quotesOpenCount })}
                 </span>
               </div>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/dashboard/sales/contracts" className="group">
+          <Card className="cursor-pointer border-l-4 border-l-emerald-500 shadow-sm transition-shadow group-hover:shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="font-medium text-muted-foreground text-sm">{t("contracts_mrr")}</CardTitle>
+              <RepeatIcon className="h-4 w-4 text-emerald-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="font-bold text-2xl">€{recurring.mrr.toLocaleString()}</div>
+              <p className="mt-1 text-muted-foreground text-xs">{t("contracts_mrrDesc")}</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        <Link href="/dashboard/sales/contracts?view=renewal_due" className="group">
+          <Card className="cursor-pointer border-l-4 border-l-yellow-500 shadow-sm transition-shadow group-hover:shadow-md">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="font-medium text-muted-foreground text-sm">{t("contracts_renewalsDue")}</CardTitle>
+              <ScrollTextIcon className="h-4 w-4 text-yellow-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="font-bold text-2xl">{recurring.renewalsDue}</div>
+              <p className="mt-1 text-muted-foreground text-xs">{t("contracts_renewalsDueDesc")}</p>
             </CardContent>
           </Card>
         </Link>

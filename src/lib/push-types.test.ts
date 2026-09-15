@@ -26,7 +26,9 @@ describe("the catalogue", () => {
     // decision about somebody's evening, not a detail — a default of "everything"
     // is how a person ends up switching the feature off entirely.
     const onByDefault = PUSH_TYPE_ORDER.filter((t) => PUSH_TYPES[t].defaultOn);
-    expect(onByDefault).toEqual(["lead_assigned", "sla_breach", "sla_warning", "task_due"]);
+    // A contract entering its notice period joins them: the decision has a
+    // deadline, and missing it renews or loses the customer by default.
+    expect(onByDefault).toEqual(["contract_renewal", "lead_assigned", "sla_breach", "sla_warning", "task_due"]);
   });
 
   it("keeps the chatty ones off until somebody asks for them", () => {

@@ -28,6 +28,8 @@ export {
   companies,
   contacts,
   contactsRelations,
+  // Contracts
+  contracts,
   // Custom fields
   customFieldDefinitions,
   customFieldDefinitionsRelations,

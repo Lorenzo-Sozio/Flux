@@ -31,6 +31,7 @@ import {
   campaignLogs,
   companies,
   contacts,
+  contracts,
   deals,
   leads,
   orders,
@@ -59,6 +60,7 @@ export const COMPANY_CHILDREN: MergeChild[] = [
   { table: appointments, field: "companyId" },
   { table: activities, field: "companyId" },
   { table: tasks, field: "companyId" },
+  { table: contracts, field: "companyId" },
 ];
 
 export const CONTACT_CHILDREN: MergeChild[] = [
@@ -71,6 +73,7 @@ export const CONTACT_CHILDREN: MergeChild[] = [
   { table: activities, field: "contactId" },
   { table: tasks, field: "contactId" },
   { table: campaignLogs, field: "contactId" },
+  { table: contracts, field: "contactId" },
 ];
 
 export const LEAD_CHILDREN: MergeChild[] = [

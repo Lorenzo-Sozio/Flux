@@ -1,0 +1,86 @@
+[
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️⚠️ un mese dopo il 31 gennaio sfora a marzo: ogni rinnovo di fine mese slitta",
+    "find": "  return format(ty, tm, Math.min(d, last));",
+    "replace": "  return format(ty, tm, d);"
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️⚠️ un contratto a rinnovo automatico risulta scaduto dopo il primo periodo",
+    "find": "  if (!c.autoRenew || renewal < 1 || c.endDate >= on) return c.endDate;",
+    "replace": "  return c.endDate;"
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️ il rinnovo si ferma al primo giro invece di arrivare al periodo in corso",
+    "find": "  while (end < on) {",
+    "replace": "  while (false) {"
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️ il rinnovo parte dall'ultima scadenza calcolata invece che dall'originale: la fine mese slitta a ogni giro",
+    "find": "    end = addMonths(c.endDate, renewal * rounds);",
+    "replace": "    end = addMonths(end, renewal);"
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️⚠️ la finestra di preavviso si apre dopo la scadenza invece che prima",
+    "find": "  return addDays(termEnd, -noticeDays);",
+    "replace": "  return addDays(termEnd, noticeDays);"
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️⚠️ un contratto scaduto resta attivo per sempre",
+    "find": "  if (on > end) return \"expired\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️⚠️ nessun contratto risulta mai in scadenza: nessuno viene avvisato",
+    "find": "  if (on >= addDays(noticeDeadline(end, c.noticeDays), -REMINDER_LEAD_DAYS)) return \"renewal_due\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️ un contratto non ancora iniziato conta come attivo",
+    "find": "  if (on < c.startDate) return \"upcoming\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️⚠️ un contratto disdetto continua a contare",
+    "find": "  if (c.status === \"cancelled\") return \"cancelled\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️ un contratto in scadenza sparisce dal ricavo ricorrente",
+    "find": "  return phase === \"active\" || phase === \"renewal_due\";",
+    "replace": "  return phase === \"active\";"
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️⚠️ il valore annuale entra intero nel ricavo mensile",
+    "find": "  return Number(c.amount) / MONTHS_IN[c.billingPeriod];",
+    "replace": "  return Number(c.amount);"
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️⚠️ si salva un rinnovo automatico senza scadenza",
+    "find": "    if (endDate === null) return { ok: false, error: \"A contract that renews itself needs an end date.\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️ si salva una scadenza precedente all'inizio",
+    "find": "    if (endDate < input.startDate) return { ok: false, error: \"The end date is before the start date.\" };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/contract-terms.ts",
+    "description": "⚠️⚠️ l'avviso scatta il giorno della data limite: non resta tempo per disdire",
+    "find": "export const REMINDER_LEAD_DAYS = 30;",
+    "replace": "export const REMINDER_LEAD_DAYS = 0;"
+  }
+]
