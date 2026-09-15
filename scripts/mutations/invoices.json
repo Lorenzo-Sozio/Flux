@@ -1,0 +1,116 @@
+[
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ il contatore avanza anche senza bozza: ogni doppio clic lascia un buco nella numerazione",
+    "find": "      SELECT ${input.scope}, 1, now() FROM target\n",
+    "replace": "      SELECT ${input.scope}, 1, now()\n"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ il blocco non controlla che sia ancora una bozza: il doppio clic consuma un numero",
+    "find": "      WHERE id = ${input.invoiceId} AND status = 'draft' AND revision = ${input.revision}\n      FOR UPDATE",
+    "replace": "      WHERE id = ${input.invoiceId} AND revision = ${input.revision}\n      FOR UPDATE"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ una bozza modificata dopo il controllo viene emessa con totali mai verificati",
+    "find": "      WHERE id = ${input.invoiceId} AND status = 'draft' AND revision = ${input.revision}\n      FOR UPDATE",
+    "replace": "      WHERE id = ${input.invoiceId} AND status = 'draft'\n      FOR UPDATE"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️ il numero della serie B viene stampato senza la serie",
+    "find": "                             ELSE next.last_value::text || '/' || ${input.series} END,",
+    "replace": "                             ELSE next.last_value::text END,"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️ il cliente non viene congelato: modificare l'azienda riscrive la fattura emessa",
+    "find": "      customer_snapshot = ${JSON.stringify(input.customerSnapshot)}::jsonb,",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/invoice-rules.ts",
+    "description": "⚠️⚠️ serie diverse condividono la stessa numerazione",
+    "find": "  return `invoice:${series.trim().toUpperCase()}:${year}`;",
+    "replace": "  return `invoice:${year}`;"
+  },
+  {
+    "file": "src/lib/invoice-rules.ts",
+    "description": "⚠️⚠️ la numerazione non riparte ogni anno",
+    "find": "  return `invoice:${series.trim().toUpperCase()}:${year}`;",
+    "replace": "  return `invoice:${series.trim().toUpperCase()}`;"
+  },
+  {
+    "file": "src/lib/invoice-rules.ts",
+    "description": "⚠️⚠️ una riga a 0% senza Natura passa, e SDI scarta la fattura",
+    "find": "    if (l.taxPercent === 0 && !nature) problems.push({ kind: \"zero_rate_without_nature\", line });",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/invoice-rules.ts",
+    "description": "⚠️ una riga con IVA e Natura passa",
+    "find": "    if (l.taxPercent > 0 && nature) problems.push({ kind: \"nature_with_vat\", line });",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/invoice-rules.ts",
+    "description": "⚠️ il bollo viene suggerito anche per le esportazioni",
+    "find": "  const exemptFromDuty = new Set([\"N3.1\", \"N3.2\"]);",
+    "replace": "  const exemptFromDuty = new Set<string>([]);"
+  },
+  {
+    "file": "src/lib/invoice-rules.ts",
+    "description": "⚠️ il bollo viene suggerito sotto la soglia",
+    "find": "  return round2(vatFree) > STAMP_DUTY_THRESHOLD;",
+    "replace": "  return round2(vatFree) >= STAMP_DUTY_THRESHOLD - 1;"
+  },
+  {
+    "file": "src/actions/invoices.ts",
+    "description": "⚠️⚠️ chiunque puo' emettere una fattura",
+    "find": "  const actor = await requireCapability(\"invoice:issue\");",
+    "replace": "  const actor = { userId: \"x\" };"
+  },
+  {
+    "file": "src/actions/invoices.ts",
+    "description": "⚠️⚠️ si elimina anche una fattura emessa: un buco nella numerazione",
+    "find": "    .where(and(eq(invoices.id, id), eq(invoices.status, \"draft\")))\n    .returning({ id: invoices.id });\n  revalidatePath(LIST);",
+    "replace": "    .where(eq(invoices.id, id))\n    .returning({ id: invoices.id });\n  revalidatePath(LIST);"
+  },
+  {
+    "file": "src/actions/invoices.ts",
+    "description": "⚠️⚠️ si emette con emittente, cliente o bozza incompleti: SDI scarta la fattura",
+    "find": "  if (blockers.issuer.length || blockers.customer.length || blockers.draft.length) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/actions/invoices.ts",
+    "description": "⚠️⚠️ il salvataggio non controlla la revisione: sovrascrive la modifica di un altro o una fattura gia' emessa",
+    "find": "    .where(and(eq(invoices.id, id), eq(invoices.status, \"draft\"), eq(invoices.revision, revision)))",
+    "replace": "    .where(eq(invoices.id, id))"
+  },
+  {
+    "file": "src/actions/invoices.ts",
+    "description": "⚠️⚠️ la data di emissione e' quella UTC: la prima fattura dell'anno prende il numero dell'anno prima",
+    "find": "  const issueDate = italianToday();",
+    "replace": "  const issueDate = new Date().toISOString().slice(0, 10);"
+  },
+  {
+    "file": "src/lib/invoice-draft.ts",
+    "description": "⚠️⚠️ la data italiana torna UTC",
+    "find": "    timeZone: \"Europe/Rome\",",
+    "replace": "    timeZone: \"UTC\","
+  },
+  {
+    "file": "src/lib/invoice-draft.ts",
+    "description": "⚠️ una riga senza descrizione nell'ordine arriva vuota in fattura",
+    "find": "    description: i.description?.trim() || i.productName?.trim() || \"\",",
+    "replace": "    description: i.description?.trim() || \"\","
+  },
+  {
+    "file": "src/lib/invoice-draft.ts",
+    "description": "⚠️ si salva un codice Natura inesistente",
+    "find": "    if (nature && !Object.hasOwn(NATURE_CODES, nature)) return { ok: false, error: `Line ${n}: unknown Natura code.` };",
+    "replace": ""
+  }
+]

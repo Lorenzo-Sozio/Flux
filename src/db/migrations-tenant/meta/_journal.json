@@ -162,6 +162,13 @@
       "when": 1789560000000,
       "tag": "0022_who_sends_the_invoice",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1789580000000,
+      "tag": "0023_numbered_without_gaps",
+      "breakpoints": true
     }
   ]
 }

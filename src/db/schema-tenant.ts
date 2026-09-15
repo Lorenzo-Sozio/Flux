@@ -73,6 +73,8 @@ export {
   geoCountries,
   // Invoicing
   invoiceIssuers,
+  invoiceItems,
+  invoices,
   leads,
   leadsRelations,
   marketingCampaigns,

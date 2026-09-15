@@ -1522,7 +1522,8 @@
       "territoryReport": "By territory",
       "contracts": "Contracts",
       "sequences": "Sequences",
-      "invoicing": "E-invoicing"
+      "invoicing": "E-invoicing",
+      "invoices": "Invoices"
     },
     "quickCreate": {
       "title": "Quick Create",
@@ -3765,5 +3766,72 @@
     "billingTitle": "Billing",
     "customerReady": "Complete for receiving an e-invoice.",
     "customerNotReady": "Before an invoice can be issued to this customer:"
+  },
+  "invoices": {
+    "title": "Invoices",
+    "subtitle": "Invoices and credit notes. A draft has no number: it gets one when issued, in order and without gaps.",
+    "empty": "No invoices yet. Create one from an order's page.",
+    "number": "Number",
+    "date": "Date",
+    "customer": "Customer",
+    "type": "Type",
+    "status": "Status",
+    "total": "Total",
+    "draftNumber": "Draft",
+    "types": {
+      "TD01": "Invoice",
+      "TD04": "Credit note"
+    },
+    "statuses": {
+      "draft": "Draft",
+      "issued": "Issued"
+    },
+    "back": "All invoices",
+    "numberTitle": "Invoice no. {number}",
+    "draftTitle": "Draft invoice",
+    "delete": "Delete draft",
+    "deleteConfirm": "Delete this draft? It has no number yet, so it leaves no gap.",
+    "save": "Save",
+    "saved": "Draft saved.",
+    "issue": "Issue",
+    "issuedToast": "Invoice no. {number} issued.",
+    "issueTitle": "Issue this invoice?",
+    "issueDescription": "It gets the next number and today's date now, and the issuer, customer and lines are frozen. An issued invoice cannot be deleted or edited: it is corrected with a credit note.",
+    "cancel": "Cancel",
+    "cannotIssue": "Before this can be issued:",
+    "issuerLabel": "Issuer",
+    "customerLabel": "Customer",
+    "problems": {
+      "no_lines": "at least one line",
+      "line_without_description": "line {line}: description",
+      "line_quantity": "line {line}: a quantity above zero",
+      "zero_rate_without_nature": "line {line}: 0% VAT without a Natura code",
+      "nature_with_vat": "line {line}: Natura code on a taxed line",
+      "unknown_nature": "line {line}: unknown Natura code",
+      "not_positive": "a total above zero"
+    },
+    "lines": "Lines",
+    "description": "Description",
+    "quantity": "Quantity",
+    "unitPrice": "Price",
+    "discount": "Discount %",
+    "vat": "VAT %",
+    "nature": "Natura",
+    "net": "Net",
+    "removeLine": "Remove line",
+    "addLine": "Add line",
+    "chooseNature": "Choose…",
+    "series": "Series",
+    "mainSeries": "main",
+    "dueDate": "Due date",
+    "documentDiscount": "Document discount %",
+    "paymentMethod": "Payment method",
+    "stampDuty": "Virtual stamp duty (€2.00)",
+    "stampSuggested": "VAT-free lines exceed €77.47: stamp duty is normally due. Check with your accountant.",
+    "stampNotSuggested": "VAT-free lines do not exceed €77.47, or are exports: stamp duty is normally not due.",
+    "notes": "Notes",
+    "subtotal": "Net",
+    "on": "on",
+    "createFromOrder": "Invoice"
   }
 }

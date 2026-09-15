@@ -177,6 +177,7 @@ export const sidebarItems: NavGroup[] = [
       },
       { titleKey: "quotes", url: "/dashboard/sales/quotes", icon: FileText, module: "sales" },
       { titleKey: "contracts", url: "/dashboard/sales/contracts", icon: ScrollText, module: "sales" },
+      { titleKey: "invoices", url: "/dashboard/sales/invoices", icon: Receipt, module: "sales" },
       { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, module: "sales" },
       { titleKey: "products", url: "/dashboard/sales/products", icon: Package, module: "sales" },
     ],

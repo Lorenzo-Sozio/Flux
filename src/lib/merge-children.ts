@@ -34,6 +34,7 @@ import {
   contracts,
   deals,
   emailSequenceEnrollments,
+  invoices,
   leads,
   orders,
   quotes,
@@ -62,6 +63,8 @@ export const COMPANY_CHILDREN: MergeChild[] = [
   { table: activities, field: "companyId" },
   { table: tasks, field: "companyId" },
   { table: contracts, field: "companyId" },
+  // The legal parties are frozen in the invoice snapshot; the pointer follows the survivor.
+  { table: invoices, field: "companyId" },
 ];
 
 export const CONTACT_CHILDREN: MergeChild[] = [

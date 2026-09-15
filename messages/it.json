@@ -1522,7 +1522,8 @@
       "territoryReport": "Per territorio",
       "contracts": "Contratti",
       "sequences": "Sequenze",
-      "invoicing": "Fatturazione elettronica"
+      "invoicing": "Fatturazione elettronica",
+      "invoices": "Fatture"
     },
     "quickCreate": {
       "title": "Crea Rapido",
@@ -3765,5 +3766,72 @@
     "billingTitle": "Fatturazione",
     "customerReady": "Dati completi per ricevere una fattura elettronica.",
     "customerNotReady": "Per emettere una fattura a questo cliente manca:"
+  },
+  "invoices": {
+    "title": "Fatture",
+    "subtitle": "Fatture e note di credito. Una bozza non ha numero: lo riceve all'emissione, in ordine e senza buchi.",
+    "empty": "Nessuna fattura. Si crea dalla pagina di un ordine.",
+    "number": "Numero",
+    "date": "Data",
+    "customer": "Cliente",
+    "type": "Tipo",
+    "status": "Stato",
+    "total": "Totale",
+    "draftNumber": "Bozza",
+    "types": {
+      "TD01": "Fattura",
+      "TD04": "Nota di credito"
+    },
+    "statuses": {
+      "draft": "Bozza",
+      "issued": "Emessa"
+    },
+    "back": "Tutte le fatture",
+    "numberTitle": "Fattura n. {number}",
+    "draftTitle": "Bozza di fattura",
+    "delete": "Elimina bozza",
+    "deleteConfirm": "Eliminare la bozza? Non ha ancora un numero, quindi non lascia buchi.",
+    "save": "Salva",
+    "saved": "Bozza salvata.",
+    "issue": "Emetti",
+    "issuedToast": "Fattura n. {number} emessa.",
+    "issueTitle": "Emettere la fattura?",
+    "issueDescription": "Riceve ora il numero progressivo e la data di oggi, e i dati di emittente, cliente e righe vengono congelati. Una fattura emessa non si elimina né si modifica: si corregge con una nota di credito.",
+    "cancel": "Annulla",
+    "cannotIssue": "Prima di emettere manca:",
+    "issuerLabel": "Emittente",
+    "customerLabel": "Cliente",
+    "problems": {
+      "no_lines": "almeno una riga",
+      "line_without_description": "riga {line}: descrizione",
+      "line_quantity": "riga {line}: quantità maggiore di zero",
+      "zero_rate_without_nature": "riga {line}: IVA 0% senza Natura",
+      "nature_with_vat": "riga {line}: Natura su una riga con IVA",
+      "unknown_nature": "riga {line}: codice Natura non valido",
+      "not_positive": "un totale maggiore di zero"
+    },
+    "lines": "Righe",
+    "description": "Descrizione",
+    "quantity": "Quantità",
+    "unitPrice": "Prezzo",
+    "discount": "Sconto %",
+    "vat": "IVA %",
+    "nature": "Natura",
+    "net": "Imponibile",
+    "removeLine": "Elimina riga",
+    "addLine": "Aggiungi riga",
+    "chooseNature": "Scegli…",
+    "series": "Sezionale",
+    "mainSeries": "principale",
+    "dueDate": "Scadenza",
+    "documentDiscount": "Sconto sul documento %",
+    "paymentMethod": "Modalità di pagamento",
+    "stampDuty": "Bollo virtuale (€ 2,00)",
+    "stampSuggested": "Le righe senza IVA superano € 77,47: di norma il bollo è dovuto. Verifica col commercialista.",
+    "stampNotSuggested": "Le righe senza IVA non superano € 77,47, o sono esportazioni: di norma il bollo non è dovuto.",
+    "notes": "Note",
+    "subtotal": "Imponibile",
+    "on": "su",
+    "createFromOrder": "Fattura"
   }
 }

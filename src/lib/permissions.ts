@@ -77,6 +77,9 @@ export const CAPABILITIES = {
   "contract:delete": "admin",
   "sequence:manage": "editor",
   "invoicing:manage": "admin",
+  "invoice:write": "editor",
+  // Issuing assigns a number that can never be taken back.
+  "invoice:issue": "admin",
   "product:manage": "admin",
 
   // Support

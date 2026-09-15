@@ -897,6 +897,93 @@ export const invoiceIssuers = pgTable("invoice_issuer", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+/**
+ * An invoice (TD01) or credit note (TD04).
+ *
+ * ⚠️⚠️ A draft has no number. The number is assigned when it is issued, in the same
+ * statement that issues it (src/lib/invoice-issue.ts): Italian invoices are numbered
+ * without gaps, and a number drawn for a draft that is then deleted is a gap.
+ *
+ * ⚠️ `issuerSnapshot` and `customerSnapshot` are frozen at issue. An issued invoice
+ * states who and where the parties were that day; editing the company next year
+ * must not rewrite it.
+ *
+ * ⚠️ `revision` rises with every edit of a draft. Issuing names the revision whose
+ * totals it checked, so an edit landing in between refuses the issue instead of
+ * freezing figures nobody looked at.
+ */
+export const invoices = pgTable(
+  "invoice",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    documentType: text("document_type").default("TD01").notNull(), // TD01 | TD04
+    status: text("status").default("draft").notNull(), // draft | issued
+    series: text("series").default("").notNull(),
+    fiscalYear: integer("fiscal_year"),
+    number: integer("number"),
+    documentNumber: text("document_number"),
+    issueDate: date("issue_date", { mode: "string" }),
+    dueDate: date("due_date", { mode: "string" }),
+    orderId: text("order_id").references(() => orders.id, { onDelete: "set null" }),
+    // The invoice a credit note corrects. FK in migration 0023.
+    originalInvoiceId: text("original_invoice_id"),
+    companyId: text("company_id").references(() => companies.id, { onDelete: "set null" }),
+    currency: text("currency").default("EUR").notNull(),
+    discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }).default("0").notNull(),
+    subtotal: numeric("subtotal", { precision: 12, scale: 2 }).default("0").notNull(),
+    discountAmount: numeric("discount_amount", { precision: 12, scale: 2 }).default("0").notNull(),
+    taxableAmount: numeric("taxable_amount", { precision: 12, scale: 2 }).default("0").notNull(),
+    taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0").notNull(),
+    stampDuty: boolean("stamp_duty").default(false).notNull(),
+    total: numeric("total", { precision: 12, scale: 2 }).default("0").notNull(),
+    paymentMethod: text("payment_method").default("MP05").notNull(),
+    notes: text("notes"),
+    revision: integer("revision").default(1).notNull(),
+    issuerSnapshot: jsonb("issuer_snapshot"),
+    customerSnapshot: jsonb("customer_snapshot"),
+    // The lines exactly as checked when issuing. An issued invoice is read from here,
+    // never from invoice_item, which a save racing the issue could still touch.
+    linesSnapshot: jsonb("lines_snapshot"),
+    createdBy: text("created_by"),
+    issuedBy: text("issued_by"),
+    issuedAt: timestamp("issued_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [
+    // The backstop under the numbering statement: never two invoices with one number.
+    uniqueIndex("invoice_number_uniq")
+      .on(t.series, t.fiscalYear, t.number)
+      .where(sql`number IS NOT NULL`),
+    index("invoice_order_idx").on(t.orderId),
+    index("invoice_company_idx").on(t.companyId),
+  ],
+);
+
+export const invoiceItems = pgTable(
+  "invoice_item",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    invoiceId: text("invoice_id")
+      .notNull()
+      .references(() => invoices.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    productId: text("product_id").references(() => products.id, { onDelete: "set null" }),
+    description: text("description").notNull(),
+    quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull(),
+    unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+    discountPercent: numeric("discount_percent", { precision: 5, scale: 2 }).default("0").notNull(),
+    taxPercent: numeric("tax_percent", { precision: 5, scale: 2 }).default("0").notNull(),
+    // Natura IVA, required on a zero-rate line and forbidden on a taxed one.
+    nature: text("nature"),
+  },
+  (t) => [unique("invoice_item_position_uniq").on(t.invoiceId, t.position)],
+);
+
 // --- FOLLOW-UP SEQUENCES ---
 
 /**

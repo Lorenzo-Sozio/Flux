@@ -49,6 +49,7 @@ import { useCurrency } from "@/hooks/use-currency";
 import { advanceLabelKey, isTerminalStatus, nextStatus } from "@/lib/order-status";
 import { cn } from "@/lib/utils";
 
+import { CreateInvoiceButton } from "./_components/create-invoice-button";
 import { PaymentsCard } from "./_components/payments-card";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -316,6 +317,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          <CreateInvoiceButton orderId={order.id} />
           <Button
             variant="outline"
             size="sm"
