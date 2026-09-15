@@ -1,0 +1,14 @@
+[
+  {
+    "file": "src/lib/email-queue.ts",
+    "description": "⚠️⚠️ la presa non controlla lo stato: due esecuzioni sovrapposte inviano la stessa email due volte",
+    "find": "    .where(and(inArray(emailJobs.id, ids), eq(emailJobs.status, \"pending\")))",
+    "replace": "    .where(inArray(emailJobs.id, ids))"
+  },
+  {
+    "file": "src/app/api/cron/email-worker/route.ts",
+    "description": "⚠️⚠️ il worker torna a leggere e inviare senza prendere i job",
+    "find": "  const jobs = await claimDueJobs(db, now, BATCH_SIZE);",
+    "replace": "  const jobs = await db.select().from(emailJobs).where(eq(emailJobs.status, \"pending\")).for(\"update\", { skipLocked: true });"
+  }
+]

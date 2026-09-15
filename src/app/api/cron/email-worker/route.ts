@@ -9,13 +9,14 @@
  * Retry: up to 3 attempts with exponential backoff (5 min, 30 min).
  */
 
-import { and, eq, gte, lte, sql } from "drizzle-orm";
+import { and, eq, gte, sql } from "drizzle-orm";
 
 import { getActivitiesWithPendingReminder } from "@/actions/activities";
 import { campaignLogs, emailJobs, marketingCampaigns, notifications, users } from "@/db/schema";
 import { runCronJob } from "@/lib/cron-runner";
 import { sendActivityReminderEmail } from "@/lib/email";
 import { getEmailConfig, sendEmail } from "@/lib/email-provider";
+import { claimDueJobs } from "@/lib/email-queue";
 import { notify } from "@/lib/notify";
 import type { TenantDb } from "@/lib/tenant-resolve";
 
@@ -41,31 +42,15 @@ async function runForTenant(db: TenantDb) {
   const now = new Date();
   const config = await getEmailConfig();
 
-  // Fetch a batch of pending jobs scheduled for now or earlier
-  const jobs = await db
-    .select()
-    .from(emailJobs)
-    .where(and(eq(emailJobs.status, "pending"), lte(emailJobs.scheduledAt, now)))
-    .limit(BATCH_SIZE)
-    .for("update", { skipLocked: true }); // prevent duplicate processing
+  // Claimed, not locked: see src/lib/email-queue.ts for the double sends a lock
+  // the HTTP driver cannot hold used to produce.
+  const jobs = await claimDueJobs(db, now, BATCH_SIZE);
 
   if (jobs.length === 0) {
     // Reminders still have to run even when the queue is empty.
     const reminders = await dispatchActivityReminders(db);
     return { processed: 0, sent: 0, failed: 0, remindersDispatched: reminders };
   }
-
-  // Mark all fetched jobs as "processing" atomically
-  const jobIds = jobs.map((j) => j.id);
-  await db
-    .update(emailJobs)
-    .set({ status: "processing" })
-    .where(
-      sql`${emailJobs.id} = ANY(ARRAY[${sql.join(
-        jobIds.map((id) => sql`${id}`),
-        sql`, `,
-      )}]::text[])`,
-    );
 
   let sent = 0;
   let failed = 0;
