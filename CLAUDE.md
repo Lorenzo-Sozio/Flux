@@ -81,7 +81,7 @@ opaque token (see [src/lib/tenant-resolve.ts](src/lib/tenant-resolve.ts)).
 
 ```
 webhook-retry        every 5 minutes   redelivers failed webhook events
-email-worker         every minute      sends queued emails
+email-worker         every minute      sends queued emails; queues due follow-up sequence steps
 campaign-scheduler   every 5 minutes   starts due campaigns
 task-reminders       every 15 minutes  reminds about tasks
 ticket-sla-check     every 15 minutes  flags tickets past their SLA
@@ -492,6 +492,39 @@ order-dependent statement is not.
 
 `npm test` fails when the generated file and the folder disagree, because shipping code
 whose columns were never created is exactly the failure that looks like a working deploy.
+
+### Follow-up sequences
+
+Steps of "wait so many days, then send this", walked through by an enrollment per
+person. Rules in [src/lib/sequence-plan.ts](src/lib/sequence-plan.ts), carrying
+out in [src/lib/sequence-runner.ts](src/lib/sequence-runner.ts), migration
+`0021_until_they_answer`.
+
+⚠️⚠️ **Four one-line hooks in files that are otherwise about something else**, and
+removing any of them breaks nothing visible — sequences simply keep writing:
+
+- the email worker calls `advanceSequences` before claiming what to send;
+- `processInboundEmail` calls `stopOnReply` before any early return;
+- the Resend delivery webhook stops sequences on a bounce or complaint, and finds
+  the workspace through `email_job.message_id` for emails that are not campaigns;
+- `/api/unsubscribe` understands the `seq:` token and stops sequences on a
+  campaign unsubscribe too.
+
+`src/lib/sequence-hooks.test.ts` reads all four.
+
+⚠️ **Replies are detected only where inbound email is configured**
+(`RESEND_INBOUND_WEBHOOK_SECRET` or `INBOUND_EMAIL_SECRET`). Without it a sequence
+cannot know somebody answered; the sequences page says so rather than letting it
+look like the feature works.
+
+⚠️ An enrollment sends only to the address it was enrolled with, and one active
+enrollment per sequence and address is a partial unique index, not a check. Both
+exist because two people racing to enroll the same lead, or two merged records,
+would otherwise receive every step twice.
+
+⚠️ An automatic reply (out of office) counts as a reply and stops the sequence.
+That is the safe direction to be wrong in; telling the two apart needs headers
+the inbound payload does not carry today.
 
 ### Mobile and the installable app (PWA)
 

@@ -397,6 +397,10 @@ const sections = [
       "Il modulo Marketing gestisce le comunicazioni di massa verso lead e contatti. Crea template riutilizzabili con variabili di personalizzazione, poi lanciaci campagne email con tracking di aperture e click.",
     topics: [
       {
+        q: "Come funzionano le sequenze di follow-up?",
+        a: "In Marketing → Sequenze crei una serie di email automatiche per lead oppure per contatti: ogni passo dice dopo quanti giorni partire, l'oggetto e il testo, che puoi caricare da un modello e personalizzare con i segnaposto. Iscrivi una persona dalla sua scheda con il pulsante 'Sequenza', oppure con una regola di automazione ('Enroll in Sequence'), per esempio su ogni nuovo lead. La sequenza si ferma da sola quando la persona risponde, si disiscrive, quando l'indirizzo rimbalza o cambia, quando il lead viene convertito o eliminato; puoi fermarla anche a mano. Chi segue il record riceve una notifica, anche push, quando la persona risponde. Ogni email ha il link di disiscrizione, aggiunto in fondo se non lo inserisci. Una persona non può essere iscritta due volte alla stessa sequenza in corso. Una sequenza in pausa non invia nulla e gli iscritti restano al loro punto. Attenzione: le risposte vengono rilevate solo se è configurata la ricezione della posta in arrivo; se non lo è, la pagina Sequenze lo segnala.",
+      },
+      {
         q: "Come creo un template email?",
         a: "Marketing → Template → 'Nuovo Template'. Dai un nome, scrivi oggetto e corpo in HTML, e usa i segnaposto per personalizzare ogni copia: nome, cognome, nome completo, azienda, email, telefono e ruolo, ciascuno fra doppie graffe. Gli stessi funzionano anche in inglese (first_name, last_name, company…) e con qualche sinonimo — societa vale come azienda — perché un segnaposto scritto quasi giusto non deve partire com'è verso il cliente. Gli spazi dentro le graffe sono tollerati. C'è anche il segnaposto del collegamento per disiscriversi, che va messo in ogni campagna.",
       },

@@ -34,6 +34,7 @@ import { ActivityTimeline } from "@/components/crm/activity-timeline";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { CustomerRecordPanel } from "@/components/crm/customer-record";
 import { DocumentPanel } from "@/components/crm/document-panel";
+import { EnrollInSequence } from "@/components/crm/enroll-in-sequence";
 import { FormattedDate } from "@/components/crm/formatted-date";
 import { QuickTaskForm } from "@/components/crm/quick-task-form";
 import { RecordVisit } from "@/components/crm/record-visit";
@@ -163,6 +164,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                 </Button>
               </ContactModal>
               <SendEmailModal entity={cData} templates={templates} ownerId={userId} />
+              <EnrollInSequence entity="contact" recordId={cData.id} />
             </div>
           </div>
         </CardContent>

@@ -1,0 +1,134 @@
+[
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ l'iscrizione non si affida all'indice unico: la stessa persona riceve ogni email due volte",
+    "find": "    .onConflictDoNothing()\n    .returning({ id: emailSequenceEnrollments.id });\n  if (inserted.length === 0) return { ok: false, reason: \"already_enrolled\" };",
+    "replace": "    .returning({ id: emailSequenceEnrollments.id });\n  if (inserted.length === 0) return { ok: false, reason: \"already_enrolled\" };"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ la presa del passo non controlla il passo atteso: due esecuzioni in parallelo inviano lo stesso passo",
+    "find": "          eq(emailSequenceEnrollments.nextStep, enrollment.nextStep),\n        ),\n      )\n      .returning({ id: emailSequenceEnrollments.id });\n    // Another run took this step",
+    "replace": "        ),\n      )\n      .returning({ id: emailSequenceEnrollments.id });\n    // Another run took this step"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ il passo preso viene inviato anche se un'altra esecuzione l'aveva gia' preso",
+    "find": "    if (claimed.length === 0) continue;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ la fermata non annulla l'email gia' in coda: il cliente che ha risposto riceve comunque il passo",
+    "find": "      .set({ status: \"cancelled\" })",
+    "replace": "      .set({})"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️ la fermata annulla anche email gia' partite",
+    "find": "          eq(emailJobs.status, \"pending\"),\n        ),\n      );",
+    "replace": "        ),\n      );"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ all'invio non si ricontrolla la lista di esclusione: chi si e' disiscritto riceve i passi successivi",
+    "find": "      suppression: await suppressionFor(db, enrollment.email),",
+    "replace": "      suppression: null,"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ si iscrive un indirizzo disiscritto",
+    "find": "    suppression: email ? await suppressionFor(db, email) : null,",
+    "replace": "    suppression: null,"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ una sequenza in pausa continua a inviare",
+    "find": "    if (!sequence?.isActive) continue;",
+    "replace": "    if (!sequence) continue;"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ l'email automatica parte senza link di disiscrizione quando l'autore non l'ha messo",
+    "find": "        htmlBody: ensureUnsubscribe(renderPlaceholders(step.body, values), unsubscribeUrl),",
+    "replace": "        htmlBody: renderPlaceholders(step.body, values),"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ se la coda fallisce il passo resta consumato: il cliente non lo riceve mai",
+    "find": "          nextStep: enrollment.nextStep,\n          nextSendAt: enrollment.nextSendAt,\n          status: \"active\",",
+    "replace": "          nextSendAt: enrollment.nextSendAt,\n          status: \"active\","
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️ la risposta non avvisa il titolare",
+    "find": "    if (!s.ownerId) continue;",
+    "replace": "    continue;"
+  },
+  {
+    "file": "src/lib/sequence-runner.ts",
+    "description": "⚠️⚠️ la risposta non ferma la sequenza perche' l'indirizzo non viene normalizzato",
+    "find": "      and(eq(emailSequenceEnrollments.email, normaliseEmail(email)), eq(emailSequenceEnrollments.status, \"active\")),",
+    "replace": "      and(eq(emailSequenceEnrollments.email, email), eq(emailSequenceEnrollments.status, \"active\")),"
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️⚠️ dopo l'ultimo passo la sequenza resta attiva e cerca un passo in piu'",
+    "find": "  if (nextStep >= steps.length) return { nextStep, nextSendAt: null, status: \"completed\" };",
+    "replace": "  if (nextStep > steps.length) return { nextStep, nextSendAt: null, status: \"completed\" };"
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️⚠️ la sequenza continua a scrivere dopo che l'indirizzo del record e' cambiato",
+    "find": "  if (normaliseEmail(r.email) !== r.enrolledEmail) return \"email_changed\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️ un rimbalzo viene registrato come disiscrizione",
+    "find": "r.suppression.startsWith(\"bounce\") || r.suppression === \"complaint\" ? \"bounced\" : \"unsubscribed\"",
+    "replace": "\"unsubscribed\""
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️⚠️ si salva un passo con un segnaposto che nessuno compilera'",
+    "find": "    if (unknown.length) return { ok: false, error: `Step ${n} uses unknown placeholders: ${unknown.join(\", \")}` };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/sequence-plan.ts",
+    "description": "⚠️ un lead convertito continua a ricevere la sequenza",
+    "find": "  if (r.converted) return \"converted\";",
+    "replace": ""
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ ogni rifiuto dell'iscrizione diventa un errore: il registro della regola si riempie di lead senza email",
+    "find": "    if (!result.ok && (result.reason === \"sequence_unavailable\" || result.reason === \"no_steps\")) {",
+    "replace": "    if (!result.ok) {"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ una sequenza in pausa o senza passi viene saltata in silenzio: la regola sembra funzionare e non iscrive nessuno",
+    "find": "    if (!result.ok && (result.reason === \"sequence_unavailable\" || result.reason === \"no_steps\")) {",
+    "replace": "    if (false) {"
+  },
+  {
+    "file": "src/actions/sequences.ts",
+    "description": "⚠️⚠️ chiunque puo' iscrivere un record a una sequenza",
+    "find": "  const actor = await requireCapability(\"record:write\");\n  await requirePlanModule(\"marketing\");\n  const db = await getDb();\n  const result = await enroll(",
+    "replace": "  const actor = { userId: \"x\" };\n  await requirePlanModule(\"marketing\");\n  const db = await getDb();\n  const result = await enroll("
+  },
+  {
+    "file": "src/actions/sequences.ts",
+    "description": "⚠️⚠️ chiunque puo' creare o modificare una sequenza",
+    "find": "  const actor = await requireCapability(\"sequence:manage\");",
+    "replace": "  const actor = { userId: \"x\" };"
+  },
+  {
+    "file": "src/actions/sequences.ts",
+    "description": "⚠️ eliminando la sequenza le email gia' in coda partono comunque",
+    "find": "  await stopEnrollments(\n    db,\n    active.map((a) => a.id),\n    \"manual\",\n  );",
+    "replace": ""
+  }
+]

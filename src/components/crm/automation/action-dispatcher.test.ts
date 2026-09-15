@@ -26,6 +26,7 @@ vi.mock("../../crm/automation/webhook-service", () => ({
 }));
 vi.mock("@/lib/tenant-context", () => ({ getDb: async () => ({}) }));
 vi.mock("@/db", () => ({ platformDb: {} }));
+vi.mock("@/lib/sequence-runner", () => ({ enroll: async () => ({ ok: true }) }));
 vi.mock("@/lib/notify", () => ({ notify: async () => undefined }));
 vi.mock("@/lib/document-counter", () => ({ nextInSequence: async () => 1 }));
 vi.mock("@/db/schema", () => ({

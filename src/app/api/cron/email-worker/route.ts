@@ -18,6 +18,8 @@ import { sendActivityReminderEmail } from "@/lib/email";
 import { getEmailConfig, sendEmail } from "@/lib/email-provider";
 import { claimDueJobs } from "@/lib/email-queue";
 import { notify } from "@/lib/notify";
+import { tolerateUnmigrated } from "@/lib/schema-ready";
+import { advanceSequences } from "@/lib/sequence-runner";
 import type { TenantDb } from "@/lib/tenant-resolve";
 
 const BATCH_SIZE = Number.parseInt(process.env.EMAILS_PER_WORKER_RUN ?? "30", 10);
@@ -42,6 +44,10 @@ async function runForTenant(db: TenantDb) {
   const now = new Date();
   const config = await getEmailConfig();
 
+  // Follow-up sequences first, so a step that falls due now is queued and sent in
+  // this same run rather than a minute later.
+  const sequences = await tolerateUnmigrated("sequences", () => advanceSequences(db, now), null);
+
   // Claimed, not locked: see src/lib/email-queue.ts for the double sends a lock
   // the HTTP driver cannot hold used to produce.
   const jobs = await claimDueJobs(db, now, BATCH_SIZE);
@@ -49,7 +55,7 @@ async function runForTenant(db: TenantDb) {
   if (jobs.length === 0) {
     // Reminders still have to run even when the queue is empty.
     const reminders = await dispatchActivityReminders(db);
-    return { processed: 0, sent: 0, failed: 0, remindersDispatched: reminders };
+    return { processed: 0, sent: 0, failed: 0, remindersDispatched: reminders, sequences };
   }
 
   let sent = 0;
@@ -64,7 +70,7 @@ async function runForTenant(db: TenantDb) {
         // Mark job sent
         await db
           .update(emailJobs)
-          .set({ status: "sent", processedAt: now, ...(result.messageId ? { lastError: null } : {}) })
+          .set({ status: "sent", processedAt: now, messageId: result.messageId ?? null, lastError: null })
           .where(eq(emailJobs.id, job.id));
 
         // Update campaign log
@@ -106,7 +112,7 @@ async function runForTenant(db: TenantDb) {
 
   const remindersDispatched = await dispatchActivityReminders(db);
 
-  return { processed: jobs.length, sent, failed, remindersDispatched };
+  return { processed: jobs.length, sent, failed, remindersDispatched, sequences };
 }
 
 // ── Activity reminder notifications ──────────────────────────────────────────

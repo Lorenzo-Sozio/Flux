@@ -10,7 +10,9 @@ import type { NextRequest } from "next/server";
 
 import { eq } from "drizzle-orm";
 
-import { campaignLogs, contacts, emailSuppressions, leads } from "@/db/schema";
+import { campaignLogs, contacts, emailSequenceEnrollments, emailSuppressions, leads } from "@/db/schema";
+import { tolerateUnmigrated } from "@/lib/schema-ready";
+import { SEQUENCE_TOKEN_PREFIX, stopForAddress } from "@/lib/sequence-runner";
 import { resolveTenantByProbe } from "@/lib/tenant-resolve";
 import { verifyUnsubscribeToken } from "@/lib/unsubscribe-token";
 
@@ -28,6 +30,46 @@ export async function GET(req: NextRequest) {
   }
 
   const { email, logId } = payload;
+
+  // A follow-up sequence signs its link with the enrollment instead of a campaign log.
+  if (logId.startsWith(SEQUENCE_TOKEN_PREFIX)) {
+    const enrollmentId = logId.slice(SEQUENCE_TOKEN_PREFIX.length);
+    const bySequence = await resolveTenantByProbe(`enrollment:${enrollmentId}`, async (tenantDb) => {
+      const [row] = await tenantDb
+        .select({ id: emailSequenceEnrollments.id })
+        .from(emailSequenceEnrollments)
+        .where(eq(emailSequenceEnrollments.id, enrollmentId));
+      return Boolean(row);
+    }).catch(() => null);
+    if (!bySequence) {
+      return htmlResponse("Invalid link", "This unsubscribe link is invalid or has expired.", false);
+    }
+    try {
+      const sdb = bySequence.db;
+      await sdb
+        .insert(emailSuppressions)
+        .values({ email: email.toLowerCase(), reason: "unsubscribe" })
+        .onConflictDoNothing();
+      await stopForAddress(sdb, email, "unsubscribed");
+      const [enrollment] = await sdb
+        .select({ leadId: emailSequenceEnrollments.leadId, contactId: emailSequenceEnrollments.contactId })
+        .from(emailSequenceEnrollments)
+        .where(eq(emailSequenceEnrollments.id, enrollmentId));
+      if (enrollment?.leadId) {
+        await sdb.update(leads).set({ marketingConsent: false }).where(eq(leads.id, enrollment.leadId));
+      } else if (enrollment?.contactId) {
+        await sdb.update(contacts).set({ marketingConsent: false }).where(eq(contacts.id, enrollment.contactId));
+      }
+    } catch {
+      // Same stance as below: the page still confirms, and the send-time check on
+      // the suppression list is what actually keeps the next email from going out.
+    }
+    return htmlResponse(
+      "Unsubscribed successfully",
+      `The address <strong>${escapeHtml(email)}</strong> has been removed from our mailing list. You will no longer receive marketing emails from us.`,
+      true,
+    );
+  }
 
   // The recipient of a marketing email has no session and no workspace header, so
   // the tenant is derived from the campaign log the token is signed against.
@@ -54,6 +96,9 @@ export async function GET(req: NextRequest) {
       .insert(emailSuppressions)
       .values({ email: email.toLowerCase(), reason: "unsubscribe" })
       .onConflictDoNothing();
+
+    // Unsubscribing from a campaign is unsubscribing: sequences stop writing too.
+    await tolerateUnmigrated("sequences", () => stopForAddress(db, email, "unsubscribed"), 0);
 
     // Update campaign log and resolve the lead/contact FK
     const [log] = await db

@@ -406,4 +406,20 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nCREATE INDEX IF NOT EXISTS "contract_company_id_idx" ON "contract" ("company_id");\n',
     ],
   },
+  {
+    tag: "0021_until_they_answer",
+    folderMillis: 1789540000000,
+    hash: "7164054353daa5a1083d63cea0f8e36dfb4dbeb411e530c992a32d483e82804a",
+    sql: [
+      '-- Follow-up sequences: steps, and the people walking through them.\n--\n-- ⚠️ One active enrollment per sequence and address is a partial unique index,\n-- not a check in code: two enrolments racing would both pass a check.\n--\n-- Additive and re-runnable, as every tenant migration has to be.\nCREATE TABLE IF NOT EXISTS "email_sequence" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"name" text NOT NULL,\n\t"description" text,\n\t"entity_type" text NOT NULL,\n\t"is_active" boolean DEFAULT true NOT NULL,\n\t"owner_id" text REFERENCES "user"("id") ON DELETE SET NULL,\n\t"created_by" text,\n\t"created_at" timestamp DEFAULT now() NOT NULL,\n\t"updated_at" timestamp DEFAULT now() NOT NULL\n);\n',
+      '\nCREATE TABLE IF NOT EXISTS "email_sequence_step" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"sequence_id" text NOT NULL REFERENCES "email_sequence"("id") ON DELETE CASCADE,\n\t"position" integer NOT NULL,\n\t"delay_days" integer DEFAULT 0 NOT NULL,\n\t"subject" text NOT NULL,\n\t"body" text NOT NULL,\n\t"created_at" timestamp DEFAULT now() NOT NULL,\n\tCONSTRAINT "email_sequence_step_position_uniq" UNIQUE("sequence_id", "position")\n);\n',
+      '\nCREATE TABLE IF NOT EXISTS "email_sequence_enrollment" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"sequence_id" text NOT NULL REFERENCES "email_sequence"("id") ON DELETE CASCADE,\n\t"lead_id" text REFERENCES "lead"("id") ON DELETE CASCADE,\n\t"contact_id" text REFERENCES "contact"("id") ON DELETE CASCADE,\n\t"email" text NOT NULL,\n\t"status" text DEFAULT \'active\' NOT NULL,\n\t"stop_reason" text,\n\t"next_step" integer DEFAULT 0 NOT NULL,\n\t"next_send_at" timestamp,\n\t"last_sent_at" timestamp,\n\t"owner_id" text,\n\t"enrolled_by" text,\n\t"enrolled_at" timestamp DEFAULT now() NOT NULL,\n\t"stopped_at" timestamp,\n\t"completed_at" timestamp\n);\n',
+      '\nCREATE UNIQUE INDEX IF NOT EXISTS "email_sequence_enrollment_active_uniq" ON "email_sequence_enrollment" ("sequence_id", "email") WHERE status = \'active\';\n',
+      '\nCREATE INDEX IF NOT EXISTS "email_sequence_enrollment_due_idx" ON "email_sequence_enrollment" ("status", "next_send_at");\n',
+      '\nCREATE INDEX IF NOT EXISTS "email_sequence_enrollment_email_idx" ON "email_sequence_enrollment" ("email");\n',
+      '\n-- Lets stopping an enrollment cancel the email already queued for it.\nALTER TABLE "email_job" ADD COLUMN IF NOT EXISTS "sequence_enrollment_id" text REFERENCES "email_sequence_enrollment"("id") ON DELETE SET NULL;\n',
+      '\n-- The provider\'s message id, so a bounce on an email that is not part of a\n-- campaign still finds its workspace.\nALTER TABLE "email_job" ADD COLUMN IF NOT EXISTS "message_id" text;\n',
+      '\nCREATE INDEX IF NOT EXISTS "email_job_message_id_idx" ON "email_job" ("message_id");\n',
+    ],
+  },
 ];

@@ -115,6 +115,7 @@ vi.mock("@/lib/document-counter", () => ({
     return next;
   },
 }));
+vi.mock("@/lib/sequence-runner", () => ({ enroll: async () => ({ ok: true }) }));
 vi.mock("@/lib/notify", () => ({
   notify: async (n: { userId: string; type: string; message: string; link?: string }) => {
     notified.push(n);

@@ -207,6 +207,18 @@ export const AssignOwnerActionSchema = z.object({
     }),
 });
 
+/**
+ * Enroll the record in a follow-up sequence (leads and contacts only).
+ *
+ * ⚠️ A record that cannot be enrolled for an ordinary reason — no address, already
+ * in the sequence, unsubscribed — is skipped, not failed: a rule on every new lead
+ * would otherwise fill the log with errors nobody can act on.
+ */
+export const EnrollInSequenceActionSchema = z.object({
+  type: z.literal("enroll_in_sequence"),
+  params: z.object({ sequenceId: z.string().min(1) }),
+});
+
 export const ActionSchema = z.discriminatedUnion("type", [
   CreateTaskActionSchema,
   SendNotificationActionSchema,
@@ -215,6 +227,7 @@ export const ActionSchema = z.discriminatedUnion("type", [
   SendWebhookActionSchema,
   EmitEventActionSchema,
   AssignOwnerActionSchema,
+  EnrollInSequenceActionSchema,
 ]);
 
 export type AutomationAction = z.infer<typeof ActionSchema>;

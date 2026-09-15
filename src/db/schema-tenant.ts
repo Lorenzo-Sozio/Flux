@@ -56,6 +56,10 @@ export {
   // Documents
   documents,
   emailJobs,
+  // Follow-up sequences
+  emailSequenceEnrollments,
+  emailSequenceSteps,
+  emailSequences,
   emailSettings,
   emailSuppressions,
   // Marketing / email

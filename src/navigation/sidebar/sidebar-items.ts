@@ -18,6 +18,7 @@ import {
   KeyRound,
   LifeBuoy,
   LineChart,
+  ListOrdered,
   type LucideIcon,
   Mail,
   MailOpen,
@@ -213,6 +214,7 @@ export const sidebarItems: NavGroup[] = [
       // area of its own; it is not one, it is how the other areas do their work.
       { titleKey: "campaigns", url: "/dashboard/marketing/campaigns", icon: Target, module: "marketing" },
       { titleKey: "templates", url: "/dashboard/marketing/templates", icon: Mail, module: "marketing" },
+      { titleKey: "sequences", url: "/dashboard/marketing/sequences", icon: ListOrdered, module: "marketing" },
       { titleKey: "automations", url: "/dashboard/automation", icon: Zap, module: "automation" },
     ],
   },

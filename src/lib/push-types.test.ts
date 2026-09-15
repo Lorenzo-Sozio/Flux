@@ -28,7 +28,16 @@ describe("the catalogue", () => {
     const onByDefault = PUSH_TYPE_ORDER.filter((t) => PUSH_TYPES[t].defaultOn);
     // A contract entering its notice period joins them: the decision has a
     // deadline, and missing it renews or loses the customer by default.
-    expect(onByDefault).toEqual(["contract_renewal", "lead_assigned", "sla_breach", "sla_warning", "task_due"]);
+    // And a prospect answering a follow-up sequence: the conversation is now a
+    // person's to pick up, and the automatic emails have stopped.
+    expect(onByDefault).toEqual([
+      "contract_renewal",
+      "lead_assigned",
+      "sequence_reply",
+      "sla_breach",
+      "sla_warning",
+      "task_due",
+    ]);
   });
 
   it("keeps the chatty ones off until somebody asks for them", () => {

@@ -1518,7 +1518,8 @@
       "workload": "Carico Lavoro",
       "territories": "Territori",
       "territoryReport": "Per territorio",
-      "contracts": "Contratti"
+      "contracts": "Contratti",
+      "sequences": "Sequenze"
     },
     "quickCreate": {
       "title": "Crea Rapido",
@@ -3537,6 +3538,10 @@
       "contract_renewal": {
         "label": "Un mio contratto entra nel preavviso",
         "help": "Il giorno in cui si apre il periodo per decidere se rinnovare o disdire."
+      },
+      "sequence_reply": {
+        "label": "Un destinatario risponde a una sequenza",
+        "help": "Qualcuno a cui scrive una tua sequenza di follow-up ha risposto; gli invii automatici si sono fermati."
       }
     },
     "noServiceWorker": "Su questa pagina non è attivo nessun service worker, quindi niente può ricevere una notifica. Ricarica la pagina; se persiste, l'applicazione è in modalità sviluppo, dove il worker non viene registrato di proposito.",
@@ -3622,5 +3627,79 @@
     "deleteTitle": "Eliminare il contratto?",
     "deleteDescription": "Sparisce anche dal ricavo ricorrente. Per un cliente che ha disdetto, imposta lo stato «Disdetto»: resta nello storico.",
     "footnote": "Stato calcolato al {on} dalle date del contratto. Chi ne è titolare riceve una notifica un mese prima della data limite del preavviso. Gli importi sono sommati senza conversione di valuta."
+  },
+  "sequences": {
+    "title": "Sequenze di follow-up",
+    "subtitle": "Email automatiche a distanza di giorni, che si fermano quando il destinatario risponde o si disiscrive.",
+    "newSequence": "Nuova sequenza",
+    "back": "Tutte le sequenze",
+    "empty": "Nessuna sequenza. Creane una e iscrivi lead o contatti dalla loro scheda, o con una regola di automazione.",
+    "noReplyDetectionTitle": "Le risposte non vengono rilevate",
+    "noReplyDetectionBody": "Questa installazione non riceve la posta in arrivo, quindi una sequenza non può accorgersi che il destinatario ha risposto e continua a scrivergli. Si ferma comunque alla disiscrizione, al rimbalzo, alla conversione del lead e a mano. Per attivare il rilevamento configura il webhook della posta in arrivo (RESEND_INBOUND_WEBHOOK_SECRET).",
+    "name": "Nome",
+    "namePlaceholder": "es. Benvenuto nuovi lead",
+    "for": "Per",
+    "entity": {
+      "lead": "Lead",
+      "contact": "Contatti"
+    },
+    "steps": "Passi",
+    "inProgress": "In corso",
+    "completed": "Completate",
+    "replied": "Hanno risposto",
+    "stoppedOther": "Fermate",
+    "paused": "in pausa",
+    "description": "Descrizione",
+    "activeLabel": "Attiva: invia i passi quando sono dovuti",
+    "pausedLabel": "In pausa: nessun invio, gli iscritti restano al loro punto",
+    "stepN": "Passo {n}",
+    "moveUp": "Sposta su",
+    "moveDown": "Sposta giù",
+    "removeStep": "Elimina passo",
+    "waitFirst": "Invia dopo l'iscrizione, attendendo",
+    "waitNext": "Invia dopo il passo precedente, attendendo",
+    "days": "giorni",
+    "fromTemplate": "Carica da modello…",
+    "subject": "Oggetto",
+    "body": "Testo",
+    "placeholdersHint": "Puoi usare {examples} e gli altri segnaposto dei modelli. Il link di disiscrizione viene aggiunto in fondo se non lo inserisci tu.",
+    "addStep": "Aggiungi passo",
+    "delete": "Elimina sequenza",
+    "deleteConfirm": "Eliminare la sequenza? Gli iscritti vengono fermati e le email in coda annullate.",
+    "deleted": "Sequenza eliminata.",
+    "save": "Salva",
+    "saving": "Salvataggio…",
+    "saved": "Sequenza salvata.",
+    "failed": "Operazione non riuscita.",
+    "enrolled": "{count, plural, one {# iscritto} other {# iscritti}}",
+    "noEnrollments": "Ancora nessun iscritto.",
+    "recipient": "Destinatario",
+    "status": "Stato",
+    "progress": "Passi inviati",
+    "lastSent": "Ultimo invio",
+    "nextSend": "Prossimo invio",
+    "stop": "Ferma",
+    "stoppedToast": "Iscrizione fermata.",
+    "statuses": {
+      "active": "In corso",
+      "completed": "Completata",
+      "stopped": "Fermata"
+    },
+    "reasons": {
+      "replied": "Ha risposto",
+      "unsubscribed": "Disiscritto",
+      "bounced": "Indirizzo non valido",
+      "converted": "Lead convertito",
+      "missing_email": "Senza email",
+      "record_deleted": "Record eliminato",
+      "email_changed": "Email cambiata",
+      "manual": "Fermata a mano"
+    },
+    "sequenceButton": "Sequenza",
+    "noSequencesFor": "Nessuna sequenza attiva per questo tipo di record.",
+    "chooseSequence": "Scegli una sequenza…",
+    "enroll": "Iscrivi",
+    "enrolledToast": "Iscritto alla sequenza.",
+    "close": "Chiudi"
   }
 }

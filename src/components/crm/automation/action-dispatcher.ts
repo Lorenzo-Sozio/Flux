@@ -20,6 +20,7 @@ import { nextInSequence } from "@/lib/document-counter";
 import { notify } from "@/lib/notify";
 import { eligibleInOrder, isOwnedEntity, pickInTurn } from "@/lib/round-robin";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
+import { enroll } from "@/lib/sequence-runner";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import type { Located } from "@/lib/territory";
 import { placeOfDeal } from "@/lib/territory-report";
@@ -89,6 +90,9 @@ export class ActionDispatcher {
         return 0;
       case "assign_owner":
         await this.assignOwner(action, context, executionCtx);
+        return 0;
+      case "enroll_in_sequence":
+        await this.enrollInSequence(action, context);
         return 0;
       // TypeScript exhaustiveness: no `default` — new action types require an explicit case.
     }
@@ -230,6 +234,28 @@ export class ActionDispatcher {
           .where(eq(contacts.id, String(deal.contactId)))
       : [];
     return placeOfDeal(company ?? {}, contact ?? {});
+  }
+
+  // ─── Action: enroll_in_sequence ───────────────────────────────────────────────
+
+  /** Only a sequence that cannot run at all is a failure; an ordinary refusal is a skip. */
+  private async enrollInSequence(
+    action: Extract<AutomationAction, { type: "enroll_in_sequence" }>,
+    context: RuleContext,
+  ): Promise<void> {
+    if (context.entityType !== "lead" && context.entityType !== "contact") {
+      throw new Error(`"enroll_in_sequence" applies to leads and contacts, not ${context.entityType}`);
+    }
+    const db = await getDb();
+    const result = await enroll(db, {
+      sequenceId: action.params.sequenceId,
+      entity: context.entityType,
+      recordId: context.entityId,
+      enrolledBy: context.currentUserId ?? null,
+    });
+    if (!result.ok && (result.reason === "sequence_unavailable" || result.reason === "no_steps")) {
+      throw new Error(`The sequence cannot enroll anyone: ${result.reason.replace("_", " ")}`);
+    }
   }
 
   // ─── Action: emit_event ───────────────────────────────────────────────────────

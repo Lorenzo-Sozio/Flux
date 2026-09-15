@@ -13,7 +13,9 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { eq } from "drizzle-orm";
 
-import { campaignLogs, emailSuppressions } from "@/db/schema";
+import { campaignLogs, emailJobs, emailSuppressions } from "@/db/schema";
+import { tolerateUnmigrated } from "@/lib/schema-ready";
+import { stopForAddress } from "@/lib/sequence-runner";
 import { resolveTenantByProbe } from "@/lib/tenant-resolve";
 
 export async function POST(req: NextRequest) {
@@ -54,7 +56,15 @@ export async function POST(req: NextRequest) {
       where: eq(campaignLogs.messageId, messageId),
       columns: { id: true },
     });
-    return Boolean(row);
+    if (row) return true;
+    // Emails that are not part of a campaign — follow-up sequences — carry their
+    // message id on the queue row instead.
+    const [job] = await tolerateUnmigrated(
+      "email_job.message_id",
+      () => tenantDb.select({ id: emailJobs.id }).from(emailJobs).where(eq(emailJobs.messageId, messageId)).limit(1),
+      [],
+    );
+    return Boolean(job);
   }).catch(() => null);
 
   if (!resolved) {
@@ -88,6 +98,9 @@ export async function POST(req: NextRequest) {
             .values({ email: email.toLowerCase(), reason: "bounce_hard" })
             .onConflictDoNothing();
 
+          // Nothing more from any sequence to an address that does not exist.
+          await tolerateUnmigrated("sequences", () => stopForAddress(db, email, "bounced"), 0);
+
           // Update campaign log if we can correlate by messageId
           if (messageId) {
             await db.update(campaignLogs).set({ status: "bounced" }).where(eq(campaignLogs.messageId, messageId));
@@ -111,6 +124,8 @@ export async function POST(req: NextRequest) {
             .insert(emailSuppressions)
             .values({ email: email.toLowerCase(), reason: "complaint" })
             .onConflictDoNothing();
+
+          await tolerateUnmigrated("sequences", () => stopForAddress(db, email, "bounced"), 0);
 
           if (messageId) {
             await db.update(campaignLogs).set({ status: "complained" }).where(eq(campaignLogs.messageId, messageId));

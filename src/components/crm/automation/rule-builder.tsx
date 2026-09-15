@@ -9,6 +9,7 @@ import {
   Bell,
   CheckSquare,
   GitMergeIcon,
+  ListOrdered,
   Loader2Icon,
   Mail,
   PencilLine,
@@ -25,6 +26,7 @@ import { toast } from "sonner";
 import { createAutomationRule, updateAutomationRule } from "@/actions/automation";
 import { getAllUsers } from "@/actions/crm";
 import { getEmailTemplates } from "@/actions/marketing";
+import { getSequencesForEnrolling } from "@/actions/sequences";
 import { getTerritories } from "@/actions/territories";
 import {
   type AutomationRuleFormData,
@@ -254,6 +256,12 @@ const ACTION_META: Record<string, { label: string; icon: React.ReactNode; color:
     color: "text-sky-600 dark:text-sky-400",
     bg: "bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800",
   },
+  enroll_in_sequence: {
+    label: "Enroll in Sequence",
+    icon: <ListOrdered className="h-4 w-4" />,
+    color: "text-teal-600 dark:text-teal-400",
+    bg: "bg-teal-50 dark:bg-teal-950/30 border-teal-200 dark:border-teal-800",
+  },
 };
 
 /**
@@ -415,6 +423,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
   const [open, setOpen] = useState(false);
   const [userList, setUserList] = useState<{ id: string; name: string | null; email: string | null }[]>([]);
   const [territoryList, setTerritoryList] = useState<{ id: string; name: string }[]>([]);
+  const [sequenceList, setSequenceList] = useState<{ id: string; name: string; entity: "lead" | "contact" }[]>([]);
   const [templateList, setTemplateList] = useState<
     { id: string; name: string; subject: string; body: string; category: string }[]
   >([]);
@@ -427,6 +436,14 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
       getTerritories()
         .then((rows) => setTerritoryList(rows.map((r) => ({ id: r.id, name: r.name }))))
         .catch(() => setTerritoryList([]));
+      Promise.all([getSequencesForEnrolling("lead"), getSequencesForEnrolling("contact")])
+        .then(([forLeads, forContacts]) =>
+          setSequenceList([
+            ...forLeads.map((x) => ({ ...x, entity: "lead" as const })),
+            ...forContacts.map((x) => ({ ...x, entity: "contact" as const })),
+          ]),
+        )
+        .catch(() => setSequenceList([]));
       getEmailTemplates().then((tpls) =>
         setTemplateList(
           tpls.map((t) => ({ id: t.id, name: t.name, subject: t.subject, body: t.body, category: t.category })),
@@ -1014,6 +1031,8 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                       type: "assign_owner",
                                       params: { strategy: "round_robin", routes: [], userIds: [], overwrite: false },
                                     });
+                                  else if (v === "enroll_in_sequence")
+                                    updateAction(index, { type: "enroll_in_sequence", params: { sequenceId: "" } });
                                 }}
                               >
                                 <SelectTrigger
@@ -1593,6 +1612,50 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                             route whose people have all left passes the record on to the next. A record no route takes
                             goes to "everyone else", or stays unassigned if nobody is ticked there. A record someone has
                             already claimed stays with them unless reassigning is ticked.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* ── enroll_in_sequence params ── */}
+                      {actionType === "enroll_in_sequence" && (
+                        <div className="space-y-2">
+                          {targetEntity !== "lead" && targetEntity !== "contact" ? (
+                            <p className="rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive text-xs">
+                              Sequences write to leads and contacts. Choose one of them as the target.
+                            </p>
+                          ) : (
+                            <F label="Sequence" required error={actionErrs?.sequenceId?.message}>
+                              <Controller
+                                control={control}
+                                // biome-ignore lint/suspicious/noExplicitAny: dynamic RHF path
+                                name={`actions.${index}.params.sequenceId` as any}
+                                render={({ field: f }) => {
+                                  const options = sequenceList.filter((x) => x.entity === targetEntity);
+                                  return options.length === 0 ? (
+                                    <p className="text-muted-foreground text-xs">
+                                      No active sequence for this record type — create one in Marketing → Sequences.
+                                    </p>
+                                  ) : (
+                                    <Select value={f.value ?? ""} onValueChange={f.onChange}>
+                                      <SelectTrigger className="h-8 bg-background text-sm">
+                                        <SelectValue placeholder="Choose a sequence…" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {options.map((x) => (
+                                          <SelectItem key={x.id} value={x.id}>
+                                            {x.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  );
+                                }}
+                              />
+                            </F>
+                          )}
+                          <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
+                            💡 A record already in the sequence, without an email address, or unsubscribed is skipped
+                            rather than logged as a failure.
                           </p>
                         </div>
                       )}

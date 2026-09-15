@@ -40,6 +40,7 @@ const TYPE_ICONS: Record<string, string> = {
   sla_warning: "⏳",
   sla_breach: "⏰",
   contract_renewal: "📄",
+  sequence_reply: "↩️",
   system: "ℹ️",
 };
 

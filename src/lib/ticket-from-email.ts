@@ -20,6 +20,8 @@ import {
   stripHtmlQuotesAndSignature,
   stripPlainTextQuotes,
 } from "@/lib/email-parser";
+import { tolerateUnmigrated } from "@/lib/schema-ready";
+import { stopOnReply } from "@/lib/sequence-runner";
 import { getStorage, newStorageKey } from "@/lib/storage";
 import { runWithTenant } from "@/lib/tenant-context";
 import { resolveTenantByProbe, type TenantDb } from "@/lib/tenant-resolve";
@@ -238,6 +240,15 @@ export async function processInboundEmail(payload: InboundEmailPayload): Promise
     return { ok: false, skipped: "unknown_workspace" };
   }
   const { db, tenantId } = resolved;
+
+  // ⚠️ Before anything that can return early: an empty or quoted-only reply is
+  // still an answer, and the automatic emails must stop for it. Never allowed to
+  // fail the delivery of the message itself.
+  if (senderEmail) {
+    await runWithTenant(tenantId, () => tolerateUnmigrated("sequences", () => stopOnReply(db, senderEmail), 0)).catch(
+      (err) => console.error("[inbound-email] could not stop sequences on reply:", err),
+    );
+  }
 
   // Clean body: prefer HTML, fall back to plain text
   let messageContent: string;

@@ -1518,7 +1518,8 @@
       "workload": "Workload",
       "territories": "Territories",
       "territoryReport": "By territory",
-      "contracts": "Contracts"
+      "contracts": "Contracts",
+      "sequences": "Sequences"
     },
     "quickCreate": {
       "title": "Quick Create",
@@ -3537,6 +3538,10 @@
       "contract_renewal": {
         "label": "A contract of mine reaches its notice period",
         "help": "The day the window to renew or cancel opens."
+      },
+      "sequence_reply": {
+        "label": "Someone replies to a sequence",
+        "help": "A person one of your follow-up sequences writes to has replied; the automatic emails have stopped."
       }
     },
     "noServiceWorker": "No service worker is running on this page, so nothing can receive a notification. Reload the page; if it persists, the app is running in development mode, where the worker is deliberately not registered.",
@@ -3622,5 +3627,79 @@
     "deleteTitle": "Delete this contract?",
     "deleteDescription": "It also disappears from recurring revenue. For a customer who cancelled, set the status to Cancelled instead: it stays in the history.",
     "footnote": "Status computed on {on} from the contract dates. Its owner is notified a month before the notice deadline. Amounts are added without currency conversion."
+  },
+  "sequences": {
+    "title": "Follow-up sequences",
+    "subtitle": "Automatic emails days apart, which stop when the recipient replies or unsubscribes.",
+    "newSequence": "New sequence",
+    "back": "All sequences",
+    "empty": "No sequences yet. Create one, then enroll leads or contacts from their page or with an automation rule.",
+    "noReplyDetectionTitle": "Replies are not detected",
+    "noReplyDetectionBody": "This installation does not receive inbound email, so a sequence cannot tell that the recipient replied and keeps writing to them. It still stops on unsubscribe, bounce, lead conversion and by hand. To detect replies, configure the inbound email webhook (RESEND_INBOUND_WEBHOOK_SECRET).",
+    "name": "Name",
+    "namePlaceholder": "e.g. Welcome new leads",
+    "for": "For",
+    "entity": {
+      "lead": "Leads",
+      "contact": "Contacts"
+    },
+    "steps": "Steps",
+    "inProgress": "In progress",
+    "completed": "Completed",
+    "replied": "Replied",
+    "stoppedOther": "Stopped",
+    "paused": "paused",
+    "description": "Description",
+    "activeLabel": "Active: sends steps when they are due",
+    "pausedLabel": "Paused: nothing is sent, enrollments keep their place",
+    "stepN": "Step {n}",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "removeStep": "Remove step",
+    "waitFirst": "Send after enrolling, waiting",
+    "waitNext": "Send after the previous step, waiting",
+    "days": "days",
+    "fromTemplate": "Load from template…",
+    "subject": "Subject",
+    "body": "Text",
+    "placeholdersHint": "You can use {examples} and the other template placeholders. The unsubscribe link is added at the bottom if you leave it out.",
+    "addStep": "Add step",
+    "delete": "Delete sequence",
+    "deleteConfirm": "Delete this sequence? Its enrollments are stopped and queued emails cancelled.",
+    "deleted": "Sequence deleted.",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Sequence saved.",
+    "failed": "Something went wrong.",
+    "enrolled": "{count, plural, one {# enrolled} other {# enrolled}}",
+    "noEnrollments": "Nobody enrolled yet.",
+    "recipient": "Recipient",
+    "status": "Status",
+    "progress": "Steps sent",
+    "lastSent": "Last sent",
+    "nextSend": "Next send",
+    "stop": "Stop",
+    "stoppedToast": "Enrollment stopped.",
+    "statuses": {
+      "active": "In progress",
+      "completed": "Completed",
+      "stopped": "Stopped"
+    },
+    "reasons": {
+      "replied": "Replied",
+      "unsubscribed": "Unsubscribed",
+      "bounced": "Address bounces",
+      "converted": "Lead converted",
+      "missing_email": "No email",
+      "record_deleted": "Record deleted",
+      "email_changed": "Email changed",
+      "manual": "Stopped by hand"
+    },
+    "sequenceButton": "Sequence",
+    "noSequencesFor": "No active sequences for this kind of record.",
+    "chooseSequence": "Choose a sequence…",
+    "enroll": "Enroll",
+    "enrolledToast": "Enrolled in the sequence.",
+    "close": "Close"
   }
 }

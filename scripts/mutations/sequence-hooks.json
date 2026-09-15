@@ -1,0 +1,44 @@
+[
+  {
+    "file": "src/app/api/cron/email-worker/route.ts",
+    "description": "⚠️⚠️ il worker non fa avanzare le sequenze: nessun passo parte mai",
+    "find": "  const sequences = await tolerateUnmigrated(\"sequences\", () => advanceSequences(db, now), null);",
+    "replace": "  const sequences = null;"
+  },
+  {
+    "file": "src/app/api/cron/email-worker/route.ts",
+    "description": "⚠️⚠️ la coda non registra l'id del messaggio: i rimbalzi delle sequenze non trovano il workspace",
+    "find": "          .set({ status: \"sent\", processedAt: now, messageId: result.messageId ?? null, lastError: null })",
+    "replace": "          .set({ status: \"sent\", processedAt: now, lastError: null })"
+  },
+  {
+    "file": "src/lib/ticket-from-email.ts",
+    "description": "⚠️⚠️ una risposta non ferma la sequenza: il cliente che ha risposto continua a ricevere email automatiche",
+    "find": "    await runWithTenant(tenantId, () => tolerateUnmigrated(\"sequences\", () => stopOnReply(db, senderEmail), 0)).catch(",
+    "replace": "    await Promise.resolve().catch("
+  },
+  {
+    "file": "src/app/api/webhooks/resend/route.ts",
+    "description": "⚠️⚠️ il rimbalzo non ferma le sequenze",
+    "find": "          // Nothing more from any sequence to an address that does not exist.\n          await tolerateUnmigrated(\"sequences\", () => stopForAddress(db, email, \"bounced\"), 0);",
+    "replace": ""
+  },
+  {
+    "file": "src/app/api/webhooks/resend/route.ts",
+    "description": "⚠️⚠️ il rimbalzo di un'email non di campagna viene ignorato",
+    "find": "      () => tenantDb.select({ id: emailJobs.id }).from(emailJobs).where(eq(emailJobs.messageId, messageId)).limit(1),",
+    "replace": "      async () => [],"
+  },
+  {
+    "file": "src/app/api/unsubscribe/route.ts",
+    "description": "⚠️⚠️ il link di disiscrizione di una sequenza non viene riconosciuto",
+    "find": "  if (logId.startsWith(SEQUENCE_TOKEN_PREFIX)) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/app/api/unsubscribe/route.ts",
+    "description": "⚠️ disiscriversi da una campagna non ferma le sequenze",
+    "find": "    await tolerateUnmigrated(\"sequences\", () => stopForAddress(db, email, \"unsubscribed\"), 0);",
+    "replace": ""
+  }
+]

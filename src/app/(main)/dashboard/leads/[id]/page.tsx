@@ -35,6 +35,7 @@ import { auth } from "@/auth";
 import { ActivityTimeline } from "@/components/crm/activity-timeline";
 import { CustomFieldsPanel } from "@/components/crm/custom-fields-panel";
 import { DocumentPanel } from "@/components/crm/document-panel";
+import { EnrollInSequence } from "@/components/crm/enroll-in-sequence";
 import { FormattedDate } from "@/components/crm/formatted-date";
 import { QuickTaskForm } from "@/components/crm/quick-task-form";
 import { RecordVisit } from "@/components/crm/record-visit";
@@ -236,6 +237,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </Button>
               </LeadModal>
               <SendEmailModal entity={lead} templates={templates} ownerId={userId} />
+              {!lead.isConverted && <EnrollInSequence entity="lead" recordId={lead.id} />}
               {!lead.isConverted && (
                 <ConvertLeadButton
                   leadId={lead.id}

@@ -5,7 +5,7 @@
  * ⚠️ Not every notification should push. The product writes twelve kinds, and a
  * push for each one — every chat message, every note — is how a person ends up
  * turning the whole feature off, at which point the SLA breach at 3am does not
- * reach them either. So the catalogue below is opinionated: the five that mean
+ * reach them either. So the catalogue below is opinionated: the six that mean
  * "something now needs you" default to on, the rest default to off, and all of
  * them can be changed.
  *
@@ -21,6 +21,7 @@ export const PUSH_TYPES = {
   sla_breach: { defaultOn: true },
   sla_warning: { defaultOn: true },
   contract_renewal: { defaultOn: true },
+  sequence_reply: { defaultOn: true },
   deal_won: { defaultOn: false },
   quote_approval_requested: { defaultOn: false },
   quote_approved: { defaultOn: false },

@@ -1,6 +1,7 @@
 import {
   boolean,
   date,
+  index,
   integer,
   jsonb,
   numeric,
@@ -9,6 +10,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 import type { AdapterAccountType } from "next-auth/adapters";
 
@@ -383,7 +385,7 @@ export const orderItems = pgTable("order_item", {
   totalPrice: numeric("total_price", { precision: 12, scale: 2 }).notNull(),
 });
 
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 export const pipelineStages = pgTable("pipeline_stage", {
   id: text("id")
@@ -653,6 +655,13 @@ export const emailJobs = pgTable("email_job", {
   lastError: text("last_error"),
   scheduledAt: timestamp("scheduled_at", { mode: "date" }).defaultNow(),
   processedAt: timestamp("processed_at", { mode: "date" }),
+  // The follow-up sequence enrollment this email belongs to, so stopping the
+  // enrollment can cancel an email already queued for it. FK added in migration 0021.
+  sequenceEnrollmentId: text("sequence_enrollment_id"),
+  // The provider's id for the sent message. Campaign logs carried it and nothing
+  // else did, so a bounce on any other email named a message no workspace
+  // recognised, and the dead address was mailed again.
+  messageId: text("message_id"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
@@ -850,6 +859,92 @@ export const documentCounters = pgTable("document_counter", {
   lastValue: integer("last_value").notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+// --- FOLLOW-UP SEQUENCES ---
+
+/**
+ * A follow-up sequence: steps of "wait so many days, then send this", for leads
+ * or for contacts. The rules are in src/lib/sequence-plan.ts, the sending in
+ * src/lib/sequence-runner.ts.
+ */
+export const emailSequences = pgTable("email_sequence", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  description: text("description"),
+  entityType: text("entity_type").notNull(), // lead | contact
+  // Paused sequences keep their enrollments where they are and send nothing.
+  isActive: boolean("is_active").default(true).notNull(),
+  ownerId: text("owner_id").references(() => users.id, { onDelete: "set null" }),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/**
+ * One step. The text is the step's own, copied from a template when it was
+ * written: a template edited or deleted later must not change or break an email
+ * that is already on its way to somebody.
+ */
+export const emailSequenceSteps = pgTable(
+  "email_sequence_step",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    sequenceId: text("sequence_id")
+      .notNull()
+      .references(() => emailSequences.id, { onDelete: "cascade" }),
+    position: integer("position").notNull(),
+    delayDays: integer("delay_days").default(0).notNull(),
+    subject: text("subject").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [unique("email_sequence_step_position_uniq").on(t.sequenceId, t.position)],
+);
+
+/**
+ * One person walking through one sequence.
+ *
+ * ⚠️⚠️ At most one *active* enrollment per sequence and address, enforced by a
+ * partial unique index rather than by a check before inserting: two people — or an
+ * automation and a person — enrolling the same lead at the same moment would both
+ * pass a check, and the lead would get every email twice.
+ */
+export const emailSequenceEnrollments = pgTable(
+  "email_sequence_enrollment",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    sequenceId: text("sequence_id")
+      .notNull()
+      .references(() => emailSequences.id, { onDelete: "cascade" }),
+    leadId: text("lead_id").references(() => leads.id, { onDelete: "cascade" }),
+    contactId: text("contact_id").references(() => contacts.id, { onDelete: "cascade" }),
+    // Lower-cased; what replies and unsubscribes are matched on.
+    email: text("email").notNull(),
+    status: text("status").default("active").notNull(), // active | completed | stopped
+    stopReason: text("stop_reason"),
+    // Index into the steps of the next one to send.
+    nextStep: integer("next_step").default(0).notNull(),
+    nextSendAt: timestamp("next_send_at", { mode: "date" }),
+    lastSentAt: timestamp("last_sent_at", { mode: "date" }),
+    // Who hears about a reply: whoever owns the record, or the sequence's owner.
+    ownerId: text("owner_id"),
+    enrolledBy: text("enrolled_by"),
+    enrolledAt: timestamp("enrolled_at", { mode: "date" }).defaultNow().notNull(),
+    stoppedAt: timestamp("stopped_at", { mode: "date" }),
+    completedAt: timestamp("completed_at", { mode: "date" }),
+  },
+  (t) => [
+    uniqueIndex("email_sequence_enrollment_active_uniq").on(t.sequenceId, t.email).where(sql`status = 'active'`),
+    index("email_sequence_enrollment_due_idx").on(t.status, t.nextSendAt),
+    index("email_sequence_enrollment_email_idx").on(t.email),
+  ],
+);
 
 // --- CONTRACTS ---
 

@@ -33,6 +33,7 @@ import {
   contacts,
   contracts,
   deals,
+  emailSequenceEnrollments,
   leads,
   orders,
   quotes,
@@ -74,6 +75,9 @@ export const CONTACT_CHILDREN: MergeChild[] = [
   { table: tasks, field: "contactId" },
   { table: campaignLogs, field: "contactId" },
   { table: contracts, field: "contactId" },
+  // Safe to carry: the one-active-enrollment index is on the address, not the record,
+  // and an enrollment whose address no longer matches its record stops at its next send.
+  { table: emailSequenceEnrollments, field: "contactId" },
 ];
 
 export const LEAD_CHILDREN: MergeChild[] = [
@@ -82,6 +86,7 @@ export const LEAD_CHILDREN: MergeChild[] = [
   { table: activities, field: "leadId" },
   { table: tasks, field: "leadId" },
   { table: campaignLogs, field: "leadId" },
+  { table: emailSequenceEnrollments, field: "leadId" },
 ];
 
 /** The three merges, for anything that wants to check all of them at once. */

@@ -75,6 +75,7 @@ export const CAPABILITIES = {
   "order:delete": "admin",
   "contract:write": "editor",
   "contract:delete": "admin",
+  "sequence:manage": "editor",
   "product:manage": "admin",
 
   // Support
