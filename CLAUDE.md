@@ -490,6 +490,10 @@ statements before it applied and records nothing — and re-running repeats them
 COLUMN`, `CREATE TABLE IF NOT EXISTS` and guarded `UPDATE`s are safe; a destructive or
 order-dependent statement is not.
 
+`src/db/migrations-rerun.test.ts` holds that line: it applies every embedded
+migration to a real Postgres (PGlite, in-process) and then runs each one a second
+time. `0002_odd_ulik` predates the rule and is the one named exception.
+
 `npm test` fails when the generated file and the folder disagree, because shipping code
 whose columns were never created is exactly the failure that looks like a working deploy.
 
