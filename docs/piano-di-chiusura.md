@@ -30,6 +30,7 @@ Ogni riga è verificata con suite, build e, dove indicato, mutazioni intercettat
 | — | **Fuori piano:** il contatore messaggi di elenco e kanban ticket valeva sempre al massimo 1, perché la query carica un solo messaggio per l'anteprima. | `fda6ad2` |
 | O6 | Il provider Google era registrato con le variabili vuote. Ora solo se configurato. L'unico pulsante Google era in un modulo di login che nessuno importava, eliminato. | `7cfcc00` |
 | O4 | La chiave cifra tre campi, tutti nel database di piattaforma. La rotazione aveva un buco: in qualunque ordine, per un momento la produzione non avrebbe letto nessun workspace. Ora la decifratura accetta `PLATFORM_ENCRYPTION_KEY_PREVIOUS`, e lo script `npm run rotate:platform-key` parte in prova a secco, blocca tutto se un solo valore è illeggibile, fa il backup dei testi cifrati, scrive solo valori non cambiati nel frattempo, rilegge e verifica, e ha il ripristino. **Non è stato eseguito contro un database**: l'unico configurato è la produzione. Verificati i cinque percorsi di errore con un indirizzo inesistente, e l'SQL della scrittura condizionata. 14 + 8 + 3 test, 12 mutazioni. | `cb8ffe3` · commit successivo |
+| S3 | **Fuori piano, trovata durante O4.** La chiave Resend e la password SMTP di ogni workspace erano in chiaro nel suo database. Ora si cifrano al salvataggio; la lettura accetta entrambe le forme, così i workspace esistenti continuano a inviare il giorno del rilascio; e una riga ancora in chiaro viene cifrata al primo invio, con scrittura condizionata. La maschera rimandata dal modulo non sovrascrive più una chiave vera. Guardia sui due punti reali di salvataggio e lettura. 12 test, 5 mutazioni. | commit successivo |
 
 ### Prossimi passi, in quest'ordine
 
@@ -37,12 +38,11 @@ Nessuno richiede decisioni. Ciascuno si chiude con test, mutazioni dove un error
 
 | # | ID | Attività | Perché in questa posizione |
 |---|---|---|---|
-| 1 | S3 | **Nuova.** Cifrare le credenziali email del workspace | Trovata durante O4: la chiave Resend e la password SMTP di ogni cliente sono salvate in chiaro nel suo database, mentre quelle di piattaforma sono cifrate. Sicurezza prima delle funzionalità. Lo script di rotazione copre già quei campi. |
-| 2 | L1 | Assegnazione automatica dei lead a rotazione | Autonoma, e serve a L5. |
-| 3 | L4 | Territori | Autonoma, e serve a L5. |
-| 4 | L5 | Assegnazione per regola | Dipende da L1 e L4, entrambe prima. |
-| 5 | L7 | Contratti e rinnovi | Autonoma. |
-| 6 | L6 | Sequenze di follow-up | La più grande del gruppo, per ultima. |
+| 1 | L1 | Assegnazione automatica dei lead a rotazione | Autonoma, e serve a L5. |
+| 2 | L4 | Territori | Autonoma, e serve a L5. |
+| 3 | L5 | Assegnazione per regola | Dipende da L1 e L4, entrambe prima. |
+| 4 | L7 | Contratti e rinnovi | Autonoma. |
+| 5 | L6 | Sequenze di follow-up | La più grande del gruppo, per ultima. |
 
 ### Da fare sulla dashboard Cloudflare
 

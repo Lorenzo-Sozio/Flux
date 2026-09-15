@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 
 import { emailSettings } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
+import { changeFor } from "@/lib/email-credentials";
 import { type EmailConfig, testEmailConfig } from "@/lib/email-provider";
 import { chooseTestTarget } from "@/lib/email-test-target";
 import { getDb } from "@/lib/tenant-context";
@@ -68,12 +69,19 @@ export async function saveEmailSettings(data: {
     smtpSecure: data.smtpSecure ?? false,
   };
 
-  // Only persist secrets when the user typed a real value (not the masked placeholder)
+  // ⚠️⚠️ Encrypted before they are written. They used to be stored exactly as typed,
+  // so anybody who could read this workspace's database read a live key that sends
+  // mail as the customer. `changeFor` also keeps the mask the screen sends back from
+  // overwriting a working key — see src/lib/email-credentials.ts.
   const secrets: Record<string, string | null> = {};
-  if (data.resendApiKey && !data.resendApiKey.includes("•")) secrets.resendApiKey = data.resendApiKey;
-  if (data.smtpPassword && !data.smtpPassword.includes("•")) secrets.smtpPassword = data.smtpPassword;
-  if (data.smtpPassword === "") secrets.smtpPassword = null;
-  if (data.resendApiKey === "") secrets.resendApiKey = null;
+  for (const [field, submitted] of [
+    ["resendApiKey", data.resendApiKey],
+    ["smtpPassword", data.smtpPassword],
+  ] as const) {
+    const change = changeFor(submitted);
+    if (change.kind === "set") secrets[field] = change.stored;
+    if (change.kind === "clear") secrets[field] = null;
+  }
 
   const payload = { ...base, ...secrets };
 

@@ -4,8 +4,11 @@
  * Config is loaded from DB (email_settings table), falling back to env vars.
  */
 
+import { and, eq } from "drizzle-orm";
+
 import { platformDb } from "@/db";
 import { emailSettings } from "@/db/schema";
+import { openSecret, sealIfPlaintext } from "@/lib/email-credentials";
 import { getDb } from "@/lib/tenant-context";
 import { tryDecryptSecret } from "@/lib/tenant-db";
 
@@ -46,18 +49,52 @@ export interface SendResult {
 
 // ─── Config loader ────────────────────────────────────────────────────────────
 
+/**
+ * Encrypts a workspace's email credentials that are still stored as typed.
+ *
+ * Each column is written only while it still holds the plaintext that was read.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: the tenant db handle from getDb
+async function sealPlaintextCredentials(
+  db: any,
+  row: { id: string; resendApiKey: string | null; smtpPassword: string | null },
+) {
+  const resend = sealIfPlaintext(row.resendApiKey);
+  if (resend && row.resendApiKey) {
+    await db
+      .update(emailSettings)
+      .set({ resendApiKey: resend })
+      .where(and(eq(emailSettings.id, row.id), eq(emailSettings.resendApiKey, row.resendApiKey)));
+  }
+  const smtp = sealIfPlaintext(row.smtpPassword);
+  if (smtp && row.smtpPassword) {
+    await db
+      .update(emailSettings)
+      .set({ smtpPassword: smtp })
+      .where(and(eq(emailSettings.id, row.id), eq(emailSettings.smtpPassword, row.smtpPassword)));
+  }
+}
+
 export async function getEmailConfig(): Promise<EmailConfig> {
   try {
     const db = await getDb(); // throws when no tenant context (e.g. admin panel)
     const [row] = await db.select().from(emailSettings).limit(1);
     if (row) {
+      // A workspace still holding plaintext credentials gets them encrypted now, the
+      // first time it sends. Conditional on the value just read, so a key saved from
+      // the settings screen in the same instant is never overwritten; and never
+      // allowed to stop the email this call is loading credentials for.
+      void sealPlaintextCredentials(db, row).catch((e) => {
+        console.error("[email-provider] Could not encrypt stored credentials:", e);
+      });
       return {
         provider: (row.provider as "resend" | "smtp") ?? "resend",
-        resendApiKey: row.resendApiKey,
+        // Either shape: encrypted, or plaintext from before encryption existed.
+        resendApiKey: openSecret(row.resendApiKey),
         smtpHost: row.smtpHost,
         smtpPort: row.smtpPort,
         smtpUser: row.smtpUser,
-        smtpPassword: row.smtpPassword,
+        smtpPassword: openSecret(row.smtpPassword),
         smtpSecure: row.smtpSecure,
         fromEmail: row.fromEmail,
         fromName: row.fromName,
