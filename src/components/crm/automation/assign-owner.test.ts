@@ -30,8 +30,9 @@ function table(name: string, cols: string[]) {
   return Object.fromEntries([["__table", name], ...cols.map((c) => [c, `${name}.${c}`])]);
 }
 vi.mock("@/db/schema", () => {
-  const t = (name: string) => table(name, ["id", "ownerId", "updatedAt"]);
+  const t = (name: string) => table(name, ["id", "ownerId", "updatedAt", "country", "state", "zipCode"]);
   return {
+    territories: table("territories", ["id"]),
     companies: t("companies"),
     contacts: t("contacts"),
     deals: t("deals"),
@@ -68,6 +69,9 @@ function fakeDb() {
     select: () => ({
       from: (t: { __table: string }) => ({
         where: async (cond: Cond) => (rows[t.__table] ?? []).filter((r) => matches(r, cond)).map((r) => ({ ...r })),
+        // A select with no WHERE is awaited straight after from().
+        // biome-ignore lint/suspicious/noThenProperty: mimics drizzle's thenable query builder
+        then: (resolve: (v: Row[]) => unknown) => resolve((rows[t.__table] ?? []).map((r) => ({ ...r }))),
       }),
     }),
     update: (t: { __table: string }) => ({
@@ -86,6 +90,7 @@ function fakeDb() {
 }
 
 let turn = 0;
+const turnsByScope = new Map<string, number>();
 // Runs when the rule takes its turn: after it has read the record, before it writes.
 let betweenReadAndWrite: (() => void) | null = null;
 const scopes: string[] = [];
@@ -102,7 +107,12 @@ vi.mock("@/lib/document-counter", () => ({
   nextInSequence: async (_db: unknown, scope: string) => {
     scopes.push(scope);
     betweenReadAndWrite?.();
-    return ++turn;
+    // One counter per sequence, like the real table: a route's turns do not move the
+    // general rotation's.
+    turn++;
+    const next = (turnsByScope.get(scope) ?? 0) + 1;
+    turnsByScope.set(scope, next);
+    return next;
   },
 }));
 vi.mock("@/lib/notify", () => ({
@@ -124,15 +134,18 @@ const { ActionDispatcher } = await import("./action-dispatcher");
 
 const TEAM = ["anna", "bruno", "carla"];
 
-function assign(params: Partial<{ userIds: string[]; overwrite: boolean }> = {}) {
+type Route = { id: string; territoryIds: string[]; sources: string[]; userIds: string[] };
+
+// The shape the engine hands the dispatcher: parsed, with every default filled in.
+function assign(params: Partial<{ userIds: string[]; overwrite: boolean; routes: Route[] }> = {}) {
   return {
     type: "assign_owner" as const,
-    params: { strategy: "round_robin" as const, userIds: TEAM, overwrite: false, ...params },
+    params: { strategy: "round_robin" as const, routes: [] as Route[], userIds: TEAM, overwrite: false, ...params },
   };
 }
 
-function lead(id: string, ownerId: string | null = null) {
-  rows.leads.push({ id, ownerId, firstName: "Mario", lastName: "Rossi" });
+function lead(id: string, ownerId: string | null = null, extra: Row = {}) {
+  rows.leads.push({ id, ownerId, firstName: "Mario", lastName: "Rossi", ...extra });
   return { entityType: "lead", entityId: id, event: "onCreate" as const, newData: {}, currentUserId: "u0" };
 }
 
@@ -153,12 +166,16 @@ beforeEach(() => {
   for (const k of Object.keys(rows)) delete rows[k];
   rows.leads = [];
   rows.deals = [];
+  rows.companies = [];
+  rows.contacts = [];
+  rows.territories = [];
   rows.tenantMembers = TEAM.map((userId) => ({ tenantId: "t1", userId }));
   writes.length = 0;
   scopes.length = 0;
   notified.length = 0;
   cascaded.length = 0;
   turn = 0;
+  turnsByScope.clear();
   betweenReadAndWrite = null;
   tenantId = "t1";
 });
@@ -281,6 +298,100 @@ describe("saving a rule that assigns", () => {
   it("does not reassign owned records unless told to", async () => {
     const { ActionSchema } = await import("./types");
     const parsed = ActionSchema.parse({ type: "assign_owner", params: { userIds: ["anna"] } });
-    expect(parsed.params).toEqual({ strategy: "round_robin", userIds: ["anna"], overwrite: false });
+    expect(parsed.params).toEqual({ strategy: "round_robin", routes: [], userIds: ["anna"], overwrite: false });
+  });
+});
+
+describe("routing by territory and source", () => {
+  const LOMBARDIA = { id: "lom", name: "Lombardia", countries: ["IT"], states: ["Lombardia"], postalPrefixes: [] };
+  const nord: Route = { id: "nord", territoryIds: ["lom"], sources: [], userIds: ["carla", "dario"] };
+  const web: Route = { id: "web", territoryIds: [], sources: ["website"], userIds: ["elena"] };
+
+  beforeEach(() => {
+    rows.territories = [LOMBARDIA];
+    rows.tenantMembers = ["anna", "bruno", "carla", "dario", "elena"].map((userId) => ({ tenantId: "t1", userId }));
+  });
+
+  it("⚠️⚠️ gives a lead in the route's territory to the route's people, in their own turn", async () => {
+    await run(assign({ routes: [nord] }), lead("l1", null, { country: "Italia", state: "MI" }), inRule());
+    await run(assign({ routes: [nord] }), lead("l2", null, { country: "IT", state: "Bergamo" }), inRule());
+    expect([ownerOf("l1"), ownerOf("l2")]).toEqual(["carla", "dario"]);
+    expect(scopes).toEqual(["round-robin:rule-1:nord", "round-robin:rule-1:nord"]);
+  });
+
+  it("⚠️⚠️ gives everything else to the general rotation, whose turn is untouched by the route", async () => {
+    await run(assign({ routes: [nord] }), lead("l1", null, { country: "IT", state: "MI" }), inRule());
+    await run(assign({ routes: [nord] }), lead("l2", null, { country: "IT", state: "NA" }), inRule());
+    expect(ownerOf("l2")).toBe("anna");
+    expect(scopes.at(-1)).toBe("round-robin:rule-1");
+  });
+
+  it("routes by source", async () => {
+    await run(assign({ routes: [web] }), lead("l1", null, { source: "Website" }), inRule());
+    expect(ownerOf("l1")).toBe("elena");
+  });
+
+  it("⚠️⚠️ uses the first matching route, in the order written", async () => {
+    const place = { country: "IT", state: "MI", source: "website" };
+    await run(assign({ routes: [web, nord] }), lead("l1", null, place), inRule());
+    await run(assign({ routes: [nord, web] }), lead("l2", null, place), inRule("rule-2"));
+    expect([ownerOf("l1"), ownerOf("l2")]).toEqual(["elena", "carla"]);
+  });
+
+  it("⚠️⚠️ falls through when everyone in the matching route has left", async () => {
+    rows.tenantMembers = [{ tenantId: "t1", userId: "anna" }];
+    await run(assign({ routes: [nord] }), lead("l1", null, { country: "IT", state: "MI" }), inRule());
+    expect(ownerOf("l1")).toBe("anna");
+    expect(scopes).toEqual(["round-robin:rule-1"]);
+  });
+
+  it("⚠️ leaves a record no route takes alone when there is no general rotation, using no turn", async () => {
+    await run(assign({ routes: [nord], userIds: [] }), lead("l1", null, { country: "FR" }), inRule());
+    expect(ownerOf("l1")).toBeNull();
+    expect(scopes).toHaveLength(0);
+    expect(notified).toHaveLength(0);
+  });
+
+  it("⚠️ places a deal by its company's address", async () => {
+    rows.companies.push({ id: "c1", country: "Italia", state: "MI" });
+    rows.deals.push({ id: "d1", ownerId: null, companyId: "c1", contactId: null });
+    await run(
+      assign({ routes: [nord] }),
+      { entityType: "deal", entityId: "d1", event: "onCreate", newData: {} },
+      inRule(),
+    );
+    expect(rows.deals[0].ownerId).toBe("carla");
+  });
+
+  it("places a deal by its contact when its company has no address", async () => {
+    rows.companies.push({ id: "c1", country: null, state: null });
+    rows.contacts.push({ id: "p1", country: "IT", state: "Varese" });
+    rows.deals.push({ id: "d1", ownerId: null, companyId: "c1", contactId: "p1" });
+    await run(
+      assign({ routes: [nord] }),
+      { entityType: "deal", entityId: "d1", event: "onCreate", newData: {} },
+      inRule(),
+    );
+    expect(rows.deals[0].ownerId).toBe("carla");
+  });
+});
+
+describe("saving routes", () => {
+  it("⚠️ refuses a route with no territory and no source", async () => {
+    const { ActionSchema } = await import("./types");
+    const route = { id: "r", territoryIds: [], sources: [], userIds: ["anna"] };
+    expect(ActionSchema.safeParse(assign({ routes: [route] })).success).toBe(false);
+  });
+
+  it("⚠️ refuses two routes with one id, which would share one rotation", async () => {
+    const { ActionSchema } = await import("./types");
+    const route = { id: "r", territoryIds: ["lom"], sources: [], userIds: ["anna"] };
+    expect(ActionSchema.safeParse(assign({ routes: [route, { ...route }] })).success).toBe(false);
+  });
+
+  it("accepts routes with no general rotation", async () => {
+    const { ActionSchema } = await import("./types");
+    const route = { id: "r", territoryIds: ["lom"], sources: [], userIds: ["anna"] };
+    expect(ActionSchema.safeParse(assign({ routes: [route], userIds: [] })).success).toBe(true);
   });
 });

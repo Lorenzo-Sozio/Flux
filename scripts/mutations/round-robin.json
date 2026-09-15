@@ -32,19 +32,19 @@
   {
     "file": "src/components/crm/automation/action-dispatcher.ts",
     "description": "⚠️⚠️ l'appartenenza non filtra per workspace: un membro di un altro cliente riceve il lead",
-    "find": "      .where(and(eq(tenantMembers.tenantId, tenantId), inArray(tenantMembers.userId, userIds)));",
-    "replace": "      .where(inArray(tenantMembers.userId, userIds));"
+    "find": "      .where(and(eq(tenantMembers.tenantId, tenantId), inArray(tenantMembers.userId, everyone)));",
+    "replace": "      .where(inArray(tenantMembers.userId, everyone));"
   },
   {
     "file": "src/components/crm/automation/action-dispatcher.ts",
     "description": "⚠️⚠️ la rotazione ignora chi e' ancora membro: il lead va a chi se n'e' andato",
-    "find": "    const eligible = eligibleInOrder(userIds, new Set(members.map((m) => m.userId)));",
-    "replace": "    const eligible = eligibleInOrder(userIds, new Set(userIds));"
+    "find": "      const eligible = eligibleInOrder(candidate.userIds, memberIds);",
+    "replace": "      const eligible = eligibleInOrder(candidate.userIds, new Set(candidate.userIds));"
   },
   {
     "file": "src/components/crm/automation/action-dispatcher.ts",
     "description": "⚠️⚠️ un record gia' assegnato viene tolto a chi lo aveva",
-    "find": "    if ((before as { ownerId?: string | null }).ownerId && !overwrite) return;",
+    "find": "    if (record.ownerId && !overwrite) return;",
     "replace": ""
   },
   {
@@ -68,7 +68,79 @@
   {
     "file": "src/components/crm/automation/types.ts",
     "description": "⚠️ si salva una rotazione vuota: la regola fallisce a ogni lead",
-    "find": "    userIds: z.array(z.string().min(1)).min(1).max(50),",
-    "replace": "    userIds: z.array(z.string().min(1)).max(50),"
+    "find": "    .refine((p) => p.userIds.length > 0 || p.routes.length > 0, {",
+    "replace": "    .refine((p) => true || p.userIds.length > 0 || p.routes.length > 0, {"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ tutti gli instradamenti condividono la rotazione generale: i turni di un gruppo spostano quelli dell'altro",
+    "find": "    const turn = await nextInSequence(db, routeScope(ruleId, chosen.routeId), sql`1`);",
+    "replace": "    const turn = await nextInSequence(db, routeScope(ruleId, null), sql`1`);"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ un gruppo senza piu' membri si prende il record invece di passarlo al successivo",
+    "find": "      if (eligible.length) {",
+    "replace": "      if (true) {"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️ un record che nessun instradamento prende, senza rotazione generale, diventa un errore nel registro",
+    "find": "    if (candidates.length === 0) return;",
+    "replace": ""
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ la trattativa viene collocata dai propri campi, che non contengono un indirizzo: nessun instradamento la prende",
+    "find": "    const place = context.entityType === \"deal\" ? await this.placeOfDeal(db, record) : (record as Located);",
+    "replace": "    const place = record as Located;"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ i territori non vengono caricati: nessun instradamento per territorio prende mai niente",
+    "find": "    const territoryRows = routes.some((r) => r.territoryIds.length)",
+    "replace": "    const territoryRows = false"
+  },
+  {
+    "file": "src/lib/assignment-routing.ts",
+    "description": "⚠️⚠️ un instradamento senza criteri prende tutti i record",
+    "find": "  if (route.territoryIds.length === 0 && route.sources.length === 0) return false;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/assignment-routing.ts",
+    "description": "⚠️⚠️ il territorio dell'instradamento viene ignorato",
+    "find": "    if (!listed.some((t) => covers(t, record))) return false;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/assignment-routing.ts",
+    "description": "⚠️ la fonte viene confrontata senza normalizzare",
+    "find": "route.sources.some((s) => fold(s) === source)",
+    "replace": "route.sources.some((s) => s === record.source)"
+  },
+  {
+    "file": "src/lib/assignment-routing.ts",
+    "description": "⚠️⚠️ la rotazione generale non viene mai usata",
+    "find": "  if (general.length) out.push({ routeId: null, userIds: [...general] });",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/assignment-routing.ts",
+    "description": "⚠️⚠️ le regole scritte prima degli instradamenti ripartono da capo con la rotazione",
+    "find": "  return routeId === null ? roundRobinScope(ruleId) : `${roundRobinScope(ruleId)}:${routeId}`;",
+    "replace": "  return `${roundRobinScope(ruleId)}:${routeId ?? \"general\"}`;"
+  },
+  {
+    "file": "src/components/crm/automation/types.ts",
+    "description": "⚠️ si salva un instradamento senza territori ne' fonti",
+    "find": "  .refine((r) => r.territoryIds.length + r.sources.length > 0, {",
+    "replace": "  .refine((r) => true || r.territoryIds.length + r.sources.length > 0, {"
+  },
+  {
+    "file": "src/components/crm/automation/types.ts",
+    "description": "⚠️ si salvano due instradamenti con lo stesso id, che condividerebbero la rotazione",
+    "find": "    .refine((p) => new Set(p.routes.map((r) => r.id)).size === p.routes.length, {",
+    "replace": "    .refine((p) => true || new Set(p.routes.map((r) => r.id)).size === p.routes.length, {"
   }
 ]

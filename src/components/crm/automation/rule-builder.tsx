@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
+  ArrowDown,
+  ArrowUp,
   Bell,
   CheckSquare,
   GitMergeIcon,
@@ -23,6 +25,7 @@ import { toast } from "sonner";
 import { createAutomationRule, updateAutomationRule } from "@/actions/automation";
 import { getAllUsers } from "@/actions/crm";
 import { getEmailTemplates } from "@/actions/marketing";
+import { getTerritories } from "@/actions/territories";
 import {
   type AutomationRuleFormData,
   AutomationRuleFormSchema,
@@ -266,6 +269,88 @@ const NO_VALUE_OPERATORS = new Set(["is_empty", "is_not_empty", "changed"]);
 
 // ── Field Helper (identical style to LeadModal) ───────────────────────────────
 
+type PickableUser = { id: string; name: string | null; email: string | null };
+
+/** People ticked in order; the number beside a name is its place in the rotation. */
+function PeoplePicker({
+  users,
+  value,
+  onChange,
+  idPrefix,
+}: {
+  users: PickableUser[];
+  value: string[];
+  onChange: (next: string[]) => void;
+  idPrefix: string;
+}) {
+  return (
+    <div className="max-h-56 space-y-1 overflow-y-auto rounded border bg-background p-2">
+      {users.length === 0 && <p className="px-1 py-2 text-muted-foreground text-xs">Loading people…</p>}
+      {users.map((u) => {
+        const position = value.indexOf(u.id);
+        const inputId = `${idPrefix}-${u.id}`;
+        return (
+          <div key={u.id} className="flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/50">
+            <Checkbox
+              id={inputId}
+              checked={position >= 0}
+              onCheckedChange={(on) => onChange(on === true ? [...value, u.id] : value.filter((c) => c !== u.id))}
+            />
+            <label htmlFor={inputId} className="min-w-0 flex-1 cursor-pointer truncate">
+              {u.name ?? u.email}
+            </label>
+            {position >= 0 && (
+              <Badge variant="secondary" className="text-[10px]">
+                {position + 1}
+              </Badge>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * A comma-separated list edited as text.
+ *
+ * ⚠️ Holds its own text: re-deriving it from the parsed list on every keystroke
+ * would delete the comma the moment it is typed, and nobody could add a second value.
+ */
+function ListInput({
+  value,
+  onChange,
+  placeholder,
+  id,
+}: {
+  value: string[];
+  onChange: (next: string[]) => void;
+  placeholder?: string;
+  id?: string;
+}) {
+  const [text, setText] = useState(value.join(", "));
+  return (
+    <Input
+      id={id}
+      className="h-8 bg-background text-sm"
+      value={text}
+      placeholder={placeholder}
+      onChange={(e) => {
+        setText(e.target.value);
+        onChange(
+          e.target.value
+            .split(",")
+            .map((v) => v.trim())
+            .filter(Boolean),
+        );
+      }}
+      onBlur={() => setText(value.join(", "))}
+    />
+  );
+}
+
+type RouteDraft = { id: string; territoryIds: string[]; sources: string[]; userIds: string[] };
+
 function F({
   label,
   error,
@@ -329,6 +414,7 @@ interface RuleModalProps {
 export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
   const [open, setOpen] = useState(false);
   const [userList, setUserList] = useState<{ id: string; name: string | null; email: string | null }[]>([]);
+  const [territoryList, setTerritoryList] = useState<{ id: string; name: string }[]>([]);
   const [templateList, setTemplateList] = useState<
     { id: string; name: string; subject: string; body: string; category: string }[]
   >([]);
@@ -337,6 +423,10 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
   useEffect(() => {
     if (open) {
       getAllUsers().then(setUserList);
+      // Routes by territory need the names; a workspace without the table yet just has none.
+      getTerritories()
+        .then((rows) => setTerritoryList(rows.map((r) => ({ id: r.id, name: r.name }))))
+        .catch(() => setTerritoryList([]));
       getEmailTemplates().then((tpls) =>
         setTemplateList(
           tpls.map((t) => ({ id: t.id, name: t.name, subject: t.subject, body: t.body, category: t.category })),
@@ -922,7 +1012,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                   else if (v === "assign_owner")
                                     updateAction(index, {
                                       type: "assign_owner",
-                                      params: { strategy: "round_robin", userIds: [], overwrite: false },
+                                      params: { strategy: "round_robin", routes: [], userIds: [], overwrite: false },
                                     });
                                 }}
                               >
@@ -1309,54 +1399,183 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
 
                       {/* ── assign_owner params ── */}
                       {actionType === "assign_owner" && (
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                           {!isOwnedEntity(targetEntity) && (
                             <p className="rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive text-xs">
                               This record type has no owner. Choose leads, contacts, companies or deals as the target.
                             </p>
                           )}
+
+                          <Controller
+                            control={control}
+                            // biome-ignore lint/suspicious/noExplicitAny: dynamic RHF path
+                            name={`actions.${index}.params.routes` as any}
+                            render={({ field: f }) => {
+                              const routes: RouteDraft[] = Array.isArray(f.value) ? f.value : [];
+                              const put = (i: number, patch: Partial<RouteDraft>) =>
+                                f.onChange(routes.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+                              const move = (i: number, by: number) => {
+                                const next = [...routes];
+                                const [taken] = next.splice(i, 1);
+                                next.splice(i + by, 0, taken);
+                                f.onChange(next);
+                              };
+                              return (
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                                        Routes
+                                      </p>
+                                      <p className="text-[11px] text-muted-foreground">
+                                        Tried from the top; the first that matches the record decides who takes turns.
+                                      </p>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-7 shrink-0 gap-1 text-xs"
+                                      onClick={() =>
+                                        f.onChange([
+                                          ...routes,
+                                          {
+                                            id: crypto.randomUUID().slice(0, 8),
+                                            territoryIds: [],
+                                            sources: [],
+                                            userIds: [],
+                                          },
+                                        ])
+                                      }
+                                    >
+                                      <Plus className="h-3 w-3" /> Add route
+                                    </Button>
+                                  </div>
+                                  {actionErrs?.routes?.message && (
+                                    <p className="text-destructive text-xs">{actionErrs.routes.message}</p>
+                                  )}
+                                  {routes.map((route, i) => {
+                                    const routeErr = actionErrs?.routes?.[i];
+                                    return (
+                                      <div key={route.id} className="space-y-3 rounded-lg border bg-background/60 p-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="font-semibold text-xs">Route {i + 1}</span>
+                                          <div className="flex gap-1">
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-6 w-6"
+                                              disabled={i === 0}
+                                              onClick={() => move(i, -1)}
+                                              aria-label="Move route up"
+                                            >
+                                              <ArrowUp className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-6 w-6"
+                                              disabled={i === routes.length - 1}
+                                              onClick={() => move(i, 1)}
+                                              aria-label="Move route down"
+                                            >
+                                              <ArrowDown className="h-3 w-3" />
+                                            </Button>
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                              onClick={() => f.onChange(routes.filter((_, j) => j !== i))}
+                                              aria-label="Remove route"
+                                            >
+                                              <Trash2 className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        </div>
+                                        {routeErr?.message && (
+                                          <p className="text-destructive text-xs">{routeErr.message}</p>
+                                        )}
+                                        <F label="In any of these territories">
+                                          {territoryList.length === 0 ? (
+                                            <p className="text-[11px] text-muted-foreground">
+                                              No territories yet — define them in Settings → Territories.
+                                            </p>
+                                          ) : (
+                                            <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                              {territoryList.map((terr) => {
+                                                const inputId = `route-${index}-${route.id}-t-${terr.id}`;
+                                                return (
+                                                  <div key={terr.id} className="flex items-center gap-1.5 text-sm">
+                                                    <Checkbox
+                                                      id={inputId}
+                                                      checked={route.territoryIds.includes(terr.id)}
+                                                      onCheckedChange={(on) =>
+                                                        put(i, {
+                                                          territoryIds:
+                                                            on === true
+                                                              ? [...route.territoryIds, terr.id]
+                                                              : route.territoryIds.filter((x) => x !== terr.id),
+                                                        })
+                                                      }
+                                                    />
+                                                    <label htmlFor={inputId} className="cursor-pointer">
+                                                      {terr.name}
+                                                    </label>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          )}
+                                        </F>
+                                        <F label="With source (comma separated)">
+                                          <ListInput
+                                            id={`route-${index}-${route.id}-sources`}
+                                            value={route.sources}
+                                            onChange={(sources) => put(i, { sources })}
+                                            placeholder="e.g. website, trade fair"
+                                          />
+                                        </F>
+                                        <F label="Share out among, in this order" required>
+                                          <PeoplePicker
+                                            users={userList}
+                                            value={route.userIds}
+                                            onChange={(userIds) => put(i, { userIds })}
+                                            idPrefix={`route-${index}-${route.id}`}
+                                          />
+                                        </F>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            }}
+                          />
+
                           <Controller
                             control={control}
                             // biome-ignore lint/suspicious/noExplicitAny: dynamic RHF path
                             name={`actions.${index}.params.userIds` as any}
-                            render={({ field: f }) => {
-                              const chosen: string[] = Array.isArray(f.value) ? f.value : [];
-                              const toggle = (id: string, on: boolean) =>
-                                f.onChange(on ? [...chosen, id] : chosen.filter((c) => c !== id));
-                              return (
-                                <F label="Share out among, in this order" required error={actionErrs?.userIds?.message}>
-                                  <div className="max-h-56 space-y-1 overflow-y-auto rounded border bg-background p-2">
-                                    {userList.length === 0 && (
-                                      <p className="px-1 py-2 text-muted-foreground text-xs">Loading people…</p>
-                                    )}
-                                    {userList.map((u) => {
-                                      const position = chosen.indexOf(u.id);
-                                      const inputId = `assign-${index}-${u.id}`;
-                                      return (
-                                        <div
-                                          key={u.id}
-                                          className="flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/50"
-                                        >
-                                          <Checkbox
-                                            id={inputId}
-                                            checked={position >= 0}
-                                            onCheckedChange={(on) => toggle(u.id, on === true)}
-                                          />
-                                          <label htmlFor={inputId} className="min-w-0 flex-1 cursor-pointer truncate">
-                                            {u.name ?? u.email}
-                                          </label>
-                                          {position >= 0 && (
-                                            <Badge variant="secondary" className="text-[10px]">
-                                              {position + 1}
-                                            </Badge>
-                                          )}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </F>
-                              );
-                            }}
+                            render={({ field: f }) => (
+                              <F
+                                label={
+                                  // biome-ignore lint/suspicious/noExplicitAny: dynamic RHF path
+                                  (watch(`actions.${index}.params.routes` as any) as unknown[] | undefined)?.length
+                                    ? "Everyone else, in turn (optional)"
+                                    : "Share out among, in this order"
+                                }
+                                error={actionErrs?.userIds?.message}
+                              >
+                                <PeoplePicker
+                                  users={userList}
+                                  value={Array.isArray(f.value) ? f.value : []}
+                                  onChange={f.onChange}
+                                  idPrefix={`assign-${index}`}
+                                />
+                              </F>
+                            )}
                           />
                           <Controller
                             control={control}
@@ -1370,9 +1589,10 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                             )}
                           />
                           <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
-                            💡 Each new record goes to the next person in the list. People who have left the workspace
-                            are skipped, and a record someone has already claimed stays with them unless reassigning is
-                            ticked.
+                            💡 Each route keeps its own turn. People who have left the workspace are skipped, and a
+                            route whose people have all left passes the record on to the next. A record no route takes
+                            goes to "everyone else", or stays unassigned if nobody is ticked there. A record someone has
+                            already claimed stays with them unless reassigning is ticked.
                           </p>
                         </div>
                       )}

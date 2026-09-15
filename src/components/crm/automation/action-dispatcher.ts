@@ -12,12 +12,17 @@ import {
   orders,
   tasks,
   tenantMembers,
+  territories,
   tickets,
 } from "@/db/schema";
+import { candidatesFor, routeScope } from "@/lib/assignment-routing";
 import { nextInSequence } from "@/lib/document-counter";
 import { notify } from "@/lib/notify";
-import { eligibleInOrder, isOwnedEntity, pickInTurn, roundRobinScope } from "@/lib/round-robin";
+import { eligibleInOrder, isOwnedEntity, pickInTurn } from "@/lib/round-robin";
+import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
+import type { Located } from "@/lib/territory";
+import { placeOfDeal } from "@/lib/territory-report";
 
 import { sendAutomationEmailWithContext } from "../../crm/automation/email-service";
 import type { ExecutionContext } from "../../crm/automation/loop-detector";
@@ -92,7 +97,7 @@ export class ActionDispatcher {
   // ─── Action: assign_owner ─────────────────────────────────────────────────────
 
   /**
-   * Gives the record to the next person in the rule's rotation.
+   * Gives the record to the next person in the rotation its routes choose.
    *
    * ⚠️⚠️ The turn comes from the atomic counter, not from reading the last owner.
    * Two leads created in the same instant would otherwise both see the same last
@@ -102,14 +107,17 @@ export class ActionDispatcher {
    * ⚠️ The write is conditional on the record still having no owner (unless the rule
    * says overwrite), so a person assigning it by hand in the same instant wins.
    * A turn is taken only once it is certain to be used, so a record that already
-   * has an owner does not skip somebody's turn.
+   * has an owner, or that no route takes, does not skip somebody's turn.
+   *
+   * ⚠️ A route whose people have all left the workspace does not swallow the
+   * record: the next matching route, then the general rotation, is tried.
    */
   private async assignOwner(
     action: Extract<AutomationAction, { type: "assign_owner" }>,
     context: RuleContext,
     executionCtx: ExecutionContext,
   ): Promise<void> {
-    const { userIds, overwrite } = action.params;
+    const { userIds, overwrite, routes } = action.params;
     if (!isOwnedEntity(context.entityType)) {
       throw new Error(`"assign_owner" does not apply to ${context.entityType}: it has no owner to set`);
     }
@@ -119,17 +127,6 @@ export class ActionDispatcher {
     const tenantId = await getCurrentTenantId();
     if (!tenantId) throw new Error(`"assign_owner" needs a workspace, and none is active`);
 
-    // Membership is the workspace's own list, in the platform registry: a user row
-    // in this database outlives the person's membership.
-    const members = await platformDb
-      .select({ userId: tenantMembers.userId })
-      .from(tenantMembers)
-      .where(and(eq(tenantMembers.tenantId, tenantId), inArray(tenantMembers.userId, userIds)));
-    const eligible = eligibleInOrder(userIds, new Set(members.map((m) => m.userId)));
-    if (eligible.length === 0) {
-      throw new Error("None of the people this rule assigns to is still a member of the workspace");
-    }
-
     const table = this.entityTable(context.entityType);
     if (!table) throw new Error(`Unknown entity type: ${context.entityType}`);
     // biome-ignore lint/suspicious/noExplicitAny: owned tables all carry id and ownerId
@@ -138,10 +135,46 @@ export class ActionDispatcher {
     const db = await getDb();
     const [before] = await db.select().from(t).where(eq(t.id, context.entityId));
     if (!before) return;
-    if ((before as { ownerId?: string | null }).ownerId && !overwrite) return;
+    const record = before as Record<string, unknown> & { ownerId?: string | null };
+    if (record.ownerId && !overwrite) return;
 
-    const turn = await nextInSequence(db, roundRobinScope(ruleId), sql`1`);
-    const ownerId = pickInTurn(eligible, turn);
+    const territoryRows = routes.some((r) => r.territoryIds.length)
+      ? await tolerateUnmigrated("territories", () => db.select().from(territories), [])
+      : [];
+    const place = context.entityType === "deal" ? await this.placeOfDeal(db, record) : (record as Located);
+    const candidates = candidatesFor(
+      { ...place, source: (record.source as string | null | undefined) ?? null },
+      routes,
+      territoryRows,
+      userIds,
+    );
+    // No route takes it and the rule has no general rotation: this rule does not
+    // assign records like this one, which is a configuration, not a failure.
+    if (candidates.length === 0) return;
+
+    // Membership is the workspace's own list, in the platform registry: a user row
+    // in this database outlives the person's membership.
+    const everyone = [...new Set(candidates.flatMap((c) => c.userIds))];
+    const members = await platformDb
+      .select({ userId: tenantMembers.userId })
+      .from(tenantMembers)
+      .where(and(eq(tenantMembers.tenantId, tenantId), inArray(tenantMembers.userId, everyone)));
+    const memberIds = new Set(members.map((m) => m.userId));
+
+    let chosen: { routeId: string | null; eligible: string[] } | null = null;
+    for (const candidate of candidates) {
+      const eligible = eligibleInOrder(candidate.userIds, memberIds);
+      if (eligible.length) {
+        chosen = { routeId: candidate.routeId, eligible };
+        break;
+      }
+    }
+    if (!chosen) {
+      throw new Error("None of the people this rule assigns to is still a member of the workspace");
+    }
+
+    const turn = await nextInSequence(db, routeScope(ruleId, chosen.routeId), sql`1`);
+    const ownerId = pickInTurn(chosen.eligible, turn);
 
     const written = await db
       .update(t)
@@ -178,6 +211,25 @@ export class ActionDispatcher {
         executionCtx,
       );
     }
+  }
+
+  /** A deal has no address: its company's, or its contact's when the company has none. */
+  // biome-ignore lint/suspicious/noExplicitAny: the tenant db handle is built per request
+  private async placeOfDeal(db: any, deal: Record<string, unknown>): Promise<Located> {
+    const columns = { country: companies.country, state: companies.state, zipCode: companies.zipCode };
+    const [company] = deal.companyId
+      ? await db
+          .select(columns)
+          .from(companies)
+          .where(eq(companies.id, String(deal.companyId)))
+      : [];
+    const [contact] = deal.contactId
+      ? await db
+          .select({ country: contacts.country, state: contacts.state, zipCode: contacts.zipCode })
+          .from(contacts)
+          .where(eq(contacts.id, String(deal.contactId)))
+      : [];
+    return placeOfDeal(company ?? {}, contact ?? {});
   }
 
   // ─── Action: emit_event ───────────────────────────────────────────────────────

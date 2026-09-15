@@ -170,14 +170,41 @@ export const EmitEventActionSchema = z.object({
  * took it off them would be the rule everyone learns to switch off. `overwrite`
  * exists for the workspace that genuinely wants every new record distributed.
  */
+export const AssignmentRouteSchema = z
+  .object({
+    // Stable across edits: the route's place in its own rotation is keyed on it.
+    id: z.string().min(1).max(40),
+    territoryIds: z.array(z.string().min(1)).max(50).default([]),
+    sources: z.array(z.string().trim().min(1).max(80)).max(50).default([]),
+    userIds: z.array(z.string().min(1)).min(1).max(50),
+  })
+  .refine((r) => r.territoryIds.length + r.sources.length > 0, {
+    // A route with no criteria would take nothing, and look like it takes everything.
+    message: "A route needs at least one territory or source.",
+  });
+
 export const AssignOwnerActionSchema = z.object({
   type: z.literal("assign_owner"),
-  params: z.object({
-    strategy: z.literal("round_robin").default("round_robin"),
-    // The people records are shared out among, in turn and in this order.
-    userIds: z.array(z.string().min(1)).min(1).max(50),
-    overwrite: z.boolean().default(false),
-  }),
+  params: z
+    .object({
+      strategy: z.literal("round_robin").default("round_robin"),
+      // Tried in order; the first that takes the record and has a current member wins.
+      // See src/lib/assignment-routing.ts for why these are not separate rules.
+      routes: z.array(AssignmentRouteSchema).max(20).default([]),
+      // The general rotation, for records no route takes. Rules written before routes
+      // existed have only this.
+      userIds: z.array(z.string().min(1)).max(50).default([]),
+      overwrite: z.boolean().default(false),
+    })
+    .refine((p) => p.userIds.length > 0 || p.routes.length > 0, {
+      message: "Choose the people to share records out among.",
+      path: ["userIds"],
+    })
+    .refine((p) => new Set(p.routes.map((r) => r.id)).size === p.routes.length, {
+      // Two routes with one id would share one rotation.
+      message: "Two routes have the same id.",
+      path: ["routes"],
+    }),
 });
 
 export const ActionSchema = z.discriminatedUnion("type", [
