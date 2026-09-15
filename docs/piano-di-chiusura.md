@@ -29,8 +29,9 @@ Ogni riga è verificata con suite, build e, dove indicato, mutazioni intercettat
 | P6 | Thread paginato a 100 elementi con "carica precedenti". Il riepilogo di presa in carico ora è calcolato sul server sull'intero thread: da una pagina sola avrebbe indicato il messaggio di apertura sbagliato senza nessun segno. Pagina caricata dal server. 5 mutazioni su 5. | `7b0795b` · `def0c3e` |
 | — | **Fuori piano:** il contatore messaggi di elenco e kanban ticket valeva sempre al massimo 1, perché la query carica un solo messaggio per l'anteprima. | `fda6ad2` |
 | O6 | Il provider Google era registrato con le variabili vuote. Ora solo se configurato. L'unico pulsante Google era in un modulo di login che nessuno importava, eliminato. | `7cfcc00` |
-| O4 | La chiave cifra tre campi, tutti nel database di piattaforma. La rotazione aveva un buco: in qualunque ordine, per un momento la produzione non avrebbe letto nessun workspace. Ora la decifratura accetta `PLATFORM_ENCRYPTION_KEY_PREVIOUS`, e lo script `npm run rotate:platform-key` parte in prova a secco, blocca tutto se un solo valore è illeggibile, fa il backup dei testi cifrati, scrive solo valori non cambiati nel frattempo, rilegge e verifica, e ha il ripristino. **Non è stato eseguito contro un database**: l'unico configurato è la produzione. Verificati i cinque percorsi di errore con un indirizzo inesistente, e l'SQL della scrittura condizionata. 14 + 8 + 3 test, 12 mutazioni. | `cb8ffe3` · commit successivo |
-| S3 | **Fuori piano, trovata durante O4.** La chiave Resend e la password SMTP di ogni workspace erano in chiaro nel suo database. Ora si cifrano al salvataggio; la lettura accetta entrambe le forme, così i workspace esistenti continuano a inviare il giorno del rilascio; e una riga ancora in chiaro viene cifrata al primo invio, con scrittura condizionata. La maschera rimandata dal modulo non sovrascrive più una chiave vera. Guardia sui due punti reali di salvataggio e lettura. 12 test, 5 mutazioni. | commit successivo |
+| O4 | La chiave cifra tre campi, tutti nel database di piattaforma. La rotazione aveva un buco: in qualunque ordine, per un momento la produzione non avrebbe letto nessun workspace. Ora la decifratura accetta `PLATFORM_ENCRYPTION_KEY_PREVIOUS`, e lo script `npm run rotate:platform-key` parte in prova a secco, blocca tutto se un solo valore è illeggibile, fa il backup dei testi cifrati, scrive solo valori non cambiati nel frattempo, rilegge e verifica, e ha il ripristino. **Non è stato eseguito contro un database**: l'unico configurato è la produzione. Verificati i cinque percorsi di errore con un indirizzo inesistente, e l'SQL della scrittura condizionata. 14 + 8 + 3 test, 12 mutazioni. | `cb8ffe3` · `28cff13` |
+| S3 | **Fuori piano, trovata durante O4.** La chiave Resend e la password SMTP di ogni workspace erano in chiaro nel suo database. Ora si cifrano al salvataggio; la lettura accetta entrambe le forme, così i workspace esistenti continuano a inviare il giorno del rilascio; e una riga ancora in chiaro viene cifrata al primo invio, con scrittura condizionata. La maschera rimandata dal modulo non sovrascrive più una chiave vera. Guardia sui due punti reali di salvataggio e lettura. 12 test, 5 mutazioni. | `c98bb72` |
+| L1 | Nuova azione **Assign Owner (round robin)** per lead, contatti, aziende e deal. Non un compare-and-swap sul turno ma lo stesso contatore atomico di P4, con una sequenza per regola: due lead simultanei vanno a due persone diverse. Tre regole oltre al piano, ognuna contro un'assegnazione che sembra riuscita: riceve solo chi è **ancora membro** del workspace (letto dal registro di piattaforma, non dalla tabella utenti che sopravvive all'uscita); un record **già assegnato** resta a chi lo ha, salvo opzione esplicita, e non consuma il turno di nessuno; la scrittura è **condizionata** all'assenza di titolare, così un'assegnazione a mano arrivata un attimo prima vince. Il nuovo titolare di un lead riceve la notifica (e il push); la modifica fa scattare le regole su aggiornamento come qualunque altra. Test su un database finto che valuta davvero le condizioni; 31 test, 12 mutazioni su 12 (una sopravvissuta al primo giro: il test accettava il messaggio d'errore sbagliato). Voce nel Help Centre. | commit successivo |
 
 ### Prossimi passi, in quest'ordine
 
@@ -38,11 +39,10 @@ Nessuno richiede decisioni. Ciascuno si chiude con test, mutazioni dove un error
 
 | # | ID | Attività | Perché in questa posizione |
 |---|---|---|---|
-| 1 | L1 | Assegnazione automatica dei lead a rotazione | Autonoma, e serve a L5. |
-| 2 | L4 | Territori | Autonoma, e serve a L5. |
-| 3 | L5 | Assegnazione per regola | Dipende da L1 e L4, entrambe prima. |
-| 4 | L7 | Contratti e rinnovi | Autonoma. |
-| 5 | L6 | Sequenze di follow-up | La più grande del gruppo, per ultima. |
+| 1 | L4 | Territori | Autonoma, e serve a L5. |
+| 2 | L5 | Assegnazione per regola | Dipende da L1 (fatta) e L4. |
+| 3 | L7 | Contratti e rinnovi | Autonoma. |
+| 4 | L6 | Sequenze di follow-up | La più grande del gruppo, per ultima. |
 
 ### Da fare sulla dashboard Cloudflare
 

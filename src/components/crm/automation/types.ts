@@ -162,6 +162,24 @@ export const EmitEventActionSchema = z.object({
   }),
 });
 
+/**
+ * Hand the record to the next person in turn.
+ *
+ * ⚠️ By default it assigns only a record nobody owns yet. Somebody who creates a
+ * lead and gives it to themselves has made a decision, and a rule that silently
+ * took it off them would be the rule everyone learns to switch off. `overwrite`
+ * exists for the workspace that genuinely wants every new record distributed.
+ */
+export const AssignOwnerActionSchema = z.object({
+  type: z.literal("assign_owner"),
+  params: z.object({
+    strategy: z.literal("round_robin").default("round_robin"),
+    // The people records are shared out among, in turn and in this order.
+    userIds: z.array(z.string().min(1)).min(1).max(50),
+    overwrite: z.boolean().default(false),
+  }),
+});
+
 export const ActionSchema = z.discriminatedUnion("type", [
   CreateTaskActionSchema,
   SendNotificationActionSchema,
@@ -169,6 +187,7 @@ export const ActionSchema = z.discriminatedUnion("type", [
   SendEmailActionSchema,
   SendWebhookActionSchema,
   EmitEventActionSchema,
+  AssignOwnerActionSchema,
 ]);
 
 export type AutomationAction = z.infer<typeof ActionSchema>;

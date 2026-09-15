@@ -14,6 +14,7 @@ import {
   RocketIcon,
   Send,
   Trash2,
+  UserRoundCheck,
   Zap,
 } from "lucide-react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
@@ -41,6 +42,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { isOwnedEntity } from "@/lib/round-robin";
 import { cn } from "@/lib/utils";
 
 import { ConditionExpressionEditor } from "./condition-expression-editor";
@@ -242,6 +244,12 @@ const ACTION_META: Record<string, { label: string; icon: React.ReactNode; color:
     icon: <PencilLine className="h-4 w-4" />,
     color: "text-amber-600 dark:text-amber-400",
     bg: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800",
+  },
+  assign_owner: {
+    label: "Assign Owner (round robin)",
+    icon: <UserRoundCheck className="h-4 w-4" />,
+    color: "text-sky-600 dark:text-sky-400",
+    bg: "bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800",
   },
 };
 
@@ -911,6 +919,11 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                       // biome-ignore lint/suspicious/noExplicitAny: union field cast
                                       params: { field: (updFields[0]?.value ?? "status") as any, value: "" },
                                     });
+                                  else if (v === "assign_owner")
+                                    updateAction(index, {
+                                      type: "assign_owner",
+                                      params: { strategy: "round_robin", userIds: [], overwrite: false },
+                                    });
                                 }}
                               >
                                 <SelectTrigger
@@ -1290,6 +1303,76 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
 
                           <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
                             💡 Merge fields: deal.name, contact.email, owner.name, deal.amount, etc.
+                          </p>
+                        </div>
+                      )}
+
+                      {/* ── assign_owner params ── */}
+                      {actionType === "assign_owner" && (
+                        <div className="space-y-3">
+                          {!isOwnedEntity(targetEntity) && (
+                            <p className="rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive text-xs">
+                              This record type has no owner. Choose leads, contacts, companies or deals as the target.
+                            </p>
+                          )}
+                          <Controller
+                            control={control}
+                            // biome-ignore lint/suspicious/noExplicitAny: dynamic RHF path
+                            name={`actions.${index}.params.userIds` as any}
+                            render={({ field: f }) => {
+                              const chosen: string[] = Array.isArray(f.value) ? f.value : [];
+                              const toggle = (id: string, on: boolean) =>
+                                f.onChange(on ? [...chosen, id] : chosen.filter((c) => c !== id));
+                              return (
+                                <F label="Share out among, in this order" required error={actionErrs?.userIds?.message}>
+                                  <div className="max-h-56 space-y-1 overflow-y-auto rounded border bg-background p-2">
+                                    {userList.length === 0 && (
+                                      <p className="px-1 py-2 text-muted-foreground text-xs">Loading people…</p>
+                                    )}
+                                    {userList.map((u) => {
+                                      const position = chosen.indexOf(u.id);
+                                      const inputId = `assign-${index}-${u.id}`;
+                                      return (
+                                        <div
+                                          key={u.id}
+                                          className="flex items-center gap-2 rounded px-1 py-1 text-sm hover:bg-muted/50"
+                                        >
+                                          <Checkbox
+                                            id={inputId}
+                                            checked={position >= 0}
+                                            onCheckedChange={(on) => toggle(u.id, on === true)}
+                                          />
+                                          <label htmlFor={inputId} className="min-w-0 flex-1 cursor-pointer truncate">
+                                            {u.name ?? u.email}
+                                          </label>
+                                          {position >= 0 && (
+                                            <Badge variant="secondary" className="text-[10px]">
+                                              {position + 1}
+                                            </Badge>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </F>
+                              );
+                            }}
+                          />
+                          <Controller
+                            control={control}
+                            // biome-ignore lint/suspicious/noExplicitAny: dynamic RHF path
+                            name={`actions.${index}.params.overwrite` as any}
+                            render={({ field: f }) => (
+                              <div className="flex items-center gap-2 rounded border bg-background px-3 py-2">
+                                <Checkbox checked={f.value ?? false} onCheckedChange={f.onChange} />
+                                <span className="text-xs">Reassign records that already have an owner</span>
+                              </div>
+                            )}
+                          />
+                          <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
+                            💡 Each new record goes to the next person in the list. People who have left the workspace
+                            are skipped, and a record someone has already claimed stays with them unless reassigning is
+                            ticked.
                           </p>
                         </div>
                       )}

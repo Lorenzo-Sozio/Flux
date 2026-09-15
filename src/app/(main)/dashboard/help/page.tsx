@@ -568,7 +568,11 @@ const sections = [
       },
       {
         q: "Quali azioni può eseguire una regola?",
-        a: "Sei: inviare un'email, creare un task collegato al record, aggiornare un campo del record (per esempio lo stato), inviare una notifica interna a un collega, chiamare un webhook, ed emettere un evento verso un'integrazione collegata. L'evento parte marcato come originato da una persona, non da una macchina, perché la regola scatta per qualcosa che qualcuno ha fatto: un'integrazione che ignora le proprie scritture lo vedrebbe altrimenti passare per suo e non reagirebbe.",
+        a: "Sette: inviare un'email, creare un task collegato al record, aggiornare un campo del record (per esempio lo stato), assegnare il record a turno a un gruppo di persone, inviare una notifica interna a un collega, chiamare un webhook, ed emettere un evento verso un'integrazione collegata. L'evento parte marcato come originato da una persona, non da una macchina, perché la regola scatta per qualcosa che qualcuno ha fatto: un'integrazione che ignora le proprie scritture lo vedrebbe altrimenti passare per suo e non reagirebbe.",
+      },
+      {
+        q: "Come distribuisco i nuovi lead a turno tra i commerciali?",
+        a: "Crea una regola sui lead, con trigger 'alla creazione', e scegli l'azione 'Assign Owner (round robin)'. Spunta le persone nell'ordine in cui vuoi che ricevano i lead: il primo lead va alla prima, il secondo alla seconda, e così via ricominciando dall'inizio. Chi riceve il lead ne viene avvisato con una notifica. Due lead arrivati nello stesso istante vanno comunque a due persone diverse. Chi nel frattempo ha lasciato il workspace viene saltato senza dover modificare la regola, e un lead che qualcuno ha già preso in carico resta a quella persona, a meno di spuntare 'Reassign records that already have an owner'. Funziona anche per contatti, aziende e deal.",
       },
       {
         q: "Devo scrivere ogni regola da zero?",

@@ -1,8 +1,23 @@
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import { dispatchWebhook } from "@/actions/webhooks";
-import { companies, contacts, deals, emailTemplates, leads, notifications, orders, tasks, tickets } from "@/db/schema";
-import { getDb } from "@/lib/tenant-context";
+import { platformDb } from "@/db";
+import {
+  companies,
+  contacts,
+  deals,
+  emailTemplates,
+  leads,
+  notifications,
+  orders,
+  tasks,
+  tenantMembers,
+  tickets,
+} from "@/db/schema";
+import { nextInSequence } from "@/lib/document-counter";
+import { notify } from "@/lib/notify";
+import { eligibleInOrder, isOwnedEntity, pickInTurn, roundRobinScope } from "@/lib/round-robin";
+import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 
 import { sendAutomationEmailWithContext } from "../../crm/automation/email-service";
 import type { ExecutionContext } from "../../crm/automation/loop-detector";
@@ -67,7 +82,101 @@ export class ActionDispatcher {
       case "emit_event":
         await this.emitEvent(action, context);
         return 0;
+      case "assign_owner":
+        await this.assignOwner(action, context, executionCtx);
+        return 0;
       // TypeScript exhaustiveness: no `default` — new action types require an explicit case.
+    }
+  }
+
+  // ─── Action: assign_owner ─────────────────────────────────────────────────────
+
+  /**
+   * Gives the record to the next person in the rule's rotation.
+   *
+   * ⚠️⚠️ The turn comes from the atomic counter, not from reading the last owner.
+   * Two leads created in the same instant would otherwise both see the same last
+   * owner and both go to the same next person — and the imbalance compounds with
+   * every burst of leads from a form or an import.
+   *
+   * ⚠️ The write is conditional on the record still having no owner (unless the rule
+   * says overwrite), so a person assigning it by hand in the same instant wins.
+   * A turn is taken only once it is certain to be used, so a record that already
+   * has an owner does not skip somebody's turn.
+   */
+  private async assignOwner(
+    action: Extract<AutomationAction, { type: "assign_owner" }>,
+    context: RuleContext,
+    executionCtx: ExecutionContext,
+  ): Promise<void> {
+    const { userIds, overwrite } = action.params;
+    if (!isOwnedEntity(context.entityType)) {
+      throw new Error(`"assign_owner" does not apply to ${context.entityType}: it has no owner to set`);
+    }
+    const ruleId = executionCtx.ruleChain.at(-1)?.ruleId;
+    if (!ruleId) throw new Error(`"assign_owner" ran outside a rule, so there is no rotation to take a turn from`);
+
+    const tenantId = await getCurrentTenantId();
+    if (!tenantId) throw new Error(`"assign_owner" needs a workspace, and none is active`);
+
+    // Membership is the workspace's own list, in the platform registry: a user row
+    // in this database outlives the person's membership.
+    const members = await platformDb
+      .select({ userId: tenantMembers.userId })
+      .from(tenantMembers)
+      .where(and(eq(tenantMembers.tenantId, tenantId), inArray(tenantMembers.userId, userIds)));
+    const eligible = eligibleInOrder(userIds, new Set(members.map((m) => m.userId)));
+    if (eligible.length === 0) {
+      throw new Error("None of the people this rule assigns to is still a member of the workspace");
+    }
+
+    const table = this.entityTable(context.entityType);
+    if (!table) throw new Error(`Unknown entity type: ${context.entityType}`);
+    // biome-ignore lint/suspicious/noExplicitAny: owned tables all carry id and ownerId
+    const t = table as any;
+
+    const db = await getDb();
+    const [before] = await db.select().from(t).where(eq(t.id, context.entityId));
+    if (!before) return;
+    if ((before as { ownerId?: string | null }).ownerId && !overwrite) return;
+
+    const turn = await nextInSequence(db, roundRobinScope(ruleId), sql`1`);
+    const ownerId = pickInTurn(eligible, turn);
+
+    const written = await db
+      .update(t)
+      .set({ ownerId, updatedAt: new Date() })
+      .where(overwrite ? eq(t.id, context.entityId) : and(eq(t.id, context.entityId), isNull(t.ownerId)))
+      .returning({ id: t.id });
+    // Somebody assigned it by hand between the read and the write. Theirs stands.
+    if (written.length === 0) return;
+
+    if (context.entityType === "lead") {
+      const lead = before as { firstName?: string | null; lastName?: string | null };
+      await notify({
+        userId: ownerId,
+        type: "lead_assigned",
+        title: "Lead assigned to you",
+        message: `${[lead.firstName, lead.lastName].filter(Boolean).join(" ") || "A lead"} has been assigned to you.`,
+        link: `/dashboard/leads/${context.entityId}`,
+      });
+    }
+
+    const [after] = await db.select().from(t).where(eq(t.id, context.entityId));
+    if (after) {
+      // The change cascades like any other update, carrying the chain so a rule that
+      // reassigns on update cannot loop.
+      await runAutomations(
+        {
+          entityType: context.entityType,
+          entityId: context.entityId,
+          event: "onUpdate",
+          oldData: before as Record<string, unknown>,
+          newData: after as Record<string, unknown>,
+          currentUserId: context.currentUserId,
+        },
+        executionCtx,
+      );
     }
   }
 

@@ -25,6 +25,9 @@ vi.mock("../../crm/automation/webhook-service", () => ({
   },
 }));
 vi.mock("@/lib/tenant-context", () => ({ getDb: async () => ({}) }));
+vi.mock("@/db", () => ({ platformDb: {} }));
+vi.mock("@/lib/notify", () => ({ notify: async () => undefined }));
+vi.mock("@/lib/document-counter", () => ({ nextInSequence: async () => 1 }));
 vi.mock("@/db/schema", () => ({
   companies: {},
   contacts: {},
@@ -33,6 +36,7 @@ vi.mock("@/db/schema", () => ({
   leads: {},
   notifications: {},
   tasks: {},
+  tenantMembers: {},
   tickets: {},
 }));
 vi.mock("drizzle-orm", () => ({ eq: () => "eq" }));

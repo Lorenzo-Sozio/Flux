@@ -1,0 +1,74 @@
+[
+  {
+    "file": "src/lib/round-robin.ts",
+    "description": "⚠️⚠️ chi ha lasciato il workspace resta nella rotazione: riceve lead che nessuno lavora",
+    "find": "    if (!id || seen.has(id) || !members.has(id)) continue;",
+    "replace": "    if (!id || seen.has(id)) continue;"
+  },
+  {
+    "file": "src/lib/round-robin.ts",
+    "description": "⚠️ una persona elencata due volte riceve il doppio dei lead",
+    "find": "    if (!id || seen.has(id) || !members.has(id)) continue;",
+    "replace": "    if (!id || !members.has(id)) continue;"
+  },
+  {
+    "file": "src/lib/round-robin.ts",
+    "description": "⚠️⚠️ una lista vuota assegna a undefined invece di rifiutare",
+    "find": "  if (eligible.length === 0) throw new Error(\"Nobody is eligible to receive this record.\");",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/round-robin.ts",
+    "description": "il turno salta la prima persona della lista",
+    "find": "  return eligible[(turn - 1) % eligible.length];",
+    "replace": "  return eligible[turn % eligible.length];"
+  },
+  {
+    "file": "src/lib/round-robin.ts",
+    "description": "⚠️ la rotazione condivide la sequenza con la numerazione degli ordini",
+    "find": "  return `round-robin:${ruleId}`;",
+    "replace": "  return ruleId;"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ l'appartenenza non filtra per workspace: un membro di un altro cliente riceve il lead",
+    "find": "      .where(and(eq(tenantMembers.tenantId, tenantId), inArray(tenantMembers.userId, userIds)));",
+    "replace": "      .where(inArray(tenantMembers.userId, userIds));"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ la rotazione ignora chi e' ancora membro: il lead va a chi se n'e' andato",
+    "find": "    const eligible = eligibleInOrder(userIds, new Set(members.map((m) => m.userId)));",
+    "replace": "    const eligible = eligibleInOrder(userIds, new Set(userIds));"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ un record gia' assegnato viene tolto a chi lo aveva",
+    "find": "    if ((before as { ownerId?: string | null }).ownerId && !overwrite) return;",
+    "replace": ""
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️⚠️ la scrittura non e' condizionale: un'assegnazione a mano arrivata un attimo prima viene sovrascritta",
+    "find": "      .where(overwrite ? eq(t.id, context.entityId) : and(eq(t.id, context.entityId), isNull(t.ownerId)))",
+    "replace": "      .where(eq(t.id, context.entityId))"
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "⚠️ una scrittura persa notifica e fa scattare altre regole come se l'assegnazione fosse avvenuta",
+    "find": "    if (written.length === 0) return;",
+    "replace": ""
+  },
+  {
+    "file": "src/components/crm/automation/action-dispatcher.ts",
+    "description": "senza workspace la regola fallisce con un messaggio che accusa le persone invece della mancanza del workspace",
+    "find": "    if (!tenantId) throw new Error(`\"assign_owner\" needs a workspace, and none is active`);",
+    "replace": ""
+  },
+  {
+    "file": "src/components/crm/automation/types.ts",
+    "description": "⚠️ si salva una rotazione vuota: la regola fallisce a ogni lead",
+    "find": "    userIds: z.array(z.string().min(1)).min(1).max(50),",
+    "replace": "    userIds: z.array(z.string().min(1)).max(50),"
+  }
+]
