@@ -2,15 +2,18 @@ import Link from "next/link";
 
 import { getTranslations } from "next-intl/server";
 
-import { getInvoices } from "@/actions/invoices";
+import { getInvoices, getStampDutySummary } from "@/actions/invoices";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { italianToday } from "@/lib/invoice-draft";
 import { requirePageCapability } from "@/lib/page-guard";
 
 export default async function InvoicesPage() {
   await requirePageCapability("record:read", "/dashboard/sales/invoices");
-  const [rows, t] = await Promise.all([getInvoices(), getTranslations("invoices")]);
+  const year = Number(italianToday().slice(0, 4));
+  const [rows, stamps, t] = await Promise.all([getInvoices(), getStampDutySummary(year), getTranslations("invoices")]);
+  const euro = (n: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(n);
   const money = (value: string, currency: string) =>
     new Intl.NumberFormat("it-IT", { style: "currency", currency }).format(Number(value));
 
@@ -58,6 +61,41 @@ export default async function InvoicesPage() {
               </TableBody>
             </Table>
           )}
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="space-y-3 p-4">
+          <div>
+            <p className="font-semibold text-sm">{t("stampSummaryTitle", { year })}</p>
+            <p className="text-muted-foreground text-xs">{t("stampSummaryHint")}</p>
+          </div>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t("quarter")}</TableHead>
+                  <TableHead className="text-right">{t("invoicesWithStamp")}</TableHead>
+                  <TableHead className="text-right">{t("amount")}</TableHead>
+                  <TableHead>{t("f24Code")}</TableHead>
+                  <TableHead>{t("payBy")}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stamps.map((q) => (
+                  <TableRow key={q.quarter}>
+                    <TableCell>{t("quarterN", { n: q.quarter })}</TableCell>
+                    <TableCell className="text-right tabular-nums">{q.invoices}</TableCell>
+                    <TableCell className="text-right tabular-nums">{euro(q.amount)}</TableCell>
+                    <TableCell className="font-mono">{q.f24Code}</TableCell>
+                    <TableCell className="tabular-nums">
+                      {q.dueDate}
+                      {q.deferred && <span className="ml-2 text-muted-foreground text-xs">({t("deferred")})</span>}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

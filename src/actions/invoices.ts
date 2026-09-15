@@ -11,8 +11,9 @@ import { computeDocument } from "@/lib/document-totals";
 import { customerGaps, type Gap, issuerGaps } from "@/lib/fiscal-ids";
 import { cleanDraft, customerSnapshot, type DraftInput, italianToday, linesFromOrder } from "@/lib/invoice-draft";
 import { issueInvoice } from "@/lib/invoice-issue";
-import { type DraftLine, type DraftProblem, draftProblems, invoiceScope, suggestsStampDuty } from "@/lib/invoice-rules";
+import { type DraftLine, type DraftProblem, draftProblems, invoiceScope } from "@/lib/invoice-rules";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
+import { assessStampDuty, quarterlyStampDuty, quarterOf, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
 import { getDb } from "@/lib/tenant-context";
 
 const LIST = "/dashboard/sales/invoices";
@@ -64,6 +65,30 @@ async function writeLines(db: Db, invoiceId: string, lines: DraftInput["lines"])
   await db
     .delete(invoiceItems)
     .where(and(eq(invoiceItems.invoiceId, invoiceId), gte(invoiceItems.position, lines.length)));
+}
+
+/**
+ * The lines an invoice is totalled and frozen with: its own, plus the stamp recharge
+ * line when the stamp applies and the issuer recharges it. Decided in one place so
+ * the draft screen, the saved totals and the issued snapshot cannot disagree.
+ */
+function finalLines(lines: DraftLine[], discountPercent: number, mode: string, recharge: boolean) {
+  const stamp = assessStampDuty(lines, discountPercent, mode as StampMode);
+  const withDescription = lines.map((l) => ({ ...l, description: l.description ?? "" }));
+  return { stamp, lines: withStampRecharge(withDescription, stamp.applied, recharge) as DraftLine[] };
+}
+
+async function issuerRecharges(db: Db): Promise<boolean> {
+  const [row] = await tolerateUnmigrated(
+    "invoice_issuer.recharge_stamp_duty",
+    () =>
+      db
+        .select({ recharge: invoiceIssuers.rechargeStampDuty })
+        .from(invoiceIssuers)
+        .where(eq(invoiceIssuers.id, "workspace")),
+    [],
+  );
+  return Boolean(row?.recharge);
 }
 
 function totalsOf(lines: DraftLine[], discountPercent: number) {
@@ -121,18 +146,21 @@ export async function getInvoice(id: string) {
   ]);
   const lines = toDraftLines(items);
   const discount = Number(invoice.discountPercent);
+  const recharge = Boolean(issuer?.rechargeStampDuty);
+  const final = finalLines(lines, discount, invoice.stampDutyMode, recharge);
   const blockers: IssueBlockers = {
     issuer: issuerGaps(issuer ?? {}),
     customer: company ? customerGaps({ ...company, province: company.state }) : [{ field: "name", problem: "missing" }],
-    draft: draftProblems(lines, discount),
+    draft: draftProblems(lines, discount, { mode: invoice.stampDutyMode, note: invoice.stampDutyNote }),
   };
   return {
     invoice,
     items,
     companyName: company?.name ?? null,
     blockers,
-    stampDutySuggested: suggestsStampDuty(lines, discount),
-    totals: computeDocument({ lines, discountPercent: discount }),
+    stamp: final.stamp,
+    rechargeStamp: recharge,
+    totals: computeDocument({ lines: final.lines, discountPercent: discount }),
   };
 }
 
@@ -173,7 +201,8 @@ export async function createInvoiceFromOrder(
 
   const lines = linesFromOrder(items);
   const discountPercent = Number(order.discountPercent ?? 0);
-  const totals = totalsOf(lines, discountPercent);
+  const final = finalLines(lines, discountPercent, "auto", await issuerRecharges(db));
+  const totals = totalsOf(final.lines, discountPercent);
   const [row] = await db
     .insert(invoices)
     .values({
@@ -188,7 +217,7 @@ export async function createInvoiceFromOrder(
       taxableAmount: String(totals.taxableAmount),
       taxAmount: String(totals.taxAmount),
       total: String(totals.total),
-      stampDuty: suggestsStampDuty(lines, discountPercent),
+      stampDuty: final.stamp.applied,
       createdBy: actor.userId,
     })
     .returning({ id: invoices.id });
@@ -215,14 +244,17 @@ export async function saveInvoiceDraft(
   const { lines, ...header } = cleaned.value;
   const db = await getDb();
 
-  const totals = totalsOf(lines, header.discountPercent);
+  const final = finalLines(lines, header.discountPercent, header.stampDutyMode, await issuerRecharges(db));
+  const totals = totalsOf(final.lines, header.discountPercent);
   const [bumped] = await db
     .update(invoices)
     .set({
       series: header.series,
       dueDate: header.dueDate,
       discountPercent: String(header.discountPercent),
-      stampDuty: header.stampDuty,
+      stampDuty: final.stamp.applied,
+      stampDutyMode: header.stampDutyMode,
+      stampDutyNote: header.stampDutyNote,
       paymentMethod: header.paymentMethod,
       notes: header.notes,
       subtotal: String(totals.subtotal),
@@ -279,7 +311,7 @@ export async function issueInvoiceAction(
   const blockers: IssueBlockers = {
     issuer: issuerGaps(issuer ?? {}),
     customer: company ? customerGaps({ ...company, province: company.state }) : [{ field: "name", problem: "missing" }],
-    draft: draftProblems(lines, discount),
+    draft: draftProblems(lines, discount, { mode: invoice.stampDutyMode, note: invoice.stampDutyNote }),
   };
   if (blockers.issuer.length || blockers.customer.length || blockers.draft.length) {
     return { ok: false, error: "This invoice cannot be issued yet.", blockers };
@@ -288,6 +320,9 @@ export async function issueInvoiceAction(
   const issueDate = italianToday();
   const fiscalYear = Number(issueDate.slice(0, 4));
   const { id: _id, updatedAt: _u, updatedBy: _b, ...issuerFields } = issuer;
+  // Decided again here, from the lines being frozen, rather than trusted from the
+  // draft row: the stamp and its recharge line are part of what is issued.
+  const final = finalLines(lines, discount, invoice.stampDutyMode, Boolean(issuer.rechargeStampDuty));
   const result = await issueInvoice(db, {
     invoiceId: id,
     revision,
@@ -298,14 +333,40 @@ export async function issueInvoiceAction(
     issuedBy: actor.userId,
     issuerSnapshot: issuerFields,
     customerSnapshot: customerSnapshot(company),
-    linesSnapshot: lines,
-    totals: totalsOf(lines, discount),
+    linesSnapshot: final.lines,
+    stampDuty: final.stamp.applied,
+    totals: totalsOf(final.lines, discount),
   });
   if (!result) return { ok: false, error: "This invoice was issued or changed in the meantime. Reload it." };
 
   revalidatePath(LIST);
   revalidatePath(`${LIST}/${id}`);
   return { ok: true, documentNumber: result.documentNumber };
+}
+
+/** The value the upsert tried to insert, for the columns it updates on conflict. */
+/**
+ * Stamp duty on the invoices issued in `year`, by quarter, with the F24 deadline.
+ *
+ * ⚠️ A support figure. The Agenzia computes what is due from SDI data and publishes
+ * it in the reserved area; that amount is the one to pay.
+ */
+export async function getStampDutySummary(year: number) {
+  await requireCapability("record:read");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  const rows = await tolerateUnmigrated(
+    "invoices",
+    () =>
+      db
+        .select({ issueDate: invoices.issueDate })
+        .from(invoices)
+        .where(and(eq(invoices.status, "issued"), eq(invoices.stampDuty, true), eq(invoices.fiscalYear, year))),
+    [],
+  );
+  const perQuarter = { 1: 0, 2: 0, 3: 0, 4: 0 };
+  for (const r of rows) if (r.issueDate) perQuarter[quarterOf(r.issueDate)]++;
+  return quarterlyStampDuty(year, perQuarter);
 }
 
 /** The value the upsert tried to insert, for the columns it updates on conflict. */

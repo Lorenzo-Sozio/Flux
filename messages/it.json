@@ -3747,7 +3747,8 @@
       "bankName": "Banca",
       "name": "Ragione sociale",
       "sdiCode": "Codice destinatario (SDI)",
-      "pec": "PEC"
+      "pec": "PEC",
+      "rechargeStampDuty": "Addebita il bollo al cliente"
     },
     "soleShareholderOptions": {
       "none": "Non indicato",
@@ -3765,7 +3766,8 @@
     "failed": "Salvataggio non riuscito.",
     "billingTitle": "Fatturazione",
     "customerReady": "Dati completi per ricevere una fattura elettronica.",
-    "customerNotReady": "Per emettere una fattura a questo cliente manca:"
+    "customerNotReady": "Per emettere una fattura a questo cliente manca:",
+    "rechargeStampDutyHint": "Quando il bollo è dovuto, la fattura riceve una riga «Imposta di bollo assolta in modo virtuale» di € 2,00 esclusa IVA (N1). Senza, il bollo resta a carico tuo."
   },
   "invoices": {
     "title": "Fatture",
@@ -3808,7 +3810,8 @@
       "zero_rate_without_nature": "riga {line}: IVA 0% senza Natura",
       "nature_with_vat": "riga {line}: Natura su una riga con IVA",
       "unknown_nature": "riga {line}: codice Natura non valido",
-      "not_positive": "un totale maggiore di zero"
+      "not_positive": "un totale maggiore di zero",
+      "stamp_override_without_reason": "bollo: scrivi il motivo della scelta manuale"
     },
     "lines": "Righe",
     "description": "Descrizione",
@@ -3826,12 +3829,41 @@
     "dueDate": "Scadenza",
     "documentDiscount": "Sconto sul documento %",
     "paymentMethod": "Modalità di pagamento",
-    "stampDuty": "Bollo virtuale (€ 2,00)",
-    "stampSuggested": "Le righe senza IVA superano € 77,47: di norma il bollo è dovuto. Verifica col commercialista.",
-    "stampNotSuggested": "Le righe senza IVA non superano € 77,47, o sono esportazioni: di norma il bollo non è dovuto.",
     "notes": "Note",
     "subtotal": "Imponibile",
     "on": "su",
-    "createFromOrder": "Fattura"
+    "createFromOrder": "Fattura",
+    "stampTitle": "Imposta di bollo",
+    "stampApplied": "€ 2,00 applicata",
+    "stampNotApplied": "Non applicata",
+    "stampReasons": {
+      "above_threshold": "Dovuta: le righe senza IVA che la richiedono sommano {base}, oltre la soglia di € 77,47.",
+      "below_threshold": "Non dovuta: le righe senza IVA che la richiedono sommano {base}, entro la soglia di € 77,47.",
+      "only_exempt_lines": "Non dovuta: le righe senza IVA ({exempt}) sono esportazioni, cessioni UE o assimilate, esenti da bollo.",
+      "no_vat_free_lines": "Non dovuta: tutte le righe hanno IVA.",
+      "forced_on": "Applicata per scelta, contro il calcolo automatico (righe che la richiedono: {base}).",
+      "forced_off": "Non applicata per scelta, contro il calcolo automatico (righe che la richiedono: {base})."
+    },
+    "stampModes": {
+      "auto": "Automatica (dalle Nature IVA)",
+      "force_on": "Applica comunque",
+      "force_off": "Non applicare"
+    },
+    "stampReasonLabel": "Motivo",
+    "stampReasonPlaceholder": "Perché diverge dal calcolo automatico",
+    "stampRecharged": "Addebitata al cliente come riga N1 separata.",
+    "stampBorne": "A carico dell'emittente, non addebitata al cliente.",
+    "stampChangeSetting": "Cambia impostazione",
+    "stampLine": "Imposta di bollo assolta in modo virtuale",
+    "stampLineAuto": "aggiunta automaticamente",
+    "stampSummaryTitle": "Imposta di bollo {year}",
+    "stampSummaryHint": "Stima dalle fatture emesse. L'importo da versare è quello che l'Agenzia delle Entrate pubblica nell'area riservata, sulla base dei dati SDI. Le scadenze tengono conto dei rinvii sotto € 5.000 e dei fine settimana, non delle festività.",
+    "quarter": "Trimestre",
+    "quarterN": "{n}° trimestre",
+    "invoicesWithStamp": "Fatture con bollo",
+    "amount": "Importo",
+    "f24Code": "Codice tributo F24",
+    "payBy": "Da versare entro",
+    "deferred": "rinviato"
   }
 }

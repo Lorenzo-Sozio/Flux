@@ -893,6 +893,8 @@ export const invoiceIssuers = pgTable("invoice_issuer", {
   phone: text("phone"),
   iban: text("iban"),
   bankName: text("bank_name"),
+  // Recharge the €2.00 stamp to the customer as its own N1 line, or bear it.
+  rechargeStampDuty: boolean("recharge_stamp_duty").default(false).notNull(),
   updatedBy: text("updated_by"),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -936,7 +938,11 @@ export const invoices = pgTable(
     discountAmount: numeric("discount_amount", { precision: 12, scale: 2 }).default("0").notNull(),
     taxableAmount: numeric("taxable_amount", { precision: 12, scale: 2 }).default("0").notNull(),
     taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }).default("0").notNull(),
+    // Whether the invoice carries the stamp, decided by src/lib/stamp-duty.ts unless
+    // overridden; an override needs the reason in `stampDutyNote`.
     stampDuty: boolean("stamp_duty").default(false).notNull(),
+    stampDutyMode: text("stamp_duty_mode").default("auto").notNull(), // auto | force_on | force_off
+    stampDutyNote: text("stamp_duty_note"),
     total: numeric("total", { precision: 12, scale: 2 }).default("0").notNull(),
     paymentMethod: text("payment_method").default("MP05").notNull(),
     notes: text("notes"),

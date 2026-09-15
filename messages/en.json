@@ -3747,7 +3747,8 @@
       "bankName": "Bank",
       "name": "Company name",
       "sdiCode": "Recipient code (SDI)",
-      "pec": "PEC"
+      "pec": "PEC",
+      "rechargeStampDuty": "Recharge stamp duty to the customer"
     },
     "soleShareholderOptions": {
       "none": "Not stated",
@@ -3765,7 +3766,8 @@
     "failed": "Could not save.",
     "billingTitle": "Billing",
     "customerReady": "Complete for receiving an e-invoice.",
-    "customerNotReady": "Before an invoice can be issued to this customer:"
+    "customerNotReady": "Before an invoice can be issued to this customer:",
+    "rechargeStampDutyHint": "When stamp duty is due, the invoice gets a €2.00 line \"Imposta di bollo assolta in modo virtuale\", excluded from VAT (N1). Without it, you bear the stamp."
   },
   "invoices": {
     "title": "Invoices",
@@ -3808,7 +3810,8 @@
       "zero_rate_without_nature": "line {line}: 0% VAT without a Natura code",
       "nature_with_vat": "line {line}: Natura code on a taxed line",
       "unknown_nature": "line {line}: unknown Natura code",
-      "not_positive": "a total above zero"
+      "not_positive": "a total above zero",
+      "stamp_override_without_reason": "stamp duty: write the reason for the manual choice"
     },
     "lines": "Lines",
     "description": "Description",
@@ -3826,12 +3829,41 @@
     "dueDate": "Due date",
     "documentDiscount": "Document discount %",
     "paymentMethod": "Payment method",
-    "stampDuty": "Virtual stamp duty (€2.00)",
-    "stampSuggested": "VAT-free lines exceed €77.47: stamp duty is normally due. Check with your accountant.",
-    "stampNotSuggested": "VAT-free lines do not exceed €77.47, or are exports: stamp duty is normally not due.",
     "notes": "Notes",
     "subtotal": "Net",
     "on": "on",
-    "createFromOrder": "Invoice"
+    "createFromOrder": "Invoice",
+    "stampTitle": "Stamp duty",
+    "stampApplied": "€2.00 applied",
+    "stampNotApplied": "Not applied",
+    "stampReasons": {
+      "above_threshold": "Due: VAT-free lines that attract it add up to {base}, above the €77.47 threshold.",
+      "below_threshold": "Not due: VAT-free lines that attract it add up to {base}, within the €77.47 threshold.",
+      "only_exempt_lines": "Not due: the VAT-free lines ({exempt}) are exports, intra-EU or equivalent supplies, exempt from stamp duty.",
+      "no_vat_free_lines": "Not due: every line carries VAT.",
+      "forced_on": "Applied by choice, against the automatic assessment (lines that attract it: {base}).",
+      "forced_off": "Not applied by choice, against the automatic assessment (lines that attract it: {base})."
+    },
+    "stampModes": {
+      "auto": "Automatic (from the Natura codes)",
+      "force_on": "Apply anyway",
+      "force_off": "Do not apply"
+    },
+    "stampReasonLabel": "Reason",
+    "stampReasonPlaceholder": "Why this differs from the automatic assessment",
+    "stampRecharged": "Recharged to the customer as a separate N1 line.",
+    "stampBorne": "Borne by the issuer, not recharged.",
+    "stampChangeSetting": "Change setting",
+    "stampLine": "Imposta di bollo assolta in modo virtuale",
+    "stampLineAuto": "added automatically",
+    "stampSummaryTitle": "Stamp duty {year}",
+    "stampSummaryHint": "An estimate from issued invoices. The amount to pay is the one the Agenzia delle Entrate publishes in the reserved area from SDI data. Deadlines account for deferrals under €5,000 and weekends, not public holidays.",
+    "quarter": "Quarter",
+    "quarterN": "Q{n}",
+    "invoicesWithStamp": "Invoices with stamp",
+    "amount": "Amount",
+    "f24Code": "F24 tax code",
+    "payBy": "Pay by",
+    "deferred": "deferred"
   }
 }

@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { draftProblems, formatInvoiceNumber, invoiceScope, isValidSeries, suggestsStampDuty } from "./invoice-rules";
+import { draftProblems, formatInvoiceNumber, invoiceScope, isValidSeries } from "./invoice-rules";
 
 const line = (l: Partial<Parameters<typeof draftProblems>[0][number]> = {}) => ({
   description: "Consulenza",
@@ -43,22 +43,14 @@ describe("a draft ready to issue", () => {
   });
 });
 
-describe("stamp duty", () => {
-  it("⚠️ is suggested when VAT-free amounts pass €77.47", () => {
-    expect(suggestsStampDuty([line({ taxPercent: 0, nature: "N4", unitPrice: 77.48 })])).toBe(true);
-    expect(suggestsStampDuty([line({ taxPercent: 0, nature: "N4", unitPrice: 77.47 })])).toBe(false);
-  });
-
-  it("⚠️ counts only the VAT-free lines, after the document discount", () => {
-    expect(suggestsStampDuty([line({ unitPrice: 1000 }), line({ taxPercent: 0, nature: "N4", unitPrice: 50 })])).toBe(
-      false,
-    );
-    expect(suggestsStampDuty([line({ taxPercent: 0, nature: "N4", unitPrice: 80 })], 10)).toBe(false);
-  });
-
-  it("is not suggested for exports and intra-EU supplies", () => {
-    expect(suggestsStampDuty([line({ taxPercent: 0, nature: "N3.1", unitPrice: 500 })])).toBe(false);
-    expect(suggestsStampDuty([line({ taxPercent: 0, nature: "N3.2", unitPrice: 500 })])).toBe(false);
+describe("overriding the stamp duty", () => {
+  it("⚠️ needs a written reason before the invoice can be issued", () => {
+    expect(draftProblems([line()], 0, { mode: "force_off" })).toEqual([{ kind: "stamp_override_without_reason" }]);
+    expect(draftProblems([line()], 0, { mode: "force_off", note: "ok" })).toEqual([
+      { kind: "stamp_override_without_reason" },
+    ]);
+    expect(draftProblems([line()], 0, { mode: "force_off", note: "Esenzione soggettiva ONLUS" })).toEqual([]);
+    expect(draftProblems([line()], 0, { mode: "auto" })).toEqual([]);
   });
 });
 

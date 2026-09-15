@@ -1,11 +1,11 @@
-import { computeDocument, round2 } from "@/lib/document-totals";
+import { computeDocument } from "@/lib/document-totals";
 
 /**
  * The rules of an invoice that do not depend on how it reaches SDI.
  *
  * Perimeter decided on 15 September 2026 (D2, D3): TD01 invoices and TD04 credit
  * notes, ordinary VAT with a Natura code on every zero-rate line, virtual stamp
- * duty; one invoice per order. Split payment, withholding tax and reverse charge
+ * duty (src/lib/stamp-duty.ts); one invoice per order. Split payment, withholding tax and reverse charge
  * are a later version, and nothing here pretends to handle them.
  */
 
@@ -46,10 +46,15 @@ export type DraftProblem =
   | { kind: "zero_rate_without_nature"; line: number }
   | { kind: "nature_with_vat"; line: number }
   | { kind: "unknown_nature"; line: number }
-  | { kind: "not_positive" };
+  | { kind: "not_positive" }
+  | { kind: "stamp_override_without_reason" };
 
 /** What stops this draft being issued, line by line (1-based). Empty means it can go. */
-export function draftProblems(lines: readonly DraftLine[], discountPercent = 0): DraftProblem[] {
+export function draftProblems(
+  lines: readonly DraftLine[],
+  discountPercent = 0,
+  stamp: { mode: string; note?: string | null } = { mode: "auto" },
+): DraftProblem[] {
   if (lines.length === 0) return [{ kind: "no_lines" }];
   const problems: DraftProblem[] = [];
   lines.forEach((l, i) => {
@@ -64,30 +69,12 @@ export function draftProblems(lines: readonly DraftLine[], discountPercent = 0):
   const totals = computeDocument({ lines: [...lines], discountPercent });
   // A credit note is its own document type; an invoice of zero or less is not one.
   if (!(totals.total > 0)) problems.push({ kind: "not_positive" });
+  // Overriding what the Natura codes say about stamp duty is sometimes right, and
+  // always something an auditor will ask about: the reason travels with the invoice.
+  if (stamp.mode !== "auto" && (stamp.note ?? "").trim().length < 5) {
+    problems.push({ kind: "stamp_override_without_reason" });
+  }
   return problems;
-}
-
-/** The stamp duty on an invoice, in euro. */
-export const STAMP_DUTY = 2;
-/** Above this, VAT-free amounts attract stamp duty. */
-export const STAMP_DUTY_THRESHOLD = 77.47;
-
-/**
- * Whether stamp duty is due, as a *suggestion* for the draft.
- *
- * ⚠️ Deliberately a proposal the person confirms, not a rule applied silently:
- * exports and intra-EU supplies (N3.1, N3.2) are outside it while other
- * non-taxable operations are not, and edge cases belong to an accountant. What
- * the code can do is not forget to ask when zero-rate amounts cross the threshold.
- */
-export function suggestsStampDuty(lines: readonly DraftLine[], discountPercent = 0): boolean {
-  const totals = computeDocument({ lines: [...lines], discountPercent });
-  const exemptFromDuty = new Set(["N3.1", "N3.2"]);
-  const vatFree = totals.lines.reduce((sum, l, i) => {
-    const nature = lines[i].nature ?? "";
-    return l.taxPercent === 0 && !exemptFromDuty.has(nature) ? sum + l.netAfterDocumentDiscount : sum;
-  }, 0);
-  return round2(vatFree) > STAMP_DUTY_THRESHOLD;
 }
 
 /** The sequence an invoice number is drawn from: one per document series and year. */

@@ -36,8 +36,9 @@ export interface IssueInput {
   issuedBy: string | null;
   issuerSnapshot: unknown;
   customerSnapshot: unknown;
-  /** The lines the totals were computed from. */
+  /** The lines the totals were computed from, stamp recharge line included. */
   linesSnapshot: unknown;
+  stampDuty: boolean;
   totals: {
     subtotal: number;
     discountAmount: number;
@@ -73,6 +74,7 @@ export function issueStatement(input: IssueInput) {
       issuer_snapshot = ${JSON.stringify(input.issuerSnapshot)}::jsonb,
       customer_snapshot = ${JSON.stringify(input.customerSnapshot)}::jsonb,
       lines_snapshot = ${JSON.stringify(input.linesSnapshot)}::jsonb,
+      stamp_duty = ${input.stampDuty},
       subtotal = ${money(input.totals.subtotal)},
       discount_amount = ${money(input.totals.discountAmount)},
       taxable_amount = ${money(input.totals.taxableAmount)},

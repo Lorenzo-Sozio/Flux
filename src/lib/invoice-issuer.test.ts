@@ -66,4 +66,9 @@ describe("cleaning the issuer profile", () => {
     expect(cleanIssuer({ legalName: "x".repeat(200) }).legalName).toHaveLength(80);
     expect(cleanIssuer({ phone: "+39 02 1234 5678 999" }).phone?.length).toBeLessThanOrEqual(12);
   });
+
+  it("stores whether the stamp is recharged as a plain yes or no", () => {
+    expect(cleanIssuer({ rechargeStampDuty: true }).rechargeStampDuty).toBe(true);
+    expect(cleanIssuer({}).rechargeStampDuty).toBe(false);
+  });
 });

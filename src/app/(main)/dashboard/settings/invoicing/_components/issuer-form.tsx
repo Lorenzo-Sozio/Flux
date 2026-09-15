@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { type IssuerProfileRow, saveIssuerProfile } from "@/actions/invoicing";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -51,6 +52,7 @@ export function IssuerForm({ initial }: { initial: IssuerProfileRow | null }) {
         ]),
       ) as Values,
   );
+  const [recharge, setRecharge] = useState(Boolean(initial?.rechargeStampDuty));
   const [saving, setSaving] = useState(false);
   // Computed on what will be stored, so "it 00905811006" does not show as invalid.
   const gaps = useMemo(() => issuerGaps(cleanIssuer(values)), [values]);
@@ -61,7 +63,7 @@ export function IssuerForm({ initial }: { initial: IssuerProfileRow | null }) {
   const save = async () => {
     setSaving(true);
     try {
-      await saveIssuerProfile(values);
+      await saveIssuerProfile({ ...values, rechargeStampDuty: recharge });
       toast.success(t("saved"));
     } catch {
       toast.error(t("failed"));
@@ -196,6 +198,20 @@ export function IssuerForm({ initial }: { initial: IssuerProfileRow | null }) {
           {input("bankName")}
           {input("email", { type: "email" })}
           {input("phone", { type: "tel" })}
+          <div className="flex items-start gap-2 sm:col-span-2">
+            <Checkbox
+              id="issuer-recharge"
+              className="mt-0.5"
+              checked={recharge}
+              onCheckedChange={(v) => setRecharge(v === true)}
+            />
+            <div className="min-w-0">
+              <Label htmlFor="issuer-recharge" className="cursor-pointer">
+                {t("fields.rechargeStampDuty")}
+              </Label>
+              <p className="text-muted-foreground text-xs">{t("rechargeStampDutyHint")}</p>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

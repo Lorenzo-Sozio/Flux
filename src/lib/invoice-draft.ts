@@ -20,7 +20,8 @@ export interface DraftInput {
   series: string;
   dueDate?: string | null;
   discountPercent: number;
-  stampDuty: boolean;
+  stampDutyMode: string;
+  stampDutyNote?: string | null;
   paymentMethod: string;
   notes?: string | null;
   lines: DraftLineInput[];
@@ -75,6 +76,9 @@ export function cleanDraft(input: DraftInput): { ok: true; value: DraftInput } |
   const discountPercent = Number(input.discountPercent) || 0;
   if (discountPercent < 0 || discountPercent > 100) return { ok: false, error: "The discount is between 0 and 100%." };
   if (!Object.hasOwn(PAYMENT_METHODS, input.paymentMethod)) return { ok: false, error: "Unknown payment method." };
+  if (!["auto", "force_on", "force_off"].includes(input.stampDutyMode)) {
+    return { ok: false, error: "Unknown stamp duty setting." };
+  }
   if (input.lines.length > 200) return { ok: false, error: "An invoice has at most 200 lines." };
 
   const lines: DraftLineInput[] = [];
@@ -111,7 +115,9 @@ export function cleanDraft(input: DraftInput): { ok: true; value: DraftInput } |
       series,
       dueDate,
       discountPercent: Math.round(discountPercent * 100) / 100,
-      stampDuty: Boolean(input.stampDuty),
+      stampDutyMode: input.stampDutyMode,
+      // Kept only while it means something: back on automatic, the old reason is noise.
+      stampDutyNote: input.stampDutyMode === "auto" ? null : input.stampDutyNote?.trim().slice(0, 500) || null,
       paymentMethod: input.paymentMethod,
       notes: input.notes?.trim().slice(0, 2000) || null,
       lines,

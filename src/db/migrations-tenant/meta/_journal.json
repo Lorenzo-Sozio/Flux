@@ -169,6 +169,13 @@
       "when": 1789580000000,
       "tag": "0023_numbered_without_gaps",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789600000000,
+      "tag": "0024_two_euros_decided_by_rule",
+      "breakpoints": true
     }
   ]
 }

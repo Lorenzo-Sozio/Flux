@@ -1,0 +1,92 @@
+[
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️⚠️ la dichiarazione d'intento (N3.5) viene trattata come esente: bollo mancante e sanzioni",
+    "find": "  \"N3.5\": \"counts\",",
+    "replace": "  \"N3.5\": \"exempt\","
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️⚠️ le esportazioni pagano il bollo",
+    "find": "  \"N3.1\": \"exempt\",",
+    "replace": "  \"N3.1\": \"counts\","
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️⚠️ le cessioni intracomunitarie pagano il bollo",
+    "find": "  \"N3.2\": \"exempt\",",
+    "replace": "  \"N3.2\": \"counts\","
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️ il regime del margine paga il bollo",
+    "find": "  N5: \"not_applicable\",",
+    "replace": "  N5: \"counts\","
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️⚠️ la soglia di 77,47 viene applicata con il maggiore o uguale",
+    "find": "  const due = base > STAMP_DUTY_THRESHOLD;",
+    "replace": "  const due = base >= STAMP_DUTY_THRESHOLD;"
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️⚠️ la soglia si confronta sul totale della fattura invoce che sulle righe senza IVA",
+    "find": "    if (l.taxPercent !== 0) return;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️⚠️ la riga di rivalsa del bollo conta per la propria soglia",
+    "find": "  const counted = lines.filter((l) => !l.isStampRecharge);",
+    "replace": "  const counted = [...lines];"
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️ lo sconto sul documento non riduce la base del bollo",
+    "find": "    const net = totals.lines[i].netAfterDocumentDiscount;",
+    "replace": "    const net = totals.lines[i].net;"
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️⚠️ la forzatura viene ignorata",
+    "find": "  return { due, applied: mode === \"force_on\" ? true : mode === \"force_off\" ? false : due, base, exemptBase, reason };",
+    "replace": "  return { due, applied: due, base, exemptBase, reason };"
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️⚠️ la riga di rivalsa si duplica a ogni salvataggio",
+    "find": "  const own = lines.filter((l) => !l.isStampRecharge);",
+    "replace": "  const own = [...lines];"
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️⚠️ la rivalsa viene addebitata anche quando l'emittente non la vuole",
+    "find": "  if (!applied || !recharge) return own;",
+    "replace": "  if (!applied) return own;"
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️⚠️ il primo trimestre sotto 5.000 euro non viene rinviato",
+    "find": "  const q1Deferred = amount(1) < DEFERRAL_THRESHOLD;",
+    "replace": "  const q1Deferred = false;"
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️ il rinvio al 30 novembre ignora il secondo trimestre",
+    "find": "  const firstHalfDeferred = amount(1) + amount(2) < DEFERRAL_THRESHOLD;",
+    "replace": "  const firstHalfDeferred = amount(1) < DEFERRAL_THRESHOLD;"
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️ una scadenza di domenica non slitta al lunedi'",
+    "find": "    if (weekday !== 0 && weekday !== 6) return d;",
+    "replace": "    return d;"
+  },
+  {
+    "file": "src/lib/stamp-duty.ts",
+    "description": "⚠️⚠️ i codici tributo F24 sono scambiati",
+    "find": "{ 1: \"2521\", 2: \"2522\", 3: \"2523\", 4: \"2524\" }",
+    "replace": "{ 1: \"2522\", 2: \"2521\", 3: \"2523\", 4: \"2524\" }"
+  }
+]

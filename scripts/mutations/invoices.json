@@ -54,18 +54,6 @@
     "replace": ""
   },
   {
-    "file": "src/lib/invoice-rules.ts",
-    "description": "⚠️ il bollo viene suggerito anche per le esportazioni",
-    "find": "  const exemptFromDuty = new Set([\"N3.1\", \"N3.2\"]);",
-    "replace": "  const exemptFromDuty = new Set<string>([]);"
-  },
-  {
-    "file": "src/lib/invoice-rules.ts",
-    "description": "⚠️ il bollo viene suggerito sotto la soglia",
-    "find": "  return round2(vatFree) > STAMP_DUTY_THRESHOLD;",
-    "replace": "  return round2(vatFree) >= STAMP_DUTY_THRESHOLD - 1;"
-  },
-  {
     "file": "src/actions/invoices.ts",
     "description": "⚠️⚠️ chiunque puo' emettere una fattura",
     "find": "  const actor = await requireCapability(\"invoice:issue\");",
@@ -112,5 +100,17 @@
     "description": "⚠️ si salva un codice Natura inesistente",
     "find": "    if (nature && !Object.hasOwn(NATURE_CODES, nature)) return { ok: false, error: `Line ${n}: unknown Natura code.` };",
     "replace": ""
+  },
+  {
+    "file": "src/actions/invoices.ts",
+    "description": "⚠️⚠️ all'emissione il bollo si prende dalla bozza invece che dalle righe congelate",
+    "find": "    stampDuty: final.stamp.applied,\n    totals: totalsOf(final.lines, discount),",
+    "replace": "    stampDuty: invoice.stampDuty,\n    totals: totalsOf(final.lines, discount),"
+  },
+  {
+    "file": "src/lib/invoice-rules.ts",
+    "description": "⚠️ si emette una fattura con il bollo forzato senza motivo",
+    "find": "  if (stamp.mode !== \"auto\" && (stamp.note ?? \"\").trim().length < 5) {",
+    "replace": "  if (false) {"
   }
 ]

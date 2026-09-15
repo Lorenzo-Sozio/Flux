@@ -46,6 +46,7 @@ const input = (id: string, over: Partial<IssueInput> = {}): IssueInput => ({
   issuerSnapshot: { legalName: "Esempio S.r.l." },
   customerSnapshot: { name: "Cliente S.p.A." },
   linesSnapshot: [{ description: "Consulenza", quantity: 1, unitPrice: 100, taxPercent: 22 }],
+  stampDuty: true,
   totals: { subtotal: 100, discountAmount: 0, taxableAmount: 100, taxAmount: 22, total: 122 },
   ...over,
 });
@@ -103,6 +104,7 @@ describe("issuing", () => {
       issuer_snapshot: { legalName: "Esempio S.r.l." },
       customer_snapshot: { name: "Cliente S.p.A." },
       lines_snapshot: [{ description: "Consulenza", quantity: 1, unitPrice: 100, taxPercent: 22 }],
+      stamp_duty: true,
       total: "122.00",
       tax_amount: "22.00",
     });

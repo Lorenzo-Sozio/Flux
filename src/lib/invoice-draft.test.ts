@@ -54,13 +54,22 @@ const draft = {
   series: "",
   dueDate: "2026-10-15",
   discountPercent: 0,
-  stampDuty: false,
+  stampDutyMode: "auto",
+  stampDutyNote: "left over",
   paymentMethod: "MP05",
   notes: "",
   lines: [{ description: " Consulenza ", quantity: 1.23456, unitPrice: 99.999, taxPercent: 22 }],
 };
 
 describe("saving a draft", () => {
+  it("⚠️ drops a stamp duty reason once the invoice is back on automatic", () => {
+    const r = cleanDraft(draft);
+    expect(r.ok && r.value.stampDutyNote).toBeNull();
+    const forced = cleanDraft({ ...draft, stampDutyMode: "force_off", stampDutyNote: " Esenzione ONLUS " });
+    expect(forced.ok && forced.value.stampDutyNote).toBe("Esenzione ONLUS");
+    expect(cleanDraft({ ...draft, stampDutyMode: "sometimes" }).ok).toBe(false);
+  });
+
   it("rounds to what the XML carries and trims text", () => {
     const r = cleanDraft(draft);
     expect(r.ok && r.value.lines[0]).toMatchObject({ description: "Consulenza", quantity: 1.235, unitPrice: 100 });

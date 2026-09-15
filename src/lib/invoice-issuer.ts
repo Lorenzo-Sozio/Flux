@@ -28,6 +28,7 @@ export interface IssuerInput {
   phone?: string | null;
   iban?: string | null;
   bankName?: string | null;
+  rechargeStampDuty?: boolean | null;
 }
 
 const text = (v: string | null | undefined, max: number) => {
@@ -65,5 +66,6 @@ export function cleanIssuer(input: IssuerInput) {
     phone: text(input.phone, 12),
     iban: code(input.iban, 34),
     bankName: text(input.bankName, 80),
+    rechargeStampDuty: Boolean(input.rechargeStampDuty),
   };
 }

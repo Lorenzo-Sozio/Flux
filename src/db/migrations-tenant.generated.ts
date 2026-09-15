@@ -444,4 +444,14 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nCREATE TABLE IF NOT EXISTS "invoice_item" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"invoice_id" text NOT NULL REFERENCES "invoice"("id") ON DELETE CASCADE,\n\t"position" integer NOT NULL,\n\t"product_id" text REFERENCES "product"("id") ON DELETE SET NULL,\n\t"description" text NOT NULL,\n\t"quantity" numeric(12, 3) NOT NULL,\n\t"unit_price" numeric(12, 2) NOT NULL,\n\t"discount_percent" numeric(5, 2) DEFAULT \'0\' NOT NULL,\n\t"tax_percent" numeric(5, 2) DEFAULT \'0\' NOT NULL,\n\t"nature" text,\n\tCONSTRAINT "invoice_item_position_uniq" UNIQUE("invoice_id", "position")\n);\n',
     ],
   },
+  {
+    tag: "0024_two_euros_decided_by_rule",
+    folderMillis: 1789600000000,
+    hash: "01d71dd7b4ebc1d0197f1ed558b6ff83e232d06b2e6dcf098df59b3d6bf687e9",
+    sql: [
+      '-- Stamp duty decided from the Natura codes, with a reason for any override, and\n-- whether the issuer recharges it to the customer.\n--\n-- Additive and re-runnable, as every tenant migration has to be.\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "stamp_duty_mode" text DEFAULT \'auto\' NOT NULL;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "stamp_duty_note" text;\n',
+      '\nALTER TABLE "invoice_issuer" ADD COLUMN IF NOT EXISTS "recharge_stamp_duty" boolean DEFAULT false NOT NULL;\n',
+    ],
+  },
 ];

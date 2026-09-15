@@ -29,7 +29,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -37,7 +36,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { computeDocument } from "@/lib/document-totals";
 import { PAYMENT_METHODS } from "@/lib/invoice-draft";
-import { draftProblems, NATURE_CODES, suggestsStampDuty } from "@/lib/invoice-rules";
+import { draftProblems, NATURE_CODES } from "@/lib/invoice-rules";
+import { assessStampDuty, STAMP_DUTY_AMOUNT, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
 
 type Data = NonNullable<Awaited<ReturnType<typeof getInvoice>>>;
 
@@ -67,7 +67,8 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
   const [series, setSeries] = useState(invoice.series);
   const [dueDate, setDueDate] = useState(invoice.dueDate ?? "");
   const [discount, setDiscount] = useState(String(Number(invoice.discountPercent)));
-  const [stampDuty, setStampDuty] = useState(invoice.stampDuty);
+  const [stampMode, setStampMode] = useState<StampMode>(invoice.stampDutyMode as StampMode);
+  const [stampNote, setStampNote] = useState(invoice.stampDutyNote ?? "");
   const [paymentMethod, setPaymentMethod] = useState(invoice.paymentMethod);
   const [notes, setNotes] = useState(invoice.notes ?? "");
   const [lines, setLines] = useState<Line[]>(() => {
@@ -106,10 +107,22 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
       })),
     [lines],
   );
-  const totals = computeDocument({ lines: draftLines, discountPercent: num(discount) });
+  // A draft decides the stamp live from its lines; an issued invoice shows what was frozen.
+  const stamp = assessStampDuty(draftLines, num(discount), stampMode);
+  const stampApplied = isDraft ? stamp.applied : invoice.stampDuty;
+  const rechargeLine = isDraft && stamp.applied && data.rechargeStamp;
+  const totalledLines = isDraft
+    ? withStampRecharge(
+        draftLines.map((l) => ({ ...l, description: l.description })),
+        stamp.applied,
+        data.rechargeStamp,
+      )
+    : draftLines;
+  const totals = computeDocument({ lines: totalledLines, discountPercent: num(discount) });
   // The draft checks run on the screen as typed, so the list of what is missing moves with the edit.
-  const liveDraftProblems = isDraft ? draftProblems(draftLines, num(discount)) : [];
-  const stampSuggested = suggestsStampDuty(draftLines, num(discount));
+  const liveDraftProblems = isDraft
+    ? draftProblems(draftLines, num(discount), { mode: stampMode, note: stampNote })
+    : [];
   const money = (n: number) =>
     new Intl.NumberFormat("it-IT", { style: "currency", currency: invoice.currency }).format(n);
 
@@ -129,7 +142,8 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
       series,
       dueDate: dueDate || null,
       discountPercent: num(discount),
-      stampDuty,
+      stampDutyMode: stampMode,
+      stampDutyNote: stampNote,
       paymentMethod,
       notes,
       lines: lines.map((l) => ({
@@ -360,6 +374,23 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
                   )}
                 </TableRow>
               ))}
+              {rechargeLine && (
+                <TableRow className="bg-muted/30 text-muted-foreground">
+                  <TableCell>
+                    {t("stampLine")}
+                    <span className="ml-2 text-[11px]">({t("stampLineAuto")})</span>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">1</TableCell>
+                  <TableCell className="text-right tabular-nums">{STAMP_DUTY_AMOUNT}</TableCell>
+                  <TableCell className="text-right tabular-nums">0</TableCell>
+                  <TableCell className="text-right tabular-nums">0</TableCell>
+                  <TableCell>
+                    <span className="font-mono text-xs">N1</span>
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">{money(STAMP_DUTY_AMOUNT)}</TableCell>
+                  {editable && <TableCell />}
+                </TableRow>
+              )}
             </TableBody>
           </Table>
           {editable && (
@@ -443,22 +474,61 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
                 </SelectContent>
               </Select>
             </div>
-            <div className="sm:col-span-2">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="inv-stamp"
-                  checked={stampDuty}
-                  disabled={!editable}
-                  onCheckedChange={(v) => touch(setStampDuty)(v === true)}
-                />
-                <Label htmlFor="inv-stamp" className="cursor-pointer">
-                  {t("stampDuty")}
-                </Label>
+            <div className="space-y-2 rounded-md border p-3 sm:col-span-2">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-medium text-sm">{t("stampTitle")}</p>
+                <Badge variant={stampApplied ? "secondary" : "outline"}>
+                  {stampApplied ? t("stampApplied") : t("stampNotApplied")}
+                </Badge>
               </div>
-              {isDraft && stampSuggested !== stampDuty && (
-                <p className="mt-1 text-amber-700 text-xs dark:text-amber-400">
-                  {stampSuggested ? t("stampSuggested") : t("stampNotSuggested")}
-                </p>
+              {isDraft ? (
+                <>
+                  <p className="text-muted-foreground text-xs">
+                    {t(`stampReasons.${stamp.reason}`, {
+                      base: money(stamp.base),
+                      exempt: money(stamp.exemptBase),
+                    })}
+                  </p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <Select
+                      value={stampMode}
+                      onValueChange={(v) => touch(setStampMode)(v as StampMode)}
+                      disabled={!editable}
+                    >
+                      <SelectTrigger aria-label={t("stampTitle")} className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="auto">{t("stampModes.auto")}</SelectItem>
+                        <SelectItem value="force_on">{t("stampModes.force_on")}</SelectItem>
+                        <SelectItem value="force_off">{t("stampModes.force_off")}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {stampMode !== "auto" && (
+                      <Input
+                        aria-label={t("stampReasonLabel")}
+                        placeholder={t("stampReasonPlaceholder")}
+                        value={stampNote}
+                        disabled={!editable}
+                        onChange={(e) => touch(setStampNote)(e.target.value)}
+                      />
+                    )}
+                  </div>
+                  {stamp.applied && (
+                    <p className="text-muted-foreground text-xs">
+                      {data.rechargeStamp ? t("stampRecharged") : t("stampBorne")}{" "}
+                      <Link href="/dashboard/settings/invoicing" className="underline">
+                        {t("stampChangeSetting")}
+                      </Link>
+                    </p>
+                  )}
+                </>
+              ) : (
+                invoice.stampDutyNote && (
+                  <p className="text-muted-foreground text-xs">
+                    {t("stampReasonLabel")}: {invoice.stampDutyNote}
+                  </p>
+                )
               )}
             </div>
             <div className="sm:col-span-2">

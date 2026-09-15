@@ -62,7 +62,24 @@ describe("issuing", () => {
     expect(b).toContain("await issueInvoice(db, {");
     expect(b).toContain("    revision,\n");
     expect(b).toContain("scope: invoiceScope(invoice.series, fiscalYear)");
-    expect(b).toContain("linesSnapshot: lines,");
+    expect(b).toContain("linesSnapshot: final.lines,");
+  });
+
+  it("⚠️⚠️ decides the stamp again from the lines being frozen, and freezes the recharge line with them", () => {
+    const b = body("issueInvoiceAction");
+    const decide = b.indexOf(
+      "const final = finalLines(lines, discount, invoice.stampDutyMode, Boolean(issuer.rechargeStampDuty));",
+    );
+    expect(decide, "the stamp is taken from the draft row instead").toBeGreaterThan(-1);
+    expect(decide).toBeLessThan(b.indexOf("await issueInvoice("));
+    expect(b).toContain("stampDuty: final.stamp.applied,");
+    expect(b).toContain("totals: totalsOf(final.lines, discount),");
+  });
+
+  it("⚠️ refuses a stamp override without a reason", () => {
+    expect(body("issueInvoiceAction")).toContain(
+      "draft: draftProblems(lines, discount, { mode: invoice.stampDutyMode, note: invoice.stampDutyNote }),",
+    );
   });
 
   it("⚠️ dates the invoice in Italian time, not UTC", () => {
