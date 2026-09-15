@@ -16,6 +16,7 @@ import {
   Clock,
   ExternalLink,
   FileText,
+  Loader2,
   Lock,
   Mail,
   MessageCircle,
@@ -46,6 +47,7 @@ import {
   getMacros,
   getOrdersForTicket,
   getTicketById,
+  getTicketTimelineBefore,
   linkTicketToOrderAction,
   reassignTicketAction,
   updateTicketAction,
@@ -79,6 +81,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { ticketMacros } from "@/db/schema";
 import { useCurrency } from "@/hooks/use-currency";
 import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
+import { mergeThread, oldestOf } from "@/lib/ticket-thread";
 
 import { HandoverCard } from "../_components/handover-card";
 import { TriageCard } from "../_components/triage-card";
@@ -982,6 +985,8 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
   const [loading, setLoading] = useState(true);
   const [presence, setPresence] = useState<PresenceEntry[]>([]);
   const [ticketDocs, setTicketDocs] = useState<Record<string, TicketDocument>>({});
+  /** Whether an older page is on its way, so the button cannot fire twice. */
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
 
   const [replyContent, setReplyContent] = useState("");
   const [isInternal, setIsInternal] = useState(false);
@@ -1033,12 +1038,12 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
       ]);
       if (data) {
         setTicket(data);
-        setMessages(
-          [...(data.messages ?? [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
-        );
-        setAuditLogs(
-          [...(data.auditLogs ?? [])].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()),
-        );
+        // ⚠️ Merged, not replaced. This runs again after every reply, and it loads
+        // only the latest page: replacing would throw away every older page the
+        // agent had opened, and the conversation they were reading would vanish
+        // from above the reply they had just sent.
+        setMessages((held) => mergeThread(data.messages ?? [], held));
+        setAuditLogs((held) => mergeThread(data.auditLogs ?? [], held));
         setSelectedAssignee(encodeAssignee(data.assigneeId, null));
       }
       const docsById: Record<string, TicketDocument> = {};
@@ -1181,6 +1186,27 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
     ticket?.sla && !ticket.resolvedAt
       ? new Date(new Date(ticket.createdAt).getTime() + ticket.sla.resolutionTimeMinutes * 60_000)
       : null;
+
+  /** More of the thread exists than the screen holds. Counted, not inferred from a page length. */
+  const hasEarlier = ticket
+    ? messages.length < (ticket.messageCount ?? 0) || auditLogs.length < (ticket.auditCount ?? 0)
+    : false;
+
+  const loadEarlier = async () => {
+    const before = oldestOf(messages, auditLogs);
+    if (!before || loadingEarlier) return;
+    setLoadingEarlier(true);
+    try {
+      const older = await getTicketTimelineBefore(id, before.toISOString());
+      setMessages((held) => mergeThread(older.messages, held));
+      setAuditLogs((held) => mergeThread(older.auditLogs, held));
+    } catch (e) {
+      console.error("Failed to load earlier messages:", e);
+      toast.error(t("loadEarlierFailed"));
+    } finally {
+      setLoadingEarlier(false);
+    }
+  };
 
   // Build chronological timeline merging messages + audit events
   const timeline = [
@@ -1334,6 +1360,14 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
 
             {/* Timeline */}
             <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 px-4 py-4 lg:overflow-y-auto lg:px-6 lg:py-5">
+              {hasEarlier && (
+                <div className="flex justify-center">
+                  <Button type="button" variant="outline" size="sm" onClick={loadEarlier} disabled={loadingEarlier}>
+                    {loadingEarlier && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    {t("loadEarlier")}
+                  </Button>
+                </div>
+              )}
               {timeline.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-center">
                   <MessageSquare className="mb-3 h-10 w-10 text-muted-foreground/20" />
@@ -1481,16 +1515,7 @@ export default function TicketDetailPage({ params }: { params: Promise<{ id: str
               it" decides whether this ticket gets opened at all, and it is read
               before anything else on the page.
             */}
-            <HandoverCard
-              messages={messages.map((m) => ({
-                id: m.id,
-                senderId: m.senderId ?? null,
-                senderName: m.sender?.name ?? m.senderName ?? null,
-                isPublic: m.isPublic,
-                content: m.content,
-                createdAt: new Date(m.createdAt),
-              }))}
-            />
+            {ticket.handoverSummary && <HandoverCard summary={ticket.handoverSummary} />}
             {/*
               What this ticket resembles, from what the workspace has already
               answered (audit rilievo S-05). Above the history because it is the

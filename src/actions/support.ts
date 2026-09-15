@@ -36,7 +36,9 @@ import { TICKET_LIST_CAP, TICKET_WINDOW_DAYS } from "@/lib/queue-window";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 import { logTicketChange } from "@/lib/ticket-audit";
+import { handover } from "@/lib/ticket-handover";
 import { canTransition, isSLAPauseStatus } from "@/lib/ticket-state-machine";
+import { HANDOVER_CONTENT_CAP, TICKET_THREAD_PAGE } from "@/lib/ticket-thread";
 import { suggestMacros, triage } from "@/lib/ticket-triage";
 import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
 
@@ -209,14 +211,19 @@ export async function getTicketById(ticketId: string) {
       owner: { columns: USER_SUMMARY_COLUMNS },
       sla: true,
       group: true,
+      // ⚠️ The most recent page only. Older pages come from
+      // `getTicketTimelineBefore`. See src/lib/ticket-thread.ts for why the whole
+      // thread used to arrive at once, and what still needs all of it.
       messages: {
         orderBy: desc(ticketMessages.createdAt),
+        limit: TICKET_THREAD_PAGE,
         with: {
           sender: { columns: USER_SUMMARY_COLUMNS },
         },
       },
       auditLogs: {
         orderBy: desc(ticketAuditLogs.createdAt),
+        limit: TICKET_THREAD_PAGE,
         with: {
           actor: { columns: USER_SUMMARY_COLUMNS },
         },
@@ -226,7 +233,77 @@ export async function getTicketById(ticketId: string) {
 
   if (!ticket) throw new Error("Ticket not found");
 
-  return ticket;
+  // ⚠️⚠️ Computed over the WHOLE thread, not over the page just loaded. The
+  // summary names the message the customer opened with, counts the replies and
+  // says whether anybody ever answered; read from the latest hundred messages of
+  // a long ticket it would name the wrong opening and undercount, and nothing on
+  // the screen would look wrong. So it reads every message — but only what the
+  // summary uses, and only as much content as its excerpt could ever show.
+  const [thread, [messageTotal], [auditTotal]] = await Promise.all([
+    db
+      .select({
+        id: ticketMessages.id,
+        senderId: ticketMessages.senderId,
+        senderName: sql<string | null>`coalesce(${users.name}, ${ticketMessages.senderName})`,
+        isPublic: ticketMessages.isPublic,
+        content: sql<string>`left(${ticketMessages.content}, ${sql.raw(String(HANDOVER_CONTENT_CAP))})`,
+        createdAt: ticketMessages.createdAt,
+      })
+      .from(ticketMessages)
+      .leftJoin(users, eq(users.id, ticketMessages.senderId))
+      .where(eq(ticketMessages.ticketId, ticketId)),
+    db.select({ n: count() }).from(ticketMessages).where(eq(ticketMessages.ticketId, ticketId)),
+    db.select({ n: count() }).from(ticketAuditLogs).where(eq(ticketAuditLogs.ticketId, ticketId)),
+  ]);
+
+  return {
+    ...ticket,
+    /** Every message the ticket has, whether or not this page carries them. */
+    messageCount: Number(messageTotal?.n ?? 0),
+    auditCount: Number(auditTotal?.n ?? 0),
+    handoverSummary: handover(
+      thread.map((m) => ({
+        id: m.id,
+        senderId: m.senderId ?? null,
+        senderName: m.senderName ?? null,
+        isPublic: m.isPublic,
+        content: m.content ?? "",
+        createdAt: new Date(m.createdAt),
+      })),
+    ),
+  };
+}
+
+/**
+ * The page of a ticket's thread that comes before a given moment.
+ *
+ * Messages and audit entries are paged separately, each up to one page, because
+ * a ticket can collect far more of one than the other. The screen merges them.
+ */
+export async function getTicketTimelineBefore(ticketId: string, before: string) {
+  const db = await getDb();
+  await requireCapability("ticket:read");
+  await requirePlanModule("support");
+
+  const cutoff = new Date(before);
+  if (Number.isNaN(cutoff.getTime())) throw new Error("Invalid cursor");
+
+  const [messages, auditLogs] = await Promise.all([
+    db.query.ticketMessages.findMany({
+      where: and(eq(ticketMessages.ticketId, ticketId), lt(ticketMessages.createdAt, cutoff)),
+      orderBy: desc(ticketMessages.createdAt),
+      limit: TICKET_THREAD_PAGE,
+      with: { sender: { columns: USER_SUMMARY_COLUMNS } },
+    }),
+    db.query.ticketAuditLogs.findMany({
+      where: and(eq(ticketAuditLogs.ticketId, ticketId), lt(ticketAuditLogs.createdAt, cutoff)),
+      orderBy: desc(ticketAuditLogs.createdAt),
+      limit: TICKET_THREAD_PAGE,
+      with: { actor: { columns: USER_SUMMARY_COLUMNS } },
+    }),
+  ]);
+
+  return { messages, auditLogs };
 }
 
 /**

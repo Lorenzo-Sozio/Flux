@@ -2931,7 +2931,9 @@
       "showArchive": "Mostrali",
       "showingArchive": "Vengono mostrati tutti i ticket, compresi quelli chiusi",
       "backToOpen": "Torna alla coda",
-      "cappedAt": "Vengono mostrati solo i {count} ticket più recenti. Restringi l'elenco per vedere gli altri."
+      "cappedAt": "Vengono mostrati solo i {count} ticket più recenti. Restringi l'elenco per vedere gli altri.",
+      "loadEarlier": "Carica i messaggi precedenti",
+      "loadEarlierFailed": "Non è stato possibile caricare i messaggi precedenti."
     },
     "sla": {
       "title": "Gestione SLA",

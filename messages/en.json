@@ -2931,7 +2931,9 @@
       "showArchive": "Show them",
       "showingArchive": "Showing every ticket, closed ones included",
       "backToOpen": "Back to the queue",
-      "cappedAt": "Only the {count} most recent tickets are shown. Narrow the list to see the rest."
+      "cappedAt": "Only the {count} most recent tickets are shown. Narrow the list to see the rest.",
+      "loadEarlier": "Load earlier messages",
+      "loadEarlierFailed": "Earlier messages could not be loaded."
     },
     "sla": {
       "title": "SLA Management",

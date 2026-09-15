@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/lib/ticket-thread.ts",
+    "description": "⚠️⚠️ il ricaricamento sostituisce invece di unire: dopo una risposta spariscono tutti i messaggi precedenti che l'operatore aveva aperto",
+    "find": "  for (const item of held) byId.set(item.id, item);",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/ticket-thread.ts",
+    "description": "⚠️ vince la copia vecchia di un messaggio presente in entrambe: la modifica appena salvata non compare",
+    "find": "  for (const item of held) byId.set(item.id, item);\n  for (const item of fresh) byId.set(item.id, item);",
+    "replace": "  for (const item of fresh) byId.set(item.id, item);\n  for (const item of held) byId.set(item.id, item);"
+  },
+  {
+    "file": "src/lib/ticket-thread.ts",
+    "description": "il thread esce dal piu' recente al piu' vecchio: la conversazione si legge al contrario",
+    "find": "  return [...byId.values()].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());",
+    "replace": "  return [...byId.values()].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());"
+  },
+  {
+    "file": "src/lib/ticket-thread.ts",
+    "description": "⚠️ la pagina precedente parte dal messaggio piu' recente invece che dal piu' vecchio: si ricaricano pagine gia' viste e quelle vere non arrivano mai",
+    "find": "      if (oldest === null || t < oldest) oldest = t;",
+    "replace": "      if (oldest === null || t > oldest) oldest = t;"
+  },
+  {
+    "file": "src/lib/ticket-thread.ts",
+    "description": "il riepilogo legge meno dell'estratto che mostra: la prima frase del cliente arriva gia' tagliata",
+    "find": "export const HANDOVER_CONTENT_CAP = 1000;",
+    "replace": "export const HANDOVER_CONTENT_CAP = 100;"
+  }
+]

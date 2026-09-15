@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { excerpt, type HandoverMessage, handover } from "@/lib/ticket-handover";
+import { excerpt, type Handover } from "@/lib/ticket-handover";
 
 /**
  * Where this ticket stands, for whoever is picking it up.
@@ -20,9 +20,14 @@ import { excerpt, type HandoverMessage, handover } from "@/lib/ticket-handover";
  * "they are waiting on us" in the middle of a sentence, and this is read in
  * about fifteen seconds by somebody deciding what to do next.
  */
-export function HandoverCard({ messages }: { messages: HandoverMessage[] }) {
+/**
+ * ⚠️ Takes the summary, not the messages. It used to compute the summary here from
+ * whatever messages the page had loaded — which was fine while the page loaded all
+ * of them, and would have named the wrong opening message the moment the thread
+ * was paged. The server computes it over the whole thread now.
+ */
+export function HandoverCard({ summary: h }: { summary: Handover }) {
   const t = useTranslations("handover");
-  const h = handover(messages);
 
   // A ticket nobody has written on yet has no thread to hand over.
   if (h.publicMessages === 0 && h.internalNotes === 0) return null;
