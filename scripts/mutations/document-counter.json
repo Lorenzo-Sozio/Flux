@@ -1,0 +1,38 @@
+[
+  {
+    "file": "src/lib/document-counter.ts",
+    "description": "⚠️⚠️ il contatore non avanza piu': ogni documento riceve lo stesso numero del precedente e il secondo non si salva",
+    "find": "      set: { lastValue: sql`${documentCounters.lastValue} + 1`, updatedAt: new Date() },",
+    "replace": "      set: { lastValue: sql`${documentCounters.lastValue}`, updatedAt: new Date() },"
+  },
+  {
+    "file": "src/lib/document-counter.ts",
+    "description": "⚠️⚠️ il seme torna a confrontare testo: dopo il 9.999esimo ordine dell'anno il massimo smette di muoversi e ogni ordine fallisce",
+    "find": "    select coalesce(max(cast(substring(\"order_number\" from ${from}) as integer)), 0) + 1",
+    "replace": "    select coalesce(max(substring(\"order_number\" from ${from})), 0) + 1"
+  },
+  {
+    "file": "src/lib/document-counter.ts",
+    "description": "⚠️ un valore non valido viene emesso comunque: un cliente riceve un documento numerato ORD-2026-NaN",
+    "find": "  if (!Number.isInteger(value) || value < 1) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/document-counter.ts",
+    "description": "la sequenza non cambia con l'anno: il primo ordine di gennaio continua la numerazione di dicembre",
+    "find": "  return `order:${year}`;",
+    "replace": "  return `order`;"
+  },
+  {
+    "file": "src/lib/document-counter.ts",
+    "description": "il numero perde gli zeri iniziali: ORD-2026-7 non si ordina accanto a ORD-2026-0010",
+    "find": "  return `${ORDER_PREFIX}-${year}-${String(value).padStart(4, \"0\")}`;",
+    "replace": "  return `${ORDER_PREFIX}-${year}-${String(value)}`;"
+  },
+  {
+    "file": "src/lib/document-counter.ts",
+    "description": "⚠️ il conflitto si risolve su una chiave sbagliata: due sequenze diverse si contendono la stessa riga",
+    "find": "      target: documentCounters.scope,",
+    "replace": "      target: documentCounters.lastValue,"
+  }
+]

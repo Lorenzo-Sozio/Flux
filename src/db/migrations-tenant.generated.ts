@@ -381,4 +381,12 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\n-- The only read this table serves: a period, newest first, grouped by what was written.\nCREATE INDEX IF NOT EXISTS "api_write_log_created_at_idx" ON "api_write_log" ("created_at");\n',
     ],
   },
+  {
+    tag: "0018_numbers_that_cannot_collide",
+    folderMillis: 1788980060000,
+    hash: "db8e526258df79f52961f5b3f30a294e2f2f619361728eb8cd9a3655a29b200b",
+    sql: [
+      '-- A counter per numbering sequence, advanced in one statement.\n--\n-- Order numbers were derived from `max(order_number)` of the current year. Two\n-- defects came with that, and neither needed bad luck to happen:\n--\n--   * Two orders created at the same moment read the same maximum and computed\n--     the same next number. The unique constraint refused the second, so somebody\n--     saw their order fail to save.\n--   * `max()` on text compares character by character, and "ORD-2026-10000" sorts\n--     *below* "ORD-2026-9999". Past the nine-thousand-nine-hundred-and-ninety-ninth\n--     order of a year the maximum stops moving, the next number is always 10000,\n--     and every order after the first one at that size fails for the rest of the\n--     year.\n--\n-- `INSERT … ON CONFLICT DO UPDATE SET last_value = last_value + 1 RETURNING` is a\n-- single statement, and a single statement is atomic in Postgres with or without a\n-- transaction: the row lock on the conflicting row serialises concurrent callers.\n-- The Neon HTTP driver holds no session, so one statement is the only kind of\n-- atomic this code gets.\n--\n-- Additive and re-runnable, as every tenant migration has to be. The counter\n-- seeds itself from the numbers already issued the first time a scope is used, so\n-- there is no backfill here and nothing to get wrong in one.\nCREATE TABLE IF NOT EXISTS "document_counter" (\n\t"scope" text PRIMARY KEY NOT NULL,\n\t"last_value" integer NOT NULL,\n\t"updated_at" timestamp DEFAULT now() NOT NULL\n);\n',
+    ],
+  },
 ];

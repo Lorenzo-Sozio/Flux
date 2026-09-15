@@ -825,6 +825,21 @@ export const notifications = pgTable("notification", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// --- DOCUMENT NUMBERING ---
+
+/**
+ * One row per numbering sequence: `order:2026` today, an invoice register later.
+ *
+ * Advanced only by `nextInSequence` in src/lib/document-counter.ts, in a single
+ * `INSERT … ON CONFLICT DO UPDATE … RETURNING` — see that file and migration
+ * `0018_numbers_that_cannot_collide` for the two defects `max()+1` had.
+ */
+export const documentCounters = pgTable("document_counter", {
+  scope: text("scope").primaryKey(),
+  lastValue: integer("last_value").notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
 // --- API IDEMPOTENCY ---
 
 /**

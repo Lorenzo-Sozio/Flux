@@ -49,6 +49,8 @@ export {
   dmConversationsRelations,
   dmMessages,
   dmMessagesRelations,
+  // Document numbering
+  documentCounters,
   // Documents
   documents,
   emailJobs,
