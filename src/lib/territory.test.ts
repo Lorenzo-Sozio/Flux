@@ -9,9 +9,11 @@ import { describe, expect, it } from "vitest";
 import {
   cleanTerritory,
   countryCode,
+  countryOptions,
   covers,
   fold,
   ITALIAN_PROVINCE_COUNT,
+  readStateEntry,
   type TerritoryRule,
   territoryOf,
 } from "./territory";
@@ -182,5 +184,27 @@ describe("saving a territory", () => {
       ok: true,
       value: { name: "Nord", description: null, countries: ["IT"], states: ["MI"], postalPrefixes: ["201"] },
     });
+  });
+});
+
+describe("showing how a territory's entries are read", () => {
+  it("⚠️ names the province and its region, so a wrong sigla is visible", () => {
+    expect(readStateEntry("mi", true)).toEqual({ kind: "province", code: "MI", name: "Milano", region: "Lombardia" });
+    expect(readStateEntry("Lombardy", true)).toEqual({ kind: "region", name: "Lombardia" });
+  });
+
+  it("⚠️ reports a typo as plain text rather than as a place", () => {
+    expect(readStateEntry("Lombadia", true)).toEqual({ kind: "text" });
+  });
+
+  it("reads nothing as Italian for a territory outside Italy", () => {
+    expect(readStateEntry("CA", false)).toEqual({ kind: "text" });
+  });
+
+  it("lists countries named in the reader's language", () => {
+    const it = countryOptions("it");
+    expect(it.find((c) => c.code === "DE")?.name).toBe("Germania");
+    expect(it.some((c) => c.code === "EU")).toBe(false);
+    expect(it.length).toBeGreaterThan(200);
   });
 });

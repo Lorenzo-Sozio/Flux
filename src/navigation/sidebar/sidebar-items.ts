@@ -21,6 +21,7 @@ import {
   type LucideIcon,
   Mail,
   MailOpen,
+  MapPin,
   MessageCircle,
   MessageSquare,
   Package,
@@ -251,6 +252,7 @@ export const sidebarItems: NavGroup[] = [
           // from the settings index, so configuring the pipeline — the first thing
           // anyone does — meant typing the path (audit rilievo D-04).
           { titleKey: "pipelineStages", url: "/dashboard/settings/pipeline", icon: GitMerge, need: "pipeline:manage" },
+          { titleKey: "territories", url: "/dashboard/settings/territories", icon: MapPin, need: "territory:manage" },
           {
             titleKey: "customFields",
             url: "/dashboard/settings/custom-fields",

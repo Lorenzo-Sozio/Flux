@@ -840,6 +840,37 @@ export const documentCounters = pgTable("document_counter", {
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
 
+// --- TERRITORIES ---
+
+/**
+ * A named area — countries, provinces or regions, postal code prefixes — used to
+ * route and report on records by where they are.
+ *
+ * ⚠️ Records carry no territory column. Which territory a record is in is computed
+ * from its address by `territoryOf` in src/lib/territory.ts, so there is no stored
+ * answer for a write path to forget to update. Every list is free of duplicates and
+ * checked by `cleanTerritory` before it is written.
+ *
+ * Territories do not restrict who can see a record.
+ */
+export const territories = pgTable(
+  "territory",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    name: text("name").notNull(),
+    description: text("description"),
+    countries: text("countries").array().notNull().default([]),
+    states: text("states").array().notNull().default([]),
+    postalPrefixes: text("postal_prefixes").array().notNull().default([]),
+    createdBy: text("created_by"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (t) => [unique("territory_name_uniq").on(t.name)],
+);
+
 // --- API IDEMPOTENCY ---
 
 /**

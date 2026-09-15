@@ -96,6 +96,7 @@ export const CAPABILITIES = {
   "emailSettings:manage": "admin",
   "automation:manage": "admin",
   "target:manage": "admin",
+  "territory:manage": "admin",
 
   // People and money
   "user:read": "admin",

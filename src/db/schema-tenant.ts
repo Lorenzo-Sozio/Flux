@@ -106,6 +106,8 @@ export {
   tasksRelations,
   taskTimeLogs,
   taskTimeLogsRelations,
+  // Territories
+  territories,
   ticketAuditLogs,
   ticketAuditLogsRelations,
   ticketMacros,

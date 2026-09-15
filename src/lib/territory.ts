@@ -257,12 +257,14 @@ const REGION_ALIASES: Record<string, string[]> = {
   "Friuli-Venezia Giulia": ["Friuli"],
 };
 
-const provinceByKey = new Map<string, { code: string; region: string }>();
+const provinceByKey = new Map<string, { code: string; region: string; name: string; regionName: string }>();
 const regionByKey = new Map<string, string>();
+const regionNames = new Map<string, string>();
 for (const [code, name, region, aliases = []] of PROVINCES) {
-  const entry = { code, region: fold(region) };
+  const entry = { code, region: fold(region), name, regionName: region };
   for (const key of [code, name, ...aliases]) provinceByKey.set(fold(key), entry);
   regionByKey.set(fold(region), fold(region));
+  regionNames.set(fold(region), region);
 }
 for (const [region, aliases] of Object.entries(REGION_ALIASES)) {
   for (const alias of aliases) regionByKey.set(fold(alias), fold(region));
@@ -309,6 +311,41 @@ function ruleStateKeys(raw: string, italian: boolean): string[] {
   const region = regionByKey.get(folded);
   if (region) keys.push(`R:${region}`);
   return keys;
+}
+
+export type StateReading =
+  | { kind: "province"; code: string; name: string; region: string }
+  | { kind: "region"; name: string }
+  | { kind: "text" };
+
+/**
+ * How one entry of a territory's list will be read, for the settings screen.
+ *
+ * ⚠️ Shown next to every entry because a typo is otherwise invisible: "Lombadia" is
+ * saved without complaint and matches only records carrying the same typo.
+ */
+export function readStateEntry(raw: string, italian: boolean): StateReading {
+  const folded = fold(raw);
+  if (italian) {
+    const province = provinceByKey.get(folded);
+    if (province) return { kind: "province", code: province.code, name: province.name, region: province.regionName };
+    const region = regionByKey.get(folded);
+    if (region) return { kind: "region", name: regionNames.get(region) ?? raw };
+  }
+  return { kind: "text" };
+}
+
+/** Every country, named in `locale`, sorted by that name. */
+export function countryOptions(locale: string): { code: string; name: string }[] {
+  if (!countryCodes) buildCountryIndex();
+  const codes = [...(countryCodes ?? [])];
+  const names =
+    typeof Intl.DisplayNames === "function"
+      ? new Intl.DisplayNames([locale], { type: "region", fallback: "code" })
+      : null;
+  return codes
+    .map((code) => ({ code, name: names?.of(code) ?? code }))
+    .sort((a, b) => a.name.localeCompare(b.name, locale));
 }
 
 // ─── Matching ─────────────────────────────────────────────────────────────────

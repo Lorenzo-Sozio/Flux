@@ -1,6 +1,16 @@
 import Link from "next/link";
 
-import { BellRing, CreditCard, GitMerge, KeyRound, Mail, MessageSquareQuote, Settings2, Webhook } from "lucide-react";
+import {
+  BellRing,
+  CreditCard,
+  GitMerge,
+  KeyRound,
+  Mail,
+  MapPin,
+  MessageSquareQuote,
+  Settings2,
+  Webhook,
+} from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -39,6 +49,13 @@ export default async function SettingsPage() {
       title: t("pipeline.title"),
       description: t("pipeline.description"),
       need: "pipeline:manage",
+    },
+    {
+      href: "/dashboard/settings/territories",
+      icon: MapPin,
+      title: t("territories.title"),
+      description: t("territories.description"),
+      need: "territory:manage",
     },
     {
       href: "/dashboard/settings/custom-fields",

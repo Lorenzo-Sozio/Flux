@@ -1,0 +1,20 @@
+[
+  {
+    "file": "src/actions/territories.ts",
+    "description": "⚠️⚠️ la creazione non controlla il permesso: qualunque membro salva territori chiamando l'azione",
+    "find": "  const actor = await requireCapability(\"territory:manage\");",
+    "replace": "  const actor = { userId: \"x\" };"
+  },
+  {
+    "file": "src/actions/territories.ts",
+    "description": "⚠️⚠️ l'eliminazione non controlla il permesso",
+    "find": "export async function deleteTerritory(id: string): Promise<{ ok: true }> {\n  await requireCapability(\"territory:manage\");",
+    "replace": "export async function deleteTerritory(id: string): Promise<{ ok: true }> {"
+  },
+  {
+    "file": "src/actions/territories.ts",
+    "description": "⚠️⚠️ la modifica salva un territorio rifiutato dalla validazione",
+    "find": "export async function updateTerritory(id: string, input: TerritoryInput): Promise<TerritoryResult> {\n  await requireCapability(\"territory:manage\");\n  const cleaned = cleanTerritory(input);\n  if (!cleaned.ok) return cleaned;",
+    "replace": "export async function updateTerritory(id: string, input: TerritoryInput): Promise<TerritoryResult> {\n  await requireCapability(\"territory:manage\");\n  const cleaned = cleanTerritory(input);"
+  }
+]
