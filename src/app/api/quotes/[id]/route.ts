@@ -8,6 +8,7 @@ import { quotes } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
 import { can } from "@/lib/permissions";
 import { getDb } from "@/lib/tenant-context";
+import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -24,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       deal: true,
       company: true,
       contact: true,
-      owner: true,
+      owner: { columns: USER_SUMMARY_COLUMNS },
       items: { with: { product: true } },
     },
   });

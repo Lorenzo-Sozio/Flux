@@ -16,6 +16,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { formatCurrency } from "@/lib/utils";
 
 type User = { id: string; name: string | null; email: string | null; role: string };
+/**
+ * Who a target belongs to, as the target query now returns it. Narrower than
+ * `User` on purpose: that query used to load the person's whole row, secret
+ * calendar address included, and this type accepting `role` is what let it.
+ */
+type TargetOwner = { id: string; name: string | null; email: string | null; image: string | null };
 type SalesTarget = {
   id: string;
   userId: string;
@@ -24,7 +30,7 @@ type SalesTarget = {
   targetAmount: string;
   targetDeals: number | null;
   currency: string;
-  user: User;
+  user: TargetOwner;
 };
 
 interface Props {
@@ -97,7 +103,12 @@ export function TargetsClient({ users, initialTargets }: Props) {
               targetAmount: String(amount),
               targetDeals: editDeals ? parseInt(editDeals, 10) : null,
               currency: editCurrency,
-              user: users.find((u) => u.id === userId)!,
+              // Shaped like what the query returns, so the row added here and the
+              // rows loaded from the server stay the same thing.
+              user: (() => {
+                const u = users.find((candidate) => candidate.id === userId);
+                return { id: userId, name: u?.name ?? null, email: u?.email ?? null, image: null };
+              })(),
             },
           ];
         });

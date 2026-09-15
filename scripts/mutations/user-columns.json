@@ -1,0 +1,20 @@
+[
+  {
+    "file": "src/app/api/quotes/public/route.ts",
+    "description": "⚠️⚠️ il preventivo pubblico torna a caricare il titolare intero: chi ha il link riceve l'indirizzo segreto del suo calendario",
+    "find": "owner: { columns: PUBLIC_CONTACT_COLUMNS }",
+    "replace": "owner: true"
+  },
+  {
+    "file": "src/app/api/quotes/public/route.ts",
+    "description": "⚠️ il preventivo pubblico usa l'insieme interno: un cliente esterno riceve l'identificativo interno di chi gli scrive",
+    "find": "owner: { columns: PUBLIC_CONTACT_COLUMNS }",
+    "replace": "owner: { columns: USER_SUMMARY_COLUMNS }"
+  },
+  {
+    "file": "src/lib/user-columns.ts",
+    "description": "⚠️⚠️ l'insieme riassuntivo si allarga all'indirizzo del calendario: ogni relazione che lo usa lo rimanda al browser",
+    "find": "  image: true,\n} as const;",
+    "replace": "  image: true,\n  externalCalendarUrl: true,\n} as const;"
+  }
+]

@@ -6,6 +6,7 @@ import { auth } from "@/auth";
 import { dmConversationMembers, dmConversations, dmMessages, users } from "@/db/schema";
 import { notify } from "@/lib/notify";
 import { getDb } from "@/lib/tenant-context";
+import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
 
 type SessionUser = { id: string; name?: string | null; email?: string | null };
 
@@ -44,7 +45,7 @@ export async function getConversations() {
     where: inArray(dmConversations.id, convIds),
     orderBy: desc(dmConversations.updatedAt),
     with: {
-      members: { with: { user: true } },
+      members: { with: { user: { columns: USER_SUMMARY_COLUMNS } } },
       messages: { orderBy: desc(dmMessages.createdAt), limit: 1 },
     },
   });
@@ -179,7 +180,7 @@ export async function getMessages(conversationId: string, before?: string) {
       : eq(dmMessages.conversationId, conversationId),
     orderBy: desc(dmMessages.createdAt),
     limit: 50,
-    with: { sender: true },
+    with: { sender: { columns: USER_SUMMARY_COLUMNS } },
   });
 
   return msgs.reverse();

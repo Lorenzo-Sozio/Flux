@@ -15,6 +15,7 @@ import { quoteActivities, quotes } from "@/db/schema";
 import { announceQuoteDecision } from "@/lib/quote-events";
 import { checkRateLimit } from "@/lib/rate-limiter";
 import { resolveTenantByProbe, type TenantDb } from "@/lib/tenant-resolve";
+import { PUBLIC_CONTACT_COLUMNS } from "@/lib/user-columns";
 
 /** Locates the workspace that issued this quote token. */
 async function resolveQuoteTenant(token: string): Promise<TenantDb | null> {
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
     with: {
       company: true,
       contact: true,
-      owner: true,
+      owner: { columns: PUBLIC_CONTACT_COLUMNS },
       items: { with: { product: true } },
     },
   });

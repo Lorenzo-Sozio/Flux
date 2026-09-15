@@ -38,6 +38,7 @@ import { getDb } from "@/lib/tenant-context";
 import { logTicketChange } from "@/lib/ticket-audit";
 import { canTransition, isSLAPauseStatus } from "@/lib/ticket-state-machine";
 import { suggestMacros, triage } from "@/lib/ticket-triage";
+import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
 
 // --- HELPERS ---
 
@@ -204,20 +205,20 @@ export async function getTicketById(ticketId: string) {
       company: true,
       // The order this ticket is about, when it is about one.
       order: true,
-      assignee: true,
-      owner: true,
+      assignee: { columns: USER_SUMMARY_COLUMNS },
+      owner: { columns: USER_SUMMARY_COLUMNS },
       sla: true,
       group: true,
       messages: {
         orderBy: desc(ticketMessages.createdAt),
         with: {
-          sender: true,
+          sender: { columns: USER_SUMMARY_COLUMNS },
         },
       },
       auditLogs: {
         orderBy: desc(ticketAuditLogs.createdAt),
         with: {
-          actor: true,
+          actor: { columns: USER_SUMMARY_COLUMNS },
         },
       },
     },
@@ -272,7 +273,7 @@ export async function getTickets(options?: { status?: string; includeClosed?: bo
       with: {
         contact: true,
         company: true,
-        assignee: true,
+        assignee: { columns: USER_SUMMARY_COLUMNS },
         messages: {
           limit: 1,
           orderBy: desc(ticketMessages.createdAt),
@@ -306,7 +307,7 @@ export async function getTicketsByStatus(status: string) {
     with: {
       contact: true,
       company: true,
-      assignee: true,
+      assignee: { columns: USER_SUMMARY_COLUMNS },
       messages: {
         limit: 1,
         orderBy: desc(ticketMessages.createdAt),
@@ -612,7 +613,7 @@ export async function getTicketAuditLog(ticketId: string) {
   return db.query.ticketAuditLogs.findMany({
     where: eq(ticketAuditLogs.ticketId, ticketId),
     orderBy: desc(ticketAuditLogs.createdAt),
-    with: { actor: true },
+    with: { actor: { columns: USER_SUMMARY_COLUMNS } },
   });
 }
 
@@ -813,7 +814,7 @@ export async function getMacros() {
 
   return db.query.ticketMacros.findMany({
     orderBy: ticketMacros.name,
-    with: { creator: true },
+    with: { creator: { columns: USER_SUMMARY_COLUMNS } },
   });
 }
 

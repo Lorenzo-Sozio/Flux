@@ -21,6 +21,7 @@ import { can } from "@/lib/permissions";
 import { announceQuoteDecision, announceQuoteSent, hasAlreadyLeft } from "@/lib/quote-events";
 import { approvalPolicyFrom, approvalRequiredReason, canTransition, transitionError } from "@/lib/quote-status";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
+import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
 
 // --- HELPERS ---
 
@@ -191,7 +192,7 @@ export async function getQuoteById(quoteId: string) {
         deal: true,
         company: true,
         contact: true,
-        owner: true,
+        owner: { columns: USER_SUMMARY_COLUMNS },
         items: {
           with: {
             product: true,
@@ -199,7 +200,7 @@ export async function getQuoteById(quoteId: string) {
         },
         activities: {
           with: {
-            user: true,
+            user: { columns: USER_SUMMARY_COLUMNS },
           },
           orderBy: desc(quoteActivities.createdAt),
         },

@@ -9,6 +9,7 @@ import { getAllUsersAction } from "@/actions/auth";
 import { salesTargets } from "@/db/schema";
 import { requireAdminAccess, requireCapability } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
+import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
 
 export { getAllUsersAction as getAllUsers };
 
@@ -30,7 +31,7 @@ export async function getSalesTargets(period?: string) {
   const db = await getDb();
   return db.query.salesTargets.findMany({
     where: period ? eq(salesTargets.period, period) : undefined,
-    with: { user: true },
+    with: { user: { columns: USER_SUMMARY_COLUMNS } },
     orderBy: salesTargets.period,
   });
 }
