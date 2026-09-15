@@ -25,6 +25,8 @@ type Ticket = {
   contact?: { name?: string | null; email?: string | null } | null;
   assignee?: { name?: string | null } | null;
   messages?: unknown[];
+  /** Counted on the server. `messages` holds only the latest one, for its preview. */
+  messageCount?: number;
 };
 
 const COLUMN_CONFIG = [
@@ -76,7 +78,7 @@ const CHANNEL_ICONS: Record<string, React.ReactNode> = {
 
 function TicketKanbanCard({ ticket, isDragging }: { ticket: Ticket; isDragging: boolean }) {
   const priorityBorder = PRIORITY_BORDER[ticket.priority] ?? PRIORITY_BORDER.normal;
-  const msgCount = ticket.messages?.length ?? 0;
+  const msgCount = ticket.messageCount ?? 0;
   const initials = ticket.assignee?.name
     ? ticket.assignee.name
         .split(" ")

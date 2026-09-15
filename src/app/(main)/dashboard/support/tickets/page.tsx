@@ -378,10 +378,10 @@ export default function TicketsListPage() {
                               {CHANNEL_ICONS[ticket.channel]}
                               {ticket.channel}
                             </span>
-                            {(ticket.messages?.length ?? 0) > 0 && (
+                            {(ticket.messageCount ?? 0) > 0 && (
                               <span className="flex items-center gap-1 text-muted-foreground text-xs">
                                 <MessageSquare className="h-3 w-3" />
-                                {ticket.messages?.length}
+                                {ticket.messageCount}
                               </span>
                             )}
                             <span className="text-muted-foreground text-xs">{ticketDateLabel(ticket.createdAt)}</span>
@@ -434,7 +434,7 @@ export default function TicketsListPage() {
                         <TableBody>
                           {filteredTickets.map((ticket) => {
                             const dateLabel = ticketDateLabel(ticket.createdAt);
-                            const msgCount = ticket.messages?.length ?? 0;
+                            const msgCount = ticket.messageCount ?? 0;
 
                             return (
                               <TableRow

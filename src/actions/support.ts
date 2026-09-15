@@ -364,8 +364,27 @@ export async function getTickets(options?: { status?: string; includeClosed?: bo
       : db.select({ n: count() }).from(tickets).where(sql`NOT ${recent}`),
   ]);
 
+  // ⚠️ How many messages each ticket has, counted. The list and the board used to
+  // show `ticket.messages.length` as that number, but the query above loads one
+  // message per ticket — the latest, for its preview — so every badge said 1 on
+  // a ticket with forty replies. One grouped count for the whole page.
+  const counts = new Map<string, number>();
+  if (rows.length > 0) {
+    const grouped = await db
+      .select({ ticketId: ticketMessages.ticketId, n: count() })
+      .from(ticketMessages)
+      .where(
+        inArray(
+          ticketMessages.ticketId,
+          rows.map((r) => r.id),
+        ),
+      )
+      .groupBy(ticketMessages.ticketId);
+    for (const g of grouped) counts.set(g.ticketId, Number(g.n));
+  }
+
   return {
-    rows,
+    rows: rows.map((r) => ({ ...r, messageCount: counts.get(r.id) ?? 0 })),
     hiddenClosed: Number(hidden[0]?.n ?? 0),
     // A full page is the only signal there is more, and the cap is the same
     // number the screen names, so the two cannot drift.
