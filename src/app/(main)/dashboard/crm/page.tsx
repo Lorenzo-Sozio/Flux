@@ -25,7 +25,9 @@ import { getNextActions } from "@/actions/next-actions";
 import { getTodayView } from "@/actions/today";
 import { TicketPriorityBadge } from "@/components/crm/ticket-priority-badge";
 import { TicketStatusBadge } from "@/components/crm/ticket-status-badge";
-import CRMCharts from "@/components/dashboard/CRMCharts.client";
+// Loaded after the page: the chart library is the heaviest thing on this screen
+// and the two charts sit below everything people open it to read.
+import CRMCharts from "@/components/dashboard/crm-charts-lazy";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

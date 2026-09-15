@@ -10,7 +10,7 @@
  *
  * The scheduler should pass the header: Authorization: Bearer <CRON_SECRET>
  */
-import { and, eq, gte } from "drizzle-orm";
+import { and, eq, gte, inArray } from "drizzle-orm";
 
 import { getActivitiesDueToday } from "@/actions/activities";
 import { notifications, users } from "@/db/schema";
@@ -61,11 +61,33 @@ async function runForTenant(db: TenantDb) {
     ).map((n) => `${n.userId}\u0000${n.title}`),
   );
 
+  // ⚠️ Everybody either loop is about to write to, read in one statement. This
+  // used to be a lookup per due task and another per due activity — on a driver
+  // where every statement is its own request, inside a job that runs every
+  // fifteen minutes in every workspace.
+  const dueActivities = await getActivitiesDueToday();
+  const people = new Map<string, { email: string | null; name: string | null }>();
+  const wanted = [
+    ...new Set(
+      [...dueTasks.map((t) => t.assigneeId ?? t.ownerId), ...dueActivities.map((a) => a.ownerId)].filter(
+        (id): id is string => Boolean(id),
+      ),
+    ),
+  ];
+  if (wanted.length > 0) {
+    for (const row of await db
+      .select({ id: users.id, email: users.email, name: users.name })
+      .from(users)
+      .where(inArray(users.id, wanted))) {
+      people.set(row.id, { email: row.email, name: row.name });
+    }
+  }
+
   for (const task of dueTasks) {
     const userId = task.assigneeId ?? task.ownerId;
     if (!userId) continue;
 
-    const [user] = await db.select({ email: users.email, name: users.name }).from(users).where(eq(users.id, userId));
+    const user = people.get(userId);
 
     if (!user) continue;
 
@@ -101,16 +123,12 @@ async function runForTenant(db: TenantDb) {
   }
 
   // ── Activity reminders (calls & meetings today) ──────────────────────────
-  const dueActivities = await getActivitiesDueToday();
   let activitiesNotified = 0;
 
   for (const activity of dueActivities) {
     if (!activity.ownerId) continue;
 
-    const [user] = await db
-      .select({ email: users.email, name: users.name })
-      .from(users)
-      .where(eq(users.id, activity.ownerId));
+    const user = people.get(activity.ownerId);
 
     if (!user) continue;
 

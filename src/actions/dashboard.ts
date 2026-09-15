@@ -17,121 +17,111 @@ import {
 import { requireCapability } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 
+/**
+ * The figures on the first screen after login.
+ *
+ * ⚠️ This used to be nineteen round trips for a workspace with six pipeline
+ * stages, **one after another**: twelve counts awaited in sequence, then the
+ * stages, then one more count per stage. On the Neon HTTP driver every statement
+ * is its own request, so the page waited for the sum of all of them — on the one
+ * screen everybody opens every morning.
+ *
+ * Seven statements now, all started together, so the wait is the slowest one
+ * rather than the total. Each table is read once, with `FILTER` doing what used
+ * to take a separate query per condition, and the stage distribution is one
+ * `GROUP BY` instead of a count per stage.
+ *
+ * ⚠️ The return shape is unchanged, field for field. Two details are kept on
+ * purpose because the dashboard cards depend on them: a stage with no deals still
+ * appears with a zero, which is why that query starts from the stages and joins
+ * the deals rather than the other way round; and it counts deals in every status,
+ * as it always did.
+ */
 export async function getDashboardStats() {
   await requireCapability("record:read");
   const db = await getDb();
-  // 1. Total Deal Value
-  const dealValueResult = await db
-    .select({ total: sql<number>`sum(CAST(${deals.amount} AS NUMERIC))` })
-    .from(deals)
-    .where(eq(deals.status, "open"));
-  const totalDealValue = Number(dealValueResult[0]?.total || 0);
 
-  // 2. Active Leads Count
-  const activeLeadsResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(leads)
-    .where(sql`${leads.status} IN ('new', 'contacting')`);
-  const activeLeadsCount = Number(activeLeadsResult[0]?.count || 0);
-
-  // 3. Conversion Rate
-  const totalLeadsResult = await db.select({ count: sql<number>`count(*)` }).from(leads);
-  const convertedLeadsResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(leads)
-    .where(eq(leads.status, "converted"));
-
-  const totalLeads = Number(totalLeadsResult[0]?.count || 0);
-  const convertedLeads = Number(convertedLeadsResult[0]?.count || 0);
-  const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
-
-  // 4. Tasks Summary
+  // Local midnight to local midnight, as before.
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
 
-  const overdueTasksResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(tasks)
-    .where(and(lt(tasks.dueDate, today), eq(tasks.status, "todo")));
+  const [[leadCounts], [dealValue], [taskCounts], [quoteFigures], [ticketCounts], distribution, sources] =
+    await Promise.all([
+      db
+        .select({
+          total: sql<number>`count(*)`,
+          active: sql<number>`count(*) filter (where ${leads.status} in ('new', 'contacting'))`,
+          converted: sql<number>`count(*) filter (where ${leads.status} = 'converted')`,
+        })
+        .from(leads),
 
-  const todayTasksResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(tasks)
-    .where(and(gte(tasks.dueDate, today), lt(tasks.dueDate, tomorrow), eq(tasks.status, "todo")));
-
-  const overdueTasks = Number(overdueTasksResult[0]?.count || 0);
-  const todayTasks = Number(todayTasksResult[0]?.count || 0);
-
-  // 5. Deal Distribution by Stage
-  const stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
-  const dealDistribution = await Promise.all(
-    stages.map(async (stage) => {
-      const countResult = await db
-        .select({ count: sql<number>`count(*)` })
+      db
+        .select({ total: sql<number>`coalesce(sum(cast(${deals.amount} as numeric)), 0)` })
         .from(deals)
-        .where(eq(deals.stageId, stage.id));
-      return {
-        name: stage.name,
-        value: Number(countResult[0]?.count || 0),
-        color: stage.color || "#3b82f6",
-      };
-    }),
-  );
+        .where(eq(deals.status, "open")),
 
-  // 6. Leads by Source
-  const sourcesResult = await db
-    .select({
-      source: leads.source,
-      count: sql<number>`count(*)`,
-    })
-    .from(leads)
-    .groupBy(leads.source);
+      db
+        .select({
+          // The comparisons go through drizzle's typed operators rather than a raw
+          // `${today}`, so the Date is converted exactly as the column maps it —
+          // which is what the separate queries these replace did.
+          overdue: sql<number>`count(*) filter (where ${lt(tasks.dueDate, today)})`,
+          dueToday: sql<number>`count(*) filter (where ${and(gte(tasks.dueDate, today), lt(tasks.dueDate, tomorrow))})`,
+        })
+        .from(tasks)
+        .where(eq(tasks.status, "todo")),
 
-  const leadsBySource = sourcesResult.map((r) => ({
-    name: r.source || "Other",
-    value: Number(r.count),
-  }));
+      db
+        .select({
+          pipelineValue: sql<number>`coalesce(sum(cast(${quotes.totalAmount} as numeric)) filter (where ${quotes.status} in ('sent', 'viewed')), 0)`,
+          openCount: sql<number>`count(*) filter (where ${quotes.status} in ('draft', 'sent', 'viewed'))`,
+        })
+        .from(quotes),
 
-  // 7. Quotes pipeline: total value of quotes awaiting response (sent + viewed)
-  const quotesPipelineResult = await db
-    .select({ total: sql<number>`coalesce(sum(CAST(${quotes.totalAmount} AS NUMERIC)), 0)` })
-    .from(quotes)
-    .where(sql`${quotes.status} IN ('sent', 'viewed')`);
-  const quotesPipelineValue = Number(quotesPipelineResult[0]?.total || 0);
+      db
+        .select({
+          open: sql<number>`count(*) filter (where ${tickets.status} in ('open', 'in_progress', 'waiting'))`,
+          urgent: sql<number>`count(*) filter (where ${tickets.status} in ('open', 'in_progress', 'waiting') and ${tickets.priority} = 'urgent')`,
+        })
+        .from(tickets),
 
-  const quotesOpenCountResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(quotes)
-    .where(sql`${quotes.status} IN ('draft', 'sent', 'viewed')`);
-  const quotesOpenCount = Number(quotesOpenCountResult[0]?.count || 0);
+      // From the stages, so a stage nobody has a deal in still gets its zero.
+      db
+        .select({
+          name: pipelineStages.name,
+          color: pipelineStages.color,
+          value: sql<number>`count(${deals.id})`,
+        })
+        .from(pipelineStages)
+        .leftJoin(deals, eq(deals.stageId, pipelineStages.id))
+        .groupBy(pipelineStages.id, pipelineStages.name, pipelineStages.color, pipelineStages.order)
+        .orderBy(pipelineStages.order),
 
-  // 8. Support tickets: open count + urgent count
-  const openTicketsResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(tickets)
-    .where(sql`${tickets.status} IN ('open', 'in_progress', 'waiting')`);
-  const openTicketsCount = Number(openTicketsResult[0]?.count || 0);
+      db.select({ source: leads.source, count: sql<number>`count(*)` }).from(leads).groupBy(leads.source),
+    ]);
 
-  const urgentTicketsResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(tickets)
-    .where(and(sql`${tickets.status} IN ('open', 'in_progress', 'waiting')`, eq(tickets.priority, "urgent")));
-  const urgentTicketsCount = Number(urgentTicketsResult[0]?.count || 0);
+  const totalLeads = Number(leadCounts?.total ?? 0);
+  const convertedLeads = Number(leadCounts?.converted ?? 0);
+  const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
 
   return {
-    totalDealValue,
-    activeLeadsCount,
+    totalDealValue: Number(dealValue?.total ?? 0),
+    activeLeadsCount: Number(leadCounts?.active ?? 0),
     conversionRate: conversionRate.toFixed(1),
-    overdueTasks,
-    todayTasks,
-    dealDistribution,
-    leadsBySource,
-    quotesPipelineValue,
-    quotesOpenCount,
-    openTicketsCount,
-    urgentTicketsCount,
+    overdueTasks: Number(taskCounts?.overdue ?? 0),
+    todayTasks: Number(taskCounts?.dueToday ?? 0),
+    dealDistribution: distribution.map((stage) => ({
+      name: stage.name,
+      value: Number(stage.value),
+      color: stage.color || "#3b82f6",
+    })),
+    leadsBySource: sources.map((r) => ({ name: r.source || "Other", value: Number(r.count) })),
+    quotesPipelineValue: Number(quoteFigures?.pipelineValue ?? 0),
+    quotesOpenCount: Number(quoteFigures?.openCount ?? 0),
+    openTicketsCount: Number(ticketCounts?.open ?? 0),
+    urgentTicketsCount: Number(ticketCounts?.urgent ?? 0),
   };
 }
 
