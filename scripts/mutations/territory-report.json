@@ -1,0 +1,56 @@
+[
+  {
+    "file": "src/lib/territory-report.ts",
+    "description": "⚠️⚠️ la riga «Nessun territorio» sparisce: i totali diventano piu' piccoli di quelli della pipeline e nessuno lo nota",
+    "find": "  return [...named, toRow(null, null, byId.get(null) as TerritoryFigures)];",
+    "replace": "  return named;"
+  },
+  {
+    "file": "src/lib/territory-report.ts",
+    "description": "⚠️ un territorio senza dati scompare dalla tabella",
+    "find": "  for (const rule of rules) byId.set(rule.id, { ...NO_FIGURES });",
+    "replace": "  for (const rule of rules) if (!rules.length) byId.set(rule.id, { ...NO_FIGURES });"
+  },
+  {
+    "file": "src/lib/territory-report.ts",
+    "description": "⚠️⚠️ le cifre vengono sovrascritte invece che sommate: ogni territorio mostra solo l'ultimo indirizzo",
+    "find": "      into[key] += num(row.figures[key]);",
+    "replace": "      into[key] = num(row.figures[key]);"
+  },
+  {
+    "file": "src/lib/territory-report.ts",
+    "description": "⚠️⚠️ la trattativa mescola indirizzo dell'azienda e del contatto",
+    "find": "  return hasAny(company) ? company : contact;",
+    "replace": "  return { country: company.country ?? contact.country, state: company.state ?? contact.state, zipCode: company.zipCode ?? contact.zipCode };"
+  },
+  {
+    "file": "src/lib/territory-report.ts",
+    "description": "⚠️ senza trattative chiuse il tasso di vittoria mostra 0% invece di nessun dato",
+    "find": "    winRate: closed ? Math.round((figures.wonDeals / closed) * 100) : null,",
+    "replace": "    winRate: closed ? Math.round((figures.wonDeals / closed) * 100) : 0,"
+  },
+  {
+    "file": "src/lib/territory-report.ts",
+    "description": "l'ordine dei territori ignora la pipeline aperta",
+    "find": "b.figures.openValue - a.figures.openValue || ",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/territory-report-queries.ts",
+    "description": "⚠️⚠️ le trattative senza azienda spariscono da ogni riga",
+    "find": "    .leftJoin(companies, eq(companies.id, deals.companyId))",
+    "replace": "    .innerJoin(companies, eq(companies.id, deals.companyId))"
+  },
+  {
+    "file": "src/lib/territory-report-queries.ts",
+    "description": "⚠️ i lead scartati contano come aperti",
+    "find": " and ${leads.status} <> 'unqualified')`,",
+    "replace": ")`,"
+  },
+  {
+    "file": "src/lib/territory-report-queries.ts",
+    "description": "⚠️⚠️ le vittorie sono datate dall'ultima modifica: una trattativa dell'anno scorso risalvata oggi entra nel periodo",
+    "find": "      wonDeals: sql<string>`count(*) filter (where ${deals.status} = 'won' and ${deals.closedAt} >= ${from})`,",
+    "replace": "      wonDeals: sql<string>`count(*) filter (where ${deals.status} = 'won' and ${deals.updatedAt} >= ${from})`,"
+  }
+]

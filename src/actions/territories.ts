@@ -6,6 +6,7 @@ import { and, asc, eq, ne, sql } from "drizzle-orm";
 
 import { territories } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
+import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 import { cleanTerritory, type TerritoryInput } from "@/lib/territory";
 
@@ -24,7 +25,9 @@ const PAGE = "/dashboard/settings/territories";
 export async function getTerritories(): Promise<Territory[]> {
   await requireCapability("record:read");
   const db = await getDb();
-  return db.select().from(territories).orderBy(asc(territories.name));
+  // A workspace the migration has not reached yet has no territories, rather than a
+  // broken report or settings page.
+  return tolerateUnmigrated("territories", () => db.select().from(territories).orderBy(asc(territories.name)), []);
 }
 
 function isNameTaken(err: unknown): boolean {

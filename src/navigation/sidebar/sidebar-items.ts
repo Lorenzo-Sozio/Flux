@@ -161,6 +161,13 @@ export const sidebarItems: NavGroup[] = [
           { titleKey: "salesTargets", url: "/dashboard/pipeline/targets", icon: TrendingUp, module: "sales" },
           { titleKey: "salesFunnel", url: "/dashboard/pipeline/funnel", icon: GitMerge, module: "sales" },
           { titleKey: "winLoss", url: "/dashboard/pipeline/win-loss", icon: Swords, module: "sales" },
+          {
+            titleKey: "territoryReport",
+            url: "/dashboard/pipeline/territories",
+            icon: MapPin,
+            module: "sales",
+            need: "report:read",
+          },
           { titleKey: "forecast", url: "/dashboard/pipeline/forecast", icon: LineChart, module: "sales" },
           { titleKey: "pipelineReport", url: "/dashboard/pipeline/report", icon: ClipboardList, module: "sales" },
         ],

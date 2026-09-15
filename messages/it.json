@@ -1512,7 +1512,8 @@
       "webhooks": "Webhook",
       "winLoss": "Vinte / Perse",
       "workload": "Carico Lavoro",
-      "territories": "Territori"
+      "territories": "Territori",
+      "territoryReport": "Per territorio"
     },
     "quickCreate": {
       "title": "Crea Rapido",
@@ -1891,7 +1892,24 @@
       "nothingYet": "Ancora niente da mostrare."
     },
     "ordersFromDeal": "Ordini",
-    "noOrdersFromDeal": "Ancora nessun ordine. Un preventivo accettato lo diventa."
+    "noOrdersFromDeal": "Ancora nessun ordine. Un preventivo accettato lo diventa.",
+    "territories": {
+      "title": "Per territorio",
+      "subtitle": "Lead e pipeline raggruppati per territorio, dall'indirizzo di ogni record.",
+      "lastDays": "Ultimi {days} giorni",
+      "territory": "Territorio",
+      "openLeads": "Lead aperti",
+      "newLeads": "Lead nuovi",
+      "converted": "Convertiti",
+      "openDeals": "Trattative aperte",
+      "pipeline": "Pipeline",
+      "won": "Vinte",
+      "winRate": "Tasso di vittoria",
+      "noTerritory": "Nessun territorio",
+      "noTerritories": "Nessun territorio definito: tutti i record ricadono in «Nessun territorio».",
+      "defineTerritories": "Definisci i territori",
+      "footnote": "Lead aperti, trattative aperte e pipeline sono la situazione di oggi; lead nuovi, convertiti, vinte e tasso di vittoria riguardano gli ultimi {days} giorni. Una trattativa è collocata dall'indirizzo dell'azienda o, se manca, da quello del contatto. Gli importi sono sommati senza conversione di valuta."
+    }
   },
   "placeholders": {
     "unknown": "Niente riempirà {list}. Arriverà al destinatario esattamente com'è scritto.",

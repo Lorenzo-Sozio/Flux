@@ -201,6 +201,10 @@ const sections = [
         a: "Dalla Pipeline Board clicca '+ Nuova Deal' (in cima a qualsiasi colonna) oppure dal menu laterale. Inserisci nome, importo, probabilità di chiusura, data prevista, azienda e contatto di riferimento. La deal parte automaticamente nel primo stage configurato.",
       },
       {
+        q: "Come analizzo lead e trattative per territorio?",
+        a: "Prima un amministratore definisce i territori in Impostazioni → Territori: per paese, per regione o provincia, per prefisso CAP, o combinando i tre. Per l'Italia vale sigla, nome o regione, quindi un territorio 'Lombardia' comprende i record scritti 'MI', 'Milano' o 'Bergamo'; accanto a ogni voce la schermata dice come la interpreta e segnala quelle che non riconosce, utile contro i refusi. Se due territori si sovrappongono vince il più stretto: un CAP batte una provincia, che batte un paese. Il report è in Pipeline → Per territorio: lead aperti, nuovi e convertiti, trattative aperte, pipeline, vinte e tasso di vittoria, sugli ultimi 30, 90 o 365 giorni. Una trattativa è collocata dall'indirizzo dell'azienda o, se manca, del contatto. I record che nessun territorio copre restano visibili nella riga 'Nessun territorio'. Il territorio si ricalcola dall'indirizzo ogni volta, quindi una modifica ai territori vale subito anche per i record già esistenti. I territori non limitano chi può vedere i record.",
+      },
+      {
         q: "Come sposto una deal tra gli stage?",
         a: "Trascina e rilascia la card della deal nella colonna dello stage desiderato. L'operazione è immediata e il sistema registra automaticamente il cambio di stage nella timeline della deal.",
       },

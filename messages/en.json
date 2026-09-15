@@ -1512,7 +1512,8 @@
       "webhooks": "Webhooks",
       "winLoss": "Win / Loss",
       "workload": "Workload",
-      "territories": "Territories"
+      "territories": "Territories",
+      "territoryReport": "By territory"
     },
     "quickCreate": {
       "title": "Quick Create",
@@ -1891,7 +1892,24 @@
       "nothingYet": "Nothing to show yet."
     },
     "ordersFromDeal": "Orders",
-    "noOrdersFromDeal": "No order yet. An accepted quote becomes one."
+    "noOrdersFromDeal": "No order yet. An accepted quote becomes one.",
+    "territories": {
+      "title": "By territory",
+      "subtitle": "Leads and pipeline grouped by territory, from each record's address.",
+      "lastDays": "Last {days} days",
+      "territory": "Territory",
+      "openLeads": "Open leads",
+      "newLeads": "New leads",
+      "converted": "Converted",
+      "openDeals": "Open deals",
+      "pipeline": "Pipeline",
+      "won": "Won",
+      "winRate": "Win rate",
+      "noTerritory": "No territory",
+      "noTerritories": "No territories defined: every record falls in \"No territory\".",
+      "defineTerritories": "Define territories",
+      "footnote": "Open leads, open deals and pipeline are as of today; new leads, conversions, won and win rate cover the last {days} days. A deal is placed by its company's address or, when that is missing, its contact's. Amounts are added without currency conversion."
+    }
   },
   "placeholders": {
     "unknown": "Nothing will fill in {list}. It will reach the recipient exactly as written.",
