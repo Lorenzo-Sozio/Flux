@@ -1,0 +1,74 @@
+[
+  {
+    "file": "src/lib/territory.ts",
+    "description": "⚠️⚠️ un territorio che elenca una provincia si allarga alla regione: «MI» prende anche Brescia e Bergamo",
+    "find": "  if (province) keys.push(`P:${province.code}`);",
+    "replace": "  if (province) keys.push(`P:${province.code}`, `R:${province.region}`);"
+  },
+  {
+    "file": "src/lib/territory.ts",
+    "description": "⚠️⚠️ la provincia di un record non ricade nella sua regione: «MI» resta fuori da Lombardia",
+    "find": "  if (province) keys.push(`P:${province.code}`, `R:${province.region}`);",
+    "replace": "  if (province) keys.push(`P:${province.code}`);"
+  },
+  {
+    "file": "src/lib/territory.ts",
+    "description": "⚠️⚠️ la sigla viene letta come italiana anche su un indirizzo americano: la California finisce in Sardegna",
+    "find": "    const recordKeys = new Set(recordStateKeys(place.state, country === null || country === \"IT\"));",
+    "replace": "    const recordKeys = new Set(recordStateKeys(place.state, true));"
+  },
+  {
+    "file": "src/lib/territory.ts",
+    "description": "⚠️⚠️ un territorio senza criteri copre tutto",
+    "find": "  if (specificity(rule) === 0) return false;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/territory.ts",
+    "description": "⚠️ un record senza paese passa il filtro sul paese",
+    "find": "  if (rule.countries.length && (!country || !rule.countries.includes(country))) return false;",
+    "replace": "  if (rule.countries.length && country && !rule.countries.includes(country)) return false;"
+  },
+  {
+    "file": "src/lib/territory.ts",
+    "description": "il CAP viene confrontato per contenimento invece che per prefisso",
+    "find": "zip.startsWith(foldPostal(p))",
+    "replace": "zip.includes(foldPostal(p))"
+  },
+  {
+    "file": "src/lib/territory.ts",
+    "description": "⚠️⚠️ vince il primo territorio trovato invece del piu' stretto",
+    "find": "      specificity(rule) > specificity(best) ||",
+    "replace": "      false ||"
+  },
+  {
+    "file": "src/lib/territory.ts",
+    "description": "⚠️ il CAP conta meno della provincia",
+    "find": "  return (rule.countries.length ? 1 : 0) + (rule.states.length ? 2 : 0) + (rule.postalPrefixes.length ? 4 : 0);",
+    "replace": "  return (rule.countries.length ? 1 : 0) + (rule.states.length ? 4 : 0) + (rule.postalPrefixes.length ? 2 : 0);"
+  },
+  {
+    "file": "src/lib/territory.ts",
+    "description": "⚠️ a parita' decide l'ordine di caricamento",
+    "find": "(rule.name.localeCompare(best.name) < 0 || (rule.name === best.name && rule.id < best.id))",
+    "replace": "false"
+  },
+  {
+    "file": "src/lib/territory.ts",
+    "description": "⚠️ si salva un codice paese inesistente, che non abbinera' mai niente",
+    "find": "  if (unknown.length) return { ok: false, error: `Not a country code: ${unknown.join(\", \")}` };",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/territory.ts",
+    "description": "⚠️⚠️ si salva un territorio senza criteri",
+    "find": "  if (specificity({ countries, states, postalPrefixes }) === 0) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/territory.ts",
+    "description": "i nomi inglesi delle regioni non vengono riconosciuti",
+    "find": "  for (const alias of aliases) regionByKey.set(fold(alias), fold(region));",
+    "replace": ""
+  }
+]
