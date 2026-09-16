@@ -1,0 +1,92 @@
+[
+  {
+    "file": "src/lib/fatturapa/totals.ts",
+    "description": "⚠️⚠️ l'IVA torna a essere arrotondata riga per riga: SDI scarta la fattura",
+    "find": "    return { rate: g.rate, nature: g.nature, taxable, tax: round2((taxable * g.rate) / 100) };",
+    "replace": "    return { rate: g.rate, nature: g.nature, taxable, tax: round2(g.net * 0) };"
+  },
+  {
+    "file": "src/lib/fatturapa/totals.ts",
+    "description": "⚠️⚠️ lo sconto sul documento non diventa righe: l'imponibile non corrisponde alla somma delle righe",
+    "find": "  if (documentDiscountPercent) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/fatturapa/totals.ts",
+    "description": "⚠️⚠️ la ripartizione dello sconto perde centesimi",
+    "find": "  const order = exact.map((e, i) => ({ i, r: e - floors[i] })).sort((a, b) => b.r - a.r || a.i - b.i);",
+    "replace": "  const order: { i: number }[] = [];"
+  },
+  {
+    "file": "src/lib/fatturapa/totals.ts",
+    "description": "⚠️ lo sconto viene calcolato anche sulla rivalsa del bollo",
+    "find": "  const discountAmount = round2(((subtotal - stamp) * (documentDiscountPercent ?? 0)) / 100);",
+    "replace": "  const discountAmount = round2((subtotal * (documentDiscountPercent ?? 0)) / 100);"
+  },
+  {
+    "file": "src/lib/fatturapa/totals.ts",
+    "description": "⚠️ una riga con IVA porta comunque la Natura",
+    "find": "      nature: l.taxPercent === 0 ? (l.nature ?? null) : null,",
+    "replace": "      nature: l.nature ?? null,"
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️⚠️ l'ordine degli elementi non rispetta lo schema: file scartato",
+    "find": "    el(\"TipoDocumento\", inv.documentType) +\n      el(\"Divisa\", inv.currency) +",
+    "replace": "    el(\"Divisa\", inv.currency) +\n      el(\"TipoDocumento\", inv.documentType) +"
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️⚠️ i caratteri fuori Latin-1 finiscono nel file e lo fanno scartare",
+    "find": "    if (code >= 0x20 && code <= 0xff) out += ch;",
+    "replace": "    out += ch;"
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️⚠️ gli ampersand non vengono codificati: XML non valido",
+    "find": "  return value.replace(/&/g, \"&amp;\")",
+    "replace": "  return value.replace(/&/g, \"&\")"
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️⚠️ il cliente estero riceve un CAP italiano non valido",
+    "find": "      el(\"CAP\", italian ? (p.zipCode ?? \"\").trim() : \"00000\") +",
+    "replace": "      el(\"CAP\", (p.zipCode ?? \"\").trim()) +"
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️⚠️ al cliente estero viene messa una provincia italiana",
+    "find": "      (italian ? el(\"Provincia\", (p.province ?? \"\").trim().toUpperCase()) : \"\") +",
+    "replace": "      el(\"Provincia\", (p.province ?? \"\").trim().toUpperCase()) +"
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️⚠️ la fattura a chi ha solo PEC parte senza PECDestinatario",
+    "find": "        el(\"PECDestinatario\", destination.pec),",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️⚠️ il bollo non viene dichiarato nel tracciato",
+    "find": "      (inv.stampDuty\n        ? block(\"DatiBollo\", el(\"BolloVirtuale\", \"SI\") + el(\"ImportoBollo\", amount2(STAMP_DUTY_AMOUNT)))\n        : \"\") +",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️ gli importi perdono i decimali richiesti dal formato",
+    "find": "const amount2 = (n: number) => n.toFixed(2);",
+    "replace": "const amount2 = (n: number) => String(n);"
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️ il totale del documento non corrisponde alla somma di imponibili e imposte",
+    "find": "      el(\"ImportoTotaleDocumento\", amount2(totals.total)) +",
+    "replace": "      el(\"ImportoTotaleDocumento\", amount2(totals.taxableAmount)) +"
+  },
+  {
+    "file": "src/lib/fatturapa/xml.ts",
+    "description": "⚠️ due fatture diverse ricevono lo stesso progressivo di invio",
+    "find": "  return `${seriesPart}${((fiscalYear % 100) * 100000 + number).toString(36).toUpperCase()}`.slice(-10);",
+    "replace": "  return `${seriesPart}INVIO`.slice(-10);"
+  }
+]

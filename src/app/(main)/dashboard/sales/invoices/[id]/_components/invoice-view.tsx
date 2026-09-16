@@ -34,7 +34,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
-import { computeDocument } from "@/lib/document-totals";
+import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { PAYMENT_METHODS } from "@/lib/invoice-draft";
 import { draftProblems, NATURE_CODES } from "@/lib/invoice-rules";
 import { assessStampDuty, STAMP_DUTY_AMOUNT, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
@@ -118,7 +118,7 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
         data.rechargeStamp,
       )
     : draftLines;
-  const totals = computeDocument({ lines: totalledLines, discountPercent: num(discount) });
+  const totals = invoiceTotals(totalledLines, num(discount));
   // The draft checks run on the screen as typed, so the list of what is missing moves with the edit.
   const liveDraftProblems = isDraft
     ? draftProblems(draftLines, num(discount), { mode: stampMode, note: stampNote })
@@ -241,6 +241,13 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
             {t(`statuses.${invoice.status as "draft" | "issued"}`)}
           </Badge>
         </div>
+        {!isDraft && (
+          <Button asChild variant="outline">
+            <a href={`/api/invoices/${invoice.id}/xml`} download>
+              {t("downloadXml")}
+            </a>
+          </Button>
+        )}
         {isDraft && (
           <div className="flex flex-wrap gap-2">
             {canWrite && (
@@ -355,7 +362,7 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
                       <span className="font-mono text-xs">{l.nature || "—"}</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{money(totals.lines[i]?.net ?? 0)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{money(totals.details[i]?.total ?? 0)}</TableCell>
                   {editable && (
                     <TableCell>
                       <Button
@@ -556,12 +563,13 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
                 <span>−{money(totals.discountAmount)}</span>
               </div>
             )}
-            {totals.taxBreakdown.map((r) => (
-              <div key={r.rate} className="flex justify-between text-muted-foreground">
+            {totals.summary.map((r) => (
+              <div key={`${r.rate}-${r.nature ?? ""}`} className="flex justify-between text-muted-foreground">
                 <span>
-                  {t("vat")} {r.rate}% {t("on")} {money(r.taxable)}
+                  {t("vat")} {r.rate}% {r.nature ? `(${r.nature}) ` : ""}
+                  {t("on")} {money(r.taxable)}
                 </span>
-                <span>{money(r.amount)}</span>
+                <span>{money(r.tax)}</span>
               </div>
             ))}
             <div className="flex justify-between border-t pt-2 font-semibold">

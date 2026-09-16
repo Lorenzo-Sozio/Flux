@@ -20,6 +20,7 @@ import {
   Info,
   Lock,
   Mail,
+  Receipt,
   Search,
   Server,
   Shield,
@@ -453,6 +454,60 @@ const GROUPS: ApiGroup[] = [
             status: 401,
             description: "Non autenticato",
             example: JSON.stringify({ error: "Unauthorized" }, null, 2),
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: "invoices",
+    label: "Fatture",
+    icon: Receipt,
+    color: "text-emerald-600",
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    description:
+      "Il file XML FatturaPA di una fattura emessa. Il documento è costruito dai dati congelati al momento dell'emissione — emittente, cliente e righe come erano quel giorno — quindi la stessa fattura produce sempre lo stesso file.",
+    endpoints: [
+      {
+        id: "invoice-xml",
+        method: "GET",
+        path: "/api/invoices/{id}/xml",
+        summary: "Scarica il tracciato FatturaPA",
+        description:
+          "Restituisce il file XML in formato FPR12 (schema 1.2.3) della fattura o nota di credito emessa, con il nome file previsto da SDI. Una bozza non ha un tracciato: va prima emessa.",
+        auth: "session",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "ID della fattura.",
+            example: "8f1c2b7e-4a3d-4f16-9d21-0b7e5c9a1234",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "File XML (application/xml), allegato con nome ITxxxxxxxxxxx_00001.xml",
+            example:
+              '<?xml version="1.0" encoding="UTF-8"?>\n<p:FatturaElettronica versione="FPR12" …>…</p:FatturaElettronica>',
+          },
+          {
+            status: 401,
+            description: "Non autenticato",
+            example: JSON.stringify({ error: "Unauthorized" }, null, 2),
+          },
+          {
+            status: 404,
+            description: "Fattura inesistente",
+            example: "Not found",
+          },
+          {
+            status: 409,
+            description: "La fattura è ancora una bozza",
+            example: "A draft has no XML: issue it first.",
           },
         ],
       },

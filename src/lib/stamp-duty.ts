@@ -1,5 +1,6 @@
 import { addDays } from "@/lib/contract-terms";
-import { computeDocument, round2 } from "@/lib/document-totals";
+import { round2 } from "@/lib/document-totals";
+import { invoiceTotals } from "@/lib/fatturapa/totals";
 
 /**
  * Imposta di bollo on electronic invoices.
@@ -85,16 +86,20 @@ export function assessStampDuty(
   mode: StampMode = "auto",
 ): StampAssessment {
   const counted = lines.filter((l) => !l.isStampRecharge);
-  const totals = computeDocument({ lines: [...counted], discountPercent });
+  // The same per-(rate, Natura) figures the XML summary carries, so the base that
+  // decides the stamp is the base SDI sees, to the cent.
+  const { summary } = invoiceTotals(
+    counted.map((l) => ({ ...l, description: "" })),
+    discountPercent,
+  );
   let base = 0;
   let exemptBase = 0;
-  counted.forEach((l, i) => {
-    if (l.taxPercent !== 0) return;
-    const net = totals.lines[i].netAfterDocumentDiscount;
-    const treatment = NATURE_STAMP_TREATMENT[l.nature ?? ""] ?? "counts";
-    if (treatment === "counts") base += net;
-    else if (treatment === "exempt") exemptBase += net;
-  });
+  for (const row of summary) {
+    if (row.rate !== 0) continue;
+    const treatment = NATURE_STAMP_TREATMENT[row.nature ?? ""] ?? "counts";
+    if (treatment === "counts") base += row.taxable;
+    else if (treatment === "exempt") exemptBase += row.taxable;
+  }
   base = round2(base);
   exemptBase = round2(exemptBase);
   const due = base > STAMP_DUTY_THRESHOLD;

@@ -7,7 +7,7 @@ import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
 import { companies, invoiceIssuers, invoiceItems, invoices, orderItems, orders, products } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import { addDays } from "@/lib/contract-terms";
-import { computeDocument } from "@/lib/document-totals";
+import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { customerGaps, type Gap, issuerGaps } from "@/lib/fiscal-ids";
 import { cleanDraft, customerSnapshot, type DraftInput, italianToday, linesFromOrder } from "@/lib/invoice-draft";
 import { issueInvoice } from "@/lib/invoice-issue";
@@ -91,8 +91,12 @@ async function issuerRecharges(db: Db): Promise<boolean> {
   return Boolean(row?.recharge);
 }
 
+/** The figures SDI checks — see src/lib/fatturapa/totals.ts for why not computeDocument. */
 function totalsOf(lines: DraftLine[], discountPercent: number) {
-  const t = computeDocument({ lines, discountPercent });
+  const t = invoiceTotals(
+    lines.map((l) => ({ ...l, description: l.description ?? "" })),
+    discountPercent,
+  );
   return {
     subtotal: t.subtotal,
     discountAmount: t.discountAmount,
@@ -160,7 +164,10 @@ export async function getInvoice(id: string) {
     blockers,
     stamp: final.stamp,
     rechargeStamp: recharge,
-    totals: computeDocument({ lines: final.lines, discountPercent: discount }),
+    totals: invoiceTotals(
+      final.lines.map((l) => ({ ...l, description: l.description ?? "" })),
+      discount,
+    ),
   };
 }
 

@@ -134,6 +134,8 @@ export const TAX_REGIMES: Record<string, string> = {
   RF17: "IVA per cassa",
   RF18: "Altro",
   RF19: "Regime forfettario",
+  // Added by the 2025 specifications: cross-border VAT exemption scheme.
+  RF20: "Regime transfrontaliero di franchigia IVA (Direttiva UE 2020/285)",
 };
 
 export type Gap = { field: string; problem: "missing" | "invalid" };

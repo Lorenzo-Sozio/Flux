@@ -3864,6 +3864,7 @@
     "amount": "Importo",
     "f24Code": "Codice tributo F24",
     "payBy": "Da versare entro",
-    "deferred": "rinviato"
+    "deferred": "rinviato",
+    "downloadXml": "Scarica XML"
   }
 }

@@ -530,6 +530,33 @@ would otherwise receive every step twice.
 That is the safe direction to be wrong in; telling the two apart needs headers
 the inbound payload does not carry today.
 
+### The FatturaPA file
+
+[src/lib/fatturapa/](src/lib/fatturapa/) builds the XML an issued invoice is sent
+to SDI as: `totals.ts` for the figures, `xml.ts` for the document, `schema/` for
+the official XSD.
+
+⚠️⚠️ **Validity is checked against the published schema, not against a reading of
+it.** `Schema_VFPR12_v1.2.3.xsd` (specifications 1.4) and the W3C signature schema
+it imports are vendored byte for byte, their hashes pinned in the test, and
+libxml2 compiled to WebAssembly validates every fixture. A schema updated by the
+Agenzia is then a red test with a name, not a batch of invoices rejected weeks
+later.
+
+⚠️⚠️ **Invoice arithmetic is not `document-totals.ts`.** Quotes and orders round VAT
+per line and spread the header discount inside the lines; SDI recomputes VAT per
+rate and requires ImponibileImporto to equal the sum of the lines' PrezzoTotale.
+So `invoiceTotals` groups by (rate, Natura), computes VAT once per group, and
+writes the document discount as one negative line per group, shared to the cent.
+The draft screen, the issued totals, the stamp duty base and the XML all read it.
+
+⚠️ Text is restricted to Basic Latin and Latin-1: "€", typographic quotes and
+emoji reject the whole file, so `latin()` replaces them. Element order inside each
+block is part of the schema — reordering is a rejection.
+
+⚠️ The file is built from what the invoice froze at issue, never from the records
+as they are now: `/api/invoices/{id}/xml` returns the same bytes next year.
+
 ### Mobile and the installable app (PWA)
 
 ```bash
