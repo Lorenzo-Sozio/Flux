@@ -444,6 +444,34 @@ pipeline.
 **Rimedio.** Assorbire i riquadri utili dentro Report e rimuovere la pagina, oppure
 inserirla in navigazione e correggere il link.
 
+**✅ Chiusa la prima volta scegliendo l'opzione debole, e riaperta per questo.** Il link fu
+corretto e la pagina messa in barra laterale — il che è peggio che lasciarla orfana, perché
+adesso la gente la trova. Non c'era niente da trovare: 1044 righe su cinque componenti,
+**zero accessi ai dati**, ogni numero una costante nel sorgente. «Trattative ferme: 8»,
+«Ricavo in gioco: 811.000 €», «Rischio mediano: 72» erano scritti a mano.
+
+Lo spazio dei nomi delle traduzioni lo diceva senza mezzi termini: visitatori,
+visualizzazioni di pagina, sessioni, frequenza di rimbalzo, durata media della sessione,
+fonti di traffico. Metriche di analytics web, che un CRM non ha modo di conoscere.
+
+E ogni concetto verso cui gesticolava esiste già, alimentato da dati veri: previsioni contro
+obiettivo in `/dashboard/pipeline/forecast` e nella scheda obiettivo del mese; trattative
+ferme, preventivi mai aperti e SLA a rischio in `next-actions.ts`, mostrati sulla dashboard
+riga per riga e cliccabili fino al record; il funnel, il win/loss e la distribuzione per fase
+nelle rispettive pagine sotto la pipeline; il punteggio di salute già sulla scheda della
+trattativa e aggregabile nel costruttore di report.
+
+L'unica idea che non esisteva altrove era il simulatore «cosa succede se»: «+1 trattativa
+enterprise», «+5pp di conversione», «−4 giorni di ciclo». Non è una lacuna da colmare, è una
+funzione da progettare, e nessuno l'ha chiesta.
+
+Rimossa la pagina, i cinque componenti, la voce di menu e le quindici chiavi di traduzione
+che se ne andavano con lei. `analytics.funnel` resta: la usa il funnel, che è reale.
+
+⚠️ Rimossi anche `dashboard/default/_components` — le schede e il grafico del template
+originale, con un `data.json` di cifre inventate, dietro un blocco commentato da mesi e
+importati da nessuno. La pagina resta come redirect, perché i vecchi segnalibri puntano lì.
+
 ### D-06 ✅ — La tabella `opportunity` è morta, ma vincola gli ordini
 
 **Cosa.** Nessuna query, nessuna azione, nessuna interfaccia la tocca. Ma la tabella

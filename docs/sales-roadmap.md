@@ -228,7 +228,8 @@ La conversione deve essere **atomica** (una transazione DB unica) e deve:
 **Perché:** Capire dove i lead si bloccano è fondamentale per ottimizzare il processo di vendita.
 
 **Cosa costruire:**
-- Pagina o sezione in `/dashboard/analytics`:
+- Pagina in `/dashboard/pipeline/funnel` (costruita lì, non sotto `/dashboard/analytics`,
+  che era una schermata del template ed è stata rimossa):
   - Funnel interattivo: Lead → Contatto → Deal → Preventivo Inviato → Won
   - Metriche per ogni stage: count, conversion rate, tempo medio di transizione
   - Filtri: periodo, owner, fonte (source), prodotto
@@ -238,7 +239,7 @@ La conversione deve essere **atomica** (una transazione DB unica) e deve:
 
 **File da modificare:**
 - `src/actions/reports.ts` — aggiungere query funnel
-- `src/app/(main)/dashboard/analytics/_components/` — FunnelChart component
+- `src/app/(main)/dashboard/pipeline/funnel/_components/` — FunnelChart component
 
 ---
 
@@ -247,7 +248,7 @@ La conversione deve essere **atomica** (una transazione DB unica) e deve:
 **Implementato (maggio 2026):**
 - ✅ Tabella `sales_target` in DB (migration `0023_sales_targets.sql`)
 - ✅ `src/actions/targets.ts` — `upsertSalesTarget`, `deleteSalesTarget`, `getSalesTargets`
-- ✅ `/dashboard/settings/targets` — griglia utenti × mesi con inline edit
+- ✅ `/dashboard/pipeline/targets` — griglia utenti × mesi con inline edit
 - ✅ Integrazione nel Forecast: KPI "vs. Target" + barra Target nel chart mensile
 - ⏳ Widget "Progress vs. Target" nel CRM dashboard personale utente (da fare)
 
