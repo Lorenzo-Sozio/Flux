@@ -3672,7 +3672,8 @@
       "asksFrom": "Chiederà una decisione dal {date}.",
       "notes": "Note",
       "notesPlaceholder": "Condizioni particolari, riferimenti, cosa comprende"
-    }
+    },
+    "searchPlaceholder": "Cerca per titolo, cliente o titolare…"
   },
   "sequences": {
     "title": "Sequenze di follow-up",
@@ -3940,6 +3941,9 @@
       "readyToIssue": "Pronta per l'emissione.",
       "readyNoPermission": "Completa. Per emetterla serve un amministratore: salvala come bozza.",
       "savedNotIssued": "Bozza salvata, ma non emessa: nella pagina della fattura trovi cosa manca."
-    }
+    },
+    "searchPlaceholder": "Cerca per numero o cliente…",
+    "allInvoices": "Tutte",
+    "noMatches": "Nessuna fattura corrisponde alla ricerca."
   }
 }

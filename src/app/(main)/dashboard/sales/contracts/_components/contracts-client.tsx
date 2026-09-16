@@ -3,13 +3,14 @@
 import { useState } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { type ContractRow, deleteContract } from "@/actions/contracts";
+import { type ContractList, deleteContract } from "@/actions/contracts";
+import { ListToolbar } from "@/components/crm/list-toolbar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,19 +41,13 @@ const PHASE_STYLE: Record<ContractPhase, string> = {
   cancelled: "text-muted-foreground line-through",
 };
 
-function inView(row: ContractRow, view: string): boolean {
-  if (view === "all") return true;
-  if (view === "active") return row.phase === "active" || row.phase === "upcoming";
-  return row.phase === view;
-}
-
 export function ContractsClient({
   data,
   view,
   canWrite,
   canDelete,
 }: {
-  data: { rows: ContractRow[]; on: string; mrr: number };
+  data: ContractList;
   view: string;
   canWrite: boolean;
   canDelete: boolean;
@@ -62,9 +57,20 @@ export function ContractsClient({
   const { formatAmount } = useCurrency();
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const rows = data.rows.filter((r) => inView(r, view));
-  const due = data.rows.filter((r) => r.phase === "renewal_due").length;
-  const earning = data.rows.filter((r) => r.phase === "active" || r.phase === "renewal_due").length;
+  const searchParams = useSearchParams();
+  const rows = data.page.rows;
+  const due = data.renewalsDue;
+  const earning = data.earning;
+
+  /** A view keeps the search and starts again at page one. */
+  const viewHref = (v: string) => {
+    const next = new URLSearchParams(searchParams.toString());
+    if (v === "all") next.delete("view");
+    else next.set("view", v);
+    next.delete("page");
+    const q = next.toString();
+    return q ? `?${q}` : "?";
+  };
 
   const remove = async () => {
     if (!deleteId) return;
@@ -115,7 +121,7 @@ export function ContractsClient({
             <p className="mt-1 text-muted-foreground text-xs">{t("arrDesc")}</p>
           </CardContent>
         </Card>
-        <Link href="?view=renewal_due" className="group">
+        <Link href={viewHref("renewal_due")} className="group">
           <Card
             className={cn(
               "transition-shadow group-hover:shadow-md",
@@ -133,14 +139,24 @@ export function ContractsClient({
         </Link>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {VIEWS.map((v) => (
-          <Button key={v} asChild size="sm" variant={view === v ? "default" : "outline"}>
-            <Link href={v === "all" ? "?" : `?view=${v}`} scroll={false}>
-              {t(`views.${v}`)}
-            </Link>
-          </Button>
-        ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {VIEWS.map((v) => (
+            <Button key={v} asChild size="sm" variant={view === v ? "default" : "outline"}>
+              <Link href={viewHref(v)} scroll={false}>
+                {t(`views.${v}`)}
+              </Link>
+            </Button>
+          ))}
+        </div>
+        <ListToolbar
+          total={data.page.total}
+          page={data.page.page}
+          pageCount={data.page.pageCount}
+          pageSize={data.page.pageSize}
+          shown={rows.length}
+          searchPlaceholder={t("searchPlaceholder")}
+        />
       </div>
 
       <Card>
@@ -148,74 +164,80 @@ export function ContractsClient({
           {rows.length === 0 ? (
             <p className="py-12 text-center text-muted-foreground text-sm">{t("empty")}</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t("contract")}</TableHead>
-                  <TableHead>{t("status")}</TableHead>
-                  <TableHead className="text-right">{t("amount")}</TableHead>
-                  <TableHead className="text-right">{t("monthly")}</TableHead>
-                  <TableHead>{t("termEnd")}</TableHead>
-                  <TableHead>{t("noticeBy")}</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell className="min-w-0">
-                      <p className="font-medium">{row.title}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {row.companyName ?? t("noCompany")}
-                        {row.ownerName ? ` · ${row.ownerName}` : ""}
-                      </p>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn("whitespace-nowrap", PHASE_STYLE[row.phase])}>
-                        {t(`phases.${row.phase}`)}
-                      </Badge>
-                      {row.autoRenew && <p className="mt-1 text-[11px] text-muted-foreground">{t("autoRenews")}</p>}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-right tabular-nums">
-                      {formatAmount(Number(row.amount))}
-                      <span className="ml-1 text-muted-foreground text-xs">/ {t(`periods.${row.billingPeriod}`)}</span>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{formatAmount(row.monthly)}</TableCell>
-                    <TableCell className="whitespace-nowrap tabular-nums">{row.termEnd ?? "—"}</TableCell>
-                    <TableCell
-                      className={cn(
-                        "whitespace-nowrap tabular-nums",
-                        row.phase === "renewal_due" && "font-medium text-amber-700 dark:text-amber-400",
-                      )}
-                    >
-                      {row.noticeBy ?? "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
-                        {canWrite && (
-                          <Button asChild variant="ghost" size="icon" className="h-8 w-8">
-                            <Link href={`/dashboard/sales/contracts/${row.id}`} aria-label={t("edit")}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Link>
-                          </Button>
-                        )}
-                        {canDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => setDeleteId(row.id)}
-                            aria-label={t("delete")}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t("contract")}</TableHead>
+                    <TableHead>{t("status")}</TableHead>
+                    <TableHead className="text-right">{t("amount")}</TableHead>
+                    <TableHead className="text-right">{t("monthly")}</TableHead>
+                    <TableHead>{t("termEnd")}</TableHead>
+                    <TableHead>{t("noticeBy")}</TableHead>
+                    <TableHead />
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((row) => (
+                    <TableRow key={row.id}>
+                      <TableCell className="min-w-0">
+                        <Link href={`/dashboard/sales/contracts/${row.id}`} className="font-medium hover:underline">
+                          {row.title}
+                        </Link>
+                        <p className="text-muted-foreground text-xs">
+                          {row.companyName ?? t("noCompany")}
+                          {row.ownerName ? ` · ${row.ownerName}` : ""}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn("whitespace-nowrap", PHASE_STYLE[row.phase])}>
+                          {t(`phases.${row.phase}`)}
+                        </Badge>
+                        {row.autoRenew && <p className="mt-1 text-[11px] text-muted-foreground">{t("autoRenews")}</p>}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-right tabular-nums">
+                        {formatAmount(Number(row.amount))}
+                        <span className="ml-1 text-muted-foreground text-xs">
+                          / {t(`periods.${row.billingPeriod}`)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{formatAmount(row.monthly)}</TableCell>
+                      <TableCell className="whitespace-nowrap tabular-nums">{row.termEnd ?? "—"}</TableCell>
+                      <TableCell
+                        className={cn(
+                          "whitespace-nowrap tabular-nums",
+                          row.phase === "renewal_due" && "font-medium text-amber-700 dark:text-amber-400",
+                        )}
+                      >
+                        {row.noticeBy ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          {canWrite && (
+                            <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+                              <Link href={`/dashboard/sales/contracts/${row.id}`} aria-label={t("edit")}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Link>
+                            </Button>
+                          )}
+                          {canDelete && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => setDeleteId(row.id)}
+                              aria-label={t("delete")}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

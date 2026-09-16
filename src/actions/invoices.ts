@@ -2,16 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 
-import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, ilike, or, type SQL, sql } from "drizzle-orm";
 
 import { companies, invoiceIssuers, invoiceItems, invoices, orderItems, orders, products } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
-import { addDays } from "@/lib/contract-terms";
 import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { customerGaps, type Gap, issuerGaps } from "@/lib/fiscal-ids";
 import { cleanDraft, customerSnapshot, type DraftInput, italianToday, linesFromOrder } from "@/lib/invoice-draft";
 import { issueInvoice } from "@/lib/invoice-issue";
 import { type DraftLine, type DraftProblem, draftProblems, invoiceScope } from "@/lib/invoice-rules";
+import { type ListParams, offsetOf, toPage } from "@/lib/pagination";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { assessStampDuty, quarterlyStampDuty, quarterOf, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
 import { getDb } from "@/lib/tenant-context";
@@ -108,30 +108,53 @@ function totalsOf(lines: DraftLine[], discountPercent: number) {
 
 // ─── Reading ──────────────────────────────────────────────────────────────────
 
-export async function getInvoices() {
+/**
+ * One page of invoices and credit notes, with the total that matches the query.
+ *
+ * ⚠️ It used to read the first 500 and stop, so invoice 501 existed, was numbered
+ * and counted in the stamp duty, and could not be found on the list.
+ */
+export async function getInvoices(params: ListParams, status = "all") {
   await requireCapability("record:read");
   await requirePlanModule("sales");
   const db = await getDb();
+
+  const term = params.search.trim();
+  const clauses: SQL[] = [];
+  if (status === "draft" || status === "issued") clauses.push(eq(invoices.status, status));
+  if (term) {
+    clauses.push(or(ilike(invoices.documentNumber, `%${term}%`), ilike(companies.name, `%${term}%`)) as SQL);
+  }
+  const where = clauses.length ? and(...clauses) : undefined;
+
   return tolerateUnmigrated(
     "invoices",
-    () =>
-      db
-        .select({
-          id: invoices.id,
-          documentType: invoices.documentType,
-          status: invoices.status,
-          documentNumber: invoices.documentNumber,
-          issueDate: invoices.issueDate,
-          total: invoices.total,
-          currency: invoices.currency,
-          companyName: companies.name,
-          createdAt: invoices.createdAt,
-        })
-        .from(invoices)
-        .leftJoin(companies, eq(companies.id, invoices.companyId))
-        .orderBy(asc(invoices.status), desc(invoices.issueDate), desc(invoices.createdAt))
-        .limit(500),
-    [],
+    async () => {
+      // The count carries the same join as the rows: the search can match on the customer.
+      const [rows, [counted]] = await Promise.all([
+        db
+          .select({
+            id: invoices.id,
+            documentType: invoices.documentType,
+            status: invoices.status,
+            documentNumber: invoices.documentNumber,
+            issueDate: invoices.issueDate,
+            total: invoices.total,
+            currency: invoices.currency,
+            companyName: companies.name,
+            createdAt: invoices.createdAt,
+          })
+          .from(invoices)
+          .leftJoin(companies, eq(companies.id, invoices.companyId))
+          .where(where)
+          .orderBy(asc(invoices.status), desc(invoices.issueDate), desc(invoices.createdAt))
+          .limit(params.pageSize)
+          .offset(offsetOf(params)),
+        db.select({ n: count() }).from(invoices).leftJoin(companies, eq(companies.id, invoices.companyId)).where(where),
+      ]);
+      return toPage(rows, Number(counted?.n ?? 0), params);
+    },
+    toPage([], 0, params),
   );
 }
 

@@ -18,6 +18,7 @@ import {
   termsOf,
   today,
 } from "@/lib/contract-terms";
+import { type ListParams, offsetOf, type Page, toPage } from "@/lib/pagination";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 
@@ -34,13 +35,35 @@ export type ContractRow = typeof contracts.$inferSelect & {
 
 export type ContractResult = { ok: true; id: string } | { ok: false; error: string };
 
+/** The views above the list: a phase, or "active", which also counts contracts not started yet. */
+function inView(row: ContractRow, view: string): boolean {
+  if (view === "all") return true;
+  if (view === "active") return row.phase === "active" || row.phase === "upcoming";
+  return row.phase === view;
+}
+
+export interface ContractList {
+  page: Page<ContractRow>;
+  on: string;
+  mrr: number;
+  /** Counted over the whole workspace, not over the view or the page on screen. */
+  renewalsDue: number;
+  earning: number;
+}
+
 /**
- * Every contract, with where it stands today.
+ * One page of contracts, with where each stands today.
  *
  * The phase is computed here, on the server, from one notion of "today" — so the
  * list, its filters and its totals cannot disagree about which contracts are due.
+ *
+ * ⚠️ The view filters on the phase, and the phase is not a column: it depends on
+ * today's date, the renewal term and the notice. So every contract is read and
+ * the phase worked out before the page is cut, and only that page travels to the
+ * browser. A workspace has contracts in the hundreds, not in the hundreds of
+ * thousands; the day that stops being true the phase has to become a column.
  */
-export async function getContracts(): Promise<{ rows: ContractRow[]; on: string; mrr: number }> {
+export async function getContracts(params: ListParams, view = "all"): Promise<ContractList> {
   await requireCapability("record:read");
   await requirePlanModule("sales");
   const db = await getDb();
@@ -58,7 +81,7 @@ export async function getContracts(): Promise<{ rows: ContractRow[]; on: string;
     [],
   );
 
-  const out: ContractRow[] = rows.map(({ contract, companyName, ownerName }) => {
+  const all: ContractRow[] = rows.map(({ contract, companyName, ownerName }) => {
     const terms = termsOf(contract);
     const termEnd = currentTermEnd(terms, on);
     return {
@@ -72,13 +95,22 @@ export async function getContracts(): Promise<{ rows: ContractRow[]; on: string;
     };
   });
 
+  const term = params.search.trim().toLowerCase();
+  const matching = all.filter(
+    (r) =>
+      inView(r, view) && (!term || [r.title, r.companyName, r.ownerName].some((v) => v?.toLowerCase().includes(term))),
+  );
+  const start = offsetOf(params);
+
   return {
-    rows: out,
+    page: toPage(matching.slice(start, start + params.pageSize), matching.length, params),
     on,
     mrr: monthlyRecurringRevenue(
       rows.map((r) => termsOf(r.contract)),
       on,
     ),
+    renewalsDue: all.filter((r) => r.phase === "renewal_due").length,
+    earning: all.filter((r) => r.phase === "active" || r.phase === "renewal_due").length,
   };
 }
 

@@ -4,6 +4,7 @@ import { Plus } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { getInvoices, getStampDutySummary } from "@/actions/invoices";
+import { ListToolbar } from "@/components/crm/list-toolbar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,13 +12,19 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { getActor } from "@/lib/auth-guard";
 import { italianToday } from "@/lib/invoice-draft";
 import { requirePageCapability } from "@/lib/page-guard";
+import { parseListParams } from "@/lib/pagination";
 import { can } from "@/lib/permissions";
 
-export default async function InvoicesPage() {
+const STATUSES = ["all", "draft", "issued"] as const;
+
+export default async function InvoicesPage({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   await requirePageCapability("record:read", "/dashboard/sales/invoices");
+  const params = await searchParams;
+  const status = STATUSES.includes(params.status as (typeof STATUSES)[number]) ? params.status : "all";
+  const listParams = parseListParams(params);
   const year = Number(italianToday().slice(0, 4));
-  const [rows, stamps, t, actor] = await Promise.all([
-    getInvoices(),
+  const [page, stamps, t, actor] = await Promise.all([
+    getInvoices(listParams, status),
     getStampDutySummary(year),
     getTranslations("invoices"),
     getActor(),
@@ -42,10 +49,38 @@ export default async function InvoicesPage() {
           </Button>
         )}
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2">
+          {STATUSES.map((s) => {
+            const next = new URLSearchParams(params);
+            if (s === "all") next.delete("status");
+            else next.set("status", s);
+            next.delete("page");
+            const q = next.toString();
+            return (
+              <Button key={s} asChild size="sm" variant={status === s ? "default" : "outline"}>
+                <Link href={q ? `?${q}` : "?"} scroll={false}>
+                  {s === "all" ? t("allInvoices") : t(`statuses.${s}`)}
+                </Link>
+              </Button>
+            );
+          })}
+        </div>
+        <ListToolbar
+          total={page.total}
+          page={page.page}
+          pageCount={page.pageCount}
+          pageSize={page.pageSize}
+          shown={page.rows.length}
+          searchPlaceholder={t("searchPlaceholder")}
+        />
+      </div>
       <Card>
         <CardContent className="p-0">
-          {rows.length === 0 ? (
-            <p className="py-12 text-center text-muted-foreground text-sm">{t("empty")}</p>
+          {page.rows.length === 0 ? (
+            <p className="py-12 text-center text-muted-foreground text-sm">
+              {page.total === 0 && !listParams.search && status === "all" ? t("empty") : t("noMatches")}
+            </p>
           ) : (
             <Table>
               <TableHeader>
@@ -59,7 +94,7 @@ export default async function InvoicesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r) => (
+                {page.rows.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-mono">
                       <Link href={`/dashboard/sales/invoices/${r.id}`} className="hover:underline">

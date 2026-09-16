@@ -3672,7 +3672,8 @@
       "asksFrom": "Will ask for a decision from {date}.",
       "notes": "Notes",
       "notesPlaceholder": "Particular terms, references, what it covers"
-    }
+    },
+    "searchPlaceholder": "Search by title, customer or owner…"
   },
   "sequences": {
     "title": "Follow-up sequences",
@@ -3940,6 +3941,9 @@
       "readyToIssue": "Ready to issue.",
       "readyNoPermission": "Complete. Issuing needs an administrator: save it as a draft.",
       "savedNotIssued": "Draft saved but not issued: the invoice page lists what is missing."
-    }
+    },
+    "searchPlaceholder": "Search by number or customer…",
+    "allInvoices": "All",
+    "noMatches": "No invoice matches the search."
   }
 }
