@@ -30,6 +30,7 @@ import {
   Trash2,
   Type,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createEmailTemplate, updateEmailTemplate } from "@/actions/marketing";
@@ -64,21 +65,23 @@ import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
 
 // ─── Block palette config ─────────────────────────────────────────────────────
 
-const PALETTE: { type: BlockType; label: string; icon: React.ReactNode; desc: string }[] = [
-  { type: "heading", label: "Heading", icon: <Type className="h-4 w-4" />, desc: "Title or section header" },
-  { type: "text", label: "Text", icon: <AlignLeft className="h-4 w-4" />, desc: "Paragraph or body copy" },
-  { type: "image", label: "Image", icon: <ImageIcon className="h-4 w-4" />, desc: "Full-width image" },
-  { type: "button", label: "Button", icon: <MousePointer className="h-4 w-4" />, desc: "Call-to-action button" },
-  { type: "divider", label: "Divider", icon: <Minus className="h-4 w-4" />, desc: "Horizontal separator" },
-  { type: "spacer", label: "Spacer", icon: <LayoutTemplate className="h-4 w-4" />, desc: "Vertical whitespace" },
-  { type: "two_column", label: "2 Columns", icon: <Columns className="h-4 w-4" />, desc: "Side-by-side layout" },
-  { type: "footer", label: "Footer", icon: <Mail className="h-4 w-4" />, desc: "Footer with unsubscribe" },
-  { type: "html", label: "Custom HTML", icon: <Code2 className="h-4 w-4" />, desc: "Raw HTML block" },
+/** Label and description: marketing.emailBuilder.blocks.<type>.label / .desc */
+const PALETTE: { type: BlockType; icon: React.ReactNode }[] = [
+  { type: "heading", icon: <Type className="h-4 w-4" /> },
+  { type: "text", icon: <AlignLeft className="h-4 w-4" /> },
+  { type: "image", icon: <ImageIcon className="h-4 w-4" /> },
+  { type: "button", icon: <MousePointer className="h-4 w-4" /> },
+  { type: "divider", icon: <Minus className="h-4 w-4" /> },
+  { type: "spacer", icon: <LayoutTemplate className="h-4 w-4" /> },
+  { type: "two_column", icon: <Columns className="h-4 w-4" /> },
+  { type: "footer", icon: <Mail className="h-4 w-4" /> },
+  { type: "html", icon: <Code2 className="h-4 w-4" /> },
 ];
 
 // ─── Canvas block preview ─────────────────────────────────────────────────────
 
 function BlockPreview({ block }: { block: Block }) {
+  const t = useTranslations("marketing.emailBuilder");
   const { type, props } = block;
 
   switch (type) {
@@ -93,7 +96,9 @@ function BlockPreview({ block }: { block: Block }) {
             textAlign: p.align,
           }}
         >
-          <Tag style={{ margin: 0, color: p.color, fontWeight: "bold", lineHeight: 1.3 }}>{p.text || "Heading"}</Tag>
+          <Tag style={{ margin: 0, color: p.color, fontWeight: "bold", lineHeight: 1.3 }}>
+            {p.text || t("blocks.heading.label")}
+          </Tag>
         </div>
       );
     }
@@ -114,7 +119,7 @@ function BlockPreview({ block }: { block: Block }) {
           // executes. The same sanitiser the ticket thread uses; the CSP in
           // src/proxy.ts is the second line behind it.
           // biome-ignore lint/security/noDangerouslySetInnerHtml: composed email HTML; sanitised
-          dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(p.html || "<p>Text block</p>") }}
+          dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(p.html || `<p>${t("canvas.textPlaceholder")}</p>`) }}
         />
       );
     }
@@ -142,7 +147,7 @@ function BlockPreview({ block }: { block: Block }) {
                 fontSize: 13,
               }}
             >
-              <ImageIcon className="h-5 w-5 mr-2" /> Set image URL in panel →
+              <ImageIcon className="h-5 w-5 mr-2" /> {t("canvas.imagePlaceholder")}
             </div>
           )}
         </div>
@@ -164,7 +169,7 @@ function BlockPreview({ block }: { block: Block }) {
               cursor: "default",
             }}
           >
-            {p.label || "Button"}
+            {p.label || t("blocks.button.label")}
           </span>
         </div>
       );
@@ -189,7 +194,7 @@ function BlockPreview({ block }: { block: Block }) {
             justifyContent: "center",
           }}
         >
-          <span style={{ fontSize: 10, color: "#d1d5db" }}>spacer {p.height}px</span>
+          <span style={{ fontSize: 10, color: "#d1d5db" }}>{t("canvas.spacer", { height: p.height })}</span>
         </div>
       );
     }
@@ -261,7 +266,7 @@ function BlockPreview({ block }: { block: Block }) {
               maxHeight: 80,
             }}
           >
-            {p.html || "<!-- HTML block →"}
+            {p.html || `<!-- ${t("canvas.htmlPlaceholder")} →`}
           </div>
         </div>
       );
@@ -297,6 +302,7 @@ function ColorInput({ value, onChange }: { value: string; onChange: (v: string) 
 }
 
 function AlignButtons({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const t = useTranslations("marketing.emailBuilder");
   return (
     <div className="flex gap-1">
       {(["left", "center", "right"] as const).map((a) => (
@@ -307,7 +313,7 @@ function AlignButtons({ value, onChange }: { value: string; onChange: (v: string
           className="h-7 px-3 text-xs capitalize flex-1"
           onClick={() => onChange(a)}
         >
-          {a}
+          {t(`align.${a}`)}
         </Button>
       ))}
     </div>
@@ -315,6 +321,7 @@ function AlignButtons({ value, onChange }: { value: string; onChange: (v: string
 }
 
 function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block) => void }) {
+  const t = useTranslations("marketing.emailBuilder");
   const set = (patch: Partial<BlockProps>) => onChange({ ...block, props: { ...block.props, ...patch } });
 
   const p = block.props;
@@ -322,7 +329,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
   return (
     <div className="space-y-4 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-2">
-        {PALETTE.find((x) => x.type === block.type)?.label ?? block.type} Properties
+        {t("inspector.properties", { block: t(`blocks.${block.type}.label`) })}
       </p>
 
       {block.type === "heading" &&
@@ -330,30 +337,30 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
           const hp = p as HeadingProps;
           return (
             <>
-              <Row label="Text">
+              <Row label={t("fields.text")}>
                 <Input value={hp.text} onChange={(e) => set({ text: e.target.value } as any)} className="h-8 text-sm" />
               </Row>
-              <Row label="Level">
+              <Row label={t("fields.level")}>
                 <select
                   value={hp.level}
                   onChange={(e) => set({ level: e.target.value } as any)}
                   className="w-full h-8 rounded-md border border-input bg-background px-3 text-sm"
                 >
-                  <option value="h1">H1 — Large</option>
-                  <option value="h2">H2 — Medium</option>
-                  <option value="h3">H3 — Small</option>
+                  <option value="h1">{t("levels.h1")}</option>
+                  <option value="h2">{t("levels.h2")}</option>
+                  <option value="h3">{t("levels.h3")}</option>
                 </select>
               </Row>
-              <Row label="Alignment">
+              <Row label={t("fields.alignment")}>
                 <AlignButtons value={hp.align} onChange={(v) => set({ align: v } as any)} />
               </Row>
-              <Row label="Text Color">
+              <Row label={t("fields.textColor")}>
                 <ColorInput value={hp.color} onChange={(v) => set({ color: v } as any)} />
               </Row>
-              <Row label="Background">
+              <Row label={t("fields.background")}>
                 <ColorInput value={hp.backgroundColor} onChange={(v) => set({ backgroundColor: v } as any)} />
               </Row>
-              <Row label="Padding Top">
+              <Row label={t("fields.paddingTop")}>
                 <Input
                   type="number"
                   value={hp.paddingTop}
@@ -361,7 +368,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Padding Bottom">
+              <Row label={t("fields.paddingBottom")}>
                 <Input
                   type="number"
                   value={hp.paddingBottom}
@@ -378,23 +385,23 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
           const tp = p as TextProps;
           return (
             <>
-              <Row label="Content">
+              <Row label={t("fields.content")}>
                 <Textarea
                   value={tp.html}
                   onChange={(e) => set({ html: e.target.value } as any)}
                   className="text-xs font-mono min-h-[120px] resize-y"
                 />
               </Row>
-              <Row label="Alignment">
+              <Row label={t("fields.alignment")}>
                 <AlignButtons value={tp.align} onChange={(v) => set({ align: v } as any)} />
               </Row>
-              <Row label="Color">
+              <Row label={t("fields.color")}>
                 <ColorInput value={tp.color} onChange={(v) => set({ color: v } as any)} />
               </Row>
-              <Row label="Background">
+              <Row label={t("fields.background")}>
                 <ColorInput value={tp.backgroundColor} onChange={(v) => set({ backgroundColor: v } as any)} />
               </Row>
-              <Row label="Font Size (px)">
+              <Row label={t("fields.fontSize")}>
                 <Input
                   type="number"
                   value={tp.fontSize}
@@ -402,7 +409,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Line Height">
+              <Row label={t("fields.lineHeight")}>
                 <Input
                   type="number"
                   step="0.1"
@@ -411,7 +418,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Padding Top">
+              <Row label={t("fields.paddingTop")}>
                 <Input
                   type="number"
                   value={tp.paddingTop}
@@ -419,7 +426,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Padding Bottom">
+              <Row label={t("fields.paddingBottom")}>
                 <Input
                   type="number"
                   value={tp.paddingBottom}
@@ -436,7 +443,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
           const ip = p as ImageProps;
           return (
             <>
-              <Row label="Image URL">
+              <Row label={t("fields.imageUrl")}>
                 <Input
                   value={ip.src}
                   onChange={(e) => set({ src: e.target.value } as any)}
@@ -444,10 +451,10 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   placeholder="https://…"
                 />
               </Row>
-              <Row label="Alt Text">
+              <Row label={t("fields.altText")}>
                 <Input value={ip.alt} onChange={(e) => set({ alt: e.target.value } as any)} className="h-8 text-sm" />
               </Row>
-              <Row label="Link (href)">
+              <Row label={t("fields.link")}>
                 <Input
                   value={ip.href}
                   onChange={(e) => set({ href: e.target.value } as any)}
@@ -455,7 +462,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   placeholder="https://…"
                 />
               </Row>
-              <Row label="Width (%)">
+              <Row label={t("fields.width")}>
                 <Input
                   type="number"
                   min={10}
@@ -465,13 +472,13 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Alignment">
+              <Row label={t("fields.alignment")}>
                 <AlignButtons value={ip.align} onChange={(v) => set({ align: v } as any)} />
               </Row>
-              <Row label="Background">
+              <Row label={t("fields.background")}>
                 <ColorInput value={ip.backgroundColor} onChange={(v) => set({ backgroundColor: v } as any)} />
               </Row>
-              <Row label="Padding Top">
+              <Row label={t("fields.paddingTop")}>
                 <Input
                   type="number"
                   value={ip.paddingTop}
@@ -479,7 +486,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Padding Bottom">
+              <Row label={t("fields.paddingBottom")}>
                 <Input
                   type="number"
                   value={ip.paddingBottom}
@@ -496,14 +503,14 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
           const bp = p as ButtonProps;
           return (
             <>
-              <Row label="Label">
+              <Row label={t("fields.label")}>
                 <Input
                   value={bp.label}
                   onChange={(e) => set({ label: e.target.value } as any)}
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Link (href)">
+              <Row label={t("fields.link")}>
                 <Input
                   value={bp.href}
                   onChange={(e) => set({ href: e.target.value } as any)}
@@ -511,19 +518,19 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   placeholder="https://…"
                 />
               </Row>
-              <Row label="Alignment">
+              <Row label={t("fields.alignment")}>
                 <AlignButtons value={bp.align} onChange={(v) => set({ align: v } as any)} />
               </Row>
-              <Row label="Button Color">
+              <Row label={t("fields.buttonColor")}>
                 <ColorInput value={bp.bgColor} onChange={(v) => set({ bgColor: v } as any)} />
               </Row>
-              <Row label="Text Color">
+              <Row label={t("fields.textColor")}>
                 <ColorInput value={bp.textColor} onChange={(v) => set({ textColor: v } as any)} />
               </Row>
-              <Row label="Background">
+              <Row label={t("fields.background")}>
                 <ColorInput value={bp.blockBg} onChange={(v) => set({ blockBg: v } as any)} />
               </Row>
-              <Row label="Border Radius (px)">
+              <Row label={t("fields.borderRadius")}>
                 <Input
                   type="number"
                   value={bp.borderRadius}
@@ -531,7 +538,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Font Size (px)">
+              <Row label={t("fields.fontSize")}>
                 <Input
                   type="number"
                   value={bp.fontSize}
@@ -539,7 +546,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Padding H (px)">
+              <Row label={t("fields.paddingH")}>
                 <Input
                   type="number"
                   value={bp.paddingH}
@@ -547,7 +554,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Padding V (px)">
+              <Row label={t("fields.paddingV")}>
                 <Input
                   type="number"
                   value={bp.paddingV}
@@ -564,13 +571,13 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
           const dp = p as DividerProps;
           return (
             <>
-              <Row label="Color">
+              <Row label={t("fields.color")}>
                 <ColorInput value={dp.color} onChange={(v) => set({ color: v } as any)} />
               </Row>
-              <Row label="Background">
+              <Row label={t("fields.background")}>
                 <ColorInput value={dp.backgroundColor} onChange={(v) => set({ backgroundColor: v } as any)} />
               </Row>
-              <Row label="Thickness (px)">
+              <Row label={t("fields.thickness")}>
                 <Input
                   type="number"
                   min={1}
@@ -579,7 +586,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Padding Top">
+              <Row label={t("fields.paddingTop")}>
                 <Input
                   type="number"
                   value={dp.paddingTop}
@@ -587,7 +594,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Padding Bottom">
+              <Row label={t("fields.paddingBottom")}>
                 <Input
                   type="number"
                   value={dp.paddingBottom}
@@ -604,7 +611,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
           const sp = p as SpacerProps;
           return (
             <>
-              <Row label="Height (px)">
+              <Row label={t("fields.height")}>
                 <Input
                   type="number"
                   min={4}
@@ -613,7 +620,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Background">
+              <Row label={t("fields.background")}>
                 <ColorInput value={sp.backgroundColor} onChange={(v) => set({ backgroundColor: v } as any)} />
               </Row>
             </>
@@ -625,30 +632,30 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
           const tp = p as TwoColumnProps;
           return (
             <>
-              <Row label="Left Content">
+              <Row label={t("fields.leftContent")}>
                 <Textarea
                   value={tp.leftHtml}
                   onChange={(e) => set({ leftHtml: e.target.value } as any)}
                   className="text-xs font-mono min-h-[80px] resize-y"
                 />
               </Row>
-              <Row label="Right Content">
+              <Row label={t("fields.rightContent")}>
                 <Textarea
                   value={tp.rightHtml}
                   onChange={(e) => set({ rightHtml: e.target.value } as any)}
                   className="text-xs font-mono min-h-[80px] resize-y"
                 />
               </Row>
-              <Row label="Left Background">
+              <Row label={t("fields.leftBackground")}>
                 <ColorInput value={tp.leftBg} onChange={(v) => set({ leftBg: v } as any)} />
               </Row>
-              <Row label="Right Background">
+              <Row label={t("fields.rightBackground")}>
                 <ColorInput value={tp.rightBg} onChange={(v) => set({ rightBg: v } as any)} />
               </Row>
-              <Row label="Background">
+              <Row label={t("fields.background")}>
                 <ColorInput value={tp.backgroundColor} onChange={(v) => set({ backgroundColor: v } as any)} />
               </Row>
-              <Row label="Gap (px)">
+              <Row label={t("fields.gap")}>
                 <Input
                   type="number"
                   value={tp.gap}
@@ -665,20 +672,20 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
           const fp = p as FooterProps;
           return (
             <>
-              <Row label="Content">
+              <Row label={t("fields.content")}>
                 <Textarea
                   value={fp.html}
                   onChange={(e) => set({ html: e.target.value } as any)}
                   className="text-xs font-mono min-h-[80px] resize-y"
                 />
               </Row>
-              <Row label="Background">
+              <Row label={t("fields.background")}>
                 <ColorInput value={fp.backgroundColor} onChange={(v) => set({ backgroundColor: v } as any)} />
               </Row>
-              <Row label="Text Color">
+              <Row label={t("fields.textColor")}>
                 <ColorInput value={fp.textColor} onChange={(v) => set({ textColor: v } as any)} />
               </Row>
-              <Row label="Font Size (px)">
+              <Row label={t("fields.fontSize")}>
                 <Input
                   type="number"
                   value={fp.fontSize}
@@ -686,7 +693,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   className="h-8 text-sm"
                 />
               </Row>
-              <Row label="Show Unsubscribe">
+              <Row label={t("fields.showUnsubscribe")}>
                 <button
                   type="button"
                   onClick={() => set({ showUnsubscribe: !fp.showUnsubscribe } as any)}
@@ -714,7 +721,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
                   placeholder="<table>…</table>"
                 />
               </Row>
-              <Row label="Background">
+              <Row label={t("fields.background")}>
                 <ColorInput value={hp.backgroundColor} onChange={(v) => set({ backgroundColor: v } as any)} />
               </Row>
             </>
@@ -724,7 +731,9 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
       {/* Variables helper */}
       <Separator />
       <div className="space-y-1">
-        <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground">Insert Variable</p>
+        <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground">
+          {t("inspector.insertVariable")}
+        </p>
         <div className="flex flex-wrap gap-1">
           {VARIABLES.map((v) => (
             <Badge
@@ -734,14 +743,14 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
               title={v.label}
               onClick={() => {
                 // Copy to clipboard
-                navigator.clipboard.writeText(v.key).then(() => toast.success(`Copied ${v.key}`));
+                navigator.clipboard.writeText(v.key).then(() => toast.success(t("copied", { variable: v.key })));
               }}
             >
               {v.key}
             </Badge>
           ))}
         </div>
-        <p className="text-[9px] text-muted-foreground">Click to copy, then paste in text fields above.</p>
+        <p className="text-[9px] text-muted-foreground">{t("inspector.copyHint")}</p>
       </div>
     </div>
   );
@@ -750,16 +759,17 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
 // ─── Settings inspector ───────────────────────────────────────────────────────
 
 function SettingsInspector({ settings, onChange }: { settings: EmailSettings; onChange: (s: EmailSettings) => void }) {
+  const t = useTranslations("marketing.emailBuilder");
   const set = (patch: Partial<EmailSettings>) => onChange({ ...settings, ...patch });
   return (
     <div className="space-y-4 p-4">
       <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b pb-2">
-        Global Settings
+        {t("globalSettings")}
       </p>
-      <Row label="Background Color">
+      <Row label={t("fields.backgroundColor")}>
         <ColorInput value={settings.backgroundColor} onChange={(v) => set({ backgroundColor: v })} />
       </Row>
-      <Row label="Content Width (px)">
+      <Row label={t("fields.contentWidth")}>
         <div className="flex gap-2">
           {[480, 600, 640].map((w) => (
             <Button
@@ -774,24 +784,24 @@ function SettingsInspector({ settings, onChange }: { settings: EmailSettings; on
           ))}
         </div>
       </Row>
-      <Row label="Font Family">
+      <Row label={t("fields.fontFamily")}>
         <select
           value={settings.fontFamily}
           onChange={(e) => set({ fontFamily: e.target.value })}
           className="w-full h-8 rounded-md border border-input bg-background px-3 text-sm"
         >
-          <option value="Arial, Helvetica, sans-serif">Arial (recommended)</option>
+          <option value="Arial, Helvetica, sans-serif">{t("settings.arialRecommended")}</option>
           <option value="Georgia, 'Times New Roman', serif">Georgia</option>
           <option value="'Trebuchet MS', sans-serif">Trebuchet</option>
           <option value="Verdana, Geneva, sans-serif">Verdana</option>
         </select>
       </Row>
-      <Row label="Preview Text (hidden pre-header)">
+      <Row label={t("fields.previewText")}>
         <Input
           value={settings.previewText}
           onChange={(e) => set({ previewText: e.target.value })}
           className="h-8 text-sm"
-          placeholder="A short preview shown in inbox…"
+          placeholder={t("settings.previewTextPlaceholder")}
         />
       </Row>
     </div>
@@ -815,6 +825,9 @@ export function EmailBuilder({
   initialDesign,
   initialCategory = "general",
 }: EmailBuilderProps) {
+  const t = useTranslations("marketing.emailBuilder");
+  const tm = useTranslations("marketing");
+  const tc = useTranslations("common");
   const router = useRouter();
   const [design, setDesign] = useState<EmailDesign>(initialDesign ?? emptyDesign());
   const [selectedId, setSelectedId] = useState<string | "settings" | null>("settings");
@@ -892,11 +905,11 @@ export function EmailBuilder({
 
   const handleSave = async () => {
     if (!name.trim()) {
-      toast.error("Enter a template name.");
+      toast.error(t("nameRequired"));
       return;
     }
     if (!subject.trim()) {
-      toast.error("Enter a subject line.");
+      toast.error(t("subjectRequired"));
       return;
     }
     setSaving(true);
@@ -912,14 +925,14 @@ export function EmailBuilder({
       };
       if (templateId) {
         await updateEmailTemplate(templateId, payload);
-        toast.success("Template updated.");
+        toast.success(tm("templates.updateSuccess"));
       } else {
         await createEmailTemplate(payload);
-        toast.success("Template created.");
+        toast.success(tm("templates.createSuccess"));
       }
       router.push("/dashboard/marketing/templates");
     } catch {
-      toast.error("Failed to save template.");
+      toast.error(t("saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -943,13 +956,13 @@ export function EmailBuilder({
           <Input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Template name…"
+            placeholder={t("namePlaceholder")}
             className="h-8 text-sm max-w-48 font-medium"
           />
           <Input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
-            placeholder="Subject line…"
+            placeholder={t("subjectPlaceholder")}
             className="h-8 text-sm max-w-72"
           />
           <select
@@ -959,7 +972,7 @@ export function EmailBuilder({
           >
             {["general", "welcome", "followup", "promotional", "transactional"].map((c) => (
               <option key={c} value={c} className="capitalize">
-                {c}
+                {tm(`templateCategories.${c}`)}
               </option>
             ))}
           </select>
@@ -978,7 +991,7 @@ export function EmailBuilder({
             className="h-8 w-8"
             onClick={undo}
             disabled={history.length === 0}
-            title="Undo"
+            title={t("undo")}
           >
             <RotateCcw className="h-3.5 w-3.5" />
           </Button>
@@ -991,7 +1004,7 @@ export function EmailBuilder({
             onClick={() => setPreview(preview === "desktop" ? null : "desktop")}
           >
             <Monitor className="h-3.5 w-3.5" />
-            Desktop
+            {t("desktop")}
           </Button>
           <Button
             variant={preview === "mobile" ? "default" : "outline"}
@@ -1000,12 +1013,12 @@ export function EmailBuilder({
             onClick={() => setPreview(preview === "mobile" ? null : "mobile")}
           >
             <Smartphone className="h-3.5 w-3.5" />
-            Mobile
+            {t("mobile")}
           </Button>
 
           <Button size="sm" className="h-8 gap-1 text-xs" onClick={handleSave} disabled={saving}>
             {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-            Save
+            {tc("save")}
           </Button>
         </div>
       </div>
@@ -1020,7 +1033,9 @@ export function EmailBuilder({
         {/* ── Left: Block palette ── */}
         <div className="order-2 w-full shrink-0 overflow-y-auto border-t bg-muted/30 lg:order-none lg:w-52 lg:border-t-0 lg:border-r">
           <div className="p-3">
-            <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground mb-2">Add Block</p>
+            <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground mb-2">
+              {t("addBlock")}
+            </p>
             <div className="space-y-1">
               {PALETTE.map((item) => (
                 <button
@@ -1033,22 +1048,26 @@ export function EmailBuilder({
                     {item.icon}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-xs font-medium leading-none">{item.label}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-none">{item.desc}</p>
+                    <p className="text-xs font-medium leading-none">{t(`blocks.${item.type}.label`)}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5 leading-none">
+                      {t(`blocks.${item.type}.desc`)}
+                    </p>
                   </div>
                 </button>
               ))}
             </div>
 
             <Separator className="my-3" />
-            <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground mb-2">Design</p>
+            <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground mb-2">
+              {t("design")}
+            </p>
             <button
               type="button"
               onClick={() => setSelectedId("settings")}
               className={`w-full flex items-center gap-2 p-2 rounded-md text-left text-xs font-medium transition-colors ${selectedId === "settings" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
             >
               <LayoutTemplate className="h-4 w-4 shrink-0" />
-              Global Settings
+              {t("globalSettings")}
             </button>
           </div>
         </div>
@@ -1057,7 +1076,7 @@ export function EmailBuilder({
         {preview ? (
           <div className="order-1 flex flex-1 flex-col items-center overflow-y-auto bg-muted/40 p-4 lg:order-none lg:p-6">
             <p className="text-xs text-muted-foreground mb-4">
-              {preview === "mobile" ? "Mobile preview (375px)" : "Desktop preview (600px)"}
+              {preview === "mobile" ? t("mobilePreview") : t("desktopPreview")}
             </p>
             <div
               className="shadow-xl rounded overflow-hidden bg-white"
@@ -1066,7 +1085,7 @@ export function EmailBuilder({
               <iframe
                 ref={iframeRef}
                 style={{ width: "100%", height: 600, border: "none", display: "block" }}
-                title="Email preview"
+                title={t("emailPreview")}
                 sandbox="allow-same-origin"
               />
             </div>
@@ -1084,7 +1103,7 @@ export function EmailBuilder({
                       {design.blocks.length === 0 && (
                         <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-sm gap-2">
                           <Plus className="h-8 w-8 opacity-30" />
-                          Click a block in the left panel to add it
+                          {t("emptyCanvas")}
                         </div>
                       )}
                       {design.blocks.map((block, index) => (
@@ -1138,7 +1157,7 @@ export function EmailBuilder({
                                     e.stopPropagation();
                                     duplicateBlock(block.id);
                                   }}
-                                  title="Duplicate"
+                                  title={t("duplicate")}
                                 >
                                   <Copy className="h-3 w-3" />
                                 </button>
@@ -1149,7 +1168,7 @@ export function EmailBuilder({
                                     e.stopPropagation();
                                     deleteBlock(block.id);
                                   }}
-                                  title="Delete"
+                                  title={tc("delete")}
                                 >
                                   <Trash2 className="h-3 w-3" />
                                 </button>
@@ -1158,7 +1177,7 @@ export function EmailBuilder({
                               {/* Type label */}
                               {selectedId === block.id && (
                                 <div className="absolute top-0 left-0 bg-primary text-primary-foreground text-[10px] font-semibold px-1.5 py-0.5 leading-none">
-                                  {PALETTE.find((x) => x.type === block.type)?.label}
+                                  {t(`blocks.${block.type}.label`)}
                                 </div>
                               )}
                             </div>
@@ -1182,7 +1201,7 @@ export function EmailBuilder({
             <BlockInspector block={selectedBlock} onChange={updateBlock} />
           ) : (
             <div className="p-4 text-sm text-muted-foreground text-center mt-8">
-              <p>Select a block on the canvas to edit its properties.</p>
+              <p>{t("inspector.empty")}</p>
             </div>
           )}
         </div>

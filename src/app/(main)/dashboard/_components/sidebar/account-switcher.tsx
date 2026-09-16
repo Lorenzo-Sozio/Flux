@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { BadgeCheck, Bell, CreditCard, LogOut } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { logoutAction } from "@/actions/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -27,6 +28,8 @@ export function AccountSwitcher({
     readonly role: string;
   }>;
 }) {
+  const t = useTranslations("nav");
+  const tRoles = useTranslations("roles.roleLabel");
   const [activeUser, setActiveUser] = useState(users[0]);
 
   return (
@@ -51,7 +54,9 @@ export function AccountSwitcher({
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">{user.name}</span>
-                <span className="truncate text-xs capitalize">{user.role}</span>
+                <span className="truncate text-xs capitalize">
+                  {tRoles.has(user.role) ? tRoles(user.role) : user.role}
+                </span>
               </div>
             </div>
           </DropdownMenuItem>
@@ -60,15 +65,15 @@ export function AccountSwitcher({
         <DropdownMenuGroup>
           <DropdownMenuItem>
             <BadgeCheck />
-            Account
+            {t("accountSwitcher.account")}
           </DropdownMenuItem>
           <DropdownMenuItem>
             <CreditCard />
-            Billing
+            {t("user.billing")}
           </DropdownMenuItem>
           <DropdownMenuItem>
             <Bell />
-            Notifications
+            {t("user.notifications")}
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
@@ -76,7 +81,7 @@ export function AccountSwitcher({
           <form action={logoutAction} className="w-full">
             <button type="submit" className="flex w-full items-center gap-2">
               <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
+              <span>{t("user.logout")}</span>
             </button>
           </form>
         </DropdownMenuItem>

@@ -1,3 +1,6 @@
+import type { Metadata } from "next";
+import { getTranslations } from "next-intl/server";
+
 import { getAutomationEmailLogs, getAutomationRules, getRecentAutomationLogs } from "@/actions/automation";
 import { hasCapability } from "@/lib/auth-guard";
 
@@ -6,7 +9,10 @@ import { AutomationEmailLogs } from "./_components/automation-email-logs";
 import { AutomationLogs } from "./_components/automation-logs";
 import { AutomationOverview } from "./_components/automation-overview";
 
-export const metadata = { title: "Automation Rules" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("automation");
+  return { title: t("title") };
+}
 
 export default async function AutomationPage() {
   // ⚠️ This asked `session.user.role`, which is the platform staff field and is

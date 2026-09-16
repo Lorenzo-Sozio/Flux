@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { BarChart2, ChevronDown, Download, Loader2, Play, Plus, Save, TableIcon, Trash2, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import {
   Area,
   AreaChart,
@@ -55,17 +55,14 @@ import { DATE_BUCKETS } from "@/lib/report-builder-config";
 
 const CHART_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#f97316", "#84cc16"];
 
-const OPERATOR_LABELS: Record<FilterOperator, string> = {
+/** Operators shown as a symbol; the others are words, under reports.builder.ui.operators. */
+const OPERATOR_SYMBOLS: Partial<Record<FilterOperator, string>> = {
   eq: "=",
   neq: "≠",
-  contains: "contains",
-  not_contains: "not contains",
   gt: ">",
   gte: "≥",
   lt: "<",
   lte: "≤",
-  is_empty: "is empty",
-  is_not_empty: "is not empty",
 };
 
 const OPERATORS_BY_TYPE: Record<string, FilterOperator[]> = {
@@ -115,6 +112,8 @@ interface FilterValueInputProps {
 }
 
 function FilterValueInput({ filter, index, fields, onUpdate }: FilterValueInputProps) {
+  const tUi = useTranslations("reports.builder.ui");
+  const tCommon = useTranslations("common");
   if (filter.operator === "is_empty" || filter.operator === "is_not_empty") return null;
   const def = fields.find((f) => f.key === filter.field);
 
@@ -122,7 +121,7 @@ function FilterValueInput({ filter, index, fields, onUpdate }: FilterValueInputP
     return (
       <Select value={filter.value} onValueChange={(v) => onUpdate(index, { value: v })}>
         <SelectTrigger className="h-8 text-xs flex-1">
-          <SelectValue placeholder="Value" />
+          <SelectValue placeholder={tCommon("value")} />
         </SelectTrigger>
         <SelectContent>
           {def.enumValues.map((v) => (
@@ -138,11 +137,11 @@ function FilterValueInput({ filter, index, fields, onUpdate }: FilterValueInputP
     return (
       <Select value={filter.value} onValueChange={(v) => onUpdate(index, { value: v })}>
         <SelectTrigger className="h-8 text-xs flex-1">
-          <SelectValue placeholder="Value" />
+          <SelectValue placeholder={tCommon("value")} />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="true">True</SelectItem>
-          <SelectItem value="false">False</SelectItem>
+          <SelectItem value="true">{tUi("true")}</SelectItem>
+          <SelectItem value="false">{tUi("false")}</SelectItem>
         </SelectContent>
       </Select>
     );
@@ -162,7 +161,7 @@ function FilterValueInput({ filter, index, fields, onUpdate }: FilterValueInputP
       value={filter.value}
       onChange={(e) => onUpdate(index, { value: e.target.value })}
       className="h-8 text-xs flex-1"
-      placeholder="Value"
+      placeholder={tCommon("value")}
     />
   );
 }
@@ -172,6 +171,9 @@ function FilterValueInput({ filter, index, fields, onUpdate }: FilterValueInputP
 export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved }: Props) {
   const router = useRouter();
   const t = useTranslations("reports.builder");
+  const tUi = useTranslations("reports.builder.ui");
+  const tCommon = useTranslations("common");
+  const format = useFormatter();
   const [isPending, startTransition] = useTransition();
 
   const firstEntity = Object.keys(entityConfigs)[0];
@@ -310,7 +312,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
     }));
 
     const dataKey = result.columns.find((c) => c.key === "_agg") ? "agg" : "count";
-    const dataLabel = result.columns.find((c) => c.key === "_agg")?.label ?? "Count";
+    const dataLabel = result.columns.find((c) => c.key === "_agg")?.label ?? tUi("count");
 
     if (config.chartType === "pie") {
       return (
@@ -519,7 +521,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                     <SelectContent>
                       {ops.map((op) => (
                         <SelectItem key={op} value={op}>
-                          {OPERATOR_LABELS[op]}
+                          {OPERATOR_SYMBOLS[op] ?? tUi(`operators.${op}`)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -540,7 +542,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
               onValueChange={(v) => setConfig((c) => ({ ...c, groupBy: v === "__none__" ? undefined : v, fields: [] }))}
             >
               <SelectTrigger className="h-9">
-                <SelectValue placeholder="None (list mode)" />
+                <SelectValue placeholder={t("groupByNone")} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="__none__">{t("groupByNone")}</SelectItem>
@@ -595,7 +597,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                     onValueChange={(v) => setConfig((c) => ({ ...c, aggregationField: v }))}
                   >
                     <SelectTrigger className="h-8 text-xs flex-1">
-                      <SelectValue placeholder="Field" />
+                      <SelectValue placeholder={tUi("field")} />
                     </SelectTrigger>
                     <SelectContent>
                       {aggrFields.map((f) => (
@@ -628,7 +630,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                   }`}
                 >
                   <span className="text-base leading-none">{CHART_ICONS[ct]}</span>
-                  <span className="text-[9px] uppercase">{ct}</span>
+                  <span className="text-[9px] uppercase">{tUi(`chartTypes.${ct}`)}</span>
                 </button>
               ))}
             </div>
@@ -738,8 +740,10 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm text-muted-foreground">
-                      {entityConfigs[config.entity]?.label} by{" "}
-                      {entityConfigs[config.entity]?.fields.find((f) => f.key === config.groupBy)?.label}
+                      {tUi("chartTitle", {
+                        entity: entityConfigs[config.entity]?.label ?? "",
+                        field: entityConfigs[config.entity]?.fields.find((f) => f.key === config.groupBy)?.label ?? "",
+                      })}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>{renderChart()}</CardContent>
@@ -777,8 +781,8 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                                 let display: string;
                                 if (v == null) display = "—";
                                 else if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v))
-                                  display = new Date(v).toLocaleDateString();
-                                else if (typeof v === "boolean") display = v ? "Yes" : "No";
+                                  display = format.dateTime(new Date(v), { dateStyle: "short" });
+                                else if (typeof v === "boolean") display = v ? tCommon("yes") : tCommon("no");
                                 else display = String(v);
                                 return (
                                   <td key={col.key} className="px-4 py-2 text-sm">

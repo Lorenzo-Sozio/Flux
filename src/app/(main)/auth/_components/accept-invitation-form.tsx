@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signIn } from "next-auth/react";
+import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -15,16 +16,21 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-const formSchema = z
-  .object({
-    name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-    password: z.string().min(8, { message: "Password must be at least 8 characters." }),
-    confirmPassword: z.string(),
-  })
-  .refine((d) => d.password === d.confirmPassword, {
-    message: "Passwords do not match.",
-    path: ["confirmPassword"],
-  });
+type Messages = { nameMin: string; passwordMin: string; passwordsMismatch: string };
+
+const makeFormSchema = (m: Messages) =>
+  z
+    .object({
+      name: z.string().min(2, { message: m.nameMin }),
+      password: z.string().min(8, { message: m.passwordMin }),
+      confirmPassword: z.string(),
+    })
+    .refine((d) => d.password === d.confirmPassword, {
+      message: m.passwordsMismatch,
+      path: ["confirmPassword"],
+    });
+
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 interface Props {
   token: string;
@@ -32,15 +38,27 @@ interface Props {
 }
 
 export function AcceptInvitationForm({ token, email }: Props) {
+  const t = useTranslations("auth.acceptInvitation");
+  const tValidation = useTranslations("auth.validation");
+  const tRegister = useTranslations("auth.register");
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
+  const formSchema = useMemo(
+    () =>
+      makeFormSchema({
+        nameMin: tValidation("nameMin"),
+        passwordMin: tValidation("passwordMin"),
+        passwordsMismatch: tValidation("passwordsMismatch"),
+      }),
+    [tValidation],
+  );
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { name: "", password: "", confirmPassword: "" },
   });
 
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+  const onSubmit = async (data: FormValues) => {
     setIsPending(true);
     try {
       const result = await acceptInvitationAction({ token, name: data.name, password: data.password });
@@ -49,10 +67,10 @@ export function AcceptInvitationForm({ token, email }: Props) {
         return;
       }
       await signIn("credentials", { email, password: data.password, redirect: false });
-      toast.success("Welcome! Your account has been created.");
+      toast.success(t("welcome"));
       router.push("/dashboard/crm");
     } catch {
-      toast.error("Something went wrong. Please try again.");
+      toast.error(tRegister("error"));
     } finally {
       setIsPending(false);
     }
@@ -61,7 +79,7 @@ export function AcceptInvitationForm({ token, email }: Props) {
   return (
     <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-4">
       <p className="text-center text-sm text-muted-foreground">
-        Creating account for <strong>{email}</strong>
+        {t.rich("creatingFor", { email, strong: (chunks) => <strong>{chunks}</strong> })}
       </p>
       <FieldGroup className="gap-4">
         <Controller
@@ -69,8 +87,13 @@ export function AcceptInvitationForm({ token, email }: Props) {
           name="name"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="inv-name">Full Name</FieldLabel>
-              <Input {...field} id="inv-name" placeholder="Mario Rossi" aria-invalid={fieldState.invalid} />
+              <FieldLabel htmlFor="inv-name">{tRegister("fullName")}</FieldLabel>
+              <Input
+                {...field}
+                id="inv-name"
+                placeholder={tValidation("namePlaceholder")}
+                aria-invalid={fieldState.invalid}
+              />
               {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
             </Field>
           )}
@@ -80,7 +103,7 @@ export function AcceptInvitationForm({ token, email }: Props) {
           name="password"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="inv-password">Password</FieldLabel>
+              <FieldLabel htmlFor="inv-password">{tRegister("password")}</FieldLabel>
               <Input
                 {...field}
                 id="inv-password"
@@ -97,7 +120,7 @@ export function AcceptInvitationForm({ token, email }: Props) {
           name="confirmPassword"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="inv-confirm">Confirm Password</FieldLabel>
+              <FieldLabel htmlFor="inv-confirm">{tRegister("confirmPassword")}</FieldLabel>
               <Input
                 {...field}
                 id="inv-confirm"
@@ -111,7 +134,7 @@ export function AcceptInvitationForm({ token, email }: Props) {
         />
       </FieldGroup>
       <Button className="w-full" type="submit" disabled={isPending}>
-        {isPending ? "Creating account…" : "Accept & Join"}
+        {isPending ? tRegister("creatingAccount") : t("acceptAndJoin")}
       </Button>
     </form>
   );

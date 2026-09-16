@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2, Plus, Trash2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import type { z } from "zod";
@@ -38,6 +39,7 @@ export function CreateQuoteModal({
   products,
   onSuccess,
 }: CreateQuoteModalProps) {
+  const t = useTranslations("quotes.createModal");
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<FormValues>({
@@ -71,12 +73,12 @@ export function CreateQuoteModal({
     setIsLoading(true);
     try {
       const result = await createQuoteAction(data);
-      toast.success(`Quote ${result.quoteNumber} created successfully`);
+      toast.success(t("created", { number: result.quoteNumber }));
       onOpenChange(false);
       form.reset();
       onSuccess(result.quoteId);
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : "Failed to create quote");
+      toast.error(error instanceof Error ? error.message : t("createFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -101,8 +103,8 @@ export function CreateQuoteModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Quote</DialogTitle>
-          <DialogDescription>Add line items and configure pricing</DialogDescription>
+          <DialogTitle>{t("title")}</DialogTitle>
+          <DialogDescription>{t("description")}</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -114,7 +116,9 @@ export function CreateQuoteModal({
             {/* Items Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Line Items</h3>
+                <h3 className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                  {t("lineItems")}
+                </h3>
                 <Button
                   type="button"
                   variant="outline"
@@ -131,7 +135,7 @@ export function CreateQuoteModal({
                   }
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Add Item
+                  {t("addItem")}
                 </Button>
               </div>
 
@@ -139,7 +143,7 @@ export function CreateQuoteModal({
                 <div key={field.id} className="space-y-3 rounded-lg border bg-muted/20 p-4">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                      Item {index + 1}
+                      {t("item", { number: index + 1 })}
                     </span>
                     {fields.length > 1 && (
                       <Button
@@ -161,7 +165,7 @@ export function CreateQuoteModal({
                       name={`items.${index}.productId`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">Product</FormLabel>
+                          <FormLabel className="text-xs">{t("product")}</FormLabel>
                           <Select
                             onValueChange={(val) => {
                               field.onChange(val === "custom" ? "" : val);
@@ -171,11 +175,11 @@ export function CreateQuoteModal({
                           >
                             <FormControl>
                               <SelectTrigger className="h-8 text-sm">
-                                <SelectValue placeholder="Select product" />
+                                <SelectValue placeholder={t("selectProduct")} />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="custom">Custom item</SelectItem>
+                              <SelectItem value="custom">{t("customItem")}</SelectItem>
                               {products.map((product) => (
                                 <SelectItem key={product.id} value={product.id}>
                                   {product.name}
@@ -194,7 +198,7 @@ export function CreateQuoteModal({
                       name={`items.${index}.quantity`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">Quantity</FormLabel>
+                          <FormLabel className="text-xs">{t("quantity")}</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
@@ -217,9 +221,9 @@ export function CreateQuoteModal({
                     name={`items.${index}.description`}
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-xs">Description</FormLabel>
+                        <FormLabel className="text-xs">{t("descriptionLabel")}</FormLabel>
                         <FormControl>
-                          <Input placeholder="Item description" className="h-8 text-sm" {...field} />
+                          <Input placeholder={t("descriptionPlaceholder")} className="h-8 text-sm" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -235,7 +239,7 @@ export function CreateQuoteModal({
                       name={`items.${index}.unitPrice`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">Unit Price</FormLabel>
+                          <FormLabel className="text-xs">{t("unitPrice")}</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
@@ -258,7 +262,7 @@ export function CreateQuoteModal({
                       name={`items.${index}.discountPercent`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">Discount %</FormLabel>
+                          <FormLabel className="text-xs">{t("discountPercent")}</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
@@ -282,7 +286,7 @@ export function CreateQuoteModal({
                       name={`items.${index}.taxPercent`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-xs">Tax %</FormLabel>
+                          <FormLabel className="text-xs">{t("taxPercent")}</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
@@ -306,14 +310,16 @@ export function CreateQuoteModal({
 
             {/* Quote-level adjustments */}
             <div className="space-y-3 border-t pt-4">
-              <h3 className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">Quote Adjustments</h3>
+              <h3 className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                {t("adjustments")}
+              </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <FormField
                   control={form.control}
                   name="discountPercent"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs">Quote Discount %</FormLabel>
+                      <FormLabel className="text-xs">{t("quoteDiscount")}</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -336,7 +342,7 @@ export function CreateQuoteModal({
                   name="taxPercent"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs">Quote Tax %</FormLabel>
+                      <FormLabel className="text-xs">{t("quoteTax")}</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -363,7 +369,7 @@ export function CreateQuoteModal({
                 name="expiresAt"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs">Expiration Date (Optional)</FormLabel>
+                    <FormLabel className="text-xs">{t("expiresAt")}</FormLabel>
                     <FormControl>
                       <Input type="date" className="h-8 text-sm" {...field} />
                     </FormControl>
@@ -377,10 +383,10 @@ export function CreateQuoteModal({
                 name="notes"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs">Notes</FormLabel>
+                    <FormLabel className="text-xs">{t("notes")}</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Additional notes for the customer..."
+                        placeholder={t("notesPlaceholder")}
                         className="resize-none text-sm"
                         rows={3}
                         {...field}
@@ -395,11 +401,11 @@ export function CreateQuoteModal({
             {/* Actions */}
             <div className="flex justify-end gap-2 border-t pt-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Quote
+                {t("submit")}
               </Button>
             </div>
           </form>

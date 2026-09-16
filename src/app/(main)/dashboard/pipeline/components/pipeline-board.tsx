@@ -312,7 +312,7 @@ export function PipelineBoard({
                                       {/* Health score dot */}
                                       {deal.status === "open" && (
                                         <span
-                                          title={`Health: ${deal.healthScore ?? 0}/100`}
+                                          title={t("healthScore", { score: deal.healthScore ?? 0 })}
                                           className={`h-2 w-2 shrink-0 rounded-full ${
                                             (deal.healthScore ?? 0) >= 70
                                               ? "bg-green-500"

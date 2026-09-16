@@ -87,6 +87,7 @@ export async function ActivityTimeline({
   noActivitiesLabel?: string;
 }) {
   const tD = await getTranslations("entityDetail");
+  const tc = await getTranslations("common");
 
   const typeLabels: Record<string, string> = {
     note: tD("activityTypes.note"),
@@ -158,7 +159,7 @@ export async function ActivityTimeline({
                       <button
                         type="submit"
                         className="p-1 text-muted-foreground transition-colors hover:text-destructive"
-                        title="Delete"
+                        title={tc("delete")}
                       >
                         <Trash2Icon className="h-3.5 w-3.5" />
                       </button>

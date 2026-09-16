@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2Icon, Users } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -34,17 +35,18 @@ const PRESET_COLORS = [
   "#1e293b",
 ];
 
-const groupSchema = z.object({
-  name: z.string().min(1, "Group name is required").max(100),
-  description: z.string().max(255).optional(),
-  color: z
-    .string()
-    .regex(/^#[0-9a-fA-F]{6}$/)
-    .default("#6366f1"),
-  memberIds: z.array(z.string()).default([]),
-});
+const makeGroupSchema = (nameRequired: string) =>
+  z.object({
+    name: z.string().min(1, nameRequired).max(100),
+    description: z.string().max(255).optional(),
+    color: z
+      .string()
+      .regex(/^#[0-9a-fA-F]{6}$/)
+      .default("#6366f1"),
+    memberIds: z.array(z.string()).default([]),
+  });
 
-type GroupFormValues = z.infer<typeof groupSchema>;
+type GroupFormValues = z.infer<ReturnType<typeof makeGroupSchema>>;
 
 type UserOption = { id: string; name: string | null; email: string | null };
 
@@ -61,6 +63,9 @@ interface Props {
 }
 
 export function GroupModal({ group, children, onSaved }: Props) {
+  const t = useTranslations("users.groupModal");
+  const tCommon = useTranslations("common");
+  const groupSchema = useMemo(() => makeGroupSchema(t("nameRequired")), [t]);
   const [open, setOpen] = useState(false);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [search, setSearch] = useState("");
@@ -110,30 +115,30 @@ export function GroupModal({ group, children, onSaved }: Props) {
         : await createUserGroup(data as UserGroupFormData);
 
       if (!result.success) {
-        toast.error(result.error ?? "Failed to save group.");
+        toast.error(result.error ?? t("saveFailed"));
         return;
       }
 
-      toast.success(isEditing ? "Group updated." : "Group created.");
+      toast.success(isEditing ? t("updated") : t("created"));
       setOpen(false);
       form.reset();
       setSearch("");
       onSaved?.();
     } catch {
-      toast.error("Failed to save group.");
+      toast.error(t("saveFailed"));
     }
   };
 
   const handleDelete = async () => {
     if (!group) return;
-    if (!confirm(`Delete group "${group.name}"? Records assigned to it will become unassigned.`)) return;
+    if (!confirm(t("deleteConfirm", { name: group.name }))) return;
     try {
       await deleteUserGroup(group.id);
-      toast.success("Group deleted.");
+      toast.success(t("deleted"));
       setOpen(false);
       onSaved?.();
     } catch {
-      toast.error("Failed to delete group.");
+      toast.error(t("deleteFailed"));
     }
   };
 
@@ -158,7 +163,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
             >
               <Users className="h-3.5 w-3.5 text-white" />
             </span>
-            {isEditing ? `Edit Group — ${group.name}` : "New Group"}
+            {isEditing ? t("editTitle", { name: group.name }) : t("newTitle")}
           </DialogTitle>
         </DialogHeader>
 
@@ -167,18 +172,20 @@ export function GroupModal({ group, children, onSaved }: Props) {
             {/* Name */}
             <div className="flex flex-col gap-1.5">
               <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                Group Name <span className="text-destructive">*</span>
+                {t("nameLabel")} <span className="text-destructive">*</span>
               </Label>
-              <Input {...register("name")} placeholder="e.g. Sales Team" />
+              <Input {...register("name")} placeholder={t("namePlaceholder")} />
               {errors.name && <p className="text-destructive text-xs">{errors.name.message}</p>}
             </div>
 
             {/* Description */}
             <div className="flex flex-col gap-1.5">
-              <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Description</Label>
+              <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                {t("descriptionLabel")}
+              </Label>
               <Textarea
                 {...register("description")}
-                placeholder="Briefly describe this group's purpose…"
+                placeholder={t("descriptionPlaceholder")}
                 className="resize-none"
                 rows={2}
               />
@@ -186,7 +193,9 @@ export function GroupModal({ group, children, onSaved }: Props) {
 
             {/* Color */}
             <div className="flex flex-col gap-2">
-              <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Color</Label>
+              <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                {t("colorLabel")}
+              </Label>
               <div className="flex flex-wrap items-center gap-2">
                 {PRESET_COLORS.map((c) => (
                   <button
@@ -212,13 +221,15 @@ export function GroupModal({ group, children, onSaved }: Props) {
             {/* Members */}
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">Members</Label>
+                <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                  {t("membersLabel")}
+                </Label>
                 <Badge variant="secondary" className="text-xs">
-                  {watchedMemberIds.length} selected
+                  {t("selectedCount", { count: watchedMemberIds.length })}
                 </Badge>
               </div>
               <Input
-                placeholder="Search users…"
+                placeholder={t("searchUsers")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="h-8 text-sm"
@@ -227,7 +238,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
                 <div className="space-y-0.5 p-2">
                   {filteredUsers.length === 0 && (
                     <p className="py-4 text-center text-muted-foreground text-xs">
-                      {users.length === 0 ? "Loading users…" : "No users match your search."}
+                      {users.length === 0 ? t("loadingUsers") : t("noUsersMatch")}
                     </p>
                   )}
                   {filteredUsers.map((u) => (
@@ -275,15 +286,15 @@ export function GroupModal({ group, children, onSaved }: Props) {
                 className="mr-auto text-destructive hover:bg-destructive/10 hover:text-destructive/90"
                 onClick={handleDelete}
               >
-                Delete Group
+                {t("deleteGroup")}
               </Button>
             )}
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting} className="min-w-[100px]">
               {isSubmitting && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? "Save Changes" : "Create Group"}
+              {isEditing ? t("saveChanges") : t("createGroup")}
             </Button>
           </DialogFooter>
         </form>

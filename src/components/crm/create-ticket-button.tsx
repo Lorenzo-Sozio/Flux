@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
+import { useOpenOnNew } from "@/hooks/use-open-on-new";
 
 import { CreateTicketModal } from "./create-ticket-modal";
 
@@ -13,11 +14,19 @@ interface CreateTicketButtonProps {
   contactId?: string;
   companyId?: string;
   variant?: "default" | "outline" | "ghost" | "destructive";
+  /** Open when the page is reached with ?new=true. One per page. */
+  openOnNew?: boolean;
 }
 
-export function CreateTicketButton({ contactId, companyId, variant = "default" }: CreateTicketButtonProps) {
+export function CreateTicketButton({
+  contactId,
+  companyId,
+  variant = "default",
+  openOnNew = false,
+}: CreateTicketButtonProps) {
   const t = useTranslations("support.tickets");
   const [open, setOpen] = useState(false);
+  useOpenOnNew(openOnNew, setOpen);
 
   return (
     <>

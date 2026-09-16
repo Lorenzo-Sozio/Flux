@@ -26,6 +26,7 @@ import {
   Underline as UnderlineIcon,
   Undo,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -78,12 +79,13 @@ const EMAIL_VARS = PLACEHOLDERS.map((p) => `{{${p.aliases[0]}}}`);
 const MACRO_VARS = ["{ticket.number}", "{contact.firstName}", "{agent.name}"];
 
 export function RichTextEditor({ value, onChange, placeholder, className, macroVariables = false }: Props) {
+  const t = useTranslations("marketing.richTextEditor");
   const editor = useEditor({
     extensions: [
       StarterKit,
       Underline,
       Link.configure({ openOnClick: false, HTMLAttributes: { class: "text-primary underline" } }),
-      Placeholder.configure({ placeholder: placeholder ?? "Write your email content…" }),
+      Placeholder.configure({ placeholder: placeholder ?? t("defaultPlaceholder") }),
       TextAlign.configure({ types: ["heading", "paragraph"] }),
     ],
     content: value ?? "",
@@ -114,7 +116,7 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
 
   const handleLink = () => {
     const prev = editor.getAttributes("link").href ?? "";
-    const url = window.prompt("Enter URL", prev);
+    const url = window.prompt(t("enterUrl"), prev);
     if (url === null) return;
     if (url === "") {
       editor.chain().focus().extendMarkRange("link").unsetLink().run();
@@ -131,28 +133,28 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBold().run()}
             active={editor.isActive("bold")}
-            label="Bold"
+            label={t("bold")}
           >
             <Bold className="h-3.5 w-3.5" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleItalic().run()}
             active={editor.isActive("italic")}
-            label="Italic"
+            label={t("italic")}
           >
             <Italic className="h-3.5 w-3.5" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleUnderline().run()}
             active={editor.isActive("underline")}
-            label="Underline"
+            label={t("underline")}
           >
             <UnderlineIcon className="h-3.5 w-3.5" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleStrike().run()}
             active={editor.isActive("strike")}
-            label="Strikethrough"
+            label={t("strikethrough")}
           >
             <Strikethrough className="h-3.5 w-3.5" />
           </ToolbarButton>
@@ -162,14 +164,14 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
             active={editor.isActive("heading", { level: 1 })}
-            label="Heading 1"
+            label={t("heading1")}
           >
             <Heading1 className="h-3.5 w-3.5" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
             active={editor.isActive("heading", { level: 2 })}
-            label="Heading 2"
+            label={t("heading2")}
           >
             <Heading2 className="h-3.5 w-3.5" />
           </ToolbarButton>
@@ -179,21 +181,21 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
           <ToolbarButton
             onClick={() => editor.chain().focus().setTextAlign("left").run()}
             active={editor.isActive({ textAlign: "left" })}
-            label="Align Left"
+            label={t("alignLeft")}
           >
             <AlignLeft className="h-3.5 w-3.5" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().setTextAlign("center").run()}
             active={editor.isActive({ textAlign: "center" })}
-            label="Align Center"
+            label={t("alignCenter")}
           >
             <AlignCenter className="h-3.5 w-3.5" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().setTextAlign("right").run()}
             active={editor.isActive({ textAlign: "right" })}
-            label="Align Right"
+            label={t("alignRight")}
           >
             <AlignRight className="h-3.5 w-3.5" />
           </ToolbarButton>
@@ -203,32 +205,32 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBulletList().run()}
             active={editor.isActive("bulletList")}
-            label="Bullet List"
+            label={t("bulletList")}
           >
             <List className="h-3.5 w-3.5" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleOrderedList().run()}
             active={editor.isActive("orderedList")}
-            label="Ordered List"
+            label={t("orderedList")}
           >
             <ListOrdered className="h-3.5 w-3.5" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleBlockquote().run()}
             active={editor.isActive("blockquote")}
-            label="Quote"
+            label={t("quote")}
           >
             <Quote className="h-3.5 w-3.5" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().toggleCodeBlock().run()}
             active={editor.isActive("codeBlock")}
-            label="Code"
+            label={t("code")}
           >
             <Code2 className="h-3.5 w-3.5" />
           </ToolbarButton>
-          <ToolbarButton onClick={handleLink} active={editor.isActive("link")} label="Link">
+          <ToolbarButton onClick={handleLink} active={editor.isActive("link")} label={t("link")}>
             <Link2 className="h-3.5 w-3.5" />
           </ToolbarButton>
 
@@ -237,21 +239,21 @@ export function RichTextEditor({ value, onChange, placeholder, className, macroV
           <ToolbarButton
             onClick={() => editor.chain().focus().undo().run()}
             disabled={!editor.can().undo()}
-            label="Undo"
+            label={t("undo")}
           >
             <Undo className="h-3.5 w-3.5" />
           </ToolbarButton>
           <ToolbarButton
             onClick={() => editor.chain().focus().redo().run()}
             disabled={!editor.can().redo()}
-            label="Redo"
+            label={t("redo")}
           >
             <Redo className="h-3.5 w-3.5" />
           </ToolbarButton>
 
           {/* Variable chip insertions */}
           <Separator orientation="vertical" className="mx-1 h-5" />
-          <span className="text-[10px] text-muted-foreground">Var:</span>
+          <span className="text-[10px] text-muted-foreground">{t("variables")}</span>
           {(macroVariables ? MACRO_VARS : EMAIL_VARS).map((v) => (
             <button
               key={v}

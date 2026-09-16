@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
@@ -16,29 +16,45 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-const formSchema = z
-  .object({
-    name: z.string().min(2, { message: "Name must be at least 2 characters." }),
-    email: z.string().email({ message: "Please enter a valid email address." }),
-    password: z.string().min(8, { message: "Password must be at least 8 characters." }),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match.",
-    path: ["confirmPassword"],
-  });
+type Messages = { nameMin: string; emailInvalid: string; passwordMin: string; passwordsMismatch: string };
+
+const makeFormSchema = (m: Messages) =>
+  z
+    .object({
+      name: z.string().min(2, { message: m.nameMin }),
+      email: z.string().email({ message: m.emailInvalid }),
+      password: z.string().min(8, { message: m.passwordMin }),
+      confirmPassword: z.string(),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: m.passwordsMismatch,
+      path: ["confirmPassword"],
+    });
+
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 export function RegisterForm() {
   const t = useTranslations("auth.register");
+  const tValidation = useTranslations("auth.validation");
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
+  const formSchema = useMemo(
+    () =>
+      makeFormSchema({
+        nameMin: tValidation("nameMin"),
+        emailInvalid: tValidation("emailInvalid"),
+        passwordMin: tValidation("passwordMin"),
+        passwordsMismatch: tValidation("passwordsMismatch"),
+      }),
+    [tValidation],
+  );
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { name: "", email: "", password: "", confirmPassword: "" },
   });
 
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+  const onSubmit = async (data: FormValues) => {
     setIsPending(true);
     try {
       const result = await registerAction({
@@ -81,7 +97,7 @@ export function RegisterForm() {
                 {...field}
                 id="register-name"
                 type="text"
-                placeholder="Mario Rossi"
+                placeholder={tValidation("namePlaceholder")}
                 autoComplete="name"
                 aria-invalid={fieldState.invalid}
               />

@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { format } from "date-fns";
 import {
   AlertTriangle,
   Building2,
@@ -27,7 +26,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { convertQuoteToOrderAction } from "@/actions/orders";
@@ -68,20 +67,25 @@ interface QuoteDetailProps {
   customerDrafts?: Record<string, { subject: string; body: string }>;
 }
 
-const ACTIVITY_LABELS: Record<string, string> = {
-  created: "Quote created",
-  sent: "Quote sent",
-  viewed: "Quote viewed",
-  opened_email: "Email opened",
-  clicked_email: "Link clicked",
-  accepted: "Quote accepted",
-  declined: "Quote declined",
-  reminded: "Reminder sent",
-  updated: "Quote updated",
-  approval_requested: "Approvazione richiesta",
-  approved: "Preventivo approvato",
-  rejected: "Preventivo rifiutato",
-};
+/** Activity types with a label under `quotes.detail.activity`; anything else shows its raw type. */
+const ACTIVITY_TYPES = new Set([
+  "created",
+  "sent",
+  "viewed",
+  "opened_email",
+  "clicked_email",
+  "accepted",
+  "declined",
+  "reminded",
+  "updated",
+  "approval_requested",
+  "approved",
+  "rejected",
+]);
+
+const DATE_FORMAT = { day: "numeric", month: "short", year: "numeric" } as const;
+const DATE_TIME_FORMAT = { ...DATE_FORMAT, hour: "2-digit", minute: "2-digit" } as const;
+const SHORT_DATE_TIME_FORMAT = { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" } as const;
 
 export function QuoteDetail({
   quote,
@@ -92,6 +96,8 @@ export function QuoteDetail({
   customerDrafts,
 }: QuoteDetailProps) {
   const router = useRouter();
+  const t = useTranslations("quotes.detail");
+  const formatter = useFormatter();
   const { formatMoney } = useCurrency();
   // In the quote's own currency: the figure the customer was offered, not a conversion.
   const fmt = (amount: string | null) => formatMoney(amount, quote.currency);
@@ -162,20 +168,15 @@ export function QuoteDetail({
         await updateQuoteAction(quote.id, { status: newStatus as "accepted" | "declined" });
         onStatusChange?.(newStatus);
       },
-      `Quote marked as ${newStatus}`,
-      "Failed to update status",
+      newStatus === "accepted" ? t("markedAccepted") : t("markedDeclined"),
+      t("statusUpdateFailed"),
     );
   }
 
   const handleRequestApproval = () =>
-    runAction(
-      () => requestApprovalAction(quote.id),
-      "Approvazione richiesta con successo.",
-      "Errore nell'invio della richiesta.",
-    );
+    runAction(() => requestApprovalAction(quote.id), t("approvalRequested"), t("approvalRequestFailed"));
 
-  const handleApprove = () =>
-    runAction(() => approveQuoteAction(quote.id), "Preventivo approvato.", "Errore nell'approvazione.");
+  const handleApprove = () => runAction(() => approveQuoteAction(quote.id), t("approved"), t("approveFailed"));
 
   /**
    * The last manual re-typing in the sales month.
@@ -188,18 +189,18 @@ export function QuoteDetail({
     setIsLoading(true);
     try {
       const result = await convertQuoteToOrderAction(quote.id);
-      toast.success(`Order ${result.orderNumber} created from this quote.`);
+      toast.success(t("orderCreated", { orderNumber: result.orderNumber }));
       router.push(`/dashboard/sales/orders/${result.orderId}`);
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not create the order.");
+      toast.error(error instanceof Error ? error.message : t("orderCreateFailed"));
     } finally {
       setIsLoading(false);
     }
   };
 
   async function handleReject() {
-    await runAction(() => rejectQuoteAction(quote.id, rejectNote), "Preventivo rifiutato.", "Errore nel rifiuto.");
+    await runAction(() => rejectQuoteAction(quote.id, rejectNote), t("rejected"), t("rejectFailed"));
     setShowRejectDialog(false);
     setRejectNote("");
   }
@@ -222,7 +223,7 @@ export function QuoteDetail({
                 <Button
                   variant="ghost"
                   size="icon"
-                  title="Edit quote"
+                  title={t("editQuote")}
                   onClick={() => router.push(`/dashboard/sales/quotes/${quote.id}/edit`)}
                 >
                   <Pencil className="h-4 w-4" />
@@ -233,26 +234,26 @@ export function QuoteDetail({
 
           <CardContent className="space-y-4">
             <div>
-              <p className="mb-1 text-muted-foreground text-xs">Issued</p>
+              <p className="mb-1 text-muted-foreground text-xs">{t("issued")}</p>
               <p className="flex items-center gap-1.5 font-medium text-sm">
                 <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                {format(new Date(quote.issuedAt), "MMM d, yyyy")}
+                {formatter.dateTime(new Date(quote.issuedAt), DATE_FORMAT)}
               </p>
             </div>
 
             {quote.expiresAt && (
               <div>
-                <p className="mb-1 text-muted-foreground text-xs">Expires</p>
+                <p className="mb-1 text-muted-foreground text-xs">{t("expires")}</p>
                 <p className="flex items-center gap-1.5 font-medium text-sm">
                   <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                  {format(new Date(quote.expiresAt), "MMM d, yyyy")}
+                  {formatter.dateTime(new Date(quote.expiresAt), DATE_FORMAT)}
                 </p>
               </div>
             )}
 
             {quote.deal && (
               <div>
-                <p className="mb-1 text-muted-foreground text-xs">Deal</p>
+                <p className="mb-1 text-muted-foreground text-xs">{t("deal")}</p>
                 <p className="flex items-center gap-1.5 font-medium text-sm">
                   <Hash className="h-3.5 w-3.5 text-muted-foreground" />
                   {quote.deal.name}
@@ -262,7 +263,7 @@ export function QuoteDetail({
 
             {quote.company && (
               <div>
-                <p className="mb-1 text-muted-foreground text-xs">Company</p>
+                <p className="mb-1 text-muted-foreground text-xs">{t("company")}</p>
                 <p className="flex items-center gap-1.5 font-medium text-sm">
                   <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                   {quote.company.name}
@@ -272,7 +273,7 @@ export function QuoteDetail({
 
             {contactName && (
               <div>
-                <p className="mb-1 text-muted-foreground text-xs">Contact</p>
+                <p className="mb-1 text-muted-foreground text-xs">{t("contact")}</p>
                 <p className="flex items-center gap-1.5 font-medium text-sm">
                   <User className="h-3.5 w-3.5 text-muted-foreground" />
                   {contactName}
@@ -282,7 +283,7 @@ export function QuoteDetail({
 
             {quote.owner && (
               <div>
-                <p className="mb-1 text-muted-foreground text-xs">Owner</p>
+                <p className="mb-1 text-muted-foreground text-xs">{t("owner")}</p>
                 <p className="flex items-center gap-1.5 font-medium text-sm">
                   <User className="h-3.5 w-3.5 text-muted-foreground" />
                   {quote.owner.name}
@@ -293,7 +294,7 @@ export function QuoteDetail({
             <Separator />
 
             <div>
-              <p className="mb-1 text-muted-foreground text-xs">Total Amount</p>
+              <p className="mb-1 text-muted-foreground text-xs">{t("totalAmount")}</p>
               <p className="flex items-center gap-1.5 font-bold text-xl tabular-nums">
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
                 {fmt(quote.totalAmount)}
@@ -328,7 +329,7 @@ export function QuoteDetail({
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-              Actions
+              {t("actions")}
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
@@ -340,7 +341,7 @@ export function QuoteDetail({
                 disabled={isLoading}
               >
                 <ShieldCheck className="mr-2 h-4 w-4" />
-                Richiedi Approvazione
+                {t("requestApproval")}
               </Button>
             )}
 
@@ -352,7 +353,7 @@ export function QuoteDetail({
                   disabled={isLoading}
                 >
                   <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Approva Preventivo
+                  {t("approveQuote")}
                 </Button>
                 <Button
                   variant="outline"
@@ -361,7 +362,7 @@ export function QuoteDetail({
                   disabled={isLoading}
                 >
                   <XCircle className="mr-2 h-4 w-4" />
-                  Rifiuta con nota
+                  {t("rejectWithNote")}
                 </Button>
               </>
             )}
@@ -369,7 +370,7 @@ export function QuoteDetail({
             {quote.status === "pending_approval" && !canApprove && (
               <div className="flex items-start gap-2 rounded-md border border-orange-200 bg-orange-50 px-3 py-2.5 text-orange-700 text-xs">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <span>In attesa di approvazione da un amministratore.</span>
+                <span>{t("awaitingApproval")}</span>
               </div>
             )}
 
@@ -386,21 +387,21 @@ export function QuoteDetail({
             {(quote.status === "draft" || quote.status === "approved") && (
               <Button className="w-full justify-start" onClick={() => setShowEmailDialog(true)}>
                 <Mail className="mr-2 h-4 w-4" />
-                Send Quote
+                {t("sendQuote")}
               </Button>
             )}
 
             {quote.status === "accepted" && (
               <Button className="w-full justify-start" onClick={handleConvert} disabled={isLoading}>
                 <Package className="mr-2 h-4 w-4" />
-                Create Order
+                {t("createOrder")}
               </Button>
             )}
 
             {quote.status === "converted" && (
               <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-emerald-800 text-sm dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
                 <Package className="h-4 w-4 shrink-0" />
-                <span>This quote has become an order.</span>
+                <span>{t("becameOrder")}</span>
               </div>
             )}
 
@@ -410,7 +411,7 @@ export function QuoteDetail({
               onClick={() => window.open(`/api/quotes/${quote.id}`, "_blank")}
             >
               <Printer className="mr-2 h-4 w-4" />
-              Print / Preview
+              {t("printPreview")}
             </Button>
             <Button
               variant="outline"
@@ -418,7 +419,7 @@ export function QuoteDetail({
               onClick={() => window.open(`/api/quotes/${quote.id}/pdf`, "_blank")}
             >
               <Download className="mr-2 h-4 w-4" />
-              Download PDF
+              {t("downloadPdf")}
             </Button>
 
             {quote.publicToken && (
@@ -427,11 +428,11 @@ export function QuoteDetail({
                 className="w-full justify-start"
                 onClick={() => {
                   const url = `${window.location.origin}/q/${quote.publicToken}`;
-                  navigator.clipboard.writeText(url).then(() => toast.success("Public link copied to clipboard"));
+                  navigator.clipboard.writeText(url).then(() => toast.success(t("publicLinkCopied")));
                 }}
               >
                 <Link2 className="mr-2 h-4 w-4" />
-                Copy Public Link
+                {t("copyPublicLink")}
               </Button>
             )}
 
@@ -444,7 +445,7 @@ export function QuoteDetail({
                   disabled={isLoading}
                 >
                   <Check className="mr-2 h-4 w-4" />
-                  Mark as Accepted
+                  {t("markAccepted")}
                 </Button>
                 <Button
                   variant="outline"
@@ -453,7 +454,7 @@ export function QuoteDetail({
                   disabled={isLoading}
                 >
                   <X className="mr-2 h-4 w-4" />
-                  Mark as Declined
+                  {t("markDeclined")}
                 </Button>
               </>
             )}
@@ -466,7 +467,7 @@ export function QuoteDetail({
             <CardContent className="flex items-start gap-2 p-4">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-orange-600" />
               <div>
-                <p className="font-medium text-orange-800 text-sm">Preventivo rifiutato</p>
+                <p className="font-medium text-orange-800 text-sm">{t("rejectedBanner")}</p>
                 <p className="mt-0.5 text-orange-700 text-xs">{quote.approvalNote}</p>
               </div>
             </CardContent>
@@ -478,7 +479,7 @@ export function QuoteDetail({
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                Timeline
+                {t("timeline")}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -486,9 +487,9 @@ export function QuoteDetail({
                 <div className="flex items-center gap-2 text-blue-600 text-sm">
                   <Mail className="h-3.5 w-3.5 shrink-0" />
                   <div>
-                    <p className="font-medium leading-none">Sent</p>
+                    <p className="font-medium leading-none">{t("sent")}</p>
                     <p className="mt-0.5 text-muted-foreground text-xs">
-                      {format(new Date(quote.sentAt), "MMM d, yyyy HH:mm")}
+                      {formatter.dateTime(new Date(quote.sentAt), DATE_TIME_FORMAT)}
                     </p>
                   </div>
                 </div>
@@ -497,9 +498,9 @@ export function QuoteDetail({
                 <div className="flex items-center gap-2 text-sm text-violet-600">
                   <Eye className="h-3.5 w-3.5 shrink-0" />
                   <div>
-                    <p className="font-medium leading-none">Viewed</p>
+                    <p className="font-medium leading-none">{t("viewed")}</p>
                     <p className="mt-0.5 text-muted-foreground text-xs">
-                      {format(new Date(quote.viewedAt), "MMM d, yyyy HH:mm")}
+                      {formatter.dateTime(new Date(quote.viewedAt), DATE_TIME_FORMAT)}
                     </p>
                   </div>
                 </div>
@@ -508,9 +509,9 @@ export function QuoteDetail({
                 <div className="flex items-center gap-2 text-green-600 text-sm">
                   <Check className="h-3.5 w-3.5 shrink-0" />
                   <div>
-                    <p className="font-medium leading-none">Accepted</p>
+                    <p className="font-medium leading-none">{t("accepted")}</p>
                     <p className="mt-0.5 text-muted-foreground text-xs">
-                      {format(new Date(quote.acceptedAt), "MMM d, yyyy HH:mm")}
+                      {formatter.dateTime(new Date(quote.acceptedAt), DATE_TIME_FORMAT)}
                     </p>
                   </div>
                 </div>
@@ -519,9 +520,9 @@ export function QuoteDetail({
                 <div className="flex items-center gap-2 text-red-600 text-sm">
                   <X className="h-3.5 w-3.5 shrink-0" />
                   <div>
-                    <p className="font-medium leading-none">Declined</p>
+                    <p className="font-medium leading-none">{t("declined")}</p>
                     <p className="mt-0.5 text-muted-foreground text-xs">
-                      {format(new Date(quote.declinedAt), "MMM d, yyyy HH:mm")}
+                      {formatter.dateTime(new Date(quote.declinedAt), DATE_TIME_FORMAT)}
                     </p>
                   </div>
                 </div>
@@ -537,10 +538,10 @@ export function QuoteDetail({
           <TabsList>
             <TabsTrigger value="items">
               <FileText className="mr-1.5 h-3.5 w-3.5" />
-              Items ({quote.items.length})
+              {t("itemsTab", { count: quote.items.length })}
             </TabsTrigger>
-            <TabsTrigger value="summary">Summary</TabsTrigger>
-            <TabsTrigger value="activity">Activity ({quote.activities.length})</TabsTrigger>
+            <TabsTrigger value="summary">{t("summaryTab")}</TabsTrigger>
+            <TabsTrigger value="activity">{t("activityTab", { count: quote.activities.length })}</TabsTrigger>
           </TabsList>
 
           {/* Items tab */}
@@ -549,12 +550,12 @@ export function QuoteDetail({
               <Table>
                 <TableHeader>
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="font-semibold text-xs">Description</TableHead>
-                    <TableHead className="text-right font-semibold text-xs">Qty</TableHead>
-                    <TableHead className="text-right font-semibold text-xs">Unit Price</TableHead>
-                    <TableHead className="text-right font-semibold text-xs">Discount</TableHead>
-                    <TableHead className="text-right font-semibold text-xs">Tax</TableHead>
-                    <TableHead className="text-right font-semibold text-xs">Total</TableHead>
+                    <TableHead className="font-semibold text-xs">{t("description")}</TableHead>
+                    <TableHead className="text-right font-semibold text-xs">{t("qty")}</TableHead>
+                    <TableHead className="text-right font-semibold text-xs">{t("unitPrice")}</TableHead>
+                    <TableHead className="text-right font-semibold text-xs">{t("discount")}</TableHead>
+                    <TableHead className="text-right font-semibold text-xs">{t("tax")}</TableHead>
+                    <TableHead className="text-right font-semibold text-xs">{t("total")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -592,31 +593,33 @@ export function QuoteDetail({
               <CardContent className="space-y-6 pt-6">
                 <div className="ml-auto max-w-sm space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-muted-foreground">{t("subtotal")}</span>
                     <span className="font-medium tabular-nums">{fmt(quote.subtotal)}</span>
                   </div>
                   {parseFloat(quote.discountAmount ?? "0") > 0 && (
                     <div className="flex justify-between text-amber-600 text-sm">
-                      <span>Discount ({quote.discountPercent}%)</span>
+                      <span>{t("discountPercent", { percent: quote.discountPercent ?? "0" })}</span>
                       <span className="font-medium tabular-nums">−{fmt(quote.discountAmount)}</span>
                     </div>
                   )}
                   {parseFloat(quote.taxAmount ?? "0") > 0 && (
                     <div className="flex justify-between text-slate-600 text-sm">
-                      <span>Tax ({quote.taxPercent}%)</span>
+                      <span>{t("taxPercent", { percent: quote.taxPercent ?? "0" })}</span>
                       <span className="font-medium tabular-nums">+{fmt(quote.taxAmount)}</span>
                     </div>
                   )}
                   <Separator />
                   <div className="flex justify-between">
-                    <span className="font-semibold">Total</span>
+                    <span className="font-semibold">{t("total")}</span>
                     <span className="font-bold text-lg tabular-nums">{fmt(quote.totalAmount)}</span>
                   </div>
                 </div>
 
                 {quote.notes && (
                   <div className="border-t pt-4">
-                    <p className="mb-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">Notes</p>
+                    <p className="mb-2 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
+                      {t("notes")}
+                    </p>
                     <p className="whitespace-pre-wrap text-sm">{quote.notes}</p>
                   </div>
                 )}
@@ -629,7 +632,7 @@ export function QuoteDetail({
             <Card>
               <CardContent className="pt-6">
                 {quote.activities.length === 0 ? (
-                  <p className="py-8 text-center text-muted-foreground text-sm">No activity yet</p>
+                  <p className="py-8 text-center text-muted-foreground text-sm">{t("noActivity")}</p>
                 ) : (
                   <div className="space-y-0">
                     {quote.activities.map((activity, idx) => (
@@ -640,7 +643,7 @@ export function QuoteDetail({
                         <div className="z-10 mt-1.5 h-5 w-5 shrink-0 rounded-full border-2 border-border bg-background" />
                         <div className="min-w-0 flex-1">
                           <p className="font-medium text-sm leading-tight">
-                            {ACTIVITY_LABELS[activity.type] ?? activity.type}
+                            {ACTIVITY_TYPES.has(activity.type) ? t(`activity.${activity.type}`) : activity.type}
                           </p>
                           <div className="mt-0.5 flex items-center gap-2">
                             {activity.user?.name && (
@@ -652,7 +655,7 @@ export function QuoteDetail({
                           </div>
                         </div>
                         <span className="mt-0.5 shrink-0 text-muted-foreground text-xs">
-                          {format(new Date(activity.createdAt), "MMM d, HH:mm")}
+                          {formatter.dateTime(new Date(activity.createdAt), SHORT_DATE_TIME_FORMAT)}
                         </span>
                       </div>
                     ))}
@@ -674,7 +677,7 @@ export function QuoteDetail({
         defaultMessage={QUOTE_TEXT[customerLanguage].emailDefaultMessage}
         onSuccess={() => {
           setShowEmailDialog(false);
-          toast.success("Quote sent successfully");
+          toast.success(t("sentSuccess"));
           router.refresh();
         }}
       />
@@ -710,14 +713,12 @@ export function QuoteDetail({
       <Dialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Rifiuta preventivo</DialogTitle>
+            <DialogTitle>{t("rejectTitle")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <p className="text-muted-foreground text-sm">
-              Il preventivo tornerà in stato bozza. Aggiungi una nota per il venditore (opzionale).
-            </p>
+            <p className="text-muted-foreground text-sm">{t("rejectDescription")}</p>
             <Textarea
-              placeholder="Motivo del rifiuto..."
+              placeholder={t("rejectPlaceholder")}
               value={rejectNote}
               onChange={(e) => setRejectNote(e.target.value)}
               rows={3}
@@ -725,11 +726,11 @@ export function QuoteDetail({
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setShowRejectDialog(false)} disabled={isLoading}>
-              Annulla
+              {t("cancel")}
             </Button>
             <Button variant="destructive" onClick={handleReject} disabled={isLoading}>
               <XCircle className="mr-2 h-4 w-4" />
-              Conferma rifiuto
+              {t("confirmReject")}
             </Button>
           </DialogFooter>
         </DialogContent>

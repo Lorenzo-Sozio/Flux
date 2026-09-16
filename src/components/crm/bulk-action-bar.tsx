@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Trash2, UserCheck, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +37,8 @@ interface Props {
 }
 
 export function BulkActionBar({ count, statusOptions, users, onClear, onDelete, onStatusChange, onAssign }: Props) {
+  const t = useTranslations("bulkActions");
+  const tc = useTranslations("common");
   const [loading, setLoading] = useState(false);
 
   async function handle(fn: () => Promise<void>) {
@@ -49,18 +52,18 @@ export function BulkActionBar({ count, statusOptions, users, onClear, onDelete, 
 
   return (
     <div className="flex items-center gap-3 rounded-lg border bg-primary/5 px-4 py-2.5 shadow-sm">
-      <span className="text-sm font-medium">{count} selected</span>
+      <span className="text-sm font-medium">{t("selected", { count })}</span>
 
       <div className="flex items-center gap-2 ml-2">
         {/* Change status */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" disabled={loading}>
-              Set Status
+              {t("setStatus")}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Change status to</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">{t("changeStatusTo")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {statusOptions.map((opt) => (
               <DropdownMenuItem
@@ -79,11 +82,11 @@ export function BulkActionBar({ count, statusOptions, users, onClear, onDelete, 
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" disabled={loading}>
               <UserCheck className="h-3.5 w-3.5 mr-1.5" />
-              Assign
+              {t("assign")}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="max-h-56 overflow-y-auto">
-            <DropdownMenuLabel className="text-xs text-muted-foreground">Assign to</DropdownMenuLabel>
+            <DropdownMenuLabel className="text-xs text-muted-foreground">{t("assignTo")}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {users.map((u) => (
               <DropdownMenuItem key={u.id} onSelect={() => handle(() => onAssign(u.id))}>
@@ -105,7 +108,7 @@ export function BulkActionBar({ count, statusOptions, users, onClear, onDelete, 
           onClick={() => handle(onDelete)}
         >
           <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-          Delete
+          {tc("delete")}
         </Button>
       </div>
 

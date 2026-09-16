@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { addMinutes, format } from "date-fns";
+import { addMinutes } from "date-fns";
 import {
   AlertTriangle,
   CalendarClock,
@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   Users,
 } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import {
@@ -61,6 +62,9 @@ function toLocalDatetimeValue(d: Date) {
 }
 
 export function LaunchDialog({ open, onOpenChange, campaign, templateName }: LaunchDialogProps) {
+  const t = useTranslations("marketing.campaigns.launch");
+  const tc = useTranslations("common");
+  const formatter = useFormatter();
   const router = useRouter();
   const [mode, setMode] = useState<"now" | "schedule">("now");
   const [recipientType, setRecipientType] = useState<"contacts" | "leads">("contacts");
@@ -92,9 +96,9 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
         setCounts(c);
         setSegments(s);
       })
-      .catch(() => toast.error("Failed to load recipient counts"))
+      .catch(() => toast.error(t("failedLoadCounts")))
       .finally(() => setIsLoadingCounts(false));
-  }, [open]);
+  }, [open, t]);
 
   // The number the send will actually use, asked of the server rather than
   // guessed here: same filter, same consent rule, same suppression list.
@@ -130,7 +134,7 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
       } else {
         const date = new Date(scheduledAt);
         if (Number.isNaN(date.getTime())) {
-          toast.error("Invalid date/time");
+          toast.error(t("invalidDate"));
           return;
         }
         await scheduleCampaignAction({ campaignId: campaign.id, recipientType, scheduledAt: date, filterId });
@@ -138,7 +142,7 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
       }
       router.refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to launch campaign");
+      toast.error(err instanceof Error ? err.message : t("launchFailed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -154,9 +158,9 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Send className="h-4 w-4 text-primary" />
-            Launch Campaign
+            {t("title")}
           </DialogTitle>
-          <DialogDescription>Emails are queued and sent asynchronously via the email worker.</DialogDescription>
+          <DialogDescription>{t("desc")}</DialogDescription>
         </DialogHeader>
 
         {result ? (
@@ -165,30 +169,25 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
               <CheckCircle2 className="h-12 w-12 text-green-500" />
               {result.type === "sent" ? (
                 <div>
-                  <p className="font-semibold text-lg">Campaign Launched!</p>
+                  <p className="font-semibold text-lg">{t("resultLaunched")}</p>
                   <p className="mt-1 text-muted-foreground text-sm">
-                    <span className="font-medium text-foreground">{result.queued}</span> emails queued for delivery
-                    {result.skipped > 0 && (
-                      <>
-                        , <span className="font-medium">{result.skipped}</span> skipped (no email / suppressed)
-                      </>
-                    )}
+                    {t("resultQueued", { queued: result.queued })}
+                    {result.skipped > 0 && <>, {t("resultSkipped", { skipped: result.skipped })}</>}
                   </p>
                 </div>
               ) : (
                 <div>
-                  <p className="font-semibold text-lg">Campaign Scheduled!</p>
+                  <p className="font-semibold text-lg">{t("resultScheduled")}</p>
                   <p className="mt-1 text-muted-foreground text-sm">
-                    Will send on{" "}
-                    <span className="font-medium text-foreground">
-                      {format(result.scheduledAt, "MMM d, yyyy 'at' HH:mm")}
-                    </span>
+                    {t("resultScheduledOn", {
+                      date: formatter.dateTime(result.scheduledAt, { dateStyle: "medium", timeStyle: "short" }),
+                    })}
                   </p>
                 </div>
               )}
             </div>
             <DialogFooter>
-              <Button onClick={() => onOpenChange(false)}>Done</Button>
+              <Button onClick={() => onOpenChange(false)}>{t("done")}</Button>
             </DialogFooter>
           </div>
         ) : (
@@ -196,16 +195,16 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
             {/* Campaign summary */}
             <div className="space-y-2 rounded-lg border bg-muted/30 p-4 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Campaign</span>
+                <span className="text-muted-foreground">{t("campaignLabel")}</span>
                 <span className="font-medium">{campaign.name}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Template</span>
+                <span className="text-muted-foreground">{t("templateLabel")}</span>
                 {hasTemplate ? (
-                  <span className="font-medium">{templateName ?? "Selected"}</span>
+                  <span className="font-medium">{templateName ?? t("templateSelected")}</span>
                 ) : (
                   <span className="flex items-center gap-1 font-medium text-destructive">
-                    <AlertTriangle className="h-3.5 w-3.5" /> Not set
+                    <AlertTriangle className="h-3.5 w-3.5" /> {t("templateNotSet")}
                   </span>
                 )}
               </div>
@@ -214,7 +213,7 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
             {!hasTemplate && (
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 text-sm">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-                <p>No email template assigned. Edit the campaign to add one before launching.</p>
+                <p>{t("noTemplateWarning")}</p>
               </div>
             )}
 
@@ -224,7 +223,7 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-muted-foreground" />
-                <span className="font-medium text-sm">Audience</span>
+                <span className="font-medium text-sm">{t("audienceLabel")}</span>
               </div>
               <Select
                 value={recipientType}
@@ -235,8 +234,8 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="contacts">Contacts (with marketing consent)</SelectItem>
-                  <SelectItem value="leads">Leads (unconverted, with consent)</SelectItem>
+                  <SelectItem value="contacts">{t("audienceContacts")}</SelectItem>
+                  <SelectItem value="leads">{t("audienceLeads")}</SelectItem>
                 </SelectContent>
               </Select>
 
@@ -250,7 +249,7 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all__">Everyone eligible</SelectItem>
+                  <SelectItem value="__all__">{t("everyoneEligible")}</SelectItem>
                   {segmentsForType.map((seg) => (
                     <SelectItem key={seg.id} value={seg.id}>
                       {seg.name}
@@ -258,14 +257,10 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
                   ))}
                 </SelectContent>
               </Select>
-              {segmentsForType.length === 0 && (
-                <p className="text-muted-foreground text-xs">
-                  Save a filter on the contacts or leads list to be able to aim a campaign at it.
-                </p>
-              )}
+              {segmentsForType.length === 0 && <p className="text-muted-foreground text-xs">{t("noSegmentsHint")}</p>}
 
               <div className="flex items-center justify-between rounded-md border bg-muted/20 px-3 py-2">
-                <span className="text-muted-foreground text-sm">Eligible recipients</span>
+                <span className="text-muted-foreground text-sm">{t("eligibleRecipients")}</span>
                 {isLoadingCounts ? (
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                 ) : (
@@ -274,9 +269,7 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
               </div>
 
               {eligibleCount === 0 && !isLoadingCounts && (
-                <p className="text-muted-foreground text-xs">
-                  No eligible recipients. Make sure contacts/leads have marketing consent and a valid email.
-                </p>
+                <p className="text-muted-foreground text-xs">{t("noEligible")}</p>
               )}
             </div>
 
@@ -287,10 +280,10 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
               <Tabs value={mode} onValueChange={(v) => setMode(v as "now" | "schedule")}>
                 <TabsList className="w-full">
                   <TabsTrigger value="now" className="flex-1 gap-1.5">
-                    <Send className="h-3.5 w-3.5" /> Send Now
+                    <Send className="h-3.5 w-3.5" /> {t("modeNow")}
                   </TabsTrigger>
                   <TabsTrigger value="schedule" className="flex-1 gap-1.5">
-                    <CalendarClock className="h-3.5 w-3.5" /> Schedule
+                    <CalendarClock className="h-3.5 w-3.5" /> {t("modeSchedule")}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -299,7 +292,7 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
                 <div className="space-y-2">
                   <label htmlFor="campaign-send-at" className="flex items-center gap-1.5 font-medium text-sm">
                     <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                    Send date &amp; time
+                    {t("scheduleDateLabel")}
                   </label>
                   <input
                     id="campaign-send-at"
@@ -309,9 +302,7 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
                     onChange={(e) => setScheduledAt(e.target.value)}
                     className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   />
-                  <p className="text-muted-foreground text-xs">
-                    Time is in your local timezone. The scheduler checks every 5 minutes.
-                  </p>
+                  <p className="text-muted-foreground text-xs">{t("scheduleHint")}</p>
                 </div>
               )}
             </div>
@@ -320,16 +311,15 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
             <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-emerald-800 text-xs dark:border-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
               <div>
-                <span className="font-semibold">Tracking enabled —</span> open and click tracking is automatically
-                applied.
+                <span className="font-semibold">{t("trackingHeading")}</span> {t("trackingBody")}
                 <div className="mt-1.5 flex gap-3 font-medium text-[11px] opacity-80">
                   <span className="flex items-center gap-1">
                     <Eye className="h-3 w-3" />
-                    Open tracking
+                    {t("trackingOpen")}
                   </span>
                   <span className="flex items-center gap-1">
                     <MousePointerClick className="h-3 w-3" />
-                    Click tracking
+                    {t("trackingClick")}
                   </span>
                 </div>
               </div>
@@ -337,23 +327,23 @@ export function LaunchDialog({ open, onOpenChange, campaign, templateName }: Lau
 
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+                {tc("cancel")}
               </Button>
               <Button onClick={handleSubmit} disabled={isSubmitting || !canSubmit}>
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {mode === "now" ? "Launching…" : "Scheduling…"}
+                    {mode === "now" ? t("btnLaunching") : t("btnScheduling")}
                   </>
                 ) : mode === "now" ? (
                   <>
                     <Send className="mr-2 h-4 w-4" />
-                    Launch
+                    {t("btnLaunch")}
                   </>
                 ) : (
                   <>
                     <CalendarClock className="mr-2 h-4 w-4" />
-                    Schedule
+                    {t("btnSchedule")}
                   </>
                 )}
               </Button>

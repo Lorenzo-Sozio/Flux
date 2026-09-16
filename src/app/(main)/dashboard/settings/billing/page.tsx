@@ -8,9 +8,10 @@ import { requirePageCapability } from "@/lib/page-guard";
 
 import { BillingClient } from "./_components/billing-client";
 
-export const metadata: Metadata = {
-  title: "Billing & Subscription",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations("settings.billing");
+  return { title: t("title") };
+}
 
 export default async function BillingPage({ searchParams }: { searchParams: Promise<{ upgrade?: string }> }) {
   await requirePageCapability("billing:read", "/dashboard/settings/billing");

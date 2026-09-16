@@ -95,7 +95,11 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
           </Button>
         </div>
 
-        {error.digest && <p className="mt-6 font-mono text-[11px] text-muted-foreground">Reference: {error.digest}</p>}
+        {error.digest && (
+          <p className="mt-6 font-mono text-[11px] text-muted-foreground">
+            {t("dashboardBoundary.reference", { digest: error.digest })}
+          </p>
+        )}
       </div>
     </div>
   );

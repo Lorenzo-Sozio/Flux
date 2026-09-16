@@ -37,6 +37,7 @@ import {
 } from "@/actions/orders";
 import { getProductsForSelect } from "@/actions/products";
 import { getTicketsForOrder } from "@/actions/support";
+import { RecordVisit } from "@/components/crm/record-visit";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -292,6 +293,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-5">
+      <RecordVisit type="order" id={order.id} label={order.orderNumber} sub={order.companyName ?? null} />
       {/* Back nav */}
       <Link
         href="/dashboard/sales/orders"

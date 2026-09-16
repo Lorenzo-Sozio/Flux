@@ -15,6 +15,7 @@ import {
   Square,
   Users,
 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { updateTaskStatus } from "@/actions/tasks";
@@ -54,32 +55,33 @@ const KIND_STYLE = {
     pill: "bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-200",
     dot: "bg-blue-500",
     icon: CheckSquare,
-    label: "Attività",
+    labelKey: "typeTask",
   },
   meeting: {
     border: "border-l-violet-400",
     pill: "bg-violet-100 text-violet-800 dark:bg-violet-950/70 dark:text-violet-200",
     dot: "bg-violet-500",
     icon: Users,
-    label: "Riunione",
+    labelKey: "typeMeeting",
   },
   call: {
     border: "border-l-emerald-400",
     pill: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-200",
     dot: "bg-emerald-500",
     icon: PhoneCall,
-    label: "Chiamata",
+    labelKey: "typeCall",
   },
   appointment: {
     border: "border-l-amber-400",
     pill: "bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-200",
     dot: "bg-amber-500",
     icon: CalendarCheck,
-    label: "Appuntamento",
+    labelKey: "typeAppointment",
   },
 } satisfies Record<
   AgendaItem["kind"],
-  { border: string; pill: string; dot: string; icon: React.ElementType; label: string }
+  // labelKey is a message key under `calendar`.
+  { border: string; pill: string; dot: string; icon: React.ElementType; labelKey: string }
 >;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -89,21 +91,23 @@ function toMin(iso: string): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
-function fmtTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+function fmtTime(iso: string, locale: string): string {
+  return new Date(iso).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" });
 }
 
-function fmtOverdueLabel(iso: string | null): string {
-  if (!iso) return "Scaduta";
+function fmtOverdueLabel(iso: string | null, t: (key: string, values?: { days: number }) => string): string {
+  if (!iso) return t("overdue");
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  if (days === 0) return "Scaduta oggi";
-  if (days === 1) return "Ieri";
-  return `${days}g fa`;
+  if (days === 0) return t("overdueToday");
+  if (days === 1) return t("yesterday");
+  return t("daysAgo", { days });
 }
 
 // ─── Task row (all-day section) ───────────────────────────────────────────────
 
 function TaskRow({ item, isDone, onDone }: { item: AgendaItem; isDone: boolean; onDone: (id: string) => void }) {
+  const t = useTranslations("crm.agendaWidget");
+  const tTasks = useTranslations("tasks");
   return (
     <div
       className={`group flex items-center gap-2.5 rounded-lg border-l-[3px] px-3 py-2 transition-colors hover:bg-muted/50 ${
@@ -114,7 +118,7 @@ function TaskRow({ item, isDone, onDone }: { item: AgendaItem; isDone: boolean; 
         type="button"
         onClick={() => !isDone && onDone(item.id)}
         className="shrink-0 text-muted-foreground transition-colors hover:text-emerald-500"
-        title="Segna come completata"
+        title={tTasks("markComplete")}
       >
         {isDone ? <CheckCircle2 className="h-4 w-4 text-emerald-500" /> : <Square className="h-4 w-4" />}
       </button>
@@ -129,7 +133,7 @@ function TaskRow({ item, isDone, onDone }: { item: AgendaItem; isDone: boolean; 
           {item.isOverdue && !isDone && (
             <span className="flex items-center gap-0.5 font-medium text-red-500 text-xs">
               <AlertTriangle className="h-3 w-3" />
-              {fmtOverdueLabel(item.timeISO)}
+              {fmtOverdueLabel(item.timeISO, t)}
             </span>
           )}
           {item.entityName && <span className="truncate text-muted-foreground text-xs">{item.entityName}</span>}
@@ -137,10 +141,16 @@ function TaskRow({ item, isDone, onDone }: { item: AgendaItem; isDone: boolean; 
             <span
               className={`font-medium text-xs ${item.priority === "urgent" || item.priority === "critical" ? "text-red-500" : "text-orange-500"}`}
             >
-              {item.priority === "urgent" ? "Urgente" : item.priority === "critical" ? "Critica" : "Alta"}
+              {item.priority === "urgent"
+                ? t("urgent")
+                : item.priority === "critical"
+                  ? tTasks("priorities.critical")
+                  : tTasks("priorities.high")}
             </span>
           )}
-          {item.estimatedHours && <span className="text-muted-foreground text-xs">{item.estimatedHours}h stimate</span>}
+          {item.estimatedHours && (
+            <span className="text-muted-foreground text-xs">{t("estimatedHours", { hours: item.estimatedHours })}</span>
+          )}
         </div>
       </div>
 
@@ -148,7 +158,7 @@ function TaskRow({ item, isDone, onDone }: { item: AgendaItem; isDone: boolean; 
         <Link
           href={item.taskHref}
           className="mt-0.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-          title="Apri dettaglio"
+          title={t("openDetail")}
         >
           <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
         </Link>
@@ -205,6 +215,9 @@ function layoutTimedItems(items: AgendaItem[]): LayoutEvent[] {
 // ─── Widget ───────────────────────────────────────────────────────────────────
 
 export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLabel: string }) {
+  const t = useTranslations("crm.agendaWidget");
+  const tCal = useTranslations("calendar");
+  const locale = useLocale();
   const [doneIds, setDoneIds] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
   const [currentTime, setCurrentTime] = useState(() => new Date());
@@ -236,7 +249,7 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
           s.delete(id);
           return s;
         });
-        toast.error("Errore nell'aggiornamento");
+        toast.error(t("updateError"));
       }
     });
   };
@@ -260,7 +273,7 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
           <div className="flex items-center gap-2.5 min-w-0">
             <CalendarDays className="h-5 w-5 text-primary" />
             <div>
-              <CardTitle className="text-base leading-none">Agenda di oggi</CardTitle>
+              <CardTitle className="text-base leading-none">{t("title")}</CardTitle>
               <p className="mt-1 text-muted-foreground text-xs capitalize">{dateLabel}</p>
             </div>
             {totalCount > 0 && (
@@ -271,7 +284,7 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
           </div>
           <Button variant="outline" size="sm" className="h-8 gap-1.5" asChild>
             <Link href="/dashboard/calendar">
-              <CalendarDays className="h-3.5 w-3.5" /> Calendario
+              <CalendarDays className="h-3.5 w-3.5" /> {tCal("title")}
             </Link>
           </Button>
         </div>
@@ -281,11 +294,11 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
         {items.length === 0 ? (
           <div className="flex flex-col items-center py-12 text-center">
             <CheckCircle2 className="mb-3 h-10 w-10 text-emerald-400/50" />
-            <p className="font-medium text-muted-foreground text-sm">Nessun impegno per oggi</p>
-            <p className="mt-1 text-muted-foreground/60 text-xs">Hai la giornata libera!</p>
+            <p className="font-medium text-muted-foreground text-sm">{t("emptyTitle")}</p>
+            <p className="mt-1 text-muted-foreground/60 text-xs">{t("emptyHint")}</p>
             <Button variant="outline" size="sm" className="mt-4 h-8 gap-1.5" asChild>
               <Link href="/dashboard/tasks">
-                <CheckSquare className="h-3.5 w-3.5" /> Vedi tutte le attività
+                <CheckSquare className="h-3.5 w-3.5" /> {t("viewAllTasks")}
               </Link>
             </Button>
           </div>
@@ -297,7 +310,7 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
                 <div className="flex items-center gap-1.5 px-1">
                   <CheckSquare className="h-3 w-3 text-blue-500" />
                   <span className="font-semibold text-[11px] text-blue-600 uppercase tracking-wider dark:text-blue-400">
-                    Attività
+                    {tCal("tasks")}
                   </span>
                   <span className="text-[11px] text-muted-foreground/60">({taskItems.length})</span>
                 </div>
@@ -313,7 +326,7 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
                 <div className="flex items-center gap-1.5 px-1 pb-1">
                   <CalendarDays className="h-3 w-3 text-muted-foreground" />
                   <span className="font-semibold text-[11px] text-muted-foreground uppercase tracking-wider">
-                    Programma
+                    {t("schedule")}
                   </span>
                 </div>
               )}
@@ -375,7 +388,7 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
                   {timedItems.length === 0 && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground">
                       <CalendarDays className="h-8 w-8 opacity-15" />
-                      <p className="text-xs">Nessun appuntamento programmato</p>
+                      <p className="text-xs">{t("noTimedItems")}</p>
                     </div>
                   )}
 
@@ -414,8 +427,8 @@ export function AgendaWidget({ items, dateLabel }: { items: AgendaItem[]; dateLa
                           </div>
                           {height >= 44 && ev.timeISO && (
                             <div className="mt-0.5 truncate text-[10px] leading-tight opacity-75">
-                              {fmtTime(ev.timeISO)}
-                              {ev.endTimeISO && ` – ${fmtTime(ev.endTimeISO)}`}
+                              {fmtTime(ev.timeISO, locale)}
+                              {ev.endTimeISO && ` – ${fmtTime(ev.endTimeISO, locale)}`}
                             </div>
                           )}
                           {height >= 60 && ev.entityName && (

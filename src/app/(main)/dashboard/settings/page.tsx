@@ -101,7 +101,7 @@ export default async function SettingsPage() {
       href: "/dashboard/settings/api",
       icon: KeyRound,
       title: "API",
-      description: "La chiave con cui un sistema esterno scrive qui dentro, e l'identificativo di questa attività.",
+      description: t("apiKey.cardDescription"),
       need: "settings:manage",
     },
   ];

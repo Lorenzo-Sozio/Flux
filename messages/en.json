@@ -17,7 +17,8 @@
       "avgDealCycle": "Avg deal cycle",
       "leadsBySource": "Leads by Source",
       "back": "Pipeline",
-      "daysLabel": "{count} days"
+      "daysLabel": "{count} days",
+      "conversionStep": "{rate}% conversion ({from} → {to})"
     }
   },
   "appointment": {
@@ -73,7 +74,40 @@
       "tentative": "Maybe"
     },
     "submit": "Create & Send Invitations",
-    "cancel2": "Cancel"
+    "cancel2": "Cancel",
+    "dialog": {
+      "alreadyAdded": "Participant already added.",
+      "created": "Appointment created.",
+      "noProvider": "No email provider configured: invitations were not sent. Check your email settings.",
+      "invitesSent": "{count, plural, one {# invitation sent.} other {# invitations sent.}}",
+      "invitesPartial": "{sent, plural, one {# invitation sent} other {# invitations sent}}, {failed} not delivered.",
+      "invitesFailed": "{count, plural, one {Could not send the invitations (# error).} other {Could not send the invitations (# errors).}}",
+      "conflict": "<strong>Possible overlap</strong> with: {titles}",
+      "jitsiHint": "A Jitsi Meet link will be generated automatically and included in the invitation.",
+      "noParticipants": "No participants added. You can still create the appointment without any.",
+      "checkAvailability": "Check colleagues' availability"
+    },
+    "detail": {
+      "cancelled": "Appointment cancelled.",
+      "noProvider": "No email provider configured: cancellation notices were not sent.",
+      "notificationsSent": "{count, plural, one {# cancellation notice sent.} other {# cancellation notices sent.}}",
+      "notificationsPartial": "{sent, plural, one {# notice sent} other {# notices sent}}, {failed} not delivered.",
+      "notificationsFailed": "{count, plural, one {Could not send the cancellation notices (# error).} other {Could not send the cancellation notices (# errors).}}",
+      "cancelError": "Failed to cancel the appointment.",
+      "fallbackTitle": "Appointment",
+      "cancelledBanner": "This appointment has been cancelled.",
+      "participantsCount": "Participants ({count})",
+      "noExternalParticipants": "No external participants.",
+      "confirmTitle": "Cancel this appointment?",
+      "confirmBody": "All participants will receive a cancellation notice by email. This cannot be undone.",
+      "confirmBack": "No, go back",
+      "confirmYes": "Yes, cancel it"
+    },
+    "availability": {
+      "time": "Time",
+      "busy": "Busy",
+      "free": "Free"
+    }
   },
   "auth": {
     "login": {
@@ -144,6 +178,52 @@
       "resetting": "Resetting…",
       "success": "Password reset successfully.",
       "error": "Failed to reset password. The link may have expired."
+    },
+    "validation": {
+      "nameMin": "Name must be at least 2 characters.",
+      "emailInvalid": "Please enter a valid email address.",
+      "passwordMin": "Password must be at least 8 characters.",
+      "passwordRequired": "Password is required.",
+      "passwordsMismatch": "Passwords do not match.",
+      "namePlaceholder": "Jane Smith"
+    },
+    "acceptInvitation": {
+      "invalidTitle": "Invalid invitation",
+      "invalidDesc": "This invitation link is invalid.",
+      "expiredTitle": "Invitation expired or invalid",
+      "expiredDesc": "Please ask your admin to send a new invitation.",
+      "goToLogin": "Go to login",
+      "acceptedTitle": "Already accepted",
+      "acceptedDesc": "This invitation has already been used.",
+      "sidebarTitle": "You're invited!",
+      "sidebarSubtitle": "Join the team",
+      "formTitle": "Accept Invitation",
+      "assignedRole": "Set up your account to get started. You've been assigned the role of <strong>{role}</strong>.",
+      "welcome": "Welcome! Your account has been created.",
+      "creatingFor": "Creating account for <strong>{email}</strong>",
+      "acceptAndJoin": "Accept & Join"
+    },
+    "resetPasswordPage": {
+      "invalidTitle": "Invalid reset link",
+      "invalidDesc": "This link is invalid or has expired.",
+      "requestNew": "Request a new one",
+      "sidebarTitle": "New password",
+      "sidebarSubtitle": "Choose a strong password",
+      "formTitle": "Set New Password",
+      "resettingFor": "Resetting password for <strong>{email}</strong>",
+      "success": "Password reset successfully! Please log in.",
+      "confirmNewPassword": "Confirm New Password",
+      "submit": "Reset Password",
+      "backToLogin": "Back to login"
+    },
+    "social": {
+      "continueWithGoogle": "Continue with Google"
+    },
+    "demoCredentials": {
+      "title": "Demo credentials",
+      "copyEmail": "Copy email",
+      "password": "Password",
+      "copyPassword": "Copy password"
     }
   },
   "automation": {
@@ -258,6 +338,267 @@
       "onChange": "Fires on a change, so there is nothing to count yet",
       "matchesNow": "{count} records match this right now",
       "alreadyAdded": "That rule is already here."
+    },
+    "ruleBuilder": {
+      "titleNew": "New Automation Rule",
+      "titleEdit": "Edit Rule — {name}",
+      "saveFailed": "Failed to save rule.",
+      "saveChanges": "Save Changes",
+      "createRule": "Create Rule",
+      "tabs": {
+        "details": "Details",
+        "trigger": "Trigger",
+        "conditions": "Conditions",
+        "actions": "Actions"
+      },
+      "details": {
+        "name": "Rule Name",
+        "namePlaceholder": "e.g. Legal Review on Large Proposal",
+        "description": "Description",
+        "descriptionPlaceholder": "Optional — describe what this rule does…",
+        "active": "Active",
+        "activeOn": "Rule will fire automatically",
+        "activeOff": "Rule is currently paused"
+      },
+      "trigger": {
+        "entity": "Entity",
+        "fireWhen": "Fire when",
+        "onCreate": "Record Created",
+        "onUpdate": "Record Updated",
+        "slaBreach": "SLA Breach",
+        "orSchedule": "Or schedule this automation:",
+        "dailySchedule": "Daily Schedule (time)",
+        "scheduledAt": "Scheduled daily at {time}"
+      },
+      "conditions": {
+        "empty": "No conditions added",
+        "emptyHint": "Use the button below to get started",
+        "selectField": "Select field…",
+        "collected": "Collected information…",
+        "collectedPlaceholder": "field name (e.g. budget)",
+        "operatorPlaceholder": "Operator…",
+        "valuePlaceholder": "Value…",
+        "add": "Add Condition",
+        "advanced": "🔧 Advanced Logic (Parentheses & Operators)"
+      },
+      "operators": {
+        "equals": "equals",
+        "not_equals": "does not equal",
+        "greater_than": "greater than",
+        "less_than": "less than",
+        "greater_than_or_equal": "≥ at least",
+        "less_than_or_equal": "≤ at most",
+        "contains": "contains",
+        "not_contains": "does not contain",
+        "is_empty": "is empty",
+        "is_not_empty": "is not empty",
+        "changed": "changed",
+        "changed_to": "changed to",
+        "changed_from": "changed from"
+      },
+      "actionTypes": {
+        "create_task": "Create Task",
+        "send_notification": "Send Notification",
+        "send_email": "Send Email",
+        "send_webhook": "Send Webhook",
+        "update_field": "Update Field",
+        "assign_owner": "Assign Owner (round robin)",
+        "enroll_in_sequence": "Enroll in Sequence"
+      },
+      "actions": {
+        "empty": "No actions yet. Add at least one.",
+        "add": "Add Action"
+      },
+      "task": {
+        "title": "Task Title",
+        "titlePlaceholder": "e.g. Legal Review",
+        "assignTo": "Assign to",
+        "unassigned": "— Unassigned —",
+        "priority": "Priority",
+        "priorityLow": "Low",
+        "priorityNormal": "Normal",
+        "priorityHigh": "High",
+        "dueIn": "Due in (days)",
+        "dueInPlaceholder": "e.g. 3",
+        "days": "days",
+        "description": "Description",
+        "descriptionPlaceholder": "Optional task description…"
+      },
+      "notification": {
+        "notify": "Notify",
+        "recordOwner": "Record Owner",
+        "dynamic": "(dynamic)",
+        "specificUser": "Specific User",
+        "title": "Title",
+        "titlePlaceholder": "e.g. Deal needs attention",
+        "message": "Message",
+        "messagePlaceholder": "Notification body…"
+      },
+      "email": {
+        "template": "Email Template",
+        "clearTemplate": "Clear",
+        "noTemplate": "— No template (manual) —",
+        "templates": "Templates",
+        "templateNote": "✓ Template content will be loaded at execution time — subject & body below are editable overrides.",
+        "to": "To",
+        "toPlaceholder": "e.g. {example} or email@example.com",
+        "optionalCsv": "Optional, comma-separated",
+        "subject": "Subject",
+        "subjectPlaceholder": "e.g. Deal {name} needs review",
+        "body": "Body (HTML)",
+        "bodyPlaceholder": "HTML content with {fields}…",
+        "trackOpens": "Track Opens",
+        "trackClicks": "Track Clicks",
+        "mergeFields": "💡 Merge fields: {fields}, etc."
+      },
+      "webhook": {
+        "url": "Webhook URL",
+        "urlPlaceholder": "https://example.com/webhook (supports {fields})",
+        "method": "HTTP Method",
+        "timeout": "Timeout (ms)",
+        "body": "Request Body (JSON with {fields})",
+        "bodyExample": "Deal {name} is {status}",
+        "mergeFields": "💡 Merge fields: {fields}, etc."
+      },
+      "assign": {
+        "noOwner": "This record type has no owner. Choose leads, contacts, companies or deals as the target.",
+        "routes": "Routes",
+        "routesHint": "Tried from the top; the first that matches the record decides who takes turns.",
+        "addRoute": "Add route",
+        "route": "Route {n}",
+        "moveUp": "Move route up",
+        "moveDown": "Move route down",
+        "remove": "Remove route",
+        "territories": "In any of these territories",
+        "noTerritories": "No territories yet — define them in Settings → Territories.",
+        "sources": "With source (comma separated)",
+        "sourcesPlaceholder": "e.g. website, trade fair",
+        "shareAmong": "Share out among, in this order",
+        "everyoneElse": "Everyone else, in turn (optional)",
+        "overwrite": "Reassign records that already have an owner",
+        "hint": "💡 Each route keeps its own turn. People who have left the workspace are skipped, and a route whose people have all left passes the record on to the next. A record no route takes goes to \"everyone else\", or stays unassigned if nobody is ticked there. A record someone has already claimed stays with them unless reassigning is ticked.",
+        "loadingPeople": "Loading people…"
+      },
+      "sequence": {
+        "wrongEntity": "Sequences write to leads and contacts. Choose one of them as the target.",
+        "label": "Sequence",
+        "none": "No active sequence for this record type — create one in Marketing → Sequences.",
+        "placeholder": "Choose a sequence…",
+        "hint": "💡 A record already in the sequence, without an email address, or unsubscribed is skipped rather than logged as a failure."
+      },
+      "update": {
+        "field": "Field",
+        "newValue": "New Value",
+        "selectPlaceholder": "Select…",
+        "textPlaceholder": "Text…",
+        "valuePlaceholder": "Value"
+      },
+      "fields": {
+        "name": "Name",
+        "amount": "Amount",
+        "currency": "Currency",
+        "probability": "Probability (%)",
+        "status": "Status",
+        "stageId": "Stage (ID)",
+        "notes": "Notes",
+        "firstName": "First Name",
+        "lastName": "Last Name",
+        "rating": "Rating",
+        "leadScore": "Lead Score",
+        "leadScoreRange": "Lead Score (0–100)",
+        "source": "Source",
+        "isConverted": "Converted",
+        "jobTitle": "Job Title",
+        "type": "Type",
+        "employeeCount": "Employee Count",
+        "annualRevenue": "Annual Revenue",
+        "industry": "Industry",
+        "priority": "Priority",
+        "severity": "Severity",
+        "channel": "Channel",
+        "subject": "Subject",
+        "totalAmount": "Total",
+        "discountPercent": "Discount (%)",
+        "orderNumber": "Order number"
+      },
+      "options": {
+        "deal": {
+          "status": {
+            "open": "Open",
+            "won": "Won",
+            "lost": "Lost"
+          }
+        },
+        "lead": {
+          "status": {
+            "new": "New",
+            "contacting": "Contacting",
+            "engaged": "Engaged",
+            "qualified": "Qualified",
+            "unqualified": "Unqualified"
+          },
+          "rating": {
+            "hot": "Hot",
+            "warm": "Warm",
+            "cold": "Cold"
+          }
+        },
+        "company": {
+          "type": {
+            "prospect": "Prospect",
+            "customer": "Customer",
+            "partner": "Partner",
+            "vendor": "Vendor"
+          }
+        },
+        "ticket": {
+          "status": {
+            "new": "New",
+            "open": "Open",
+            "in_progress": "In Progress",
+            "waiting": "Waiting",
+            "on_hold": "On Hold",
+            "resolved": "Resolved",
+            "closed": "Closed"
+          },
+          "priority": {
+            "low": "Low",
+            "normal": "Normal",
+            "high": "High",
+            "urgent": "Urgent"
+          }
+        },
+        "order": {
+          "status": {
+            "draft": "Draft",
+            "processing": "Processing",
+            "completed": "Completed",
+            "cancelled": "Cancelled"
+          }
+        }
+      }
+    },
+    "expressionEditor": {
+      "conditionsUsed": "Conditions used:",
+      "valid": "Valid expression",
+      "syntaxError": "Syntax error",
+      "logicError": "Logic error",
+      "infoTitle": "Complex logical expressions",
+      "infoRefer": "• Use <code>C0, C1, C2</code> to refer to the conditions",
+      "infoCombine": "• Combine with <code>AND, OR, NOT</code>",
+      "infoGroup": "• Group with parentheses: <code>(C0 AND C1) OR C2</code>",
+      "infoExample": "• Example: <code>(C0 OR C1) AND (C2 AND NOT C3)</code>",
+      "expression": "Logical expression",
+      "expressionPlaceholder": "Example: (C0 AND C1) OR (C2 AND NOT C3)",
+      "mapping": "📍 Mapping:",
+      "highlightPreview": "Highlighted preview",
+      "quickHelpers": "Quick helpers",
+      "autoGenerateTitle": "Generate the expression automatically from the AND/OR set above",
+      "autoGenerate": "✨ Generate from conditions",
+      "addParentheses": "Add ( )",
+      "addOperator": "Add {operator}",
+      "availableConditions": "Available conditions",
+      "treePreview": "Logic tree preview"
     }
   },
   "businessHours": {
@@ -424,7 +765,30 @@
     "deleteConvConfirm": "Delete this conversation? This cannot be undone.",
     "groupNamePlaceholder": "Group name…",
     "selectMembers": "Select members",
-    "createGroup": "Create Group"
+    "createGroup": "Create Group",
+    "widget": {
+      "unknown": "Unknown",
+      "openConversation": "Open {name}",
+      "openChat": "Open chat",
+      "members": "{count, plural, one {# member} other {# members}}",
+      "sendFailed": "The message could not be sent.",
+      "startFailed": "The conversation could not be started.",
+      "createGroupFailed": "The group could not be created.",
+      "muteFailed": "The mute setting could not be saved.",
+      "leaveFailed": "Could not leave the group.",
+      "deleteConfirm": "Delete this conversation? All messages will be permanently removed.",
+      "deleteFailed": "The conversation could not be deleted.",
+      "directTab": "Direct",
+      "noGroups": "No groups yet",
+      "noGroupsHint": "Create a group to start collaborating",
+      "noDirect": "No direct messages",
+      "noDirectHint": "Start a conversation with a colleague",
+      "noConversationsHint": "Message a colleague or create a group",
+      "searchPeople": "Search people…",
+      "noUsers": "No users found",
+      "addMembers": "Add members…",
+      "createGroupWithCount": "Create group ({count, plural, one {# member} other {# members}})"
+    }
   },
   "common": {
     "actions": "Actions",
@@ -671,7 +1035,16 @@
     "updateSuccess": "Company updated.",
     "deleteSuccess": "Company deleted.",
     "deleteFailed": "Failed to delete company.",
-    "deleteConfirm": "Delete this company? This action cannot be undone."
+    "deleteConfirm": "Delete this company? This action cannot be undone.",
+    "modal": {
+      "industryPlaceholder": "Technology",
+      "linkedinUrl": "LinkedIn URL",
+      "descriptionPlaceholder": "Brief description of the company…",
+      "tagsPlaceholder": "tech, enterprise, key-account",
+      "einvoicingTitle": "Italian e-invoicing",
+      "einvoicingBody": "The <strong>SDI Code</strong> (Codice Destinatario) is the 7-character code used to route electronic invoices through the Sistema di Interscambio.",
+      "similarExist": "Similar companies already exist:"
+    }
   },
   "contacts": {
     "title": "Contacts",
@@ -771,7 +1144,11 @@
     "timeline": "Timeline",
     "noActivity": "No activity yet.",
     "noDeals": "No deals linked.",
-    "noTasks": "No tasks assigned."
+    "noTasks": "No tasks assigned.",
+    "modal": {
+      "departmentPlaceholder": "Sales, Marketing…",
+      "similarExist": "Similar contacts already exist:"
+    }
   },
   "crm": {
     "activeLeads": "Active Leads",
@@ -829,7 +1206,59 @@
     "contracts_mrr": "Recurring revenue",
     "contracts_mrrDesc": "Per month, from contracts in force",
     "contracts_renewalsDue": "Renewals to decide",
-    "contracts_renewalsDueDesc": "Contracts near their notice deadline"
+    "contracts_renewalsDueDesc": "Contracts near their notice deadline",
+    "recentLeadsTable": {
+      "title": "Recent Leads",
+      "description": "Track and manage your latest leads and their status.",
+      "viewOptions": "View",
+      "toggleColumns": "Toggle columns",
+      "export": "Export",
+      "noResults": "No results.",
+      "selectedRows": "{selected} of {total} row(s) selected.",
+      "rowsPerPage": "Rows per page",
+      "pageOf": "Page {page} of {pageCount}",
+      "firstPage": "Go to first page",
+      "previousPage": "Go to previous page",
+      "nextPage": "Go to next page",
+      "lastPage": "Go to last page",
+      "selectAll": "Select all",
+      "selectRow": "Select row",
+      "columns": {
+        "ref": "Ref",
+        "name": "Name",
+        "company": "Company",
+        "status": "Status",
+        "source": "Source",
+        "lastActivity": "Last Activity"
+      },
+      "openMenu": "Open menu",
+      "view": "View",
+      "assign": "Assign",
+      "archive": "Archive",
+      "delete": "Delete"
+    },
+    "monthTarget": {
+      "title": "This month's target",
+      "ofTarget": "of {amount}",
+      "noTarget": "No target set",
+      "percentOfTarget": "of target"
+    },
+    "agendaWidget": {
+      "title": "Today's agenda",
+      "overdue": "Overdue",
+      "overdueToday": "Overdue today",
+      "yesterday": "Yesterday",
+      "daysAgo": "{days}d ago",
+      "urgent": "Urgent",
+      "estimatedHours": "{hours}h estimated",
+      "openDetail": "Open details",
+      "updateError": "Failed to update.",
+      "emptyTitle": "Nothing scheduled today",
+      "emptyHint": "Your day is free!",
+      "viewAllTasks": "View all tasks",
+      "schedule": "Schedule",
+      "noTimedItems": "No appointments scheduled"
+    }
   },
   "currency": {
     "switchCurrency": "Switch currency",
@@ -1091,7 +1520,17 @@
     },
     "cancel": "Cancel",
     "save": "Save",
-    "triggerLabel": "Filters"
+    "triggerLabel": "Filters",
+    "presets": {
+      "invalidFormat": "Invalid filter format.",
+      "loadFailed": "Could not load filter.",
+      "nameRequired": "Enter a name for this filter.",
+      "noConditions": "No active conditions to save.",
+      "saved": "Filter saved.",
+      "saveFailed": "Failed to save filter.",
+      "deleted": "Filter deleted.",
+      "deleteFailed": "Failed to delete filter."
+    }
   },
   "finance": {
     "title": "Finance",
@@ -1137,7 +1576,26 @@
     "openDealsByStage": "Open deals by stage",
     "viewArrow": "View →",
     "openDealsInPipeline": "{count, plural, one {# open deal in pipeline} other {# open deals in pipeline}}",
-    "noOpenDeals": "No open deals in pipeline."
+    "noOpenDeals": "No open deals in pipeline.",
+    "cardOverview": {
+      "title": "My card",
+      "description": "1 of 4 cards added · Overview of your primary card and upcoming payments",
+      "validThru": "Valid thru",
+      "cardType": "Card type",
+      "virtual": "Virtual",
+      "billingCycle": "Billing cycle",
+      "billingCycleValue": "21st of every month",
+      "cardLimit": "Card limit",
+      "availableBalance": "Available balance",
+      "manageCard": "Manage card",
+      "addCard": "Add card",
+      "upcomingPayments": "Upcoming payments",
+      "viewAllPayments": "View all payments",
+      "dueOn": "Due on {date}",
+      "rent": "Apartment rent",
+      "electricity": "Electricity bill",
+      "creditCard": "Credit card payment"
+    }
   },
   "leads": {
     "title": "Leads",
@@ -1246,7 +1704,24 @@
     "convertCancel": "Cancel",
     "convertSuccessToast": "Lead converted successfully!",
     "convertErrorToast": "Failed to convert lead. Please try again.",
-    "dealForName": "Deal for {firstName} {lastName}"
+    "dealForName": "Deal for {firstName} {lastName}",
+    "modal": {
+      "industryPlaceholder": "Technology, Finance…",
+      "similarExist": "Similar leads already exist:"
+    },
+    "convert": {
+      "willCreate": "Will be created",
+      "contactLine": "Contact: <b>{name}</b>",
+      "companyLine": "Company: <b>{name}</b>",
+      "historyMigrated": "History moved to the new customer",
+      "activityCount": "{count, plural, one {# activity} other {# activities}}",
+      "taskCount": "{count, plural, one {# task} other {# tasks}}",
+      "createDealHint": "Creates a pipeline opportunity linked to this customer"
+    },
+    "detail": {
+      "convertedTo": "Converted to",
+      "convertedOn": "Converted on <date></date>"
+    }
   },
   "lostDeal": {
     "title": "Why was it lost?",
@@ -1283,7 +1758,12 @@
       "createSuccess": "Template created.",
       "updateSuccess": "Template updated.",
       "deleteSuccess": "Template deleted.",
-      "size": "Size"
+      "size": "Size",
+      "deleteButton": {
+        "confirm": "Are you sure you want to delete this template?",
+        "success": "Template deleted successfully",
+        "failed": "Failed to delete template"
+      }
     },
     "campaigns": {
       "title": "Marketing Campaigns",
@@ -1379,8 +1859,290 @@
         "done": "Done",
         "failedLoadCounts": "Failed to load recipient counts",
         "invalidDate": "Invalid date/time",
-        "launchFailed": "Failed to launch campaign"
+        "launchFailed": "Failed to launch campaign",
+        "everyoneEligible": "Everyone eligible",
+        "noSegmentsHint": "Save a filter on the contacts or leads list to be able to aim a campaign at it.",
+        "trackingHeading": "Tracking enabled —",
+        "trackingBody": "open and click tracking is automatically applied."
+      },
+      "list": {
+        "deleteConfirmDesc": "Delete <strong>{name}</strong>? All send logs and tracking data will be permanently removed."
+      },
+      "deleteButton": {
+        "confirm": "Are you sure you want to delete this campaign?",
+        "success": "Campaign deleted successfully",
+        "failed": "Failed to delete campaign"
+      },
+      "logTable": {
+        "empty": "No sends yet. Launch the campaign to start.",
+        "searchPlaceholder": "Search by name or email…",
+        "noResults": "No results for this filter.",
+        "showing": "Showing {shown} of {total} records",
+        "tabs": {
+          "all": "All",
+          "sent": "Sent",
+          "opened": "Opened",
+          "clicked": "Clicked",
+          "bounced": "Bounced",
+          "unsubscribed": "Unsub",
+          "failed": "Failed"
+        },
+        "statuses": {
+          "queued": "Queued",
+          "sent": "Sent",
+          "opened": "Opened",
+          "clicked": "Clicked",
+          "bounced": "Bounced",
+          "complained": "Complained",
+          "unsubscribed": "Unsubscribed",
+          "failed": "Failed"
+        },
+        "columns": {
+          "recipient": "Recipient",
+          "type": "Type",
+          "status": "Status",
+          "sentAt": "Sent At",
+          "opened": "Opened",
+          "clicked": "Clicked"
+        },
+        "recipientTypes": {
+          "contact": "Contact",
+          "lead": "Lead"
+        }
+      },
+      "detail": {
+        "back": "Back to Campaigns",
+        "trackingBadge": "Open + Click tracking",
+        "created": "Created {date}",
+        "queued": "Queued",
+        "failed": "Failed",
+        "funnelTitle": "Engagement Funnel",
+        "funnelDesc": "Tracking self-hosted — data updates as recipients interact.",
+        "clickToOpenRate": "Click-to-Open Rate",
+        "bouncedCount": "{count} bounced",
+        "unsubscribedCount": "{count} unsubscribed",
+        "complaintsCount": "{count, plural, one {# complaint} other {# complaints}}",
+        "sendLogTitle": "Send Log",
+        "sendLogDesc": "{count, plural, one {# total recipient} other {# total recipients}} — filter by status or search by name / email"
       }
+    },
+    "templateCategories": {
+      "general": "General",
+      "welcome": "Welcome",
+      "followup": "Follow-up",
+      "promotional": "Promotional",
+      "transactional": "Transactional"
+    },
+    "campaignModal": {
+      "updated": "Campaign updated",
+      "created": "Campaign created",
+      "saveFailed": "Failed to save campaign",
+      "editTitle": "Edit — {name}",
+      "tabDetails": "Details",
+      "tabTemplate": "Email Template",
+      "nameLabel": "Campaign Name",
+      "nameRequired": "Campaign name is required",
+      "namePlaceholder": "e.g. Q2 Product Launch, Summer Promo…",
+      "descriptionPlaceholder": "Describe the goal and target audience for this campaign…",
+      "statusDesc": {
+        "draft": "Not yet ready to send",
+        "active": "Currently running",
+        "completed": "Send finished"
+      },
+      "noTemplates": "No templates yet",
+      "noTemplatesDesc": "Create an email template before assigning it to a campaign.",
+      "goToTemplates": "Go to Templates",
+      "selectTemplate": "Select Template",
+      "manage": "Manage",
+      "noTemplateOption": "No template (assign later)",
+      "subjectLine": "Subject: {subject}",
+      "selectedTemplate": "Selected template",
+      "saveChanges": "Save Changes",
+      "create": "Create Campaign"
+    },
+    "templateModal": {
+      "updated": "Template updated successfully",
+      "created": "Template created successfully",
+      "saveFailed": "Failed to save template",
+      "editTitle": "Edit Email Template",
+      "createTitle": "Create New Email Template",
+      "description": "Design a professional email template with HTML support and dynamic placeholders.",
+      "nameLabel": "Template Name",
+      "namePlaceholder": "e.g., Welcome Email",
+      "subjectLabel": "Subject Line",
+      "subjectPlaceholder": "e.g., Welcome to Flux, {name}!",
+      "plainText": "Plain Text",
+      "descriptionLabel": "Description (Internal Notes)",
+      "descriptionPlaceholder": "Internal notes about this template, usage guidelines, target audience...",
+      "tagsLabel": "Tags (Organization)",
+      "tagPlaceholder": "Add tag (e.g., sales, onboarding, q2-2026) and press Enter",
+      "addTag": "Add Tag",
+      "tabVisual": "Visual Editor",
+      "tabHtml": "HTML Source",
+      "bodyPlaceholder": "Write your email content using the toolbar above…",
+      "htmlGreeting": "Hello {name}!",
+      "update": "Update Template",
+      "create": "Create Template"
+    },
+    "richTextEditor": {
+      "defaultPlaceholder": "Write your email content…",
+      "enterUrl": "Enter URL",
+      "bold": "Bold",
+      "italic": "Italic",
+      "underline": "Underline",
+      "strikethrough": "Strikethrough",
+      "heading1": "Heading 1",
+      "heading2": "Heading 2",
+      "alignLeft": "Align Left",
+      "alignCenter": "Align Center",
+      "alignRight": "Align Right",
+      "bulletList": "Bullet List",
+      "orderedList": "Ordered List",
+      "quote": "Quote",
+      "code": "Code",
+      "link": "Link",
+      "undo": "Undo",
+      "redo": "Redo",
+      "variables": "Var:"
+    },
+    "sendEmailModal": {
+      "emptyBody": "Email body cannot be empty.",
+      "noAddress": "This record has no email address.",
+      "sent": "Email sent successfully!",
+      "sendFailed": "Failed to send email.",
+      "title": "New Email",
+      "titleWithRecipient": "New Email — {name}",
+      "templateLabel": "Template",
+      "templatePlaceholder": "Choose a template…",
+      "subjectPlaceholder": "Write a subject…",
+      "subjectRequired": "Subject is required",
+      "editHtml": "Edit HTML",
+      "clickToEdit": "Click on text to edit",
+      "changesReflected": "Changes reflected in Preview",
+      "noContent": "No content yet",
+      "noContentWithTemplates": "Select a template above or switch to HTML to compose",
+      "noContentNoTemplates": "Switch to HTML to write your email",
+      "htmlComment": "Paste or write your HTML here",
+      "htmlGreeting": "Hello {name},",
+      "tip": "Tip: use <code>{first}</code>, <code>{last}</code>, <code>{company}</code> as placeholders",
+      "discard": "Discard"
+    },
+    "emailBuilder": {
+      "blocks": {
+        "heading": {
+          "label": "Heading",
+          "desc": "Title or section header"
+        },
+        "text": {
+          "label": "Text",
+          "desc": "Paragraph or body copy"
+        },
+        "image": {
+          "label": "Image",
+          "desc": "Full-width image"
+        },
+        "button": {
+          "label": "Button",
+          "desc": "Call-to-action button"
+        },
+        "divider": {
+          "label": "Divider",
+          "desc": "Horizontal separator"
+        },
+        "spacer": {
+          "label": "Spacer",
+          "desc": "Vertical whitespace"
+        },
+        "two_column": {
+          "label": "2 Columns",
+          "desc": "Side-by-side layout"
+        },
+        "footer": {
+          "label": "Footer",
+          "desc": "Footer with unsubscribe"
+        },
+        "html": {
+          "label": "Custom HTML",
+          "desc": "Raw HTML block"
+        }
+      },
+      "canvas": {
+        "textPlaceholder": "Text block",
+        "imagePlaceholder": "Set image URL in panel →",
+        "spacer": "spacer {height}px",
+        "htmlPlaceholder": "HTML block"
+      },
+      "align": {
+        "left": "Left",
+        "center": "Center",
+        "right": "Right"
+      },
+      "levels": {
+        "h1": "H1 — Large",
+        "h2": "H2 — Medium",
+        "h3": "H3 — Small"
+      },
+      "fields": {
+        "text": "Text",
+        "level": "Level",
+        "alignment": "Alignment",
+        "textColor": "Text Color",
+        "background": "Background",
+        "paddingTop": "Padding Top",
+        "paddingBottom": "Padding Bottom",
+        "content": "Content",
+        "color": "Color",
+        "fontSize": "Font Size (px)",
+        "lineHeight": "Line Height",
+        "imageUrl": "Image URL",
+        "altText": "Alt Text",
+        "link": "Link (href)",
+        "width": "Width (%)",
+        "label": "Label",
+        "buttonColor": "Button Color",
+        "borderRadius": "Border Radius (px)",
+        "paddingH": "Padding H (px)",
+        "paddingV": "Padding V (px)",
+        "thickness": "Thickness (px)",
+        "height": "Height (px)",
+        "leftContent": "Left Content",
+        "rightContent": "Right Content",
+        "leftBackground": "Left Background",
+        "rightBackground": "Right Background",
+        "gap": "Gap (px)",
+        "showUnsubscribe": "Show Unsubscribe",
+        "backgroundColor": "Background Color",
+        "contentWidth": "Content Width (px)",
+        "fontFamily": "Font Family",
+        "previewText": "Preview Text (hidden pre-header)"
+      },
+      "inspector": {
+        "properties": "{block} Properties",
+        "insertVariable": "Insert Variable",
+        "copyHint": "Click to copy, then paste in text fields above.",
+        "empty": "Select a block on the canvas to edit its properties."
+      },
+      "copied": "Copied {variable}",
+      "globalSettings": "Global Settings",
+      "settings": {
+        "arialRecommended": "Arial (recommended)",
+        "previewTextPlaceholder": "A short preview shown in inbox…"
+      },
+      "nameRequired": "Enter a template name.",
+      "subjectRequired": "Enter a subject line.",
+      "saveFailed": "Failed to save template.",
+      "namePlaceholder": "Template name…",
+      "subjectPlaceholder": "Subject line…",
+      "undo": "Undo",
+      "desktop": "Desktop",
+      "mobile": "Mobile",
+      "addBlock": "Add Block",
+      "design": "Design",
+      "mobilePreview": "Mobile preview (375px)",
+      "desktopPreview": "Desktop preview (600px)",
+      "emailPreview": "Email preview",
+      "emptyCanvas": "Click a block in the left panel to add it",
+      "duplicate": "Duplicate"
     }
   },
   "minutes": {
@@ -1528,21 +2290,6 @@
       "invoicing": "E-invoicing",
       "invoices": "Invoices"
     },
-    "quickCreate": {
-      "title": "Quick Create",
-      "crm": "CRM",
-      "sales": "Sales",
-      "work": "Work",
-      "newLead": "New Lead",
-      "newContact": "New Contact",
-      "newCompany": "New Company",
-      "newDeal": "New Deal",
-      "newQuote": "New Quote",
-      "newOrder": "New Order",
-      "newTask": "New Task",
-      "newTicket": "New Ticket",
-      "newCampaign": "New Campaign"
-    },
     "user": {
       "profile": "Profile",
       "billing": "Billing",
@@ -1550,7 +2297,12 @@
       "logout": "Log out",
       "unknownUser": "Unknown User"
     },
-    "openMenu": "Open menu"
+    "openMenu": "Open menu",
+    "soon": "Soon",
+    "notInPlan": "{title} — not included in your plan",
+    "accountSwitcher": {
+      "account": "Account"
+    }
   },
   "nextActions": {
     "title": "Needs you",
@@ -1884,7 +2636,13 @@
       "errorEdit": "Error saving edit",
       "errorDelete": "Error deleting comment",
       "errorReply": "Error posting reply",
-      "errorPost": "Error posting comment"
+      "errorPost": "Error posting comment",
+      "title": "Comments",
+      "empty": "No comments yet.",
+      "saveFailed": "Could not save the edit.",
+      "deleteFailed": "Could not delete the comment.",
+      "replyFailed": "Could not post the reply.",
+      "postFailed": "Could not post the comment."
     },
     "winLoss": {
       "title": "Win / loss",
@@ -1923,7 +2681,16 @@
       "noTerritories": "No territories defined: every record falls in \"No territory\".",
       "defineTerritories": "Define territories",
       "footnote": "Open leads, open deals and pipeline are as of today; new leads, conversions, won and win rate cover the last {days} days. A deal is placed by its company's address or, when that is missing, its contact's. Amounts are added without currency conversion."
-    }
+    },
+    "dealModal": {
+      "openFullRecord": "Open the full record",
+      "nameRequired": "Name is required",
+      "stageRequired": "Stage is required",
+      "probabilityRange": "Enter a value between 0 and 100"
+    },
+    "healthScore": "Health: {score}/100",
+    "deleteTask": "Delete task",
+    "noData": "No data"
   },
   "placeholders": {
     "unknown": "Nothing will fill in {list}. It will reach the recipient exactly as written.",
@@ -1996,7 +2763,13 @@
     "activate": "Activate",
     "createFailed": "Failed to create product.",
     "updateFailed": "Failed to update product.",
-    "deleteFailed": "Failed to delete product."
+    "deleteFailed": "Failed to delete product.",
+    "client": {
+      "price": "Price",
+      "cancel": "Cancel",
+      "nameRequired": "Name is required",
+      "priceMin": "Must be 0 or more"
+    }
   },
   "quotes": {
     "title": "Quotes",
@@ -2112,7 +2885,134 @@
     "createSuccess": "Quote created.",
     "updateSuccess": "Quote updated.",
     "deleteSuccess": "Quote deleted.",
-    "convertSuccess": "Order created from quote."
+    "convertSuccess": "Order created from quote.",
+    "detail": {
+      "backToQuotes": "Back to quotes",
+      "editQuote": "Edit quote",
+      "issued": "Issued",
+      "expires": "Expires",
+      "deal": "Deal",
+      "company": "Company",
+      "contact": "Contact",
+      "owner": "Owner",
+      "totalAmount": "Total amount",
+      "actions": "Actions",
+      "requestApproval": "Request approval",
+      "approveQuote": "Approve quote",
+      "rejectWithNote": "Reject with a note",
+      "awaitingApproval": "Waiting for approval from an administrator.",
+      "sendQuote": "Send quote",
+      "createOrder": "Create order",
+      "becameOrder": "This quote has become an order.",
+      "printPreview": "Print / Preview",
+      "downloadPdf": "Download PDF",
+      "copyPublicLink": "Copy public link",
+      "publicLinkCopied": "Public link copied to clipboard.",
+      "markAccepted": "Mark as accepted",
+      "markDeclined": "Mark as declined",
+      "markedAccepted": "Quote marked as accepted.",
+      "markedDeclined": "Quote marked as declined.",
+      "statusUpdateFailed": "Could not update the status.",
+      "approvalRequested": "Approval requested.",
+      "approvalRequestFailed": "Could not send the approval request.",
+      "approved": "Quote approved.",
+      "approveFailed": "Could not approve the quote.",
+      "rejected": "Quote rejected.",
+      "rejectFailed": "Could not reject the quote.",
+      "orderCreated": "Order {orderNumber} created from this quote.",
+      "orderCreateFailed": "Could not create the order.",
+      "rejectedBanner": "Quote rejected at approval",
+      "timeline": "Timeline",
+      "sent": "Sent",
+      "viewed": "Viewed",
+      "accepted": "Accepted",
+      "declined": "Declined",
+      "itemsTab": "Items ({count})",
+      "summaryTab": "Summary",
+      "activityTab": "Activity ({count})",
+      "description": "Description",
+      "qty": "Qty",
+      "unitPrice": "Unit price",
+      "discount": "Discount",
+      "tax": "Tax",
+      "total": "Total",
+      "subtotal": "Subtotal",
+      "discountPercent": "Discount ({percent}%)",
+      "taxPercent": "Tax ({percent}%)",
+      "notes": "Notes",
+      "noActivity": "No activity yet",
+      "sentSuccess": "Quote sent.",
+      "rejectTitle": "Reject the quote",
+      "rejectDescription": "The quote goes back to draft. You can add a note for the salesperson (optional).",
+      "rejectPlaceholder": "Reason for rejecting…",
+      "cancel": "Cancel",
+      "confirmReject": "Confirm rejection",
+      "activity": {
+        "created": "Quote created",
+        "sent": "Quote sent",
+        "viewed": "Quote viewed",
+        "opened_email": "Email opened",
+        "clicked_email": "Link clicked",
+        "accepted": "Quote accepted",
+        "declined": "Quote declined by the customer",
+        "reminded": "Reminder sent",
+        "updated": "Quote updated",
+        "approval_requested": "Approval requested",
+        "approved": "Quote approved",
+        "rejected": "Quote rejected at approval"
+      }
+    },
+    "createModal": {
+      "addQuote": "Add quote",
+      "title": "New quote",
+      "description": "Add line items and set the pricing",
+      "lineItems": "Line items",
+      "addItem": "Add item",
+      "item": "Item {number}",
+      "product": "Product",
+      "selectProduct": "Select a product",
+      "customItem": "Custom item",
+      "quantity": "Quantity",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Item description",
+      "unitPrice": "Unit price",
+      "discountPercent": "Discount %",
+      "taxPercent": "Tax %",
+      "adjustments": "Quote adjustments",
+      "quoteDiscount": "Quote discount %",
+      "quoteTax": "Quote tax %",
+      "expiresAt": "Expiry date (optional)",
+      "notes": "Notes",
+      "notesPlaceholder": "Additional notes for the customer…",
+      "cancel": "Cancel",
+      "submit": "Create quote",
+      "created": "Quote {number} created.",
+      "createFailed": "Could not create the quote."
+    },
+    "sendEmail": {
+      "title": "Send quote by email",
+      "description": "Send this quote to your customer to review and accept",
+      "recipient": "Recipient email",
+      "recipientPlaceholder": "customer@example.com",
+      "subject": "Subject",
+      "subjectPlaceholder": "Your quote",
+      "message": "Message (optional)",
+      "messagePlaceholder": "Add a personal message to include in the email…",
+      "defaultSubject": "Your quote",
+      "defaultMessage": "Please review the attached quote and let me know if you have any questions.",
+      "invalidEmail": "Invalid email address",
+      "subjectRequired": "Subject is required",
+      "cancel": "Cancel",
+      "submit": "Send quote",
+      "sent": "Quote sent.",
+      "sendFailed": "Could not send the quote."
+    },
+    "list": {
+      "printPdf": "Print / PDF",
+      "allStatuses": "All statuses",
+      "statTotal": "Total quotes",
+      "statValue": "Total value"
+    }
   },
   "quoteFollowUp": {
     "title": "Worth a follow-up",
@@ -2178,6 +3078,26 @@
         "month": "By month",
         "quarter": "By quarter",
         "year": "By year"
+      },
+      "ui": {
+        "true": "True",
+        "false": "False",
+        "count": "Count",
+        "field": "Field",
+        "chartTitle": "{entity} by {field}",
+        "operators": {
+          "contains": "contains",
+          "not_contains": "not contains",
+          "is_empty": "is empty",
+          "is_not_empty": "is not empty"
+        },
+        "chartTypes": {
+          "table": "Table",
+          "bar": "Bar",
+          "line": "Line",
+          "area": "Area",
+          "pie": "Pie"
+        }
       }
     },
     "generate": "Generate Report",
@@ -2304,6 +3224,10 @@
       "launch_campaign": "Launch Campaign",
       "create_automation": "Create Automation",
       "trigger_automation": "Trigger Automation"
+    },
+    "overviewPage": {
+      "title": "Reports & Analytics",
+      "subtitle": "Monitor user activity, performance metrics, and campaign results. Admin only."
     }
   },
   "roles": {
@@ -2493,7 +3417,11 @@
       "createFailed": "Failed to create field.",
       "deleteConfirm": "Delete this field? All stored values will be permanently removed.",
       "deleteSuccess": "Field deleted.",
-      "deleteFailed": "Failed to delete field."
+      "deleteFailed": "Failed to delete field.",
+      "form": {
+        "namePlaceholder": "e.g. LinkedIn URL",
+        "optionsPlaceholder": "Option A, Option B, Option C"
+      }
     },
     "email": {
       "title": "Email Settings",
@@ -2534,7 +3462,13 @@
       "testFailed": "Test failed: {error}",
       "testSent": "Test email sent to {email}. Check your inbox!",
       "testFailedConfig": "Test failed — check your configuration.",
-      "enterRecipient": "Enter a recipient email address."
+      "enterRecipient": "Enter a recipient email address.",
+      "form": {
+        "gmailNote": "STARTTLS — requires App Password",
+        "saveFailed": "Could not save the email settings.",
+        "fromNamePlaceholder": "My Company",
+        "testToPlaceholder": "your@email.com"
+      }
     },
     "webhooks": {
       "title": "Webhooks",
@@ -2592,7 +3526,10 @@
       "secretUnavailable": "Could not read the secret. Only an administrator can.",
       "secretCopied": "Secret copied to clipboard.",
       "deleteFailed": "Failed to delete webhook.",
-      "updateFailed": "Failed to update webhook."
+      "updateFailed": "Failed to update webhook.",
+      "form": {
+        "namePlaceholder": "e.g. Slack notifications"
+      }
     },
     "pipeline": {
       "title": "Pipeline Stages",
@@ -2742,6 +3679,15 @@
           "void": "Void",
           "uncollectible": "Uncollectible"
         }
+      },
+      "currentPlanCard": {
+        "planName": "{name} Plan",
+        "supportTiers": {
+          "community": "Community",
+          "email": "Email",
+          "priority": "Priority",
+          "dedicated": "Dedicated"
+        }
       }
     },
     "notifications": {
@@ -2789,11 +3735,32 @@
       "deleteTitle": "Delete this territory?",
       "deleteDescription": "Records are not changed: they simply stop falling in this territory.",
       "delete": "Delete",
-      "failed": "Something went wrong."
+      "failed": "Something went wrong.",
+      "form": {
+        "countryPlaceholder": "Italy"
+      }
     },
     "invoicing": {
       "title": "E-invoicing",
       "description": "Legal name, VAT number, tax regime and office of whoever issues the invoices."
+    },
+    "apiKey": {
+      "cardDescription": "The key an external system uses to write in here, and the identifier of this business.",
+      "createFailed": "Couldn't create the key.",
+      "revoked": "Key revoked: calls made with that key stop working immediately.",
+      "revokeFailed": "Couldn't revoke the key.",
+      "title": "API key",
+      "description": "It lets an external system write in here: contacts, notes, collected fields. It is nobody's password, and it is tied to this business.",
+      "copyNow": "Copy it now: it won't be shown again.",
+      "copyKey": "Copy key",
+      "exists": "A key already exists. It can't be read back: if you've lost it, create a new one — the old one stops working at the same moment.",
+      "createNew": "Create a new key",
+      "create": "Create key",
+      "revoke": "Revoke",
+      "rotateWarning": "Creating a new one makes the previous key stop working immediately: the integration using it must be updated at the same moment.",
+      "tenantIdTitle": "Identifier of this business",
+      "tenantIdDescription": "Used to build the address an external system sends its events to.",
+      "copyTenantId": "Copy identifier"
     }
   },
   "support": {
@@ -3017,7 +3984,54 @@
       "backToOpen": "Back to the queue",
       "cappedAt": "Only the {count} most recent tickets are shown. Narrow the list to see the rest.",
       "loadEarlier": "Load earlier messages",
-      "loadEarlierFailed": "Earlier messages could not be loaded."
+      "loadEarlierFailed": "Earlier messages could not be loaded.",
+      "detail": {
+        "tasks": "Tasks",
+        "taskTitlePlaceholder": "Task title…",
+        "create": "Create",
+        "slaRemaining": "{hours}h {minutes}m",
+        "slaOverdue": "{hours}h {minutes}m overdue",
+        "system": "System",
+        "unknownSender": "Unknown",
+        "justNow": "Just now",
+        "minutesAgo": "{count}m ago",
+        "audit": {
+          "created": "Ticket created",
+          "status_changed": "Status changed",
+          "priority_changed": "Priority changed",
+          "assigned": "Assignee changed",
+          "message_added": "Message added",
+          "field_changed": "Field updated"
+        },
+        "unassigned": "Unassigned",
+        "severityBadge": "Severity: {severity}",
+        "severities": {
+          "low": "Low",
+          "normal": "Normal",
+          "high": "High",
+          "critical": "Critical"
+        },
+        "attachments": "Attachments",
+        "reopenedAsNew": "The ticket was closed: new ticket {number} has been created",
+        "sendFailed": "Could not send",
+        "error": "Something went wrong",
+        "escalated": "Priority raised to {priority}",
+        "reassigned": "Ticket reassigned",
+        "assigneeRemoved": "Assignee removed",
+        "backToTickets": "Back to tickets",
+        "typing": "{count, plural, one {{names} is typing…} other {{names} are typing…}}",
+        "publicReply": "Public reply",
+        "internalNotePlaceholder": "Write an internal note (visible to the team only)…",
+        "replyPlaceholder": "Write a reply to the customer…",
+        "ctrlEnterHint": "Ctrl+Enter to send",
+        "sending": "Sending…",
+        "addNote": "Add note",
+        "sendReply": "Send reply",
+        "reassigning": "Reassigning…",
+        "deleteConfirm": "Are you sure you want to delete <strong>{number}</strong>? This will permanently remove the ticket and all its messages.",
+        "deleting": "Deleting…",
+        "delete": "Delete"
+      }
     },
     "sla": {
       "title": "SLA Management",
@@ -3291,13 +4305,87 @@
       "avgUtilLabel": "Avg utilization",
       "utilizationOf": "{hours}h of {capacity}h",
       "noConflicts": "No overload",
-      "legend": "Legend"
+      "legend": "Legend",
+      "hoursPerDay": "{hours}h/day",
+      "openTask": "Open task",
+      "suggested": "Suggested:",
+      "restore": "reset",
+      "apply": "Apply",
+      "estimateHint": "{hours}h estimated · min. {days} working days",
+      "dueDateFits": "Due date fits the estimated load",
+      "loadError": "Failed to load data.",
+      "dueDateMoved": "Due date moved to {date}.",
+      "nothingToPostpone": "No tasks to postpone.",
+      "rescheduleFailed": "{count, plural, one {# task was not updated.} other {# tasks were not updated.}}",
+      "rescheduled": "{count, plural, one {# task rescheduled.} other {# tasks rescheduled.}}",
+      "conflictsTitle": "Overloads detected",
+      "postponeAll": "Postpone all overloads",
+      "postponeAllHint": "Moves due dates out just far enough to stay within 8h a day"
     },
     "olderDoneHidden": "{count, plural, =1 {# task completed more than {days} days ago is not shown} other {# tasks completed more than {days} days ago are not shown}}",
     "showArchive": "Show them",
     "showingArchive": "Showing every completed task",
     "backToOpen": "Back to open work",
-    "cappedAt": "Only the {count} most recently created tasks are shown. Narrow the list to see the rest."
+    "cappedAt": "Only the {count} most recently created tasks are shown. Narrow the list to see the rest.",
+    "modal": {
+      "clearDate": "Clear date",
+      "updated": "Task updated.",
+      "tabActivity": "Structure",
+      "titleRequired": "Title is required.",
+      "allDay": "All day",
+      "selectDate": "Select date",
+      "progress": "Progress",
+      "timeTracking": "Time tracking",
+      "noSubtasks": "None",
+      "dependencies": "Dependencies",
+      "lagDays": "{n}d",
+      "dependencyRemoved": "Dependency removed.",
+      "dependencyAdded": "Dependency added.",
+      "dependencyAddFailed": "Could not add the dependency.",
+      "blockedBy": "{count, plural, one {Blocked by # task} other {Blocked by # tasks}}",
+      "selectPredecessor": "Select predecessor…",
+      "lagPlaceholder": "Lag (days)",
+      "addPredecessor": "Add predecessor",
+      "saveChanges": "Save changes",
+      "depTypes": {
+        "FS": "Finish → Start",
+        "SS": "Start → Start",
+        "FF": "Finish → Finish",
+        "SF": "Start → Finish"
+      }
+    },
+    "newTaskDialog": {
+      "linkTicket": "Ticket",
+      "searchTickets": "Search tickets…"
+    },
+    "listView": {
+      "blocked": "Blocked",
+      "confirmBulkDelete": "{count, plural, one {Delete # task?} other {Delete # tasks?}}"
+    },
+    "subtaskList": {
+      "createFailed": "Failed to create subtask.",
+      "count": "{count, plural, one {# subtask} other {# subtasks}}",
+      "doneOf": "({done}/{total} done)"
+    },
+    "timer": {
+      "startFailed": "Failed to start timer.",
+      "stopFailed": "Failed to stop timer.",
+      "timeLogged": "Time logged.",
+      "invalidHours": "Enter valid hours.",
+      "hoursLogged": "Hours logged.",
+      "logFailed": "Failed to log hours.",
+      "deleteFailed": "Failed to delete log.",
+      "estimated": "Est:",
+      "actual": "Actual:",
+      "overBudget": "({pct}% over)",
+      "stop": "Stop",
+      "start": "Start timer",
+      "logManually": "+ Log manually",
+      "hoursPlaceholder": "Hours (e.g. 1.5)",
+      "notePlaceholder": "Note (optional)",
+      "log": "Log"
+    },
+    "clearDate": "Clear date"
   },
   "triage": {
     "title": "What this resembles",
@@ -3388,7 +4476,43 @@
     },
     "createSuccess": "User invited.",
     "updateSuccess": "User updated.",
-    "deleteSuccess": "User removed."
+    "deleteSuccess": "User removed.",
+    "groupModal": {
+      "nameRequired": "Group name is required",
+      "saveFailed": "Failed to save group.",
+      "updated": "Group updated.",
+      "created": "Group created.",
+      "deleteConfirm": "Delete group “{name}”? Records assigned to it will become unassigned.",
+      "deleted": "Group deleted.",
+      "deleteFailed": "Failed to delete group.",
+      "editTitle": "Edit Group — {name}",
+      "newTitle": "New Group",
+      "nameLabel": "Group Name",
+      "namePlaceholder": "e.g. Sales Team",
+      "descriptionLabel": "Description",
+      "descriptionPlaceholder": "Briefly describe this group's purpose…",
+      "colorLabel": "Color",
+      "membersLabel": "Members",
+      "selectedCount": "{count} selected",
+      "searchUsers": "Search users…",
+      "loadingUsers": "Loading users…",
+      "noUsersMatch": "No users match your search.",
+      "deleteGroup": "Delete Group",
+      "saveChanges": "Save Changes",
+      "createGroup": "Create Group"
+    },
+    "usersClient": {
+      "inviteSent": "Invitation sent to {email}",
+      "passwordsMismatch": "Passwords do not match.",
+      "passwordMin": "Password must be at least 8 characters.",
+      "passwordChanged": "Password changed successfully.",
+      "resetSent": "Password reset link sent to {email}",
+      "resetNotDelivered": "Email not delivered — copy the link below.",
+      "changePassword": "Change password",
+      "sendPasswordReset": "Send password reset",
+      "deleteUser": "Delete user",
+      "resetFallbackDesc": "The reset link was generated but could not be emailed to <strong>{email}</strong>. Share it manually:"
+    }
   },
   "layoutControls": {
     "title": "Preferences",
@@ -3414,7 +4538,13 @@
     "collapseMode": "Sidebar collapse mode",
     "icon": "Icon",
     "offcanvas": "Off canvas",
-    "restore": "Restore defaults"
+    "restore": "Restore defaults",
+    "themeSwitcher": {
+      "ariaLabel": "Current theme: {theme}. Click to cycle themes"
+    },
+    "panel": {
+      "storageNote": "*Preferences use cookies by default. You can switch between cookies, localStorage, or no storage in code."
+    }
   },
   "handover": {
     "title": "Where it stands",
@@ -3453,7 +4583,10 @@
     "tryAgain": "Try again",
     "unknownHint": "This is on our side, not yours. Retrying often works.",
     "unknownTitle": "Something went wrong loading this page",
-    "viewPlans": "View plans"
+    "viewPlans": "View plans",
+    "dashboardBoundary": {
+      "reference": "Reference: {digest}"
+    }
   },
   "documents": {
     "accepted": "PDF, Word, Excel, images — max {mb} MB",
@@ -3464,7 +4597,28 @@
     "tooLarge": "File too large (max {mb} MB).",
     "upload": "Upload",
     "uploadFailed": "Upload failed.",
-    "uploading": "Uploading…"
+    "uploading": "Uploading…",
+    "manager": {
+      "title": "Attachments",
+      "loadFailed": "Failed to load documents.",
+      "uploaded": "\"{name}\" uploaded.",
+      "confirmDelete": "Delete \"{name}\"?",
+      "deleted": "Document deleted.",
+      "deleteFailed": "Failed to delete document.",
+      "dropzone": "Drop files here or click to upload",
+      "accepted": "Max {mb} MB · PDF, images, documents",
+      "empty": "No attachments yet."
+    },
+    "panel": {
+      "loadFailed": "Failed to load documents.",
+      "uploaded": "\"{name}\" uploaded successfully.",
+      "uploadFailedStatus": "Upload failed ({status}).",
+      "networkError": "Network error during upload.",
+      "confirmDelete": "Delete \"{name}\"?",
+      "deleted": "\"{name}\" deleted.",
+      "deleteFailed": "Failed to delete document.",
+      "openPdf": "Open PDF"
+    }
   },
   "pushNotifications": {
     "title": "Notifications on this device",
@@ -3678,7 +4832,8 @@
       "notes": "Notes",
       "notesPlaceholder": "Particular terms, references, what it covers"
     },
-    "searchPlaceholder": "Search by title, customer or owner…"
+    "searchPlaceholder": "Search by title, customer or owner…",
+    "back": "Back to contracts"
   },
   "sequences": {
     "title": "Follow-up sequences",
@@ -3992,5 +5147,935 @@
       "residualLeft": "{amount} left to credit",
       "noteNumber": "Credit note no. {number}"
     }
+  },
+  "entities": {
+    "groups": {
+      "crm": "CRM",
+      "sales": "Sales",
+      "documents": "Documents",
+      "support": "Support",
+      "work": "Tasks and calendar",
+      "marketing": "Marketing"
+    },
+    "types": {
+      "lead": {
+        "one": "Lead",
+        "other": "Leads",
+        "new": "New lead"
+      },
+      "contact": {
+        "one": "Contact",
+        "other": "Contacts",
+        "new": "New contact"
+      },
+      "company": {
+        "one": "Company",
+        "other": "Companies",
+        "new": "New company"
+      },
+      "deal": {
+        "one": "Deal",
+        "other": "Deals",
+        "new": "New deal"
+      },
+      "product": {
+        "one": "Product",
+        "other": "Products",
+        "new": "New product"
+      },
+      "quote": {
+        "one": "Quote",
+        "other": "Quotes",
+        "new": "New quote"
+      },
+      "order": {
+        "one": "Order",
+        "other": "Orders",
+        "new": "New order"
+      },
+      "contract": {
+        "one": "Contract",
+        "other": "Contracts",
+        "new": "New contract"
+      },
+      "invoice": {
+        "one": "Invoice",
+        "other": "Invoices",
+        "new": "New invoice"
+      },
+      "creditNote": {
+        "one": "Credit note",
+        "other": "Credit notes",
+        "new": "New credit note"
+      },
+      "ticket": {
+        "one": "Ticket",
+        "other": "Tickets",
+        "new": "New ticket"
+      },
+      "task": {
+        "one": "Task",
+        "other": "Tasks",
+        "new": "New task"
+      },
+      "appointment": {
+        "one": "Appointment",
+        "other": "Appointments",
+        "new": "New appointment"
+      },
+      "campaign": {
+        "one": "Campaign",
+        "other": "Campaigns",
+        "new": "New campaign"
+      },
+      "sequence": {
+        "one": "Sequence",
+        "other": "Sequences",
+        "new": "New sequence"
+      },
+      "template": {
+        "one": "Email template",
+        "other": "Email templates",
+        "new": "New email template"
+      },
+      "document": {
+        "one": "Document",
+        "other": "Documents",
+        "new": "New document"
+      }
+    },
+    "statuses": {
+      "open": "Open",
+      "won": "Won",
+      "lost": "Lost",
+      "draft": "Draft",
+      "sent": "Sent",
+      "viewed": "Viewed",
+      "accepted": "Accepted",
+      "declined": "Declined",
+      "expired": "Expired",
+      "converted": "Converted",
+      "pending_approval": "Pending approval",
+      "approved": "Approved",
+      "processing": "Processing",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "issued": "Issued",
+      "active": "Active",
+      "new": "New",
+      "contacting": "Contacting",
+      "engaged": "Engaged",
+      "qualified": "Qualified",
+      "unqualified": "Unqualified",
+      "todo": "To do",
+      "in_progress": "In progress",
+      "done": "Done",
+      "scheduled": "Scheduled",
+      "paused": "Paused",
+      "pending": "Pending",
+      "waiting": "Waiting",
+      "resolved": "Resolved",
+      "closed": "Closed",
+      "sending": "Sending"
+    },
+    "attachedTo": "Attached to: {type}",
+    "search": {
+      "all": "Everything",
+      "filterLabel": "Search in",
+      "recent": "Recent",
+      "create": "Create",
+      "actions": "Actions",
+      "seeAllRecents": "All recent items"
+    },
+    "quickCreate": {
+      "title": "Quick create",
+      "hint": "Choose what to create",
+      "none": "You do not have permission to create new items."
+    },
+    "recents": {
+      "title": "Recent",
+      "button": "Recent items",
+      "all": "All",
+      "empty": "Nothing opened recently.",
+      "emptyGroup": "Nothing recent in this section.",
+      "clear": "Clear",
+      "clearGroup": "Clear section",
+      "hint": "The last items you opened, on this device and in this workspace."
+    }
+  },
+  "recordForm": {
+    "upgrade": "Upgrade",
+    "openFullRecord": "Open full record",
+    "merge": "Merge",
+    "goBack": "Go back",
+    "saveAnyway": "Save anyway",
+    "firstNamePlaceholder": "John",
+    "lastNamePlaceholder": "Smith",
+    "emailPlaceholder": "john.smith@example.com",
+    "jobTitlePlaceholder": "Sales Manager",
+    "tagsPlaceholder": "tech, startup, b2b"
+  },
+  "importExport": {
+    "selectFile": "Please select a CSV file.",
+    "csvOnly": "Only CSV files are supported.",
+    "importFailed": "Import failed.",
+    "importFailedRetry": "Import failed. Please try again.",
+    "complete": "Import complete: {created} created, {skipped} skipped.",
+    "completeWithDuplicates": "Import complete: {created} created, {skipped} skipped ({duplicates, plural, one {# duplicate} other {# duplicates}}).",
+    "exportCsv": "Export CSV",
+    "importCsv": "Import CSV",
+    "required": "Required:",
+    "optional": "Optional:",
+    "semicolonSeparated": ";-separated",
+    "dedup": "Duplicates are detected by <b>{field}</b> and skipped automatically.",
+    "csvFile": "CSV File",
+    "importing": "Importing…",
+    "import": "Import",
+    "titles": {
+      "contacts": "Import contacts",
+      "leads": "Import leads",
+      "companies": "Import companies",
+      "other": "Import"
+    }
+  },
+  "assignees": {
+    "addFailed": "Failed to add assignee.",
+    "removeFailed": "Failed to remove assignee.",
+    "raciTitle": "RACI Assignees",
+    "raciEmpty": "No RACI assignees yet.",
+    "selectUser": "Select user…",
+    "searchUsers": "Search users…",
+    "noUsers": "No users found.",
+    "roles": {
+      "responsible": "Responsible (R)",
+      "accountable": "Accountable (A)",
+      "consulted": "Consulted (C)",
+      "informed": "Informed (I)"
+    },
+    "unassigned": "— Unassigned —",
+    "groupMembers": "Group · {count, plural, one {# member} other {# members}}",
+    "searchUsersAndGroups": "Search users and groups…",
+    "noResults": "No results found."
+  },
+  "lookupCombobox": {
+    "select": "Select…",
+    "search": "Search…",
+    "create": "Create",
+    "clearSelection": "Clear selection",
+    "creating": "Creating…",
+    "noResults": "No results found."
+  },
+  "leadScore": {
+    "title": "Lead score: {score}/100",
+    "tiers": {
+      "cold": "Cold",
+      "warm": "Warm",
+      "hot": "Hot",
+      "very_hot": "Very Hot"
+    }
+  },
+  "metricCard": {
+    "vsLastMonth": "vs last month"
+  },
+  "customFieldsPanel": {
+    "title": "Custom Fields",
+    "saved": "Custom fields saved.",
+    "saveFailed": "Failed to save custom fields.",
+    "selectPlaceholder": "Select…",
+    "save": "Save Custom Fields"
+  },
+  "bulkActions": {
+    "selected": "{count} selected",
+    "setStatus": "Set Status",
+    "changeStatusTo": "Change status to",
+    "assign": "Assign",
+    "assignTo": "Assign to"
+  },
+  "recordTable": {
+    "selectRecord": "Select {name}"
+  },
+  "geoAddress": {
+    "streetPlaceholder": "1 Main Street",
+    "countryPlaceholder": "Italy",
+    "cityPlaceholder": "Milan"
+  },
+  "helpCenter": {
+    "title": "Help Centre",
+    "subtitle": "Learn how to use every feature of Flux CRM. Use search or browse by section.",
+    "searchPlaceholder": "Search help…",
+    "mainSections": "Main sections",
+    "noResults": "No results for “{search}”",
+    "tryDifferent": "Try a different term.",
+    "goToSection": "Go to section",
+    "notFoundTitle": "Didn't find what you were looking for?",
+    "notFoundHint": "Contact your system administrator for personalised support.",
+    "sections": {
+      "gettingStarted": {
+        "title": "Getting started",
+        "subtitle": "Welcome to Flux CRM",
+        "description": "Flux CRM is your central platform for managing the entire sales cycle: from the first contact with prospective customers, through to closing sales and after-sales support.",
+        "topics": {
+          "t01": {
+            "q": "How do I get started after signing in for the first time?",
+            "a": "After signing in you land on the CRM Dashboard, your home screen. It gives you a real-time summary of active leads, open deals, tasks falling due and assigned tickets. We recommend starting by creating your first Leads, then building the Pipeline with your sales opportunities."
+          },
+          "t02": {
+            "q": "What does a typical sales flow look like?",
+            "a": "The standard path is: Lead → Contact + Company → Deal (Pipeline) → Quote → Order. A lead who shows interest is converted into a qualified contact, a deal is opened in the pipeline, a quote is sent and, once accepted, the order is generated."
+          },
+          "t03": {
+            "q": "How do the lists work (contacts, leads, companies, quotes, orders, products)?",
+            "a": "Each list loads one page of rows at a time, 50 by default. Above the table you will find the search box, how many rows you are seeing out of the total, the selector to switch to 25, 50, 100 or 200 rows per page, and the arrows to move between pages. Search and filters work on the whole list, not just the page on screen, so searching for a customer finds them even if they are on page twenty. Search, filters, sorting and page all end up in the page address: you can copy it and send it to a colleague, bookmark it, and the browser's back button works as you would expect."
+          },
+          "t04": {
+            "q": "How does navigation work?",
+            "a": "The sidebar groups everything into seven sections: Work (dashboard, calendar, tasks, chat), Customers (contacts, companies, leads), Sales (pipeline with targets, funnel, win/loss, forecasts and reports, then quotes, orders, products and finance), Support (overview, tickets, SLA, macros), Marketing and automation, Analytics, and Administration (users, roles, settings). Some items only appear if your plan includes the corresponding module. On a phone the sidebar gives way to a tab bar at the bottom with the most used sections."
+          },
+          "t05": {
+            "q": "Can I install Flux on my phone?",
+            "a": "Yes. When you open Flux in your phone's browser you can add it to the home screen: from there it opens full screen, with its own icon and without the browser bar. On Android the browser offers 'Install' by itself; on iPhone use Share → Add to Home Screen. Without a connection a screen says so, instead of a browser error page."
+          },
+          "t06": {
+            "q": "Can I customise the view?",
+            "a": "Yes. From the header at the top right you can change the theme (light/dark), the language (Italian/English) and the display currency. You can also change the sidebar layout and enable the sticky navbar through the layout controls."
+          }
+        }
+      },
+      "leads": {
+        "title": "Leads",
+        "subtitle": "Managing prospective customers",
+        "description": "Leads are prospective customers who have shown interest but have not yet been qualified. Every lead has an automatic score (Lead Score) and can be converted into a contact, a company and a sales opportunity.",
+        "topics": {
+          "t01": {
+            "q": "How do I create a new lead?",
+            "a": "Go to Leads → click the 'New Lead' button at the top right. Fill in first name, last name, email, company and acquisition source (referral, organic, event…). Additional custom fields (if configured by an admin) appear in the same form."
+          },
+          "t02": {
+            "q": "What does the Cold / Warm / Hot / Very Hot badge mean?",
+            "a": "It is the Lead Score, calculated automatically by the system from profile completeness, progress status, recorded interactions and demographic data. Cold (0-25) = low interest; Warm (26-50) = worth nurturing; Hot (51-75) = high priority; Very Hot (76-100) = contact immediately."
+          },
+          "t03": {
+            "q": "How do I convert a lead into a contact?",
+            "a": "Open the lead's profile → click 'Convert Lead'. The system automatically creates: a Contact with all the lead's data, a new Company (if it does not already exist), and a Deal in the pipeline. The original lead is marked as converted and keeps references to the records created."
+          },
+          "t04": {
+            "q": "Can I import leads from an Excel or CSV file?",
+            "a": "Yes. In the Leads list you will find the 'Import CSV' button. Prepare the file with the required columns (first name, last name, email, etc.), upload it and the system will import the records, skipping duplicates automatically (same email = update of the existing record)."
+          },
+          "t05": {
+            "q": "How do I use filters and saved filters?",
+            "a": "At the top of the Leads list you will find the filter panel: you can filter by status, source, score, owner, tag and creation date. Once set, click 'Save filter' to reuse it later. Filters can be private or shared with the team. Pinned filters always appear at the top of the list."
+          },
+          "t06": {
+            "q": "What is a Bulk Action?",
+            "a": "Select several leads with the checkboxes on the left, then use the bulk actions bar that appears at the bottom: you can delete in bulk, change the status of all selected leads, or reassign the owner in a single operation."
+          }
+        }
+      },
+      "contacts": {
+        "title": "Contacts",
+        "subtitle": "Qualified individuals",
+        "description": "Contacts are people with whom you have already established, or are establishing, a business relationship. Unlike leads, they are qualified records, often linked to a company and to active deals.",
+        "topics": {
+          "t01": {
+            "q": "What can I record in a contact's profile?",
+            "a": "Full personal details (first name, last name, job title, department), all contact details (email, phone, mobile, LinkedIn), an address with structured geographic selection, free-form notes and custom tags. You can also record marketing consent (GDPR) with its date."
+          },
+          "t02": {
+            "q": "How do I link a contact to a company?",
+            "a": "In the contact form, use the 'Company' field: search among existing companies or create a new one on the spot. Once linked, the contact also appears in the company's profile, in the 'Associated contacts' section."
+          },
+          "t03": {
+            "q": "What will I find on a contact's detail page?",
+            "a": "The contact's full profile, the linked active deals, the activity timeline (notes, calls, meetings, logged emails), related tasks and custom fields. You can add new activities or tasks directly from this page without leaving the profile."
+          },
+          "t04": {
+            "q": "How do I export the contact list?",
+            "a": "Contacts → 'Export CSV', into a file that Excel and Google Sheets open directly. ⚠️ The export does NOT take the on-screen filter into account: it downloads every contact you are allowed to see. With the admin or owner role that means all of them in the workspace; with other roles only those you own."
+          },
+          "t05": {
+            "q": "How do I merge two duplicate contacts?",
+            "a": "From the list, select the duplicate and use 'Merge': choose which record keeps the field when the two disagree, and everything attached to the duplicate — activities, tasks, deals, tickets — moves to the record that remains, instead of disappearing with it. The same applies to companies and leads."
+          }
+        }
+      },
+      "companies": {
+        "title": "Companies",
+        "subtitle": "Customer and prospect organisations",
+        "description": "Companies represent the organisations you work with. They act as the hub that ties together the contacts, deals, activities and tickets of the same business customer.",
+        "topics": {
+          "t01": {
+            "q": "What types of company are there?",
+            "a": "Prospect (potential customer, not yet active), Customer (active customer), Partner (business partner), Vendor (supplier). The type is shown as a badge in the profile and in the list, and helps you filter your company base quickly."
+          },
+          "t02": {
+            "q": "Where do I enter the VAT number and SDI code?",
+            "a": "The company form has specific fields for Italian tax data: VAT number (Partita IVA) and SDI code (or recipient code for e-invoicing). This data is also available when generating quotes."
+          },
+          "t03": {
+            "q": "What will I see on a company's detail page?",
+            "a": "All company data, linked contacts, open and closed deals, logged activities, open support tickets and notes. Each section has a direct link to add new items without leaving the page."
+          }
+        }
+      },
+      "pipeline": {
+        "title": "Sales Pipeline",
+        "subtitle": "Sales opportunities and deals",
+        "description": "The Pipeline is the heart of the sales process. It shows all open deals organised by stage in a kanban view. Drag the cards to move a deal between stages.",
+        "topics": {
+          "t01": {
+            "q": "How do I create a new deal?",
+            "a": "From the Pipeline Board click '+ New Deal' (at the top of any column) or use the side menu. Enter name, amount, probability of closing, expected date, company and contact. The deal automatically starts in the first configured stage."
+          },
+          "t02": {
+            "q": "How do I analyse leads and deals by territory?",
+            "a": "First an administrator defines territories in Settings → Territories: by country, by region or province, by postcode prefix, or a combination of the three. For Italy, the abbreviation, name or region all count, so a 'Lombardia' territory includes records written as 'MI', 'Milano' or 'Bergamo'; next to each entry the screen says how it reads it and flags the ones it does not recognise, which helps catch typos. If two territories overlap, the narrower one wins: a postcode beats a province, which beats a country. The report is under Pipeline → By territory: open, new and converted leads, open deals, pipeline, won deals and win rate, over the last 30, 90 or 365 days. A deal is placed by the company's address or, if missing, the contact's. Records no territory covers remain visible in the 'No territory' row. The territory is recalculated from the address every time, so a change to territories applies immediately to existing records too. Territories do not restrict who can see records."
+          },
+          "t03": {
+            "q": "How do I move a deal between stages?",
+            "a": "Drag and drop the deal card into the column of the stage you want. The change is immediate and the system automatically records the stage change in the deal's timeline."
+          },
+          "t04": {
+            "q": "What does the Health Score mean?",
+            "a": "The Health Score (from 0 to 100) indicates the 'health' of the deal: a low score signals that the deal is stagnant, recent activities are missing or the close date has passed. It helps identify the opportunities that need attention."
+          },
+          "t05": {
+            "q": "What is the weighted pipeline value?",
+            "a": "The weighted value is the expected revenue, calculated as: deal amount × probability of closing. For example, a €10,000 deal with a 70% probability contributes €7,000 to the forecast. The Finance Dashboard shows the weighted total as a forecasting indicator."
+          },
+          "t06": {
+            "q": "How do I use comments on a deal?",
+            "a": "Open the deal detail → go to the 'Comments' section. You can leave messages for the team, mention colleagues and reply to existing comments. It is an internal collaboration space for the single opportunity, separate from the activity timeline."
+          },
+          "t07": {
+            "q": "Can I get minutes of a meeting?",
+            "a": "Yes, from the 'Minutes' button above the deal's history, if at least one meeting or call has been logged on that deal. The minutes gather what was written down: the date and duration of each session, who attended, the notes exactly as you wrote them, and, as agreed actions, the tasks created in that window. They invent nothing — this product does not record what is said, so every sentence in the minutes was written by a person. If no task was created they say so, rather than making it look as if the meeting decided nothing. There is a button to copy them."
+          },
+          "t08": {
+            "q": "Can I configure my own custom stages?",
+            "a": "Yes, but only admins can. Go to Settings → Pipeline Stages: you can add, rename, reorder and colour stages. You can also set a default probability of closing for each stage (e.g. 'Proposal sent' = 60%)."
+          }
+        }
+      },
+      "finance": {
+        "title": "Finance",
+        "subtitle": "Financial dashboard and revenue",
+        "description": "The Finance Dashboard brings together the organisation's actual financial data: revenue from won deals, completed orders and accepted quotes, with a 12-month trend and a weighted pipeline forecast.",
+        "topics": {
+          "t01": {
+            "q": "What is 'actual revenue' in Finance?",
+            "a": "Actual revenue is calculated by adding up: the values of deals marked as 'Won', the amounts of orders with status 'Completed' and quotes with status 'Accepted'. It does not include deals that are still open or pending quotes."
+          },
+          "t02": {
+            "q": "How do I read the 12-month trend chart?",
+            "a": "The chart shows month by month the revenue realised over the last 12 months. You can compare seasonal patterns, identify the best months and those in decline, and use this data to plan future activities."
+          },
+          "t03": {
+            "q": "Does the platform support multiple currencies?",
+            "a": "Yes. Deals and quotes can be in different currencies (EUR, USD, GBP, etc.). From the dashboard header you can choose the display currency: exchange rates are updated automatically by the system."
+          }
+        }
+      },
+      "products": {
+        "title": "Products",
+        "subtitle": "Catalogue of goods and services",
+        "description": "The Product Catalogue is the central register of all the goods and services your organisation sells. Products are reused in quotes and orders, keeping prices and descriptions consistent.",
+        "topics": {
+          "t01": {
+            "q": "How do I add a product to the catalogue?",
+            "a": "Go to Products → 'New Product'. Enter name, SKU (product code), unit price, VAT rate, unit of measure and category. The product is immediately available for selection in quotes and orders."
+          },
+          "t02": {
+            "q": "What happens if I change the price of a product already used in a quote?",
+            "a": "Nothing changes in existing quotes. The price is copied into the quote when the line is created ('historical price'), so documents already sent stay unchanged. Only new quotes will use the updated price."
+          },
+          "t03": {
+            "q": "How do I deactivate a product I no longer sell?",
+            "a": "Instead of deleting it (which would break the references in historical documents), use the 'Active/Inactive' toggle. Inactive products do not appear in the selection when creating new quotes, but remain visible in historical documents."
+          }
+        }
+      },
+      "quotes": {
+        "title": "Quotes",
+        "subtitle": "Sales proposals and approvals",
+        "description": "The Quotes module manages the whole proposal process: from internal drafting with an approval workflow, to sending it by email to the customer with a viewing link, through to acceptance or rejection.",
+        "topics": {
+          "t01": {
+            "q": "How do I manage recurring contracts and renewals?",
+            "a": "In Sales → Contracts you record recurring agreements: company, amount per month, quarter, half-year or year, start date, end of the period, days of notice and, where applicable, automatic renewal with its duration. The status is not set by hand but calculated from the dates: 'Active', 'Decision due', 'Expired', 'Not started yet'. Only 'Draft' and 'Cancelled' are chosen by hand. A contract becomes 'Decision due' one month before the notice deadline (the end of the period minus the days of notice), so there is still time to renew or cancel; on that day the owner receives a notification, including push, once per period. A contract with automatic renewal never expires: its end date moves forward one period at a time and the reminder repeats before every renewal. At the top of the page and on the dashboard you will find monthly recurring revenue, calculated only on contracts active today. A signed contract starting next month, or an expired one, is not included. For a customer who cancels, set 'Cancelled' instead of deleting: it stays in the history."
+          },
+          "t02": {
+            "q": "How do I issue an electronic invoice?",
+            "a": "First complete Settings → E-invoicing (company name, VAT number, tax regime, registered office) and the customer's tax data on their record: VAT number or tax code, and recipient code or PEC. Then open Sales → Invoices → 'New invoice': on a single page you choose the customer, optionally an order to copy lines and discount from, and fill in lines, payment and due date (from an order's page, the 'Invoice' button opens the same page already filled in); on lines with 0% VAT choose the Natura, which is mandatory. A panel lists what is missing before you can issue. 'Issue' assigns the progressive number for the year and the numbering series, today's date, and freezes the issuer, customer and line data: an issued invoice cannot be edited or deleted, it is corrected with a credit note. A draft has no number, so deleting it leaves no gaps in the numbering."
+          },
+          "t03": {
+            "q": "Where do I find the invoice XML file?",
+            "a": "On the issued invoice, with the 'XML FatturaPA' button. The file is in FatturaPA FPR12 format (schema 1.2.3, specifications 1.4), with the name SDI expects, and is built from the data frozen at the time of issue: downloading it a year from now gives you the same file, even if the company's or your profile's data has changed in the meantime. Every generated file is validated against the official schema of the Agenzia delle Entrate. Automatic submission to SDI is not active yet: for now the file must be transmitted through the channel you already use."
+          },
+          "t04": {
+            "q": "How do I send the invoice to the customer, and where is it archived?",
+            "a": "On the issued invoice you will find 'Courtesy PDF', 'XML FatturaPA' and 'Send to customer'. The PDF is a readable copy built from the same data as the XML, with a footer stating that it has no tax value: the real invoice is the XML file transmitted through SDI, and the customer finds it in their reserved area on the Agenzia delle Entrate website. 'Send to customer' sends the PDF as an attachment from the address configured in Settings → Email, suggesting the company's main email; the invoice records when and to whom it was sent. Right after issue, the XML and PDF are saved in the document archive, with a fingerprint that makes it possible to detect if a file is altered: in that case it is not served, and the document is rebuilt from the frozen data. If archiving failed, the invoice says so and the 'Archive now' button retries it; it also happens on its own at the first download. Note: the Flux archive does not replace legally compliant digital preservation (conservazione sostitutiva), which remains the responsibility of the preservation service you use."
+          },
+          "t05": {
+            "q": "In which language and currency do my customers receive documents?",
+            "a": "In the language set on the company record, under 'Document language' (Billing tab): Italian or English. If you leave it on 'Automatic', it is Italian for an address in Italy or with no country, and English for all others. The language applies to the quote PDF and printout, the page the customer opens from the link, the email you send it with and the courtesy copy of the invoice, whatever language you use Flux in: a quote for a German customer goes out in English even if your system is in Italian. Amounts are always in the document's currency, chosen when you create the quote, order or contract, and are never converted: the currency selector in the header only changes the overall dashboard totals. The name at the top of the quote is the company name in Settings → E-invoicing, or the workspace name if you have not filled it in yet."
+          },
+          "t06": {
+            "q": "How do I correct or cancel an issued invoice?",
+            "a": "With a credit note: an issued invoice cannot be edited or deleted. On the invoice press 'Credit note' and choose 'Full reversal', which copies all the lines and is issued as it is, or 'Partial reversal', which starts from the same lines for you to reduce or remove. A TD04 draft is created, linked to the invoice, with the same numbering series, so numbering continues; change it in the draft if you use a series dedicated to credit notes. On issue the amount is deducted from the invoice's remaining balance, and you cannot reverse more than was invoiced: if two notes are issued at the same time, the second is rejected without using up numbers. On the invoice a panel shows invoiced, reversed and remaining amounts, and the list shows 'Reversed' or 'Partially reversed'. A credit note never charges stamp duty again: the recharge line would give the customer back the €2, while stamp duty already paid is not refunded. Stamp duty on the note itself is decided as for invoices, from the VAT Natura of its lines."
+          },
+          "t07": {
+            "q": "How is stamp duty calculated?",
+            "a": "Automatically, from the VAT Natura of each line. Stamp duty of €2.00 is due when the VAT-free lines that require it together exceed €77.47: what counts is their sum, not the invoice total, after the document discount. Exports (N3.1), intra-EU supplies (N3.2), supplies to San Marino (N3.3) and transactions treated as exports (N3.4) are exempt. Note: transactions under a declaration of intent (N3.5) are not exempt, even though they are non-taxable like exports. The margin scheme (N5) pays no stamp duty because VAT is included in the price. The draft shows whether stamp duty is due and why. You can force it or remove it for special cases, such as a customer's personal exemption, but only by writing the reason, which stays on the invoice. In Settings → E-invoicing you choose whether to charge it to the customer: in that case the invoice gets a line 'Imposta di bollo assolta in modo virtuale' of €2.00 excluding VAT (N1), which does not count towards the threshold. On the Invoices page a summary estimates the stamp duty for each quarter, with the F24 tax code (2521–2524) and due date, applying the deferrals below €5,000; the amount to pay remains the one the Agenzia delle Entrate publishes in the reserved area."
+          },
+          "t08": {
+            "q": "How do I create a new quote?",
+            "a": "Go to Quotes → 'New Quote'. Select the company, the contact and the linked deal. Add product/service lines from the catalogue (or enter free-form data), set any discounts, VAT and the expiry date. The system automatically calculates subtotal, discounts, VAT and final total."
+          },
+          "t09": {
+            "q": "What is the approval workflow?",
+            "a": "It is an optional step, not a block. From a draft you can click 'Request Approval' and the quote moves to 'Pending approval': it is seen by whoever has the workspace admin or owner role, who can approve or reject it with a note. Once approved, the send button appears. Anyone with permission to write quotes can, however, send directly from the draft without going through this: approval is for those who want an internal review, it does not prevent sending for those who do not use it."
+          },
+          "t10": {
+            "q": "How do I send the quote to the customer?",
+            "a": "The send button appears on a draft and on an approved quote. The system prepares an email with a unique link to the quote: the customer opens it without signing in and sees the formatted document. Subject and text can be edited before it goes out, and nothing is sent until you send it."
+          },
+          "t11": {
+            "q": "How does the customer see the quote?",
+            "a": "The customer receives an email with a personal link. Clicking it opens a public page with all the quote details: items, prices, discounts, totals and notes. From the same page they can accept or reject the quote (with the option of leaving a reason if they reject it)."
+          },
+          "t12": {
+            "q": "How do I know whether the customer has opened the quote?",
+            "a": "As soon as the customer opens the link, the quote status automatically changes from 'Sent' to 'Viewed' and the exact time it was opened is recorded. You will see this information in the quote's timeline and detail."
+          },
+          "t13": {
+            "q": "How do I chase a quote that got no reply?",
+            "a": "On the quote detail a panel appears on its own when there is a reason to follow up, and says which: never opened, opened but no reply, about to expire, or already expired. These are four different situations and they suggest four different messages — someone who has not opened it is asked whether the email arrived, not for a decision. The panel does not appear on a quote already accepted or rejected, nor on one sent yesterday. The text is a draft: edit it as you like, and it only goes out when you press send."
+          },
+          "t14": {
+            "q": "Can I export the quote as a PDF?",
+            "a": "Yes. On the quote detail you will find the 'Export PDF' button to download the formatted document, ready to send through other channels or to archive."
+          }
+        }
+      },
+      "orders": {
+        "title": "Orders",
+        "subtitle": "Confirmed sales",
+        "description": "Orders represent confirmed sales transactions. They are typically generated by converting an accepted quote, but can also be created manually.",
+        "topics": {
+          "t01": {
+            "q": "What statuses does an order have?",
+            "a": "Draft (order just created, not yet in progress), In progress (being fulfilled), Completed (delivered and closed), Cancelled (revoked). Only 'Completed' orders count towards actual revenue in the Finance Dashboard."
+          },
+          "t02": {
+            "q": "How do I see an order's lines?",
+            "a": "Open the order detail: you will find all products with quantity, unit price and line total, and the total at the bottom. The creation and order dates also show the exact time, not just the day."
+          },
+          "t03": {
+            "q": "How do I move an order forward?",
+            "a": "Next to the status menu there are two separate buttons, each with its own icon: one moves the order to the next step of the flow (draft → in progress → completed), the other marks it completed in one go. They are kept apart on purpose, because they are two different intentions and mixing them up is costly: an order closed by mistake has to be reopened by hand. Neither appears on a completed or cancelled order, because there is nowhere further to go from there."
+          },
+          "t04": {
+            "q": "Where do I record payments and delivery?",
+            "a": "In the order detail you will find the payments panel: payments are listed one by one with date and amount, not added up into a single number, so you can see a deposit followed by a balance. Next to it you can record the actual delivery date."
+          }
+        }
+      },
+      "targetsFunnel": {
+        "title": "Sales Targets and Funnel",
+        "subtitle": "Goals and sales process analysis",
+        "description": "Planning and analysis tools: Sales Targets let you set sales goals for each salesperson and track progress in real time. The Funnel analyses how effective the conversion process is.",
+        "topics": {
+          "t01": {
+            "q": "How do I set a sales target?",
+            "a": "Go to Sales Targets → 'New Target'. Select the salesperson, the period (monthly, quarterly or yearly) and the target amount. You can also set a minimum number of deals to close. Admins see everyone's targets; each user sees their own."
+          },
+          "t02": {
+            "q": "How do I track progress towards the target?",
+            "a": "The Target card on the CRM Dashboard shows in real time the progress bar with the percentage achieved against the current month's goal. The actual value is calculated by adding up the deals the salesperson won in the period."
+          },
+          "t03": {
+            "q": "What does the Sales Funnel show?",
+            "a": "The funnel chart shows how many leads/deals move from one stage of the process to the next: prospecting → qualification → proposal → negotiation → closing. The conversion rates between stages show you where the sales process loses the most opportunities."
+          }
+        }
+      },
+      "marketing": {
+        "title": "Marketing",
+        "subtitle": "Email templates and campaigns",
+        "description": "The Marketing module manages bulk communications to leads and contacts. Create reusable templates with personalisation variables, then launch email campaigns with open and click tracking.",
+        "topics": {
+          "t01": {
+            "q": "How do follow-up sequences work?",
+            "a": "In Marketing → Sequences you create a series of automatic emails for leads or for contacts: each step says after how many days it goes out, the subject and the text, which you can load from a template and personalise with placeholders. Enrol a person from their record with the 'Sequence' button, or with an automation rule ('Enroll in Sequence'), for example on every new lead. The sequence stops on its own when the person replies, unsubscribes, when the address bounces or changes, when the lead is converted or deleted; you can also stop it by hand. Whoever follows the record receives a notification, including push, when the person replies. Every email has an unsubscribe link, added at the bottom if you do not include it. A person cannot be enrolled twice in the same running sequence. A paused sequence sends nothing and enrolled people stay where they are. Note: replies are detected only if inbound email is configured; if it is not, the Sequences page says so."
+          },
+          "t02": {
+            "q": "How do I create an email template?",
+            "a": "Marketing → Templates → 'New Template'. Give it a name, write subject and body in HTML, and use placeholders to personalise each copy: first name, last name, full name, company, email, phone and job title, each between double curly braces. The same ones also work in English (first_name, last_name, company…) and with a few synonyms — societa counts as azienda — because a placeholder written almost right must not go out to the customer as it is. Spaces inside the braces are tolerated. There is also a placeholder for the unsubscribe link, which must be included in every campaign."
+          },
+          "t03": {
+            "q": "How do I create and send a campaign?",
+            "a": "Go to Marketing → Campaigns → 'New Campaign'. Choose the template, select the recipients (contacts with marketing consent or leads), then click 'Send Now' or schedule sending for a future date/time. The system queues the sending, with automatic retry on temporary errors."
+          },
+          "t04": {
+            "q": "How does email tracking work?",
+            "a": "The system automatically detects when a recipient opens the email (through a tracking pixel) and when they click a link. In the campaign report you will find: number of emails sent, opened, clicked, bounced and unsubscribes, with percentages (open rate, click-through rate)."
+          },
+          "t05": {
+            "q": "What happens if a contact unsubscribes?",
+            "a": "The address goes onto the suppression list and is excluded from every subsequent send, even if someone adds it back to the recipients by hand. ⚠️ The list works on the ADDRESS, not on the record: ticking marketing consent on the contact again does not bring them back among the recipients, because these are two different things — consent says what you would like to do, suppression says what the person asked for. Hard bounces and spam complaints end up there too, by the same route."
+          }
+        }
+      },
+      "tasks": {
+        "title": "Tasks and Projects",
+        "subtitle": "Task management, Gantt and workload",
+        "description": "The Tasks module is a project management system built into the CRM. Tasks can stand alone or be linked to leads, contacts, companies, deals or tickets. It supports subtask hierarchies, multiple assignees and dependencies.",
+        "topics": {
+          "t01": {
+            "q": "How do I create a task?",
+            "a": "Go to Tasks → 'New Task'. Enter title, description, due date, priority (low, normal, high, critical, blocker) and assign the task to a colleague. You can link it to a CRM record (lead, company, deal) so it is easy to find from that record's profile too."
+          },
+          "t02": {
+            "q": "What are subtasks?",
+            "a": "A task can contain subtasks (up to 3 levels deep). This lets you break complex work down into smaller steps. The parent task's progress percentage is calculated automatically from the completion of its children."
+          },
+          "t03": {
+            "q": "Can I assign a task to more than one person?",
+            "a": "Yes. Every task supports multiple assignees with distinct roles: Responsible (does the work), Accountable (holds responsibility), Consulted (provides input), Informed (is kept updated on progress). You can add all the members you need."
+          },
+          "t04": {
+            "q": "How does the Gantt chart work?",
+            "a": "The Gantt view (Tasks → Gantt) shows tasks on a horizontal timeline. Each bar represents a task's duration. You can drag the bars to change dates, see the hierarchy (task → subtask) and set dependencies between tasks (e.g. 'task B starts only after task A is completed')."
+          },
+          "t05": {
+            "q": "What is the Workload view?",
+            "a": "The Workload view (Tasks → Workload) shows, for each team member, how many hours of work are planned week by week. Red cells signal overload; grey ones indicate under-use. Useful for balancing the load across people."
+          },
+          "t06": {
+            "q": "I can no longer find a task I completed months ago. Where has it gone?",
+            "a": "The task list is a work queue, not an archive: it always shows everything that is still open, whatever the date, plus only what was completed in the last 30 days. When something is left out, a line above the list says how many tasks are hidden, with a 'Show them' link to see them all. Nothing is deleted, and a direct link to a task still opens it, however old it is."
+          },
+          "t07": {
+            "q": "The list says it shows only the first 500 tasks. Why?",
+            "a": "It is a safety limit: beyond that number the page would become slow for everyone, including someone looking for a single task. When the limit kicks in the list says so, instead of stopping silently. Use the filters at the top — status, priority, assignee — or search to narrow down and find what you are looking for."
+          },
+          "t08": {
+            "q": "How do I log time worked on a task?",
+            "a": "In the task detail you will find the 'Time Tracking' section. Start the timer when you begin working and stop it when you finish, or enter the hours manually. The system compares estimated and actual hours, giving you a view of how well planned times are being kept."
+          }
+        }
+      },
+      "calendar": {
+        "title": "Calendar and Appointments",
+        "subtitle": "Managing meetings and availability",
+        "description": "The Calendar brings together all the team's appointments. It supports in-person and virtual meetings (Zoom, Teams, Jitsi), invitations with RSVP and direct links to CRM records.",
+        "topics": {
+          "t01": {
+            "q": "How do I create an appointment?",
+            "a": "In the Calendar click a free time slot or the 'New Appointment' button. Enter title, start and end date/time, time zone, physical location or virtual meeting link (Zoom, Teams, Jitsi or other). You can link the appointment to a contact, company, lead or deal."
+          },
+          "t02": {
+            "q": "How do I invite participants?",
+            "a": "In the appointment form you will find the 'Participants' section. Add internal colleagues or external contacts with their role (Required, Optional). Each participant receives a notification and can reply Accept / Decline / Maybe directly from the invitation email, without having to sign in."
+          },
+          "t03": {
+            "q": "Can I see these appointments in my personal calendar?",
+            "a": "Yes, in both directions, from the 'Subscribe' button at the top of the Calendar page.\n\nFROM HERE TO YOUR CALENDAR: the window gives you an address to paste into Google Calendar, Outlook or Apple Calendar, and from then on the appointments scheduled here appear there and keep themselves up to date. ⚠️ That address works like a password: a calendar program cannot sign in, so the address is what says who you are, and anyone who receives it can read your appointments.\n\nFROM YOUR CALENDAR TO HERE: in the same window you paste your calendar's secret iCal address — in Google it is under Settings → your calendar → Secret address in iCal format — and its appointments appear here as busy time, in grey, so nobody books something else on top of them. They are not records: they cannot be opened or edited.\n\nThe two directions are independent and each works on its own. If an event in your calendar uses a recurrence we cannot expand, you are told instead of it being hidden: a week that looks free because something was not read is worse than a warning."
+          },
+          "t04": {
+            "q": "Does the Dashboard also show today's appointments?",
+            "a": "Yes. The Agenda widget on the CRM Dashboard shows in real time all your commitments for today: tasks falling due, planned activities (calls, meetings) and appointments. Events are sorted chronologically."
+          }
+        }
+      },
+      "chat": {
+        "title": "Internal Chat",
+        "subtitle": "Messaging between colleagues",
+        "description": "The Chat module lets team members talk to each other directly without leaving the platform. It supports 1:1 direct messages and group conversations.",
+        "topics": {
+          "t01": {
+            "q": "How do I start a chat with a colleague?",
+            "a": "Go to Chat → 'New Conversation' → search for the colleague's name. You can start a private 1:1 chat or create a group (a named multi-user chat). Conversations remain available after the session ends."
+          },
+          "t02": {
+            "q": "Can I mute a conversation?",
+            "a": "Yes. From any conversation, use the 'Mute' option and choose for how long: the conversation keeps receiving messages, but will not send you notifications until the mute expires."
+          }
+        }
+      },
+      "tickets": {
+        "title": "Support Tickets",
+        "subtitle": "Customer support management",
+        "description": "The Tickets module manages customer support requests in an omnichannel system. Tickets collect communications from email, chat, phone and social media, with configurable SLAs and a full audit log.",
+        "topics": {
+          "t01": {
+            "q": "How do I create a new ticket?",
+            "a": "Go to Tickets → 'New Ticket'. Enter subject, description, source channel (email, chat, phone, social), priority and type (support, bug, complaint, information request, internal task). Link the ticket to an existing contact, company or lead."
+          },
+          "t02": {
+            "q": "What statuses does a ticket have?",
+            "a": "New (just opened), Open (taken on), In progress (an agent is working on it), Pending (waiting for the customer's reply), On hold, Resolved (solution provided, awaiting confirmation), Closed (definitively concluded). Moving a ticket to 'Pending' pauses the SLA timer."
+          },
+          "t03": {
+            "q": "What are SLAs?",
+            "a": "SLAs define the maximum first response and resolution times for each priority. For example: urgent ticket → first response within 1 hour, resolution within 4 hours. They do not wait for the breach to tell you: they warn at 50% and at 80% of the time elapsed, measured on the individual ticket's window, so a four-hour policy and a two-day policy warn at the same point in their own terms. On breach, if the policy names a group, the alert goes to everyone in that group as well as to whoever is handling the ticket."
+          },
+          "t04": {
+            "q": "Do SLAs keep counting at night and at weekends?",
+            "a": "It depends on the individual policy. By default they count on wall-clock time: a four-hour promise on a ticket that arrived on Friday at 17:00 expires at 21:00 on Friday, when nobody is there. Turning on 'Business hours' for that policy stops the count outside opening hours, on closing days and holidays, and resumes it when you open. The setting is per policy and starts off: quietly changing the meaning of a promise already made would be a surprise, not a fix. The working week, time zone and closing days are set on the SLA page."
+          },
+          "t05": {
+            "q": "Does the ticket tell me where it stands and what it resembles?",
+            "a": "Yes, in two separate panels at the top of the right-hand column. The first says whose move it is — whether it is waiting on us or on the customer — and for how long, measured from the last message rather than from when it was opened, then quotes the initial question in the customer's own words and the latest internal note, that is, what has already been tried. If nobody has replied yet it says so plainly: an internal note does not count as a reply. The second shows what the ticket resembles among those this workspace has already resolved, with a suggested category and priority and the tickets they come from, which you can click: so you can see why and disagree. None of this is applied automatically, and when the similar tickets do not agree the panel prefers to suggest nothing."
+          },
+          "t06": {
+            "q": "What are Macros?",
+            "a": "Macros are predefined replies to the most frequent questions: instead of writing the same thing again, you pick one and the text goes into the reply box, ready to edit. Placeholders such as the ticket number, the customer's name and yours are filled in when it is inserted. You can choose them from the 'Macro' menu above the reply box, or press directly the ones the suggestions panel proposes for this ticket."
+          },
+          "t07": {
+            "q": "How does the ticket Kanban work?",
+            "a": "The Kanban view shows tickets organised by status in side-by-side columns. You can drag a ticket from one column to another to change its status. Each card shows: ticket number, priority, assignee and last update time."
+          },
+          "t08": {
+            "q": "Can I leave internal notes on a ticket?",
+            "a": "Yes. In the ticket thread you can choose whether the message is 'Public' (visible to the customer) or 'Internal' (visible only to the team). Internal notes have a different background so they are easy to tell apart from replies to the customer."
+          }
+        }
+      },
+      "automation": {
+        "title": "Automation",
+        "subtitle": "Automatic if-then rules",
+        "description": "The Automation Engine lets you create automatic rules that fire when events happen in the system. It removes repetitive manual work by configuring conditional automatic actions.",
+        "topics": {
+          "t01": {
+            "q": "How do I create an automation rule?",
+            "a": "Go to Automation → 'New Rule'. Choose: the target record type (deal, lead, contact, company), the trigger (on creation or on update), the conditions (e.g. 'deal amount > 5000'), and the actions to perform. Click 'Save and Activate' to put it live."
+          },
+          "t02": {
+            "q": "What actions can a rule perform?",
+            "a": "Seven: send an email, create a task linked to the record, update a field on the record (for example the status), assign the record in turn to a group of people, send an internal notification to a colleague, call a webhook, and emit an event to a connected integration. The event is marked as originating from a person, not a machine, because the rule fires on something somebody did: otherwise an integration that ignores its own writes would take it for its own and not react."
+          },
+          "t03": {
+            "q": "How do I distribute new leads in turn among salespeople?",
+            "a": "Create a rule on leads, with the 'on creation' trigger, and choose the 'Assign Owner (round robin)' action. Tick the people in the order you want them to receive leads: the first lead goes to the first person, the second to the second, and so on, starting again from the top. Whoever receives the lead is told with a notification. Two leads arriving at the same instant still go to two different people. Anyone who has left the workspace in the meantime is skipped without having to edit the rule, and a lead someone has already taken on stays with that person, unless you tick 'Reassign records that already have an owner'. It also works for contacts, companies and deals."
+          },
+          "t04": {
+            "q": "Can I assign leads based on territory or source?",
+            "a": "Yes, in the same 'Assign Owner (round robin)' action. With 'Add route' you add one or more routes: each specifies one or more territories, one or more sources (for example 'website, trade fair') or both, and the people who take turns on those leads. Routes are tried from top to bottom and the first one that matches decides, so put the most specific cases at the top; use the arrows to change the order. Each route has its own rotation, independent of the others. If all the people in a route have left the workspace, the lead passes to the next route. Leads no route picks up go to the people listed under 'Everyone else'; if nobody is listed there, they stay unassigned. Use a single rule with several routes, not several separate rules: rules run in parallel, and two rules assigning the same lead would compete for the record. A deal is placed by the company's address or, if missing, the contact's."
+          },
+          "t05": {
+            "q": "Do I have to write every rule from scratch?",
+            "a": "No. The Automation page has a library of ready-made rules for the most common situations — a lead to call back, an important deal that has just come in, an urgent ticket, a thank-you to the customer. You pick one, adapt it and activate it: it is faster than starting from a blank page, and it shows how rules are built."
+          },
+          "t06": {
+            "q": "What conditions can I set?",
+            "a": "Besides equals and not equals: greater than, less than, greater than or equal, less than or equal, contains, does not contain, is empty, is not empty. And three that look at the change rather than the value — has changed, has become, was — which are for reacting to a status transition rather than to the status itself."
+          },
+          "t07": {
+            "q": "A practical example of automation?",
+            "a": "Example: 'When a deal is created with an amount greater than €10,000, automatically create a task for the sales manager titled High-value deal review, due in 2 days'. Or: 'When a lead is qualified, send a welcome email to the contact and notify the assigned agent'."
+          },
+          "t08": {
+            "q": "How do I check that rules are working?",
+            "a": "On the Automation page you will find the 'Execution log' section: for each run you see the record involved, the outcome (success or error), the actions performed and any error message. If a rule does not fire as expected, check the logs to understand why."
+          }
+        }
+      },
+      "reports": {
+        "title": "Reports and Analytics",
+        "subtitle": "Performance analysis and custom reports",
+        "description": "The Reports module provides analysis of operational performance: global KPIs, activity per user, completed tasks and campaigns sent. The Report Builder lets you create custom reports without writing code.",
+        "topics": {
+          "t01": {
+            "q": "What do the standard reports show?",
+            "a": "The standard reports include: total actions logged in the period (per user or for the whole team), completed tasks, deals created and closed, tickets opened and resolved, email campaigns sent. All data can be filtered by date and by individual user."
+          },
+          "t02": {
+            "q": "How do I use the Report Builder?",
+            "a": "Go to Reports → Report Builder. Select the record type to analyse (deals, contacts, leads, tickets, etc.), choose the metrics to display, apply filters and choose the chart type (bar, line, pie or table). You can save the report to consult it later or share it with the team."
+          },
+          "t03": {
+            "q": "Can I export the activity log?",
+            "a": "Yes, as CSV, filterable by date range and by individual person. It requires the workspace admin role: it is the record of who did what, so it is not a read like any other."
+          },
+          "t04": {
+            "q": "Where do I find the advanced pipeline analytics?",
+            "a": "Under Sales → Pipeline, and they are four pages answering four different questions. Funnel: where leads drop off along the way. Win/Loss: why deals are won and lost, with the reasons recorded at closing. Forecast: what it is reasonable to expect this month, by owner. Pipeline report: the distribution by stage. Targets sit alongside, under Sales targets.\n\nWhat needs attention right now — stalled deals, quotes never opened, SLAs close to their deadline — is not on an analytics page but in the next actions panel on the dashboard, where every row opens the record it comes from."
+          }
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "subtitle": "System configuration (admins only)",
+        "description": "The Settings section groups all the platform's global configuration. Access is restricted to admins and owners.",
+        "topics": {
+          "t01": {
+            "q": "How do I add custom fields?",
+            "a": "Settings → Custom Fields. Select the record type (contact, lead, company, deal), choose the field type (text, number, date, select, multi-select, yes/no, URL), give it a name and save. The field appears immediately in the form of every record of that type."
+          },
+          "t02": {
+            "q": "How do I configure the email sender?",
+            "a": "Settings → Email. Choose the provider: Resend (your API key is enough) or SMTP (host, port, credentials and TLS). Then set the sender name and the address everything goes out from: campaigns, invitations, notifications. ⚠️ That address is not only for sending: it is also the one customers reply to, and the one the system uses to recognise that an incoming email belongs to this workspace. If it is left empty, incoming emails do not become tickets."
+          },
+          "t03": {
+            "q": "How do I connect an external program to Flux?",
+            "a": "Settings → API Keys, where you generate a workspace key. It is passed as the header `Authorization: Bearer <key>` and is valid only for this workspace: the key itself says which one, so whoever integrates does not have to specify it anywhere else, and cannot pick the wrong workspace by mistake. The key is shown only once, when it is created: if you lose it you generate another one and the old one stops working. The available routes, with request bodies and responses, are in the API documentation in the administration panel."
+          },
+          "t04": {
+            "q": "I can no longer find a ticket closed months ago.",
+            "a": "The ticket list is a work queue: it always shows everything that is still open, in progress or pending, whatever the date, plus only what was resolved or closed in the last 30 days. When something is left out, a line above the status tabs says how many tickets are hidden, with a link to see them all. Nothing is deleted."
+          },
+          "t05": {
+            "q": "How do I manage canned replies for tickets?",
+            "a": "Settings → Macros. Create new macros with a title and pre-filled text. Public macros are visible to the whole team in the tickets module; private ones are visible only to you. They are available directly in the ticket's reply box."
+          }
+        }
+      },
+      "notifications": {
+        "title": "Notifications",
+        "subtitle": "Real-time alerts and updates",
+        "description": "The bell in the header shows unread alerts while you are in Flux. Push notifications, if you turn them on, reach you even when Flux is closed, just as an installed app would.",
+        "topics": {
+          "t01": {
+            "q": "Which events generate a notification?",
+            "a": "When a task assigned to you is about to fall due or is overdue, when one of your deals is closed as won, when a lead is assigned to you, when a campaign you started goes out. On tickets: when an SLA promise has used up half its time and then 80%, so you can still do something about it, and on breach — which also alerts the people in the group named in the policy, each of them only once. Automations can add more."
+          },
+          "t02": {
+            "q": "Can I receive notifications even when Flux is closed?",
+            "a": "Yes. Go to Settings → Notifications and turn on notifications on this device: the browser asks you for permission once, and from then on alerts arrive like those of an installed app. Permission applies to one browser and one device at a time, so phone and computer have to be turned on separately, and on the same page you see the list of registered devices so you can remove one you no longer use. There is also a button to send yourself a test and check straight away that it works."
+          },
+          "t03": {
+            "q": "On iPhone I cannot find the button to turn them on.",
+            "a": "Apple only delivers notifications to apps added to the home screen, never to a Safari tab. Open the share menu, choose 'Add to Home Screen', then open Flux from the icon: from there the button appears. On Android and on a computer there is nothing to install."
+          },
+          "t04": {
+            "q": "I get too many notifications. Can I choose which ones?",
+            "a": "Yes, in Settings → Notifications there is a switch for each type of event. By default only the four things that need a person right away are on: a lead assigned to you, one of your tasks falling due, a ticket close to its SLA and a ticket that has breached it. Everything else — chat messages, mentions in notes, quotes, won deals — is off until you turn it on. There is also a main switch that pauses them all without losing your individual choices. The bell inside Flux keeps showing everything regardless."
+          },
+          "t05": {
+            "q": "I said no to the browser and now it does not ask any more.",
+            "a": "That is normal behaviour: a browser that has been told no does not ask for permission a second time. You need to reopen it from the site settings in the browser — usually from the icon to the left of the address — allow notifications for Flux and reload the page."
+          },
+          "t06": {
+            "q": "How do I mark notifications as read?",
+            "a": "Click the bell icon → the panel with recent notifications opens. Click a notification to go to the corresponding page (the notification is marked as read). Or use 'Mark all as read' to clear them all in one go."
+          }
+        }
+      },
+      "usersRoles": {
+        "title": "Users and Roles",
+        "subtitle": "Access and permission management (admins only)",
+        "description": "The access management system controls who can do what on the platform. Four hierarchical role levels ensure every user sees and changes only what concerns them.",
+        "topics": {
+          "t01": {
+            "q": "Which roles are available?",
+            "a": "Owner: full access, including administration of the workspace. Admin: users, roles and settings. Editor: creates and edits CRM records. Viewer: read-only. They are hierarchical — each role includes the permissions of the one below — and they apply WITHIN this workspace: they are a different thing from the role of Flux staff, who operate the administration panel and have nothing to do with what you see here. ⚠️ Read-only means everywhere, including the API: a call made with a viewer's session is refused just as a button would be."
+          },
+          "t02": {
+            "q": "How do I invite a new user?",
+            "a": "Users → 'Invite User'. Enter the new member's email and select the role to assign. The system automatically sends an email with a link to accept the invitation. The link is valid for a limited time and lets the invitee set their own password."
+          },
+          "t03": {
+            "q": "How do I change a user's role?",
+            "a": "Users → find the person in the list → open the role menu and choose a new one. ⚠️ It does not take effect instantly: the role is re-read at most every five minutes, so until then a session already open keeps the previous permissions. The same applies to removal from the workspace. If you need to revoke access immediately, remove the person and have them signed out."
+          },
+          "t04": {
+            "q": "What are User Groups?",
+            "a": "Groups let you organise users into teams (e.g. 'North Sales Team', 'Level 2 Support'). You can assign leads, contacts, companies and deals to a group instead of a single user. Useful for managing visibility and dividing work between teams."
+          }
+        }
+      }
+    }
+  },
+  "sidebarSupportCard": {
+    "title": "Looking for something more?",
+    "description": "Open an issue or get in touch with us directly."
+  },
+  "assistantActivity": {
+    "title": "What the assistant has done",
+    "subtitle": "Writes that reached this CRM from an integration in {month}.",
+    "emptyTitle": "No writes in {month}",
+    "emptyDescription": "No integration has written to this workspace this month. If an assistant is connected, it will show up here the first time it does something: there is nothing to switch on.",
+    "rowsTitle": "Records written",
+    "rowsHint": "Rows created or updated in {month}, across {kinds, plural, one {# kind} other {# different kinds}}.",
+    "requestsTitle": "Requests",
+    "requestsHint": "⚠️ One request can write many rows: an import is a single request.",
+    "lastTitle": "Last activity",
+    "lastHint": "A long silence is the first thing worth noticing: here it has a date.",
+    "tableTitle": "What it wrote",
+    "tableDescription": "This list is what the routes have recorded, not one kept by hand: the day the assistant learns to do something new, that thing appears here on its own.",
+    "columns": {
+      "kind": "Kind",
+      "rows": "Rows",
+      "requests": "Requests",
+      "last": "Last"
+    },
+    "entities": {
+      "activity": "Activities",
+      "company": "Companies",
+      "consent": "Withdrawn consents",
+      "contact": "Contacts",
+      "custom-field": "Custom fields",
+      "deal": "Closed deals",
+      "erasure": "Erasures",
+      "lead": "Leads",
+      "note": "Notes",
+      "order": "Orders"
+    },
+    "byPerson": "{count, plural, one {<strong>#</strong> request came through the same routes but with a person's sign-in, and is not counted above} other {<strong>#</strong> requests came through the same routes but with a person's sign-in, and are not counted above}}: that is somebody's work, not the assistant's.",
+    "apiOnlyNote": "<strong>These figures count writes made through the API.</strong> The work people do in this interface does not go through it and does not show here: this is not a comparison between the assistant and your team. ⚠️ And they tell apart «a person or an integration», not <em>which</em> integration: a key identifies the workspace, not the caller. With two integrations connected, these figures are the sum of both."
+  },
+  "activityModal": {
+    "updated": "Activity updated.",
+    "logged": "Activity logged.",
+    "updateFailed": "Failed to update activity.",
+    "logFailed": "Failed to log activity.",
+    "editTitle": "Edit {type}",
+    "editActivity": "Edit activity",
+    "logActivity": "Log activity",
+    "types": {
+      "note": "Note",
+      "call": "Call",
+      "meeting": "Meeting",
+      "email": "Email"
+    },
+    "dateTime": "Date & time",
+    "futureHint": "This records what happened. For something still to come, the calendar keeps an appointment: it has an end time, the people invited, and an invitation that actually reaches them. <link>Open the calendar</link>",
+    "duration": "Duration",
+    "durations": {
+      "m15": "15 min",
+      "m30": "30 min",
+      "m45": "45 min",
+      "h1": "1 hour",
+      "h1_5": "1.5 hours",
+      "h2": "2 hours",
+      "h3": "3 hours"
+    },
+    "content": {
+      "noteLabel": "Note",
+      "callLabel": "Call summary",
+      "meetingLabel": "Agenda / Summary",
+      "emailLabel": "Email subject / notes",
+      "notePlaceholder": "Write your note…",
+      "callPlaceholder": "What was discussed?",
+      "meetingPlaceholder": "Agenda, decisions, follow-ups…",
+      "emailPlaceholder": "Email subject or summary…"
+    },
+    "contentRequired": "Content is required.",
+    "participants": "Participants",
+    "participantsPlaceholder": "John Smith, john@example.com…",
+    "participantsHint": "Separate names or emails with commas",
+    "linkTo": "Link to (optional)",
+    "selectEntityType": "Select record type…",
+    "entities": {
+      "none": "None",
+      "lead": "Lead",
+      "contact": "Contact",
+      "company": "Company",
+      "deal": "Deal"
+    },
+    "entityIdPlaceholder": "{entity} ID…",
+    "saveChanges": "Save changes"
   }
 }

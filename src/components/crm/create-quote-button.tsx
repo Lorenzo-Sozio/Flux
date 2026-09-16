@@ -2,6 +2,8 @@
 
 import React, { useState } from "react";
 
+import { useTranslations } from "next-intl";
+
 import { revalidateDealPage } from "@/actions/cache";
 import { CreateQuoteModal } from "@/components/crm/create-quote-modal";
 import { Button } from "@/components/ui/button";
@@ -14,6 +16,7 @@ interface CreateQuoteButtonProps {
 }
 
 export function CreateQuoteButton({ dealId, companyId, contactId, products }: CreateQuoteButtonProps) {
+  const t = useTranslations("quotes.createModal");
   const [open, setOpen] = useState(false);
 
   const handleSuccess = async (quoteId: string) => {
@@ -25,7 +28,7 @@ export function CreateQuoteButton({ dealId, companyId, contactId, products }: Cr
   return (
     <>
       <Button size="sm" onClick={() => setOpen(true)}>
-        Add Quote
+        {t("addQuote")}
       </Button>
       <CreateQuoteModal
         open={open}

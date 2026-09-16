@@ -4,7 +4,6 @@ import { useEffect, useState, useTransition } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { format } from "date-fns";
 import {
   AlertTriangle,
   CalendarCheck,
@@ -20,9 +19,11 @@ import {
   Video,
   XCircle,
 } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { cancelAppointment, getAppointmentById } from "@/actions/appointments";
+import { RecordVisit } from "@/components/crm/record-visit";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,28 +42,28 @@ type Appointment = NonNullable<Awaited<ReturnType<typeof getAppointmentById>>>;
 
 const STATUS_CONFIG = {
   accepted: {
-    label: "Accettato",
+    labelKey: "accepted",
     icon: CheckCircle2,
     color: "text-green-600",
     bg: "bg-green-50 dark:bg-green-950/40",
     border: "border-green-200 dark:border-green-800",
   },
   declined: {
-    label: "Rifiutato",
+    labelKey: "declined",
     icon: XCircle,
     color: "text-red-600",
     bg: "bg-red-50 dark:bg-red-950/40",
     border: "border-red-200 dark:border-red-800",
   },
   tentative: {
-    label: "Forse",
+    labelKey: "tentative",
     icon: HelpCircle,
     color: "text-amber-600",
     bg: "bg-amber-50 dark:bg-amber-950/40",
     border: "border-amber-200 dark:border-amber-800",
   },
   pending: {
-    label: "In attesa",
+    labelKey: "pending",
     icon: Timer,
     color: "text-gray-500",
     bg: "bg-gray-50 dark:bg-gray-900",
@@ -77,6 +78,9 @@ export function AppointmentDetailSheet({
   appointmentId: string | null;
   closePath: string;
 }) {
+  const t = useTranslations("appointment");
+  const tc = useTranslations("common");
+  const formatter = useFormatter();
   const router = useRouter();
   const [appt, setAppt] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(false);
@@ -101,33 +105,24 @@ export function AppointmentDetailSheet({
       try {
         const result = await cancelAppointment(appointmentId);
 
-        toast.success("Appuntamento annullato.");
+        toast.success(t("detail.cancelled"));
 
         const { inviteStatus } = result;
         if (inviteStatus.noProvider) {
-          toast.warning("Nessun provider email configurato — le notifiche di cancellazione non sono state inviate.", {
-            duration: 6000,
-          });
+          toast.warning(t("detail.noProvider"), { duration: 6000 });
         } else if (inviteStatus.sent > 0 && inviteStatus.failed === 0) {
-          toast.success(
-            inviteStatus.sent === 1
-              ? "1 notifica di cancellazione inviata."
-              : `${inviteStatus.sent} notifiche di cancellazione inviate.`,
-          );
+          toast.success(t("detail.notificationsSent", { count: inviteStatus.sent }));
         } else if (inviteStatus.sent > 0 && inviteStatus.failed > 0) {
-          toast.warning(`${inviteStatus.sent} notifiche inviate, ${inviteStatus.failed} non consegnate.`, {
+          toast.warning(t("detail.notificationsPartial", { sent: inviteStatus.sent, failed: inviteStatus.failed }), {
             duration: 6000,
           });
         } else if (inviteStatus.failed > 0) {
-          toast.error(
-            `Impossibile inviare le notifiche di cancellazione (${inviteStatus.failed} error${inviteStatus.failed === 1 ? "e" : "i"}).`,
-            { duration: 6000 },
-          );
+          toast.error(t("detail.notificationsFailed", { count: inviteStatus.failed }), { duration: 6000 });
         }
 
         handleClose();
       } catch {
-        toast.error("Errore durante l'annullamento.");
+        toast.error(t("detail.cancelError"));
       }
     });
   };
@@ -149,19 +144,27 @@ export function AppointmentDetailSheet({
       }}
     >
       <SheetContent className="flex w-full flex-col gap-0 overflow-y-auto p-0 sm:max-w-md">
+        {appt && <RecordVisit type="appointment" id={appt.id} label={appt.title} />}
         {/* Header */}
         <SheetHeader className="border-b bg-amber-50 px-5 py-4 dark:bg-amber-950/20">
           <div className="flex items-center gap-2 pr-8">
             <CalendarCheck className="h-5 w-5 shrink-0 text-amber-500" />
             <SheetTitle className="font-semibold text-base leading-snug">
-              {loading ? "Caricamento…" : (appt?.title ?? "Appuntamento")}
+              {loading ? tc("loading") : (appt?.title ?? t("detail.fallbackTitle"))}
             </SheetTitle>
           </div>
           {appt && (
             <div className="mt-1 flex items-center gap-1.5 text-muted-foreground text-xs">
               <Clock className="h-3.5 w-3.5" />
               <span>
-                {format(appt.startAt, "d MMM yyyy, HH:mm")} – {format(appt.endAt, "HH:mm")}
+                {formatter.dateTime(appt.startAt, {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}{" "}
+                – {formatter.dateTime(appt.endAt, { hour: "2-digit", minute: "2-digit" })}
               </span>
             </div>
           )}
@@ -181,7 +184,7 @@ export function AppointmentDetailSheet({
             {appt.status === "cancelled" && (
               <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-red-700 text-sm dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">
                 <AlertTriangle className="h-4 w-4 shrink-0" />
-                Questo appuntamento è stato annullato.
+                {t("detail.cancelledBanner")}
               </div>
             )}
 
@@ -220,7 +223,7 @@ export function AppointmentDetailSheet({
               <div className="space-y-3">
                 <div className="flex items-center gap-1.5 font-semibold text-sm">
                   <Users className="h-4 w-4 text-muted-foreground" />
-                  Partecipanti ({counts.total})
+                  {t("detail.participantsCount", { count: counts.total })}
                 </div>
 
                 {/* Summary counters */}
@@ -235,7 +238,9 @@ export function AppointmentDetailSheet({
                       >
                         <Icon className={`h-4 w-4 ${cfg.color}`} />
                         <span className={`font-bold text-xl tabular-nums leading-none ${cfg.color}`}>{counts[s]}</span>
-                        <span className="text-center text-[10px] text-muted-foreground leading-tight">{cfg.label}</span>
+                        <span className="text-center text-[10px] text-muted-foreground leading-tight">
+                          {t(`rsvp.${cfg.labelKey}`)}
+                        </span>
                       </div>
                     );
                   })}
@@ -270,7 +275,7 @@ export function AppointmentDetailSheet({
                         </div>
                         <div className={`flex shrink-0 items-center gap-1 font-medium text-xs ${cfg.color}`}>
                           <Icon className="h-3.5 w-3.5" />
-                          {cfg.label}
+                          {t(`rsvp.${cfg.labelKey}`)}
                         </div>
                       </div>
                     );
@@ -278,7 +283,7 @@ export function AppointmentDetailSheet({
                 </div>
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm">Nessun partecipante esterno.</p>
+              <p className="text-muted-foreground text-sm">{t("detail.noExternalParticipants")}</p>
             )}
           </div>
         )}
@@ -290,24 +295,21 @@ export function AppointmentDetailSheet({
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm" className="w-full gap-2" disabled={isPending}>
                   {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                  Annulla appuntamento
+                  {t("cancel")}
                 </Button>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Annullare l'appuntamento?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Tutti i partecipanti riceveranno una notifica di cancellazione via email. Questa azione non è
-                    reversibile.
-                  </AlertDialogDescription>
+                  <AlertDialogTitle>{t("detail.confirmTitle")}</AlertDialogTitle>
+                  <AlertDialogDescription>{t("detail.confirmBody")}</AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>No, torna indietro</AlertDialogCancel>
+                  <AlertDialogCancel>{t("detail.confirmBack")}</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={handleCancel}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    Sì, annulla
+                    {t("detail.confirmYes")}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -15,15 +16,18 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-const formSchema = z
-  .object({
-    password: z.string().min(8, { message: "Password must be at least 8 characters." }),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match.",
-    path: ["confirmPassword"],
-  });
+const makeFormSchema = (passwordMin: string, passwordsMismatch: string) =>
+  z
+    .object({
+      password: z.string().min(8, { message: passwordMin }),
+      confirmPassword: z.string(),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: passwordsMismatch,
+      path: ["confirmPassword"],
+    });
+
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 interface Props {
   email: string;
@@ -31,15 +35,23 @@ interface Props {
 }
 
 export function ResetPasswordForm({ email, token }: Props) {
+  const t = useTranslations("auth.resetPasswordPage");
+  const tReset = useTranslations("auth.resetPassword");
+  const tRegister = useTranslations("auth.register");
+  const tValidation = useTranslations("auth.validation");
   const router = useRouter();
   const [isPending, setIsPending] = useState(false);
+  const formSchema = useMemo(
+    () => makeFormSchema(tValidation("passwordMin"), tValidation("passwordsMismatch")),
+    [tValidation],
+  );
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { password: "", confirmPassword: "" },
   });
 
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+  const onSubmit = async (data: FormValues) => {
     setIsPending(true);
     try {
       const result = await resetPasswordAction({ email, token, password: data.password });
@@ -47,10 +59,10 @@ export function ResetPasswordForm({ email, token }: Props) {
         toast.error(result.error);
         return;
       }
-      toast.success("Password reset successfully! Please log in.");
+      toast.success(t("success"));
       router.push("/auth/v1/login");
     } catch {
-      toast.error("Something went wrong. Please try again.");
+      toast.error(tRegister("error"));
     } finally {
       setIsPending(false);
     }
@@ -64,7 +76,7 @@ export function ResetPasswordForm({ email, token }: Props) {
           name="password"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="new-password">New Password</FieldLabel>
+              <FieldLabel htmlFor="new-password">{tReset("newPassword")}</FieldLabel>
               <Input
                 {...field}
                 id="new-password"
@@ -82,7 +94,7 @@ export function ResetPasswordForm({ email, token }: Props) {
           name="confirmPassword"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="confirm-new-password">Confirm New Password</FieldLabel>
+              <FieldLabel htmlFor="confirm-new-password">{t("confirmNewPassword")}</FieldLabel>
               <Input
                 {...field}
                 id="confirm-new-password"
@@ -97,11 +109,11 @@ export function ResetPasswordForm({ email, token }: Props) {
         />
       </FieldGroup>
       <Button className="w-full" type="submit" disabled={isPending}>
-        {isPending ? "Resetting…" : "Reset Password"}
+        {isPending ? tReset("resetting") : t("submit")}
       </Button>
       <p className="text-center text-muted-foreground text-xs">
         <Link href="/auth/v1/login" className="text-primary hover:underline">
-          Back to login
+          {t("backToLogin")}
         </Link>
       </p>
     </form>

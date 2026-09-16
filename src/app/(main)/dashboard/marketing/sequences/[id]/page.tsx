@@ -6,6 +6,7 @@ import { getTranslations } from "next-intl/server";
 
 import { getEmailTemplates } from "@/actions/marketing";
 import { getSequence } from "@/actions/sequences";
+import { RecordVisit } from "@/components/crm/record-visit";
 import { getActor } from "@/lib/auth-guard";
 import { requirePageCapability } from "@/lib/page-guard";
 import { can } from "@/lib/permissions";
@@ -28,6 +29,7 @@ export default async function SequencePage({ params }: { params: Promise<{ id: s
 
   return (
     <div className="space-y-6">
+      {data && <RecordVisit type="sequence" id={data.sequence.id} label={data.sequence.name} />}
       <div className="min-w-0">
         <Link
           href="/dashboard/marketing/sequences"

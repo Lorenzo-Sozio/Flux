@@ -36,7 +36,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -102,7 +102,7 @@ type TicketStatus = NonNullable<Parameters<typeof updateTicketAction>[1]["status
 type TicketPriority = NonNullable<Parameters<typeof updateTicketAction>[1]["priority"]>;
 
 /** The message from a caught value, which is `unknown` and not an Error. */
-function messageOf(err: unknown, fallback = "Errore"): string {
+function messageOf(err: unknown, fallback: string): string {
   return err instanceof Error && err.message ? err.message : fallback;
 }
 
@@ -155,15 +155,6 @@ const PRIORITY_DOT: Record<string, string> = {
 // Values only: the words come from the message files, like every other list here.
 const TASK_PRIORITY_OPTIONS = ["normal", "high", "critical", "blocker", "low"] as const;
 
-const AUDIT_LABELS: Record<string, string> = {
-  created: "Ticket creato",
-  status_changed: "Stato modificato",
-  priority_changed: "Priorità modificata",
-  assigned: "Assegnatario cambiato",
-  message_added: "Messaggio aggiunto",
-  field_changed: "Campo aggiornato",
-};
-
 const AVATAR_PALETTE = [
   "from-violet-500 to-violet-700",
   "from-blue-500 to-blue-700",
@@ -198,13 +189,21 @@ function formatBytes(b: number) {
   return `${(b / 1048576).toFixed(1)} MB`;
 }
 
-function formatStamp(date: Date) {
+type Translate = ReturnType<typeof useTranslations>;
+type Formatter = ReturnType<typeof useFormatter>;
+
+/** A stored value shown through a message map when the map knows it, and as itself when not. */
+function labelOf(t: Translate, prefix: string, value: string): string {
+  return t.has(`${prefix}.${value}`) ? t(`${prefix}.${value}`) : value;
+}
+
+function formatStamp(date: Date, format: Formatter, t: Translate) {
   const now = Date.now();
   const diff = now - date.getTime();
-  if (diff < 60_000) return "Adesso";
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m fa`;
-  if (diff < 86_400_000) return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-  return date.toLocaleDateString(undefined, {
+  if (diff < 60_000) return t("detail.justNow");
+  if (diff < 3_600_000) return t("detail.minutesAgo", { count: Math.floor(diff / 60_000) });
+  if (diff < 86_400_000) return format.dateTime(date, { hour: "2-digit", minute: "2-digit" });
+  return format.dateTime(date, {
     day: "numeric",
     month: "short",
     hour: "2-digit",
@@ -216,6 +215,7 @@ function formatStamp(date: Date) {
 
 function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; currentUserId?: string }) {
   const t = useTranslations("support.tickets");
+  const format = useFormatter();
   const [tasks, setTasks] = useState<LinkedTask[]>([]);
   const [users, setUsers] = useState<{ id: string; name: string | null }[]>([]);
   const [adding, setAdding] = useState(false);
@@ -257,7 +257,7 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
         <CardTitle className="flex items-center justify-between font-semibold text-muted-foreground text-xs uppercase tracking-wide">
           <span className="flex items-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            Attività
+            {t("detail.tasks")}
             {tasks.length > 0 && (
               <span className="rounded-full bg-muted px-1.5 py-0.5 font-normal text-[10px] normal-case tracking-normal">
                 {tasks.length}
@@ -276,7 +276,12 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
       <CardContent className="space-y-1 px-3 pb-3">
         {adding && (
           <form onSubmit={handleSubmit(onSubmit)} className="mb-2 space-y-2 rounded-lg border bg-muted/30 p-2.5">
-            <Input {...register("title")} placeholder="Titolo attività…" className="h-8 text-sm" autoFocus />
+            <Input
+              {...register("title")}
+              placeholder={t("detail.taskTitlePlaceholder")}
+              className="h-8 text-sm"
+              autoFocus
+            />
             <div className="flex gap-2">
               <select
                 {...register("priority")}
@@ -310,7 +315,7 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
                 disabled={saving}
                 className="rounded bg-primary px-3 py-1 font-semibold text-primary-foreground text-xs hover:bg-primary/90 disabled:opacity-50"
               >
-                {saving ? "…" : "Crea"}
+                {saving ? "…" : t("detail.create")}
               </button>
             </div>
           </form>
@@ -340,7 +345,7 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
                   />
                   {task.dueDate && (
                     <span className="text-muted-foreground text-xs tabular-nums">
-                      {new Date(task.dueDate).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
+                      {format.dateTime(new Date(task.dueDate), { day: "2-digit", month: "short" })}
                     </span>
                   )}
                   {task.assigneeName && (
@@ -368,6 +373,7 @@ function LinkedTasksCard({ ticketId, currentUserId }: { ticketId: string; curren
 // ─── SLATimer ─────────────────────────────────────────────────────────────────
 
 function SLATimer({ targetDate }: { targetDate: Date | null }) {
+  const t = useTranslations("support.tickets");
   const [remaining, setRemaining] = useState<string | null>(null);
   const [isOverdue, setIsOverdue] = useState(false);
 
@@ -378,16 +384,23 @@ function SLATimer({ targetDate }: { targetDate: Date | null }) {
       if (diff <= 0) {
         setIsOverdue(true);
         const ms = Math.abs(diff);
-        setRemaining(`${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m in ritardo`);
+        setRemaining(
+          t("detail.slaOverdue", { hours: Math.floor(ms / 3_600_000), minutes: Math.floor((ms % 3_600_000) / 60_000) }),
+        );
       } else {
         setIsOverdue(false);
-        setRemaining(`${Math.floor(diff / 3_600_000)}h ${Math.floor((diff % 3_600_000) / 60_000)}m`);
+        setRemaining(
+          t("detail.slaRemaining", {
+            hours: Math.floor(diff / 3_600_000),
+            minutes: Math.floor((diff % 3_600_000) / 60_000),
+          }),
+        );
       }
     };
     update();
-    const t = setInterval(update, 60_000);
-    return () => clearInterval(t);
-  }, [targetDate]);
+    const timer = setInterval(update, 60_000);
+    return () => clearInterval(timer);
+  }, [targetDate, t]);
 
   if (!targetDate || !remaining) return <span className="text-muted-foreground text-sm">—</span>;
   return (
@@ -403,8 +416,15 @@ function SLATimer({ targetDate }: { targetDate: Date | null }) {
 // ─── Timeline sub-components ──────────────────────────────────────────────────
 
 function AuditEvent({ entry }: { entry: TicketAuditEntry }) {
-  const actor = entry.actor?.name ?? entry.actorName ?? "Sistema";
-  const label = AUDIT_LABELS[entry.action] ?? entry.action;
+  const t = useTranslations("support.tickets");
+  const format = useFormatter();
+  const actor = entry.actor?.name ?? entry.actorName ?? t("detail.system");
+  const label = labelOf(t, "detail.audit", entry.action);
+  // The values a status or priority change records are the stored words, which read as
+  // English code; the ones this screen already knows are shown in the interface language.
+  const valuePrefix =
+    entry.action === "status_changed" ? "statuses" : entry.action === "priority_changed" ? "priorities" : null;
+  const shown = (value: string) => (valuePrefix ? labelOf(t, valuePrefix, value) : value);
   return (
     <div className="flex items-center gap-3 py-1">
       <div className="h-px flex-1 bg-border" />
@@ -415,13 +435,13 @@ function AuditEvent({ entry }: { entry: TicketAuditEntry }) {
         <span>{label}</span>
         {entry.oldValue && entry.newValue && (
           <span className="flex items-center gap-1">
-            <span className="line-through opacity-60">{entry.oldValue}</span>
+            <span className="line-through opacity-60">{shown(entry.oldValue)}</span>
             <span>→</span>
-            <span className="font-medium">{entry.newValue}</span>
+            <span className="font-medium">{shown(entry.newValue)}</span>
           </span>
         )}
         <span>·</span>
-        <span>{formatStamp(new Date(entry.createdAt))}</span>
+        <span>{formatStamp(new Date(entry.createdAt), format, t)}</span>
       </div>
       <div className="h-px flex-1 bg-border" />
     </div>
@@ -455,9 +475,10 @@ function AttachmentChips({ docs }: { docs: TicketDocument[] }) {
 
 function MessageBubble({ msg, docs, isAgent }: { msg: TicketMessage; docs?: TicketDocument[]; isAgent: boolean }) {
   const t = useTranslations("support.tickets");
-  const senderName = msg.sender?.name ?? msg.senderName ?? msg.senderEmail?.split("@")[0] ?? "Sconosciuto";
+  const format = useFormatter();
+  const senderName = msg.sender?.name ?? msg.senderName ?? msg.senderEmail?.split("@")[0] ?? t("detail.unknownSender");
   const isInternal = !msg.isPublic;
-  const stamp = formatStamp(new Date(msg.createdAt));
+  const stamp = formatStamp(new Date(msg.createdAt), format, t);
 
   if (isInternal) {
     return (
@@ -630,7 +651,7 @@ function HistoryCard({ ticket }: { ticket: TicketRow }) {
             >
               <span className="truncate text-xs">{h.subject}</span>
               <span className="shrink-0 text-[10px] text-muted-foreground capitalize">
-                {h.status.replace(/_/g, " ")}
+                {t.has(`statuses.${h.status}`) ? t(`statuses.${h.status}`) : h.status.replace(/_/g, " ")}
               </span>
             </Link>
           ))}
@@ -642,6 +663,7 @@ function HistoryCard({ ticket }: { ticket: TicketRow }) {
 
 function OrderCard({ ticket, onLinked }: { ticket: TicketRow; onLinked: () => void }) {
   const t = useTranslations("support.tickets");
+  const tOrderStatus = useTranslations("orders.statuses");
   const { formatMoney } = useCurrency();
   const [orders, setOrders] = useState<Awaited<ReturnType<typeof getOrdersForTicket>>>([]);
   const [loading, setLoading] = useState(false);
@@ -704,7 +726,7 @@ function OrderCard({ ticket, onLinked }: { ticket: TicketRow; onLinked: () => vo
             <SelectItem value="__none__">{t("noOrder")}</SelectItem>
             {orders.map((o) => (
               <SelectItem key={o.id} value={o.id}>
-                {o.orderNumber} · {o.status}
+                {o.orderNumber} · {tOrderStatus.has(o.status) ? tOrderStatus(o.status) : o.status}
               </SelectItem>
             ))}
           </SelectContent>
@@ -844,7 +866,7 @@ function PropertiesCard({
             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted">
               <User className="h-3.5 w-3.5 text-muted-foreground" />
             </div>
-            <span className="truncate font-medium text-sm">{ticket.assignee?.name ?? "Non assegnato"}</span>
+            <span className="truncate font-medium text-sm">{ticket.assignee?.name ?? t("detail.unassigned")}</span>
             <MoreHorizontal className="ml-auto h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </button>
         </div>
@@ -859,7 +881,7 @@ function PropertiesCard({
             )}
             {ticket.severity && ticket.severity !== "normal" && (
               <Badge variant="outline" className="text-xs capitalize">
-                Severity: {ticket.severity}
+                {t("detail.severityBadge", { severity: labelOf(t, "detail.severities", ticket.severity) })}
               </Badge>
             )}
           </div>
@@ -879,6 +901,7 @@ function SLACard({
   slaResTarget: Date | null;
 }) {
   const t = useTranslations("support.tickets");
+  const format = useFormatter();
   if (!ticket.sla && !ticket.firstResponseAt && !ticket.resolvedAt) return null;
   return (
     <Card>
@@ -892,7 +915,7 @@ function SLACard({
           <span className="text-muted-foreground text-sm">{t("firstResponse")}</span>
           {ticket.firstResponseAt ? (
             <span className="font-semibold text-emerald-600 text-sm dark:text-emerald-400">
-              ✓ {new Date(ticket.firstResponseAt).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+              ✓ {format.dateTime(new Date(ticket.firstResponseAt), { hour: "2-digit", minute: "2-digit" })}
             </span>
           ) : (
             <SLATimer targetDate={slaFirstTarget} />
@@ -902,7 +925,7 @@ function SLACard({
           <span className="text-muted-foreground text-sm">{t("resolution")}</span>
           {ticket.resolvedAt ? (
             <span className="font-semibold text-emerald-600 text-sm dark:text-emerald-400">
-              ✓ {new Date(ticket.resolvedAt).toLocaleDateString(undefined, { day: "numeric", month: "short" })}
+              ✓ {format.dateTime(new Date(ticket.resolvedAt), { day: "numeric", month: "short" })}
             </span>
           ) : (
             <SLATimer targetDate={slaResTarget} />
@@ -912,7 +935,7 @@ function SLACard({
           <div className="flex items-center justify-between border-t pt-2">
             <span className="text-muted-foreground text-sm">{t("closedLabel")}</span>
             <span className="font-mono text-sm">
-              {new Date(ticket.closedAt).toLocaleDateString(undefined, {
+              {format.dateTime(new Date(ticket.closedAt), {
                 day: "numeric",
                 month: "short",
                 hour: "2-digit",
@@ -933,7 +956,7 @@ function AttachmentsCard({ docs }: { docs: TicketDocument[] }) {
       <CardHeader className="px-3 pt-3 pb-2">
         <CardTitle className="flex items-center gap-1.5 font-semibold text-muted-foreground text-xs uppercase tracking-wide">
           <Paperclip className="h-3.5 w-3.5" />
-          Allegati
+          {t("detail.attachments")}
           {docs.length > 0 && (
             <span className="rounded-full bg-muted px-1.5 py-0.5 font-normal text-[10px] text-muted-foreground normal-case tracking-normal">
               {docs.length}
@@ -994,6 +1017,7 @@ export function TicketDetail({
   initialMacros: TicketMacro[];
 }) {
   const t = useTranslations("support.tickets");
+  const format = useFormatter();
   const router = useRouter();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -1128,7 +1152,7 @@ export function TicketDetail({
         isPublic: !isInternal,
       });
       if (result?.linkedFromClosed) {
-        toast.info(`Ticket chiuso — nuovo ticket ${result.newTicketNumber} creato`);
+        toast.info(t("detail.reopenedAsNew", { number: result.newTicketNumber ?? "" }));
         router.push(`/dashboard/support/tickets/${result.newTicketId}`);
         return;
       }
@@ -1136,11 +1160,11 @@ export function TicketDetail({
       await loadTicket();
       scrollToBottom();
     } catch (err) {
-      toast.error(messageOf(err, "Invio fallito"));
+      toast.error(messageOf(err, t("detail.sendFailed")));
     } finally {
       setSending(false);
     }
-  }, [id, isInternal, isReplyEmpty, loadTicket, replyContent, router, scrollToBottom, ticket?.channel]);
+  }, [id, isInternal, isReplyEmpty, loadTicket, replyContent, router, scrollToBottom, ticket?.channel, t]);
 
   const handleStatusChange = useCallback(
     async (status: TicketStatus) => {
@@ -1149,7 +1173,7 @@ export function TicketDetail({
         setTicket((p) => (p ? { ...p, status } : p));
         toast.success(t("statusUpdated"));
       } catch (err) {
-        toast.error(messageOf(err));
+        toast.error(messageOf(err, t("detail.error")));
       }
     },
     [id, t],
@@ -1162,7 +1186,7 @@ export function TicketDetail({
         setTicket((p) => (p ? { ...p, priority } : p));
         toast.success(t("priorityUpdated"));
       } catch (err) {
-        toast.error(messageOf(err));
+        toast.error(messageOf(err, t("detail.error")));
       }
     },
     [id, t],
@@ -1176,9 +1200,11 @@ export function TicketDetail({
         return;
       }
       setTicket((p) => (p && result.newPriority ? { ...p, priority: result.newPriority } : p));
-      toast.success(`Priorità escalata a ${result.newPriority}`);
+      toast.success(
+        t("detail.escalated", { priority: result.newPriority ? labelOf(t, "priorities", result.newPriority) : "" }),
+      );
     } catch (err) {
-      toast.error(messageOf(err));
+      toast.error(messageOf(err, t("detail.error")));
     }
   }, [id, t]);
 
@@ -1189,13 +1215,13 @@ export function TicketDetail({
       await reassignTicketAction(id, ownerId);
       await loadTicket();
       setReassignOpen(false);
-      toast.success(ownerId ? "Ticket riassegnato" : "Assegnatario rimosso");
+      toast.success(ownerId ? t("detail.reassigned") : t("detail.assigneeRemoved"));
     } catch (err) {
-      toast.error(messageOf(err));
+      toast.error(messageOf(err, t("detail.error")));
     } finally {
       setReassigning(false);
     }
-  }, [id, loadTicket, selectedAssignee]);
+  }, [id, loadTicket, selectedAssignee, t]);
 
   const handleDelete = useCallback(async () => {
     setDeleting(true);
@@ -1204,7 +1230,7 @@ export function TicketDetail({
       toast.success(t("deleted"));
       router.push("/dashboard/support/tickets");
     } catch (err) {
-      toast.error(messageOf(err));
+      toast.error(messageOf(err, t("detail.error")));
       setDeleting(false);
       setDeleteOpen(false);
     }
@@ -1274,7 +1300,7 @@ export function TicketDetail({
         <MessageSquare className="mx-auto mb-4 h-12 w-12 text-muted-foreground/20" />
         <p className="mb-4 text-muted-foreground">{t("notFound")}</p>
         <Button asChild variant="outline">
-          <Link href="/dashboard/support/tickets">← Torna ai ticket</Link>
+          <Link href="/dashboard/support/tickets">← {t("detail.backToTickets")}</Link>
         </Button>
       </div>
     );
@@ -1338,11 +1364,11 @@ export function TicketDetail({
             <TicketPriorityBadge priority={ticket.priority} />
             <Badge variant="outline" className="h-5 gap-1 text-xs">
               {CHANNEL_ICONS[ticket.channel]}
-              <span className="capitalize">{ticket.channel}</span>
+              <span className="capitalize">{labelOf(t, "channels", ticket.channel)}</span>
             </Badge>
             {ticket.severity && ticket.severity !== "normal" && (
               <Badge variant="outline" className="h-5 text-xs capitalize">
-                Severity: {ticket.severity}
+                {t("detail.severityBadge", { severity: labelOf(t, "detail.severities", ticket.severity) })}
               </Badge>
             )}
             {ticket.tags?.map((tag: string) => (
@@ -1352,7 +1378,7 @@ export function TicketDetail({
             ))}
             <span className="ml-1 flex items-center gap-1 text-muted-foreground text-xs">
               <Clock className="h-3.5 w-3.5" />
-              {new Date(ticket.createdAt).toLocaleString(undefined, {
+              {format.dateTime(new Date(ticket.createdAt), {
                 day: "numeric",
                 month: "short",
                 year: "numeric",
@@ -1386,7 +1412,10 @@ export function TicketDetail({
                     />
                   ))}
                 </span>
-                {typingUsers.map((p) => p.userName).join(", ")} sta scrivendo…
+                {t("detail.typing", {
+                  count: typingUsers.length,
+                  names: typingUsers.map((p) => p.userName).join(", "),
+                })}
               </div>
             )}
 
@@ -1426,7 +1455,7 @@ export function TicketDetail({
               {/* Public / Internal toggle */}
               <div className="flex w-fit items-center gap-1 rounded-lg border bg-muted/40 p-0.5">
                 {[
-                  { val: false, icon: Send, label: "Risposta pubblica" },
+                  { val: false, icon: Send, label: t("detail.publicReply") },
                   { val: true, icon: Lock, label: t("internalNote") },
                 ].map(({ val, icon: Icon, label }) => (
                   <button
@@ -1472,9 +1501,7 @@ export function TicketDetail({
                       // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
                     }).catch(() => {});
                   }}
-                  placeholder={
-                    isInternal ? "Scrivi una nota interna (visibile solo al team)…" : "Scrivi una risposta al cliente…"
-                  }
+                  placeholder={isInternal ? t("detail.internalNotePlaceholder") : t("detail.replyPlaceholder")}
                   className={isInternal ? "border-amber-300 dark:border-amber-700" : ""}
                   macroVariables
                 />
@@ -1488,7 +1515,7 @@ export function TicketDetail({
                       <Shield className="h-3 w-3" /> {t("agentsOnly")}
                     </>
                   ) : (
-                    <>Ctrl+Enter per inviare</>
+                    t("detail.ctrlEnterHint")
                   )}
                 </p>
                 <div className="flex items-center gap-2">
@@ -1531,7 +1558,7 @@ export function TicketDetail({
                     disabled={isReplyEmpty || sending}
                   >
                     <Send className="h-3.5 w-3.5" />
-                    {sending ? "Invio…" : isInternal ? "Aggiungi nota" : "Invia risposta"}
+                    {sending ? t("detail.sending") : isInternal ? t("detail.addNote") : t("detail.sendReply")}
                   </Button>
                 </div>
               </div>
@@ -1593,7 +1620,7 @@ export function TicketDetail({
               {t("cancel")}
             </Button>
             <Button onClick={handleReassign} disabled={reassigning}>
-              {reassigning ? "Riassegno…" : t("reassign")}
+              {reassigning ? t("detail.reassigning") : t("reassign")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1607,8 +1634,10 @@ export function TicketDetail({
               <Trash2 className="h-5 w-5" /> {t("deleteTicket")}
             </DialogTitle>
             <DialogDescription>
-              {t("deleteConfirm")} <span className="font-semibold text-foreground">{ticket.ticketNumber}</span>? Questa
-              azione rimuoverà permanentemente il ticket e tutti i suoi messaggi.
+              {t.rich("detail.deleteConfirm", {
+                number: ticket.ticketNumber,
+                strong: (chunks) => <span className="font-semibold text-foreground">{chunks}</span>,
+              })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1616,7 +1645,7 @@ export function TicketDetail({
               {t("cancel")}
             </Button>
             <Button variant="destructive" onClick={handleDelete} disabled={deleting}>
-              {deleting ? "Eliminazione…" : "Elimina"}
+              {deleting ? t("detail.deleting") : t("detail.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>

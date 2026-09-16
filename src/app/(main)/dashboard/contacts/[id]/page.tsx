@@ -105,6 +105,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
     getTranslations("contacts"),
     getTranslations("entityDetail"),
   ]);
+  const tc = await getTranslations("common");
 
   const ownerName = allUsers.find((u) => u.id === cData.ownerId)?.name ?? null;
   const fullName = [cData.firstName, cData.lastName].filter(Boolean).join(" ");
@@ -130,7 +131,12 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="flex flex-col gap-6">
-      <RecordVisit type="contact" name={fullName || "Contact"} href={`/dashboard/contacts/${contactId}`} />
+      <RecordVisit
+        type="contact"
+        id={contactId}
+        label={fullName || cData.email || contactId}
+        sub={cData.email ?? null}
+      />
 
       {/* ── Hero ── */}
       <Card>
@@ -487,7 +493,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                             <button
                               type="submit"
                               className="p-1 text-muted-foreground transition-colors hover:text-destructive"
-                              title="Delete"
+                              title={tc("delete")}
                             >
                               <Trash2Icon className="h-3.5 w-3.5" />
                             </button>

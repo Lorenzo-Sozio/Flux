@@ -14,7 +14,7 @@ import {
   Trash2,
   Upload,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -76,6 +76,7 @@ const MAX_SIZE_MB = 10;
 export function DocumentPanel({ entityType, entityId }: Props) {
   const t = useTranslations("documents");
   const tc = useTranslations("common");
+  const format = useFormatter();
   const [docs, setDocs] = useState<DocumentRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -93,11 +94,11 @@ export function DocumentPanel({ entityType, entityId }: Props) {
       const data = await res.json();
       setDocs(data.documents ?? []);
     } catch {
-      toast.error("Failed to load documents.");
+      toast.error(t("panel.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [entityType, entityId]);
+  }, [entityType, entityId, t]);
 
   useEffect(() => {
     fetchDocs();
@@ -107,7 +108,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
   const uploadFile = useCallback(
     (file: File) => {
       if (file.size > MAX_SIZE_MB * 1024 * 1024) {
-        toast.error(`File exceeds ${MAX_SIZE_MB} MB limit.`);
+        toast.error(t("tooLarge", { mb: MAX_SIZE_MB }));
         return;
       }
 
@@ -136,7 +137,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
           try {
             const data = JSON.parse(xhr.responseText);
             if (data.success) {
-              toast.success(`"${file.name}" uploaded successfully.`);
+              toast.success(t("panel.uploaded", { name: file.name }));
               fetchDocs();
               return;
             }
@@ -147,9 +148,9 @@ export function DocumentPanel({ entityType, entityId }: Props) {
         } else {
           try {
             const data = JSON.parse(xhr.responseText);
-            toast.error(data.error ?? `Upload failed (${xhr.status}).`);
+            toast.error(data.error ?? t("panel.uploadFailedStatus", { status: xhr.status }));
           } catch {
-            toast.error(`Upload failed (${xhr.status}).`);
+            toast.error(t("panel.uploadFailedStatus", { status: xhr.status }));
           }
         }
       });
@@ -157,7 +158,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
       xhr.addEventListener("error", () => {
         setUploading(false);
         setProgress(0);
-        toast.error("Network error during upload.");
+        toast.error(t("panel.networkError"));
       });
 
       xhr.send(formData);
@@ -195,16 +196,16 @@ export function DocumentPanel({ entityType, entityId }: Props) {
 
   // ── Delete ───────────────────────────────────────────────────────────────────
   const handleDelete = async (doc: DocumentRecord) => {
-    if (!confirm(`Delete "${doc.name}"?`)) return;
+    if (!confirm(t("panel.confirmDelete", { name: doc.name }))) return;
     setDeletingId(doc.id);
     try {
       const res = await fetch(`/api/documents?id=${doc.id}`, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error ?? "Delete failed.");
-      toast.success(`"${doc.name}" deleted.`);
+      if (!res.ok || !data.success) throw new Error(data.error ?? t("panel.deleteFailed"));
+      toast.success(t("panel.deleted", { name: doc.name }));
       setDocs((prev) => prev.filter((d) => d.id !== doc.id));
     } catch (err: any) {
-      toast.error(err.message ?? "Failed to delete document.");
+      toast.error(err.message ?? t("panel.deleteFailed"));
     } finally {
       setDeletingId(null);
     }
@@ -293,7 +294,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
                   <p className="text-[11px] text-muted-foreground">
                     {fmtSize(doc.size)}
                     {doc.size ? " · " : ""}
-                    {new Date(doc.createdAt).toLocaleDateString()}
+                    {format.dateTime(new Date(doc.createdAt), { year: "numeric", month: "numeric", day: "numeric" })}
                   </p>
                 </div>
                 {/* View in new tab — PDFs only */}
@@ -302,7 +303,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
                     href={`/api/documents/${doc.id}?view=1`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title="Open PDF"
+                    title={t("panel.openPdf")}
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -313,7 +314,7 @@ export function DocumentPanel({ entityType, entityId }: Props) {
                 <a
                   href={`/api/documents/${doc.id}`}
                   download={doc.name}
-                  title="Download"
+                  title={tc("download")}
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   onClick={(e) => e.stopPropagation()}
                 >

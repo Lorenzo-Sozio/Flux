@@ -31,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
+import { useOpenOnNew } from "@/hooks/use-open-on-new";
 import type { Page } from "@/lib/pagination";
 import { cn } from "@/lib/utils";
 
@@ -52,11 +53,12 @@ type Product = {
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
+// Messages are keys under `products.client`, translated where they are shown.
 const formSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().min(1, "nameRequired"),
   description: z.string().optional(),
   sku: z.string().optional(),
-  price: z.coerce.number().min(0, "Must be ≥ 0"),
+  price: z.coerce.number().min(0, "priceMin"),
   taxPercent: z.coerce.number().min(0).max(100).default(0),
   unit: z.string().optional().nullable(),
   category: z.string().optional().nullable(),
@@ -159,9 +161,7 @@ function ProductDialog({
                 {t("dialog.nameLabel")} <span className="text-destructive">*</span>
               </Label>
               <Input {...form.register("name")} placeholder={t("form.namePlaceholder")} />
-              {form.formState.errors.name && (
-                <p className="text-destructive text-xs">{form.formState.errors.name.message}</p>
-              )}
+              {form.formState.errors.name && <p className="text-destructive text-xs">{t("client.nameRequired")}</p>}
             </div>
 
             {/* SKU + Price */}
@@ -170,17 +170,16 @@ function ProductDialog({
                 <Label className="flex items-center gap-1.5">
                   <Tag className="h-3.5 w-3.5 text-muted-foreground" /> SKU
                 </Label>
+                {/* i18n-ignore: an example value, the same in both languages */}
                 <Input {...form.register("sku")} placeholder="ABC-001" className="font-mono text-sm" />
               </div>
               <div className="space-y-1.5">
                 <Label className="flex items-center gap-1.5">
-                  <DollarSign className="h-3.5 w-3.5 text-muted-foreground" /> Price{" "}
+                  <DollarSign className="h-3.5 w-3.5 text-muted-foreground" /> {t("client.price")}{" "}
                   <span className="text-destructive">*</span>
                 </Label>
                 <Input type="number" step="0.01" min="0" {...form.register("price")} placeholder="0.00" />
-                {form.formState.errors.price && (
-                  <p className="text-destructive text-xs">{form.formState.errors.price.message}</p>
-                )}
+                {form.formState.errors.price && <p className="text-destructive text-xs">{t("client.priceMin")}</p>}
               </div>
             </div>
 
@@ -234,7 +233,7 @@ function ProductDialog({
 
           <DialogFooter className="border-t bg-muted/10 px-4 md:px-6 py-4">
             <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} disabled={submitting}>
-              Cancel
+              {t("client.cancel")}
             </Button>
             <Button type="submit" disabled={submitting} className="gap-2">
               {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
@@ -292,6 +291,7 @@ export function ProductsClient({ page, stats, filter }: Props) {
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Product | undefined>(undefined);
+  useOpenOnNew(true, setDialogOpen);
 
   // Delete confirm
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
@@ -523,7 +523,7 @@ export function ProductsClient({ page, stats, filter }: Props) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting}>{t("client.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
               disabled={deleting}

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { format } from "date-fns";
 import {
   AlertCircle,
   ChevronLeft,
@@ -13,19 +12,21 @@ import {
   ShieldCheck,
   UserMinus,
 } from "lucide-react";
+import { getFormatter, getTranslations } from "next-intl/server";
 
 import { getCampaignReport, getEmailTemplates } from "@/actions/marketing";
 import { CampaignModal } from "@/components/crm/campaign-modal";
+import { RecordVisit } from "@/components/crm/record-visit";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
 import { CampaignLogTable } from "../_components/campaign-log-table";
 
-const CAMPAIGN_STATUS: Record<string, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "border-slate-300 text-slate-600" },
-  active: { label: "Active", className: "border-green-300 text-green-700 bg-green-50" },
-  completed: { label: "Completed", className: "border-blue-300 text-blue-700 bg-blue-50" },
+const CAMPAIGN_STATUS: Record<string, { className: string }> = {
+  draft: { className: "border-slate-300 text-slate-600" },
+  active: { className: "border-green-300 text-green-700 bg-green-50" },
+  completed: { className: "border-blue-300 text-blue-700 bg-blue-50" },
 };
 
 interface Props {
@@ -34,25 +35,35 @@ interface Props {
 
 export default async function CampaignDetailPage({ params }: Props) {
   const { id } = await params;
-  const [report, templates] = await Promise.all([getCampaignReport(id), getEmailTemplates()]);
+  const [report, templates, t, formatter] = await Promise.all([
+    getCampaignReport(id),
+    getEmailTemplates(),
+    getTranslations("marketing.campaigns"),
+    getFormatter(),
+  ]);
   if (!report) notFound();
 
   const { campaign, stats, logs } = report;
-  const statusCfg = CAMPAIGN_STATUS[campaign.status] ?? CAMPAIGN_STATUS.draft;
-  const templateName = templates.find((t) => t.id === campaign.templateId)?.name;
+  const statusKey = campaign.status in CAMPAIGN_STATUS ? campaign.status : "draft";
+  const statusCfg = CAMPAIGN_STATUS[statusKey];
+  const templateName = templates.find((tpl) => tpl.id === campaign.templateId)?.name;
+
+  const percent = (value: number) =>
+    formatter.number(value / 100, { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
   const statCards = [
-    { label: "Queued", value: stats.queued, icon: Clock, color: "text-slate-400" },
-    { label: "Sent", value: stats.sent, icon: Send, color: "text-blue-500" },
-    { label: "Opened", value: stats.opened, icon: Eye, color: "text-violet-500" },
-    { label: "Clicked", value: stats.clicked, icon: MousePointerClick, color: "text-green-500" },
-    { label: "Bounced", value: stats.bounced, icon: AlertCircle, color: "text-amber-500" },
-    { label: "Unsubscribed", value: stats.unsubscribed, icon: UserMinus, color: "text-orange-500" },
-    { label: "Failed", value: stats.failed, icon: AlertCircle, color: "text-red-500" },
+    { label: t("detail.queued"), value: stats.queued, icon: Clock, color: "text-slate-400" },
+    { label: t("sent"), value: stats.sent, icon: Send, color: "text-blue-500" },
+    { label: t("opened"), value: stats.opened, icon: Eye, color: "text-violet-500" },
+    { label: t("clicked"), value: stats.clicked, icon: MousePointerClick, color: "text-green-500" },
+    { label: t("bounced"), value: stats.bounced, icon: AlertCircle, color: "text-amber-500" },
+    { label: t("unsubscribed"), value: stats.unsubscribed, icon: UserMinus, color: "text-orange-500" },
+    { label: t("detail.failed"), value: stats.failed, icon: AlertCircle, color: "text-red-500" },
   ];
 
   return (
     <div className="space-y-6">
+      <RecordVisit type="campaign" id={campaign.id} label={campaign.name} />
       {/* ── Header ── */}
       <div>
         <Link
@@ -60,7 +71,7 @@ export default async function CampaignDetailPage({ params }: Props) {
           className="mb-3 inline-flex items-center gap-1 text-muted-foreground text-sm transition-colors hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
-          Back to Campaigns
+          {t("detail.back")}
         </Link>
 
         <div className="flex items-start justify-between gap-4">
@@ -68,12 +79,12 @@ export default async function CampaignDetailPage({ params }: Props) {
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="font-bold text-xl tracking-tight">{campaign.name}</h1>
               <Badge variant="outline" className={`text-xs ${statusCfg.className}`}>
-                {statusCfg.label}
+                {t(`statuses.${statusKey}`)}
               </Badge>
               {/* Tracking always-on badge */}
               <Badge variant="outline" className="gap-1 border-emerald-300 bg-emerald-50 text-emerald-700 text-xs">
                 <ShieldCheck className="h-3 w-3" />
-                Open + Click tracking
+                {t("detail.trackingBadge")}
               </Badge>
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground text-sm">
@@ -85,7 +96,9 @@ export default async function CampaignDetailPage({ params }: Props) {
               )}
               <span className="flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5" />
-                Created {format(new Date(campaign.createdAt), "MMM d, yyyy")}
+                {t("detail.created", {
+                  date: formatter.dateTime(new Date(campaign.createdAt), { dateStyle: "medium" }),
+                })}
               </span>
             </div>
           </div>
@@ -121,10 +134,8 @@ export default async function CampaignDetailPage({ params }: Props) {
       {stats.sent > 0 && (
         <Card className="shadow-none">
           <CardHeader className="pb-3">
-            <CardTitle className="font-semibold text-sm">Engagement Funnel</CardTitle>
-            <CardDescription className="text-xs">
-              Tracking self-hosted — data updates as recipients interact.
-            </CardDescription>
+            <CardTitle className="font-semibold text-sm">{t("detail.funnelTitle")}</CardTitle>
+            <CardDescription className="text-xs">{t("detail.funnelDesc")}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Open rate */}
@@ -132,12 +143,12 @@ export default async function CampaignDetailPage({ params }: Props) {
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
                   <Eye className="h-3.5 w-3.5 text-violet-500" />
-                  Open Rate
+                  {t("openRate")}
                   <span className="text-[10px] text-muted-foreground">
                     ({stats.opened}/{stats.sent})
                   </span>
                 </span>
-                <span className="font-semibold tabular-nums">{stats.openRate}%</span>
+                <span className="font-semibold tabular-nums">{percent(parseFloat(stats.openRate))}</span>
               </div>
               <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                 <div
@@ -152,12 +163,12 @@ export default async function CampaignDetailPage({ params }: Props) {
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1.5 text-muted-foreground">
                   <MousePointerClick className="h-3.5 w-3.5 text-green-500" />
-                  Click Rate
+                  {t("clickRate")}
                   <span className="text-[10px] text-muted-foreground">
                     ({stats.clicked}/{stats.sent})
                   </span>
                 </span>
-                <span className="font-semibold tabular-nums">{stats.clickRate}%</span>
+                <span className="font-semibold tabular-nums">{percent(parseFloat(stats.clickRate))}</span>
               </div>
               <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                 <div
@@ -173,14 +184,12 @@ export default async function CampaignDetailPage({ params }: Props) {
                 <div className="flex items-center justify-between text-sm">
                   <span className="flex items-center gap-1.5 text-muted-foreground">
                     <MousePointerClick className="h-3.5 w-3.5 text-emerald-500" />
-                    Click-to-Open Rate
+                    {t("detail.clickToOpenRate")}
                     <span className="text-[10px] text-muted-foreground">
                       ({stats.clicked}/{stats.opened})
                     </span>
                   </span>
-                  <span className="font-semibold tabular-nums">
-                    {((stats.clicked / stats.opened) * 100).toFixed(1)}%
-                  </span>
+                  <span className="font-semibold tabular-nums">{percent((stats.clicked / stats.opened) * 100)}</span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-muted">
                   <div
@@ -197,19 +206,19 @@ export default async function CampaignDetailPage({ params }: Props) {
                 {stats.bounced > 0 && (
                   <span className="flex items-center gap-1">
                     <AlertCircle className="h-3 w-3 text-amber-500" />
-                    {stats.bounced} bounced
+                    {t("detail.bouncedCount", { count: stats.bounced })}
                   </span>
                 )}
                 {stats.unsubscribed > 0 && (
                   <span className="flex items-center gap-1">
                     <UserMinus className="h-3 w-3 text-orange-500" />
-                    {stats.unsubscribed} unsubscribed
+                    {t("detail.unsubscribedCount", { count: stats.unsubscribed })}
                   </span>
                 )}
                 {stats.complained > 0 && (
                   <span className="flex items-center gap-1">
                     <AlertCircle className="h-3 w-3 text-red-500" />
-                    {stats.complained} complaints
+                    {t("detail.complaintsCount", { count: stats.complained })}
                   </span>
                 )}
               </div>
@@ -222,9 +231,9 @@ export default async function CampaignDetailPage({ params }: Props) {
       <Card className="shadow-none">
         <CardHeader className="pb-3">
           <div>
-            <CardTitle className="font-semibold text-sm">Send Log</CardTitle>
+            <CardTitle className="font-semibold text-sm">{t("detail.sendLogTitle")}</CardTitle>
             <CardDescription className="mt-0.5 text-xs">
-              {stats.total} total recipients — filter by status or search by name / email
+              {t("detail.sendLogDesc", { count: stats.total })}
             </CardDescription>
           </div>
         </CardHeader>

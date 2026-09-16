@@ -63,6 +63,8 @@ interface Props {
 export function CompaniesTable({ companies, users, canEdit, narrowed, categories = [], companyTypes = [] }: Props) {
   const t = useTranslations("companies");
   const te = useTranslations("emptyStates");
+  const tr = useTranslations("recordTable");
+  const tc = useTranslations("common");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
 
@@ -201,7 +203,7 @@ export function CompaniesTable({ companies, users, canEdit, narrowed, categories
                 <TableRow>
                   {canEdit && (
                     <TableHead className="w-10">
-                      <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
+                      <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label={tc("selectAll")} />
                     </TableHead>
                   )}
                   <TableHead>{t("columns.name")}</TableHead>
@@ -225,7 +227,7 @@ export function CompaniesTable({ companies, users, canEdit, narrowed, categories
                         <Checkbox
                           checked={selected.has(company.id)}
                           onCheckedChange={() => toggle(company.id)}
-                          aria-label={`Select ${company.name}`}
+                          aria-label={tr("selectRecord", { name: company.name })}
                         />
                       </TableCell>
                     )}

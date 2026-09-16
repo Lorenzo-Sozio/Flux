@@ -3,20 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import {
-  Building2,
-  CheckSquare,
-  ChevronRight,
-  Contact,
-  FileText,
-  Headphones,
-  Kanban,
-  Lock,
-  MessageSquare,
-  PlusCircleIcon,
-  ShoppingCart,
-  Users,
-} from "lucide-react";
+import { ChevronRight, Lock } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -41,7 +28,10 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from "@/components/ui/sidebar";
+import type { EntityType } from "@/lib/entities";
 import type { NavGroup, NavMainItem, NavSubItem } from "@/navigation/sidebar/sidebar-items";
+
+import { QuickCreateMenu } from "./quick-create-menu";
 
 interface NavMainProps {
   readonly items: readonly NavGroup[];
@@ -55,11 +45,14 @@ interface NavMainProps {
    * the middle of the menu.
    */
   readonly showQuickCreate?: boolean;
+  /** What this person may create in this plan, decided by the layout. */
+  readonly creatable?: readonly EntityType[];
 }
 
-const IsComingSoon = () => (
-  <span className="ml-auto rounded-md bg-gray-200 px-2 py-1 text-xs dark:text-gray-800">Soon</span>
-);
+const IsComingSoon = () => {
+  const t = useTranslations("nav");
+  return <span className="ml-auto rounded-md bg-gray-200 px-2 py-1 text-xs dark:text-gray-800">{t("soon")}</span>;
+};
 
 /**
  * A module the plan does not include.
@@ -117,7 +110,7 @@ const NavItemExpanded = ({
               asChild
               aria-disabled={item.comingSoon}
               isActive={isActive(item.url)}
-              tooltip={locked ? `${title} — not included in your plan` : title}
+              tooltip={locked ? t("notInPlan", { title }) : title}
             >
               <Link
                 prefetch={false}
@@ -205,7 +198,7 @@ const NavItemCollapsed = ({
   );
 };
 
-export function NavMain({ items, showQuickCreate = true }: NavMainProps) {
+export function NavMain({ items, showQuickCreate = true, creatable = [] }: NavMainProps) {
   const path = usePathname();
   const { state, isMobile } = useSidebar();
   const t = useTranslations("nav");
@@ -228,87 +221,7 @@ export function NavMain({ items, showQuickCreate = true }: NavMainProps) {
           <SidebarGroupContent className="flex flex-col gap-2">
             <SidebarMenu>
               <SidebarMenuItem className="flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <SidebarMenuButton
-                      tooltip={t("quickCreate.title")}
-                      className="min-w-8 bg-primary text-primary-foreground duration-200 ease-linear hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground"
-                    >
-                      <PlusCircleIcon />
-                      <span>{t("quickCreate.title")}</span>
-                    </SidebarMenuButton>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-52" side="right" align="start">
-                    <DropdownMenuLabel className="text-muted-foreground text-xs">
-                      {t("quickCreate.crm")}
-                    </DropdownMenuLabel>
-                    <DropdownMenuItem asChild>
-                      <Link prefetch={false} href="/dashboard/leads?new=true" className="flex items-center gap-2">
-                        <Users className="h-3.5 w-3.5" /> {t("quickCreate.newLead")}
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link prefetch={false} href="/dashboard/contacts?new=true" className="flex items-center gap-2">
-                        <Contact className="h-3.5 w-3.5" /> {t("quickCreate.newContact")}
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link prefetch={false} href="/dashboard/companies?new=true" className="flex items-center gap-2">
-                        <Building2 className="h-3.5 w-3.5" /> {t("quickCreate.newCompany")}
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link prefetch={false} href="/dashboard/pipeline?new=true" className="flex items-center gap-2">
-                        <Kanban className="h-3.5 w-3.5" /> {t("quickCreate.newDeal")}
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="text-muted-foreground text-xs">
-                      {t("quickCreate.sales")}
-                    </DropdownMenuLabel>
-                    <DropdownMenuItem asChild>
-                      <Link prefetch={false} href="/dashboard/sales/quotes/new" className="flex items-center gap-2">
-                        <FileText className="h-3.5 w-3.5" /> {t("quickCreate.newQuote")}
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link
-                        prefetch={false}
-                        href="/dashboard/sales/orders?new=true"
-                        className="flex items-center gap-2"
-                      >
-                        <ShoppingCart className="h-3.5 w-3.5" /> {t("quickCreate.newOrder")}
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuLabel className="text-muted-foreground text-xs">
-                      {t("quickCreate.work")}
-                    </DropdownMenuLabel>
-                    <DropdownMenuItem asChild>
-                      <Link prefetch={false} href="/dashboard/tasks?new=true" className="flex items-center gap-2">
-                        <CheckSquare className="h-3.5 w-3.5" /> {t("quickCreate.newTask")}
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link
-                        prefetch={false}
-                        href="/dashboard/support/tickets?new=true"
-                        className="flex items-center gap-2"
-                      >
-                        <Headphones className="h-3.5 w-3.5" /> {t("quickCreate.newTicket")}
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link
-                        prefetch={false}
-                        href="/dashboard/marketing/campaigns?new=true"
-                        className="flex items-center gap-2"
-                      >
-                        <MessageSquare className="h-3.5 w-3.5" /> {t("quickCreate.newCampaign")}
-                      </Link>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <QuickCreateMenu creatable={creatable} />
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { it } from "date-fns/locale";
+import { enUS, it } from "date-fns/locale";
 import {
   AlertCircle,
   CalendarDays,
@@ -23,6 +23,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -41,6 +42,7 @@ import {
 } from "@/actions/tasks";
 import { AssigneeSelect, decodeAssignee, encodeAssignee } from "@/components/crm/assignee-select";
 import { MultiAssigneeSelect } from "@/components/crm/multi-assignee-select";
+import { RecordVisit } from "@/components/crm/record-visit";
 import { TaskTimer } from "@/components/crm/task-timer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -57,23 +59,23 @@ import { cn } from "@/lib/utils";
 // ─── Config ────────────────────────────────────────────────────────────────────
 
 const PRIORITY_CONFIG = {
-  blocker: { label: "Bloccante", color: "#dc2626" },
-  critical: { label: "Critica", color: "#ea580c" },
-  high: { label: "Alta", color: "#ef4444" },
-  normal: { label: "Normale", color: "#6366f1" },
-  low: { label: "Bassa", color: "#94a3b8" },
+  blocker: { labelKey: "priorities.blocker", color: "#dc2626" },
+  critical: { labelKey: "priorities.critical", color: "#ea580c" },
+  high: { labelKey: "priorities.high", color: "#ef4444" },
+  normal: { labelKey: "priorities.normal", color: "#6366f1" },
+  low: { labelKey: "priorities.low", color: "#94a3b8" },
 } as const;
 
 const STATUS_CONFIG = {
-  todo: { label: "Da fare", icon: AlertCircle, color: "text-slate-500" },
-  in_progress: { label: "In corso", icon: Clock, color: "text-blue-500" },
-  done: { label: "Completata", icon: CheckSquare, color: "text-emerald-500" },
+  todo: { labelKey: "statuses.todo", icon: AlertCircle, color: "text-slate-500" },
+  in_progress: { labelKey: "statuses.inProgress", icon: Clock, color: "text-blue-500" },
+  done: { labelKey: "statuses.done", icon: CheckSquare, color: "text-emerald-500" },
 } as const;
 
 // ─── Schema ────────────────────────────────────────────────────────────────────
 
 const taskSchema = z.object({
-  title: z.string().min(1, "Titolo obbligatorio"),
+  title: z.string().min(1, "titleRequired"),
   description: z.string().optional(),
   status: z.enum(["todo", "in_progress", "done"]).default("todo"),
   priority: z.string().default("normal"),
@@ -108,12 +110,8 @@ type DepEntry = {
   taskStatus: string | null;
 };
 
-const DEP_TYPE_LABELS: Record<string, string> = {
-  FS: "Fine→Inizio",
-  SS: "Inizio→Inizio",
-  FF: "Fine→Fine",
-  SF: "Inizio→Fine",
-};
+// Dependency types; each label is translated at render time under tasks.modal.depTypes.
+const DEP_TYPES = ["FS", "SS", "FF", "SF"] as const;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -181,6 +179,8 @@ function DatePicker({
   showTime?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const t = useTranslations("tasks.modal");
+  const dateLocale = useLocale() === "it" ? it : enUS;
   const selected = value ? new Date(value) : undefined;
 
   return (
@@ -199,7 +199,7 @@ function DatePicker({
             >
               <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-left">
-                {selected ? format(selected, "d MMM yyyy", { locale: it }) : placeholder}
+                {selected ? format(selected, "d MMM yyyy", { locale: dateLocale }) : placeholder}
               </span>
             </button>
           </PopoverTrigger>
@@ -211,7 +211,7 @@ function DatePicker({
                 onChange(date ? format(date, "yyyy-MM-dd") : undefined);
                 setOpen(false);
               }}
-              locale={it}
+              locale={dateLocale}
               captionLayout="dropdown"
             />
           </PopoverContent>
@@ -220,7 +220,7 @@ function DatePicker({
           <button
             type="button"
             onClick={() => onChange(undefined)}
-            aria-label="Cancella data"
+            aria-label={t("clearDate")}
             className="absolute right-1.5 rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
@@ -258,6 +258,8 @@ export function TaskModal({
   onUpdated?: (updated: any) => void;
   defaultOpen?: boolean;
 }) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const [open, setOpen] = useState(defaultOpen ?? false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [allDay, setAllDay] = useState<boolean>(() => inferAllDay(task.allDay, task.startDate, task.dueDate));
@@ -353,11 +355,11 @@ export function TaskModal({
         } as any,
         revalidatePathStr,
       );
-      toast.success("Attività aggiornata");
+      toast.success(t("modal.updated"));
       onUpdated?.(updated);
       setOpen(false);
     } catch {
-      toast.error("Aggiornamento fallito");
+      toast.error(tc("updateError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -382,9 +384,9 @@ export function TaskModal({
       setSubtasks(updated);
       setNewSubtaskTitle("");
       setAddingSubtask(false);
-      toast.success("Sotto-attività creata");
+      toast.success(t("subtaskCreated"));
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Creazione fallita");
+      toast.error(err instanceof Error ? err.message : tc("createError"));
     }
   };
 
@@ -407,6 +409,7 @@ export function TaskModal({
       </DialogTrigger>
 
       <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-[680px]">
+        {open && task?.id && <RecordVisit type="task" id={task.id} label={task.title ?? ""} />}
         {/* Header */}
         <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
           <div className="flex items-center gap-3">
@@ -417,7 +420,7 @@ export function TaskModal({
               <DialogTitle className="truncate font-semibold text-base">{task.title}</DialogTitle>
               <div className="mt-0.5 flex items-center gap-1.5">
                 <StatusIcon className={cn("h-3 w-3", statusCfg.color)} />
-                <span className="text-muted-foreground text-xs">{statusCfg.label}</span>
+                <span className="text-muted-foreground text-xs">{t(statusCfg.labelKey)}</span>
               </div>
             </div>
           </div>
@@ -430,41 +433,41 @@ export function TaskModal({
               <TabsList className="mb-5 w-full">
                 <TabsTrigger value="details" className="relative flex-1 gap-1.5 text-xs">
                   <CheckSquare className="h-3.5 w-3.5" />
-                  Dettagli
+                  {t("dialog.tabs.details")}
                   <TabDot has={tabErrors.details} />
                 </TabsTrigger>
                 <TabsTrigger value="assignment" className="relative flex-1 gap-1.5 text-xs">
                   <Clock className="h-3.5 w-3.5" />
-                  Assegnazione
+                  {t("dialog.tabs.assignment")}
                   <TabDot has={tabErrors.assignment} />
                 </TabsTrigger>
                 <TabsTrigger value="activity" className="relative flex-1 gap-1.5 text-xs">
                   <Link2 className="h-3.5 w-3.5" />
-                  Attività
+                  {t("modal.tabActivity")}
                 </TabsTrigger>
               </TabsList>
 
               {/* ── Tab 1: Dettagli ──────────────────────────────────────────── */}
               <TabsContent value="details" className="mt-0 space-y-4">
-                <F label="Titolo" required error={e.title?.message}>
+                <F label={t("dialog.titleLabel")} required error={e.title ? t("modal.titleRequired") : undefined}>
                   <Input
                     {...register("title")}
-                    placeholder="Titolo attività"
+                    placeholder={t("dialog.titlePlaceholder")}
                     autoFocus
                     className={cn("text-sm", e.title && "border-destructive")}
                   />
                 </F>
 
-                <F label="Descrizione">
+                <F label={t("dialog.description")}>
                   <Textarea
                     {...register("description")}
-                    placeholder="Dettagli…"
+                    placeholder={t("form.descriptionPlaceholder")}
                     className="min-h-[80px] resize-y text-sm"
                   />
                 </F>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <F label="Stato">
+                  <F label={t("dialog.status")}>
                     <Controller
                       control={control}
                       name="status"
@@ -485,7 +488,7 @@ export function TaskModal({
                                 <SelectItem key={key} value={key}>
                                   <span className="flex items-center gap-2">
                                     <Icon className={cn("h-3.5 w-3.5", cfg.color)} />
-                                    {cfg.label}
+                                    {t(cfg.labelKey)}
                                   </span>
                                 </SelectItem>
                               );
@@ -496,7 +499,7 @@ export function TaskModal({
                     />
                   </F>
 
-                  <F label="Priorità">
+                  <F label={t("dialog.priority")}>
                     <Controller
                       control={control}
                       name="priority"
@@ -518,7 +521,7 @@ export function TaskModal({
                                     className="h-2 w-2 shrink-0 rounded-full"
                                     style={{ backgroundColor: cfg.color }}
                                   />
-                                  {cfg.label}
+                                  {t(cfg.labelKey)}
                                 </span>
                               </SelectItem>
                             ))}
@@ -541,12 +544,12 @@ export function TaskModal({
                     )}
                   >
                     <CalendarDays className="h-3.5 w-3.5" />
-                    Tutto il giorno
+                    {t("modal.allDay")}
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <F label="Data inizio">
+                  <F label={t("dialog.startDate")}>
                     <Controller
                       control={control}
                       name="startDate"
@@ -554,7 +557,7 @@ export function TaskModal({
                         <DatePicker
                           value={field.value}
                           onChange={field.onChange}
-                          placeholder="Seleziona data"
+                          placeholder={t("modal.selectDate")}
                           showTime={!allDay}
                           timeValue={startTime}
                           onTimeChange={setStartTime}
@@ -562,7 +565,7 @@ export function TaskModal({
                       )}
                     />
                   </F>
-                  <F label="Scadenza">
+                  <F label={t("dialog.dueDate")}>
                     <Controller
                       control={control}
                       name="dueDate"
@@ -570,7 +573,7 @@ export function TaskModal({
                         <DatePicker
                           value={field.value}
                           onChange={field.onChange}
-                          placeholder="Seleziona data"
+                          placeholder={t("modal.selectDate")}
                           showTime={!allDay}
                           timeValue={dueTime}
                           onTimeChange={setDueTime}
@@ -584,7 +587,7 @@ export function TaskModal({
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                        Avanzamento
+                        {t("modal.progress")}
                       </Label>
                       <span className="text-muted-foreground text-xs tabular-nums">{donePct}%</span>
                     </div>
@@ -603,7 +606,7 @@ export function TaskModal({
 
               {/* ── Tab 2: Assegnazione ──────────────────────────────────────── */}
               <TabsContent value="assignment" className="mt-0 space-y-4">
-                <F label="Assegnato a">
+                <F label={t("columns.assignee")}>
                   <Controller
                     control={control}
                     name="assigneeValue"
@@ -611,7 +614,7 @@ export function TaskModal({
                   />
                 </F>
 
-                <F label="Ore stimate" error={e.estimatedHours?.message}>
+                <F label={t("dialog.estimatedHours")} error={e.estimatedHours?.message}>
                   <div className="relative">
                     <Clock className="-translate-y-1/2 absolute top-1/2 left-3 h-3.5 w-3.5 text-muted-foreground" />
                     <Input
@@ -635,7 +638,7 @@ export function TaskModal({
                 {currentUserId && (
                   <div className="space-y-1.5">
                     <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                      Tracciamento tempo
+                      {t("modal.timeTracking")}
                     </Label>
                     <TaskTimer
                       taskId={task.id}
@@ -662,13 +665,13 @@ export function TaskModal({
                     className="flex w-full items-center gap-1.5 font-medium text-sm transition-colors hover:text-foreground"
                   >
                     {subtasksOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                    Sotto-attività
+                    {t("subtasks")}
                     {subtasks.length > 0 ? (
                       <span className="font-normal text-muted-foreground text-xs">
                         ({subtasks.filter((s) => s.status === "done").length}/{subtasks.length})
                       </span>
                     ) : (
-                      <span className="font-normal text-muted-foreground text-xs">Nessuna</span>
+                      <span className="font-normal text-muted-foreground text-xs">{t("modal.noSubtasks")}</span>
                     )}
                   </button>
 
@@ -724,12 +727,12 @@ export function TaskModal({
                                   setNewSubtaskTitle("");
                                 }
                               }}
-                              placeholder="Titolo sotto-attività…"
+                              placeholder={t("subtaskPlaceholder")}
                               className="h-7 text-xs"
                               autoFocus
                             />
                             <Button type="button" size="sm" className="h-7 px-2 text-xs" onClick={handleAddSubtask}>
-                              Aggiungi
+                              {tc("add")}
                             </Button>
                             <Button
                               type="button"
@@ -751,12 +754,12 @@ export function TaskModal({
                             className="flex items-center gap-1 pt-1 text-muted-foreground/60 text-xs transition-colors hover:text-muted-foreground"
                           >
                             <Plus className="h-3 w-3" />
-                            Aggiungi sotto-attività
+                            {t("addSubtask")}
                           </button>
                         ))}
 
                       {!canAddSubtasks && subtasks.length === 0 && (
-                        <p className="py-1 text-muted-foreground/50 text-xs">Profondità massima raggiunta.</p>
+                        <p className="py-1 text-muted-foreground/50 text-xs">{t("maxDepth")}</p>
                       )}
                     </div>
                   )}
@@ -771,7 +774,7 @@ export function TaskModal({
                   >
                     {depsOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
                     <Link2 className="h-3.5 w-3.5 text-muted-foreground" />
-                    Dipendenze
+                    {t("modal.dependencies")}
                     {depPredecessors.length > 0 && (
                       <span className="font-normal text-muted-foreground text-xs">({depPredecessors.length})</span>
                     )}
@@ -798,7 +801,7 @@ export function TaskModal({
                           </Badge>
                           {dep.lagDays !== 0 && (
                             <span className="shrink-0 text-muted-foreground">
-                              {dep.lagDays > 0 ? `+${dep.lagDays}d` : `${dep.lagDays}d`}
+                              {t("modal.lagDays", { n: dep.lagDays > 0 ? `+${dep.lagDays}` : String(dep.lagDays) })}
                             </span>
                           )}
                           <button
@@ -806,7 +809,7 @@ export function TaskModal({
                             onClick={async () => {
                               await removeDependency(dep.id);
                               setDepPredecessors((prev) => prev.filter((d) => d.id !== dep.id));
-                              toast.success("Dipendenza rimossa");
+                              toast.success(t("modal.dependencyRemoved"));
                             }}
                             className="shrink-0 text-muted-foreground/40 opacity-0 transition-all hover:text-destructive group-hover:opacity-100"
                           >
@@ -818,7 +821,9 @@ export function TaskModal({
                       {depPredecessors.filter((d) => d.taskStatus !== "done").length > 0 && (
                         <p className="flex items-center gap-1 px-2 py-0.5 text-[10px] text-destructive">
                           <Lock className="h-3 w-3" />
-                          Bloccata da {depPredecessors.filter((d) => d.taskStatus !== "done").length} attività
+                          {t("modal.blockedBy", {
+                            count: depPredecessors.filter((d) => d.taskStatus !== "done").length,
+                          })}
                         </p>
                       )}
 
@@ -826,7 +831,7 @@ export function TaskModal({
                         <div className="space-y-1.5 pt-1">
                           <Select value={newDepTaskId} onValueChange={setNewDepTaskId}>
                             <SelectTrigger className="h-7 w-full text-xs">
-                              <SelectValue placeholder="Seleziona predecessore…" />
+                              <SelectValue placeholder={t("modal.selectPredecessor")} />
                             </SelectTrigger>
                             <SelectContent className="max-h-48">
                               {allTasks
@@ -844,9 +849,9 @@ export function TaskModal({
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
-                                {Object.entries(DEP_TYPE_LABELS).map(([v, l]) => (
+                                {DEP_TYPES.map((v) => (
                                   <SelectItem key={v} value={v} className="text-xs">
-                                    {l}
+                                    {t(`modal.depTypes.${v}`)}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -855,7 +860,7 @@ export function TaskModal({
                               type="number"
                               value={newDepLag}
                               onChange={(ev) => setNewDepLag(ev.target.value)}
-                              placeholder="Lag (giorni)"
+                              placeholder={t("modal.lagPlaceholder")}
                               className="h-7 w-20 text-xs"
                             />
                             <Button
@@ -872,13 +877,13 @@ export function TaskModal({
                                   setNewDepType("FS");
                                   setNewDepLag("0");
                                   setAddingDep(false);
-                                  toast.success("Dipendenza aggiunta");
+                                  toast.success(t("modal.dependencyAdded"));
                                 } catch (err: unknown) {
-                                  toast.error(err instanceof Error ? err.message : "Aggiunta fallita");
+                                  toast.error(err instanceof Error ? err.message : t("modal.dependencyAddFailed"));
                                 }
                               }}
                             >
-                              Aggiungi
+                              {tc("add")}
                             </Button>
                             <Button
                               type="button"
@@ -901,7 +906,7 @@ export function TaskModal({
                           className="flex items-center gap-1 pt-1 text-muted-foreground/60 text-xs transition-colors hover:text-muted-foreground"
                         >
                           <Plus className="h-3 w-3" />
-                          Aggiungi predecessore
+                          {t("modal.addPredecessor")}
                         </button>
                       )}
                     </div>
@@ -914,18 +919,18 @@ export function TaskModal({
           {/* Footer */}
           <DialogFooter className="border-t bg-muted/30 px-4 md:px-6 py-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Annulla
+              {tc("cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting} className="min-w-[140px] gap-2">
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Salvataggio…
+                  {tc("saving")}
                 </>
               ) : (
                 <>
                   <CheckSquare className="h-3.5 w-3.5" />
-                  Salva modifiche
+                  {t("modal.saveChanges")}
                 </>
               )}
             </Button>

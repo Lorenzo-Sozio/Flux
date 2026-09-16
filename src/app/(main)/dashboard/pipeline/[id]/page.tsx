@@ -154,7 +154,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="flex flex-col gap-6 md:flex-row">
-      <RecordVisit type="deal" name={deal.name} href={`/dashboard/pipeline/${dealId}`} />
+      <RecordVisit type="deal" id={dealId} label={deal.name} sub={companyName ?? null} />
 
       {/* ── Left sidebar ──────────────────────────────────────────────────── */}
       <div className="flex w-full flex-col gap-5 md:w-1/3">
@@ -477,7 +477,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                       <button
                         type="submit"
                         className="shrink-0 p-1 text-muted-foreground transition-colors hover:text-destructive"
-                        title="Delete"
+                        title={t("deleteTask")}
                       >
                         <Trash2Icon className="h-3.5 w-3.5" />
                       </button>
@@ -492,7 +492,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
         {/* Comments */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Comments</CardTitle>
+            <CardTitle className="text-base">{t("comments.title")}</CardTitle>
           </CardHeader>
           <CardContent>
             <CommentsThread

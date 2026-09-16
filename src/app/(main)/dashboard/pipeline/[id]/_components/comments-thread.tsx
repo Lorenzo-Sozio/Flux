@@ -4,8 +4,8 @@ import { useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { formatDistanceToNow } from "date-fns";
 import { CornerDownRight, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { DealComment } from "@/actions/deal-comments";
@@ -33,6 +33,8 @@ interface CommentRowProps {
 }
 
 function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, onAction }: CommentRowProps) {
+  const t = useTranslations("pipeline.comments");
+  const format = useFormatter();
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState(comment.content);
   const [replying, setReplying] = useState(false);
@@ -66,11 +68,10 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
         setEditing(false);
       },
       setEditLoading,
-      "Error saving edit",
+      t("saveFailed"),
     );
 
-  const handleDelete = () =>
-    run(() => deleteDealComment(comment.id, dealId), setDeleteLoading, "Error deleting comment");
+  const handleDelete = () => run(() => deleteDealComment(comment.id, dealId), setDeleteLoading, t("deleteFailed"));
 
   const handleReply = () =>
     run(
@@ -80,7 +81,7 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
         setReplying(false);
       },
       setReplyLoading,
-      "Error posting reply",
+      t("replyFailed"),
     );
 
   return (
@@ -92,10 +93,8 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
           <span className="font-medium text-sm">{comment.userName ?? "Unknown"}</span>
-          <span className="text-muted-foreground text-xs">
-            {formatDistanceToNow(new Date(comment.createdAt), { addSuffix: true })}
-          </span>
-          {comment.editedAt && <span className="text-muted-foreground text-xs italic">(edited)</span>}
+          <span className="text-muted-foreground text-xs">{format.relativeTime(new Date(comment.createdAt))}</span>
+          {comment.editedAt && <span className="text-muted-foreground text-xs italic">{t("edited")}</span>}
         </div>
 
         {editing ? (
@@ -108,7 +107,7 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
             />
             <div className="flex gap-2">
               <Button size="sm" onClick={handleEdit} disabled={editLoading}>
-                Save
+                {t("save")}
               </Button>
               <Button
                 size="sm"
@@ -118,7 +117,7 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
                   setEditContent(comment.content);
                 }}
               >
-                Cancel
+                {t("cancel")}
               </Button>
             </div>
           </div>
@@ -135,7 +134,7 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
               onClick={() => setReplying(!replying)}
             >
               <CornerDownRight className="mr-1 h-3 w-3" />
-              Reply
+              {t("reply")}
             </Button>
             {canEdit && (
               <Button
@@ -166,13 +165,13 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
             <Textarea
               value={replyContent}
               onChange={(e) => setReplyContent(e.target.value)}
-              placeholder="Write a reply…"
+              placeholder={t("replyPlaceholder")}
               className="min-h-[60px] text-sm"
               autoFocus
             />
             <div className="flex gap-2">
               <Button size="sm" onClick={handleReply} disabled={replyLoading || !replyContent.trim()}>
-                Reply
+                {t("reply")}
               </Button>
               <Button
                 size="sm"
@@ -182,7 +181,7 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
                   setReplyContent("");
                 }}
               >
-                Cancel
+                {t("cancel")}
               </Button>
             </div>
           </div>
@@ -209,6 +208,7 @@ function CommentRow({ comment, replies, dealId, currentUserId, currentUserRole, 
 }
 
 export function CommentsThread({ dealId, initialComments, currentUserId, currentUserRole }: Props) {
+  const t = useTranslations("pipeline.comments");
   const router = useRouter();
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(false);
@@ -221,7 +221,7 @@ export function CommentsThread({ dealId, initialComments, currentUserId, current
       setNewComment("");
       router.refresh();
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Error posting comment");
+      toast.error(e instanceof Error ? e.message : t("postFailed"));
     } finally {
       setLoading(false);
     }
@@ -245,20 +245,20 @@ export function CommentsThread({ dealId, initialComments, currentUserId, current
           <Textarea
             value={newComment}
             onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Add a comment…"
+            placeholder={t("placeholder")}
             className="min-h-[72px] resize-none text-sm"
             onKeyDown={(e) => {
               if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) handleSubmit();
             }}
           />
           <Button size="sm" onClick={handleSubmit} disabled={loading || !newComment.trim()}>
-            Comment
+            {t("submit")}
           </Button>
         </div>
       </div>
 
       {roots.length === 0 ? (
-        <p className="py-4 text-center text-muted-foreground text-sm">No comments yet.</p>
+        <p className="py-4 text-center text-muted-foreground text-sm">{t("empty")}</p>
       ) : (
         <div className="space-y-4 border-t pt-2">
           {roots.map((comment) => (

@@ -17,6 +17,7 @@ import {
   PlusIcon,
   UsersIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -34,7 +35,7 @@ import { cn } from "@/lib/utils";
 
 const activitySchema = z.object({
   type: z.enum(["note", "call", "meeting", "email"]),
-  content: z.string().min(1, "Content is required"),
+  content: z.string().min(1, "contentRequired"),
   date: z.string().optional(),
   durationMinutes: z.coerce.number().int().min(0).optional().nullable(),
   reminderMinutes: z.coerce.number().int().min(0).optional().nullable(),
@@ -50,41 +51,47 @@ type ActivityFormValues = z.infer<typeof activitySchema>;
 
 const TYPE_CONFIG = {
   note: {
-    label: "Note",
+    labelKey: "types.note",
     icon: FileTextIcon,
     color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
   },
   call: {
-    label: "Call",
+    labelKey: "types.call",
     icon: PhoneIcon,
     color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300",
   },
   meeting: {
-    label: "Meeting",
+    labelKey: "types.meeting",
     icon: UsersIcon,
     color: "bg-violet-100 text-violet-700 dark:bg-violet-900 dark:text-violet-300",
   },
-  email: { label: "Email", icon: MailIcon, color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" },
+  email: {
+    labelKey: "types.email",
+    icon: MailIcon,
+    color: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
+  },
 } as const;
 
+// Labels are message keys, translated at render time: reminders under
+// appointment.fields, durations under activityModal.durations.
 const REMINDER_OPTIONS = [
-  { label: "No reminder", value: "__none__" },
-  { label: "15 min before", value: "15" },
-  { label: "30 min before", value: "30" },
-  { label: "1 hour before", value: "60" },
-  { label: "2 hours before", value: "120" },
-  { label: "1 day before", value: "1440" },
+  { labelKey: "reminderNone", value: "__none__" },
+  { labelKey: "reminder15", value: "15" },
+  { labelKey: "reminder30", value: "30" },
+  { labelKey: "reminder60", value: "60" },
+  { labelKey: "reminder120", value: "120" },
+  { labelKey: "reminder1440", value: "1440" },
 ];
 
 const DURATION_OPTIONS = [
-  { label: "—", value: "__none__" },
-  { label: "15 min", value: "15" },
-  { label: "30 min", value: "30" },
-  { label: "45 min", value: "45" },
-  { label: "1 hour", value: "60" },
-  { label: "1.5 hours", value: "90" },
-  { label: "2 hours", value: "120" },
-  { label: "3 hours", value: "180" },
+  { labelKey: null, value: "__none__" },
+  { labelKey: "m15", value: "15" },
+  { labelKey: "m30", value: "30" },
+  { labelKey: "m45", value: "45" },
+  { labelKey: "h1", value: "60" },
+  { labelKey: "h1_5", value: "90" },
+  { labelKey: "h2", value: "120" },
+  { labelKey: "h3", value: "180" },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
@@ -119,6 +126,9 @@ type Props = CreateProps | EditProps;
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export function ActivityModal(props: Props) {
+  const t = useTranslations("activityModal");
+  const tf = useTranslations("appointment.fields");
+  const tc = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -183,7 +193,7 @@ export function ActivityModal(props: Props) {
 
       if (isEdit) {
         await updateActivity(props.activity.id, payload as any, props.revalidatePathStr);
-        toast.success("Activity updated.");
+        toast.success(t("updated"));
       } else {
         const cp = props as CreateProps;
         const entityLink =
@@ -199,22 +209,25 @@ export function ActivityModal(props: Props) {
           ...entityLink,
         } as any);
 
-        toast.success("Activity logged.");
+        toast.success(t("logged"));
         if (cp.onCreated) cp.onCreated();
       }
 
       setOpen(false);
       form.reset();
     } catch {
-      toast.error(isEdit ? "Failed to update activity." : "Failed to log activity.");
+      toast.error(isEdit ? t("updateFailed") : t("logFailed"));
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const editedTypeKey = isEdit ? TYPE_CONFIG[props.activity.type as keyof typeof TYPE_CONFIG]?.labelKey : undefined;
   const title = isEdit
-    ? `Edit ${TYPE_CONFIG[props.activity.type as keyof typeof TYPE_CONFIG]?.label ?? "Activity"}`
-    : "Log Activity";
+    ? editedTypeKey
+      ? t("editTitle", { type: t(editedTypeKey) })
+      : t("editActivity")
+    : t("logActivity");
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -226,7 +239,7 @@ export function ActivityModal(props: Props) {
         ) : (
           <Button variant="outline" size="sm" className="gap-1.5">
             <PlusIcon className="h-3.5 w-3.5" />
-            Log Activity
+            {t("logActivity")}
           </Button>
         )}
       </DialogTrigger>
@@ -240,7 +253,7 @@ export function ActivityModal(props: Props) {
           <div className="space-y-5 px-6 py-5">
             {/* ── Activity type selector ───────────────────────────── */}
             <div className="space-y-2">
-              <Label>Type</Label>
+              <Label>{tc("type")}</Label>
               <div className="grid grid-cols-4 gap-2">
                 {(
                   Object.entries(TYPE_CONFIG) as [
@@ -265,7 +278,7 @@ export function ActivityModal(props: Props) {
                       )}
                     >
                       <Icon className="h-4 w-4" />
-                      {cfg.label}
+                      {t(cfg.labelKey)}
                     </button>
                   );
                 })}
@@ -277,7 +290,7 @@ export function ActivityModal(props: Props) {
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <ClockIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                  Date & Time
+                  {t("dateTime")}
                 </Label>
                 <input
                   type="datetime-local"
@@ -286,11 +299,13 @@ export function ActivityModal(props: Props) {
                 />
                 {isInTheFuture && (
                   <p className="text-amber-600 text-xs leading-relaxed dark:text-amber-400">
-                    This records what happened. For something still to come, the calendar keeps an appointment: it has
-                    an end time, the people invited, and an invitation that actually reaches them.{" "}
-                    <Link href="/dashboard/calendar" className="underline underline-offset-2">
-                      Open the calendar
-                    </Link>
+                    {t.rich("futureHint", {
+                      link: (chunks) => (
+                        <Link href="/dashboard/calendar" className="underline underline-offset-2">
+                          {chunks}
+                        </Link>
+                      ),
+                    })}
                   </p>
                 )}
               </div>
@@ -299,7 +314,7 @@ export function ActivityModal(props: Props) {
                 <div className="space-y-2">
                   <Label className="flex items-center gap-1.5">
                     <ClockIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                    Duration
+                    {t("duration")}
                   </Label>
                   <Controller
                     control={form.control}
@@ -315,7 +330,7 @@ export function ActivityModal(props: Props) {
                         <SelectContent>
                           {DURATION_OPTIONS.map((o) => (
                             <SelectItem key={o.value} value={o.value}>
-                              {o.label}
+                              {o.labelKey ? t(`durations.${o.labelKey}`) : "—"}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -330,29 +345,27 @@ export function ActivityModal(props: Props) {
             <div className="space-y-2">
               <Label>
                 {selectedType === "note"
-                  ? "Note"
+                  ? t("content.noteLabel")
                   : selectedType === "call"
-                    ? "Call summary"
+                    ? t("content.callLabel")
                     : selectedType === "meeting"
-                      ? "Agenda / Summary"
-                      : "Email subject / notes"}
+                      ? t("content.meetingLabel")
+                      : t("content.emailLabel")}
               </Label>
               <Textarea
                 {...form.register("content")}
                 placeholder={
                   selectedType === "note"
-                    ? "Write your note…"
+                    ? t("content.notePlaceholder")
                     : selectedType === "call"
-                      ? "What was discussed?"
+                      ? t("content.callPlaceholder")
                       : selectedType === "meeting"
-                        ? "Agenda, decisions, follow-ups…"
-                        : "Email subject or summary…"
+                        ? t("content.meetingPlaceholder")
+                        : t("content.emailPlaceholder")
                 }
                 className="min-h-[100px] resize-none"
               />
-              {form.formState.errors.content && (
-                <p className="text-destructive text-xs">{form.formState.errors.content.message}</p>
-              )}
+              {form.formState.errors.content && <p className="text-destructive text-xs">{t("contentRequired")}</p>}
             </div>
 
             {/* ── Participants (meeting only) ───────────────────────── */}
@@ -360,10 +373,10 @@ export function ActivityModal(props: Props) {
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <UsersIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                  Participants
+                  {t("participants")}
                 </Label>
-                <Input {...form.register("participants")} placeholder="Mario Rossi, mario@example.com…" />
-                <p className="text-[11px] text-muted-foreground">Separate names or emails with commas</p>
+                <Input {...form.register("participants")} placeholder={t("participantsPlaceholder")} />
+                <p className="text-[11px] text-muted-foreground">{t("participantsHint")}</p>
               </div>
             )}
 
@@ -372,7 +385,7 @@ export function ActivityModal(props: Props) {
               <div className="space-y-2">
                 <Label className="flex items-center gap-1.5">
                   <LinkIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                  Link to (optional)
+                  {t("linkTo")}
                 </Label>
                 <Controller
                   control={form.control}
@@ -380,14 +393,14 @@ export function ActivityModal(props: Props) {
                   render={({ field }) => (
                     <Select value={field.value ?? "none"} onValueChange={field.onChange}>
                       <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Select entity type…" />
+                        <SelectValue placeholder={t("selectEntityType")} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
-                        <SelectItem value="lead">Lead</SelectItem>
-                        <SelectItem value="contact">Contact</SelectItem>
-                        <SelectItem value="company">Company</SelectItem>
-                        <SelectItem value="deal">Deal</SelectItem>
+                        <SelectItem value="none">{t("entities.none")}</SelectItem>
+                        <SelectItem value="lead">{t("entities.lead")}</SelectItem>
+                        <SelectItem value="contact">{t("entities.contact")}</SelectItem>
+                        <SelectItem value="company">{t("entities.company")}</SelectItem>
+                        <SelectItem value="deal">{t("entities.deal")}</SelectItem>
                       </SelectContent>
                     </Select>
                   )}
@@ -395,7 +408,9 @@ export function ActivityModal(props: Props) {
                 {form.watch("entityType") && form.watch("entityType") !== "none" && (
                   <Input
                     {...form.register("entityId")}
-                    placeholder={`${form.watch("entityType")} ID…`}
+                    placeholder={t("entityIdPlaceholder", {
+                      entity: t(`entities.${form.watch("entityType") ?? "none"}`),
+                    })}
                     className="h-9 font-mono text-xs"
                   />
                 )}
@@ -406,7 +421,7 @@ export function ActivityModal(props: Props) {
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5">
                 <BellIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                Reminder
+                {tf("reminderLabel")}
               </Label>
               <Controller
                 control={form.control}
@@ -417,12 +432,12 @@ export function ActivityModal(props: Props) {
                     onValueChange={(v) => field.onChange(v === "__none__" ? null : Number(v))}
                   >
                     <SelectTrigger className="h-9">
-                      <SelectValue placeholder="No reminder" />
+                      <SelectValue placeholder={tf("reminderNone")} />
                     </SelectTrigger>
                     <SelectContent>
                       {REMINDER_OPTIONS.map((o) => (
                         <SelectItem key={o.value} value={o.value}>
-                          {o.label}
+                          {tf(o.labelKey)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -434,11 +449,11 @@ export function ActivityModal(props: Props) {
 
           <DialogFooter className="border-t bg-muted/10 px-4 md:px-6 py-4">
             <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting} className="gap-2">
               {isSubmitting && <Loader2Icon className="h-3.5 w-3.5 animate-spin" />}
-              {isEdit ? "Save Changes" : "Log Activity"}
+              {isEdit ? t("saveChanges") : t("logActivity")}
             </Button>
           </DialogFooter>
         </form>

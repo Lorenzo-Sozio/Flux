@@ -17,6 +17,7 @@ type ConversionRate = {
 };
 
 export function FunnelChart({ stages, conversionRates }: { stages: Stage[]; conversionRates: ConversionRate[] }) {
+  const t = useTranslations("analytics.funnel");
   const maxCount = Math.max(...stages.map((s) => s.count), 1);
 
   return (
@@ -32,7 +33,7 @@ export function FunnelChart({ stages, conversionRates }: { stages: Stage[]; conv
                 <span
                   className={`text-xs font-medium ${cr.rate >= 50 ? "text-green-600" : cr.rate >= 20 ? "text-amber-600" : "text-red-500"}`}
                 >
-                  {cr.rate > 100 ? ">100" : cr.rate}% conversion ({cr.from} → {cr.to})
+                  {t("conversionStep", { rate: cr.rate > 100 ? ">100" : cr.rate, from: cr.from, to: cr.to })}
                 </span>
               </div>
             )}

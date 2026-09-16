@@ -1,7 +1,7 @@
 "use client";
 
 import { CreditCard, ExternalLink, Zap } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,8 @@ function formatCents(cents: number) {
 
 export function CurrentPlan({ entitlements, periodEnd, billingCycle, onManageClick, loading }: CurrentPlanProps) {
   const t = useTranslations("settings.billing");
+  const tPlan = useTranslations("settings.billing.currentPlanCard");
+  const format = useFormatter();
 
   const statusKey = entitlements.status in STATUS_VARIANT ? entitlements.status : "free";
   const statusVariant = STATUS_VARIANT[statusKey] ?? "outline";
@@ -51,7 +53,9 @@ export function CurrentPlan({ entitlements, periodEnd, billingCycle, onManageCli
         <div className="min-w-0">
           <CardTitle className="flex flex-wrap items-center gap-2">
             <Zap className="h-5 w-5 text-primary" />
-            {entitlements.planName.charAt(0).toUpperCase() + entitlements.planName.slice(1)} Plan
+            {tPlan("planName", {
+              name: entitlements.planName.charAt(0).toUpperCase() + entitlements.planName.slice(1),
+            })}
             <Badge variant={statusVariant}>{statusLabel}</Badge>
           </CardTitle>
           <CardDescription>
@@ -60,7 +64,7 @@ export function CurrentPlan({ entitlements, periodEnd, billingCycle, onManageCli
               <>
                 {" "}
                 · {t("currentPlan.renews")}{" "}
-                {new Date(periodEnd).toLocaleDateString(undefined, {
+                {format.dateTime(new Date(periodEnd), {
                   day: "numeric",
                   month: "short",
                   year: "numeric",
@@ -85,7 +89,14 @@ export function CurrentPlan({ entitlements, periodEnd, billingCycle, onManageCli
             label={t("currentPlan.statMaxUsers")}
             value={entitlements.maxUsers === null ? t("currentPlan.status.free") : String(entitlements.maxUsers)}
           />
-          <Stat label={t("currentPlan.statSupport")} value={capitalize(entitlements.supportTier)} />
+          <Stat
+            label={t("currentPlan.statSupport")}
+            value={
+              tPlan.has(`supportTiers.${entitlements.supportTier}`)
+                ? tPlan(`supportTiers.${entitlements.supportTier}`)
+                : capitalize(entitlements.supportTier)
+            }
+          />
           <Stat
             label={t("currentPlan.statModules")}
             value={t("currentPlan.modulesEnabled", { count: entitlements.enabledModules.length })}
@@ -96,7 +107,7 @@ export function CurrentPlan({ entitlements, periodEnd, billingCycle, onManageCli
             value={
               entitlements.limits.apiCallsPerMonth === null
                 ? t("usage.unlimited")
-                : formatNumber(entitlements.limits.apiCallsPerMonth)
+                : format.number(entitlements.limits.apiCallsPerMonth)
             }
           />
           <Stat
@@ -104,7 +115,7 @@ export function CurrentPlan({ entitlements, periodEnd, billingCycle, onManageCli
             value={
               entitlements.limits.automationRunsPerMonth === null
                 ? t("usage.unlimited")
-                : formatNumber(entitlements.limits.automationRunsPerMonth)
+                : format.number(entitlements.limits.automationRunsPerMonth)
             }
           />
         </div>
@@ -135,8 +146,4 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
-}
-
-function formatNumber(n: number) {
-  return new Intl.NumberFormat(undefined).format(n);
 }

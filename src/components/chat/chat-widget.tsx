@@ -19,6 +19,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import {
@@ -95,29 +96,32 @@ function initials(name: string | null, email: string | null) {
     .slice(0, 2);
 }
 
-function convName(conv: Conversation, myId: string) {
+type Translate = ReturnType<typeof useTranslations>;
+type Formatter = ReturnType<typeof useFormatter>;
+
+function convName(conv: Conversation, myId: string, unknown: string) {
   if (conv.name) return conv.name;
   const other = conv.members.find((m) => m.userId !== myId);
-  return other?.user?.name ?? other?.user?.email ?? "Unknown";
+  return other?.user?.name ?? other?.user?.email ?? unknown;
 }
 
-function formatTime(date: Date | string) {
+function formatTime(date: Date | string, format: Formatter, t: Translate) {
   const d = new Date(date);
   const diffMs = Date.now() - d.getTime();
   const diffDays = Math.floor(diffMs / 86_400_000);
-  if (diffDays === 0) return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return d.toLocaleDateString([], { weekday: "short" });
-  return d.toLocaleDateString([], { month: "short", day: "numeric" });
+  if (diffDays === 0) return format.dateTime(d, { hour: "2-digit", minute: "2-digit" });
+  if (diffDays === 1) return t("yesterday");
+  if (diffDays < 7) return format.dateTime(d, { weekday: "short" });
+  return format.dateTime(d, { month: "short", day: "numeric" });
 }
 
-function muteLabel(mutedUntil: Date | null) {
+function muteLabel(mutedUntil: Date | null, t: Translate) {
   if (!mutedUntil) return null;
   const diff = mutedUntil.getTime() - Date.now();
-  if (diff > 365 * 24 * 60 * 60_000) return "Muted forever";
+  if (diff > 365 * 24 * 60 * 60_000) return t("mutedForever");
   const h = Math.round(diff / 3_600_000);
-  if (h >= 24) return `Muted ${Math.round(h / 24)}d`;
-  return `Muted ${h}h`;
+  if (h >= 24) return t("mutedDays", { count: Math.round(h / 24) });
+  return t("mutedHours", { count: h });
 }
 
 // ── Conversation item ─────────────────────────────────────────────────────────
@@ -137,16 +141,23 @@ function ConvItem({
   onLeave: (convId: string) => void;
   onDelete: (convId: string) => void;
 }) {
+  const t = useTranslations("chat");
+  const format = useFormatter();
   const isGroup = conv.type === "group";
   const last = conv.messages[0];
-  const name = convName(conv, myId);
-  const muteText = muteLabel(conv.mutedUntil);
+  const name = convName(conv, myId, t("widget.unknown"));
+  const muteText = muteLabel(conv.mutedUntil, t);
   const other = !isGroup ? conv.members.find((m) => m.userId !== myId) : null;
 
   return (
     <div className="group relative mx-1 flex items-center gap-3 rounded-md px-3 py-2.5 transition-colors hover:bg-muted/50">
       {/* Clickable area */}
-      <button type="button" onClick={onClick} className="absolute inset-0 rounded-md" aria-label={`Open ${name}`} />
+      <button
+        type="button"
+        onClick={onClick}
+        className="absolute inset-0 rounded-md"
+        aria-label={t("widget.openConversation", { name })}
+      />
 
       {/* Avatar */}
       <Avatar className="h-9 w-9 shrink-0">
@@ -167,7 +178,7 @@ function ConvItem({
         <div className="flex items-center justify-between gap-1">
           <span className={cn("truncate text-sm", conv.unread > 0 ? "font-semibold" : "font-medium")}>{name}</span>
           <span className="shrink-0 text-[10px] text-muted-foreground tabular-nums">
-            {last ? formatTime(last.createdAt) : ""}
+            {last ? formatTime(last.createdAt, format, t) : ""}
           </span>
         </div>
         <div className="mt-0.5 flex items-center justify-between gap-1">
@@ -180,7 +191,7 @@ function ConvItem({
                 {muteText}
               </span>
             ) : (
-              (last?.content ?? "No messages yet")
+              (last?.content ?? t("noMessagesConv"))
             )}
           </span>
           {conv.unread > 0 && (
@@ -218,28 +229,28 @@ function ConvItem({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44" onClick={(e) => e.stopPropagation()}>
             <DropdownMenuLabel className="py-1 font-normal text-muted-foreground text-xs">
-              {isGroup ? "Group" : "Direct message"}
+              {isGroup ? t("groupLabel") : t("directMessageLabel")}
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onClick}>
               <MessageCircle className="mr-2 h-3.5 w-3.5" />
-              Open chat
+              {t("widget.openChat")}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {conv.muted ? (
               <DropdownMenuItem onClick={() => onMute(conv.id, null)}>
                 <Volume2 className="mr-2 h-3.5 w-3.5" />
-                Unmute
+                {t("unmute")}
               </DropdownMenuItem>
             ) : (
               <>
                 <DropdownMenuLabel className="px-2 pt-1 pb-0 text-[11px] text-muted-foreground">
-                  Mute for…
+                  {t("muteFor")}
                 </DropdownMenuLabel>
-                <DropdownMenuItem onClick={() => onMute(conv.id, 60)}>1 hour</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onMute(conv.id, 8 * 60)}>8 hours</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onMute(conv.id, 24 * 60)}>24 hours</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onMute(conv.id, 999_999_999)}>Forever</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onMute(conv.id, 60)}>{t("mute1h")}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onMute(conv.id, 8 * 60)}>{t("mute8h")}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onMute(conv.id, 24 * 60)}>{t("mute24h")}</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onMute(conv.id, 999_999_999)}>{t("muteForever")}</DropdownMenuItem>
               </>
             )}
             {isGroup && (
@@ -247,14 +258,14 @@ function ConvItem({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => onLeave(conv.id)} className="text-destructive focus:text-destructive">
                   <LogOut className="mr-2 h-3.5 w-3.5" />
-                  Leave group
+                  {t("leaveGroup")}
                 </DropdownMenuItem>
               </>
             )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onDelete(conv.id)} className="text-destructive focus:text-destructive">
               <Trash2 className="mr-2 h-3.5 w-3.5" />
-              Delete
+              {t("delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -266,6 +277,7 @@ function ConvItem({
 // ── Group badge in header ─────────────────────────────────────────────────────
 
 function GroupHeader({ conv, myId }: { conv: Conversation; myId: string }) {
+  const t = useTranslations("chat");
   const memberCount = conv.members.length;
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -275,10 +287,8 @@ function GroupHeader({ conv, myId }: { conv: Conversation; myId: string }) {
         </AvatarFallback>
       </Avatar>
       <div className="min-w-0">
-        <p className="truncate font-semibold text-sm leading-4">{convName(conv, myId)}</p>
-        <p className="text-[10px] text-muted-foreground">
-          {memberCount} member{memberCount !== 1 ? "s" : ""}
-        </p>
+        <p className="truncate font-semibold text-sm leading-4">{convName(conv, myId, t("widget.unknown"))}</p>
+        <p className="text-[10px] text-muted-foreground">{t("widget.members", { count: memberCount })}</p>
       </div>
     </div>
   );
@@ -287,6 +297,8 @@ function GroupHeader({ conv, myId }: { conv: Conversation; myId: string }) {
 // ── Main widget ───────────────────────────────────────────────────────────────
 
 export function ChatWidget({ userId }: { userId: string }) {
+  const t = useTranslations("chat");
+  const format = useFormatter();
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>({ kind: "list" });
   const [tab, setTab] = useState<TabValue>("all");
@@ -439,7 +451,7 @@ export function ChatWidget({ userId }: { userId: string }) {
       // The message did not go. Putting the text back in the box is the only
       // honest outcome: it used to vanish and look sent.
       setInput(text);
-      toast.error("The message could not be sent.");
+      toast.error(t("widget.sendFailed"));
     } finally {
       setSending(false);
       inputRef.current?.focus();
@@ -455,7 +467,7 @@ export function ChatWidget({ userId }: { userId: string }) {
       if (found) openThread(found);
       else setView({ kind: "list" });
     } catch {
-      toast.error("The conversation could not be started.");
+      toast.error(t("widget.startFailed"));
     }
   };
 
@@ -470,7 +482,7 @@ export function ChatWidget({ userId }: { userId: string }) {
       if (found) openThread(found);
       else setView({ kind: "list" });
     } catch {
-      toast.error("The group could not be created.");
+      toast.error(t("widget.createGroupFailed"));
     }
   };
 
@@ -480,32 +492,32 @@ export function ChatWidget({ userId }: { userId: string }) {
       loadConvs();
       loadUnread();
     } catch {
-      toast.error("The mute setting could not be saved.");
+      toast.error(t("widget.muteFailed"));
     }
   };
 
   const handleLeave = async (convId: string) => {
-    if (!confirm("Leave this group?")) return;
+    if (!confirm(t("leaveGroupConfirm"))) return;
     try {
       await leaveConversation(convId);
       setConversations((prev) => prev.filter((c) => c.id !== convId));
       if (view.kind === "thread" && view.conv.id === convId) setView({ kind: "list" });
     } catch {
       // The row was already removed from the list, so say it did not stick.
-      toast.error("Could not leave the group.");
+      toast.error(t("widget.leaveFailed"));
       loadConvs();
     }
   };
 
   const handleDelete = async (convId: string) => {
-    if (!confirm("Delete this conversation? All messages will be permanently removed.")) return;
+    if (!confirm(t("widget.deleteConfirm"))) return;
     try {
       await deleteConversation(convId);
       setConversations((prev) => prev.filter((c) => c.id !== convId));
       if (view.kind === "thread" && view.conv.id === convId) setView({ kind: "list" });
       loadUnread();
     } catch {
-      toast.error("The conversation could not be deleted.");
+      toast.error(t("widget.deleteFailed"));
       loadConvs();
     }
   };
@@ -547,14 +559,14 @@ export function ChatWidget({ userId }: { userId: string }) {
             <div className="flex items-center justify-between px-4 pt-3 pb-2">
               {view.kind === "list" ? (
                 <>
-                  <span className="font-semibold text-sm">Messages</span>
+                  <span className="font-semibold text-sm">{t("messages")}</span>
                   <div className="flex items-center gap-1">
                     <Button
                       size="icon"
                       variant="ghost"
                       className="h-7 w-7"
                       onClick={() => setView({ kind: "new-dm" })}
-                      title="New direct message"
+                      title={t("newDmTitle")}
                     >
                       <Edit className="h-3.5 w-3.5" />
                     </Button>
@@ -563,7 +575,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                       variant="ghost"
                       className="h-7 w-7"
                       onClick={() => setView({ kind: "new-group" })}
-                      title="New group"
+                      title={t("newGroupTitle")}
                     >
                       <Users className="h-3.5 w-3.5" />
                     </Button>
@@ -595,7 +607,9 @@ export function ChatWidget({ userId }: { userId: string }) {
                             )}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="truncate font-semibold text-sm">{convName(view.conv, userId)}</span>
+                        <span className="truncate font-semibold text-sm">
+                          {convName(view.conv, userId, t("widget.unknown"))}
+                        </span>
                       </div>
                     )}
                   </div>
@@ -609,18 +623,24 @@ export function ChatWidget({ userId }: { userId: string }) {
                     <DropdownMenuContent align="end" className="w-44">
                       {view.conv.muted ? (
                         <DropdownMenuItem onClick={() => handleMute(view.conv.id, null)}>
-                          <Volume2 className="mr-2 h-3.5 w-3.5" /> Unmute
+                          <Volume2 className="mr-2 h-3.5 w-3.5" /> {t("unmute")}
                         </DropdownMenuItem>
                       ) : (
                         <>
-                          <DropdownMenuLabel className="text-[11px] text-muted-foreground">Mute for…</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleMute(view.conv.id, 60)}>1 hour</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleMute(view.conv.id, 8 * 60)}>8 hours</DropdownMenuItem>
+                          <DropdownMenuLabel className="text-[11px] text-muted-foreground">
+                            {t("muteFor")}
+                          </DropdownMenuLabel>
+                          <DropdownMenuItem onClick={() => handleMute(view.conv.id, 60)}>
+                            {t("mute1h")}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleMute(view.conv.id, 8 * 60)}>
+                            {t("mute8h")}
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleMute(view.conv.id, 24 * 60)}>
-                            24 hours
+                            {t("mute24h")}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleMute(view.conv.id, 999_999_999)}>
-                            Forever
+                            {t("muteForever")}
                           </DropdownMenuItem>
                         </>
                       )}
@@ -631,7 +651,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                             onClick={() => handleLeave(view.conv.id)}
                             className="text-destructive focus:text-destructive"
                           >
-                            <LogOut className="mr-2 h-3.5 w-3.5" /> Leave group
+                            <LogOut className="mr-2 h-3.5 w-3.5" /> {t("leaveGroup")}
                           </DropdownMenuItem>
                         </>
                       )}
@@ -645,7 +665,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                       <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <span className="font-semibold text-sm">
-                      {view.kind === "new-dm" ? "New Message" : "New Group"}
+                      {view.kind === "new-dm" ? t("newMessageBtn") : t("newGroupBtn")}
                     </span>
                   </div>
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setOpen(false)}>
@@ -661,7 +681,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                 <Tabs value={tab} onValueChange={(v) => setTab(v as TabValue)}>
                   <TabsList className="h-8 w-full">
                     <TabsTrigger value="all" className="h-6 flex-1 gap-1 text-xs">
-                      All
+                      {t("allTab")}
                       {unreadTotal > 0 && (
                         <span className="rounded-full bg-primary/20 px-1 font-semibold text-[10px] text-primary leading-4">
                           {unreadTotal}
@@ -669,11 +689,11 @@ export function ChatWidget({ userId }: { userId: string }) {
                       )}
                     </TabsTrigger>
                     <TabsTrigger value="direct" className="h-6 flex-1 gap-1 text-xs">
-                      <User className="h-3 w-3" /> Direct
+                      <User className="h-3 w-3" /> {t("widget.directTab")}
                       {directCount > 0 && <span className="text-[10px] text-muted-foreground">({directCount})</span>}
                     </TabsTrigger>
                     <TabsTrigger value="groups" className="h-6 flex-1 gap-1 text-xs">
-                      <Users className="h-3 w-3" /> Groups
+                      <Users className="h-3 w-3" /> {t("groupsTab")}
                       {groupCount > 0 && (
                         <span
                           className={cn(
@@ -704,8 +724,8 @@ export function ChatWidget({ userId }: { userId: string }) {
                         <Users className="h-6 w-6 text-violet-600 dark:text-violet-400" />
                       </div>
                       <div>
-                        <p className="font-medium text-sm">No groups yet</p>
-                        <p className="mt-1 text-muted-foreground text-xs">Create a group to start collaborating</p>
+                        <p className="font-medium text-sm">{t("widget.noGroups")}</p>
+                        <p className="mt-1 text-muted-foreground text-xs">{t("widget.noGroupsHint")}</p>
                       </div>
                       <Button
                         size="sm"
@@ -713,7 +733,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                         className="h-8 gap-1.5 text-xs"
                         onClick={() => setView({ kind: "new-group" })}
                       >
-                        <Plus className="h-3.5 w-3.5" /> New Group
+                        <Plus className="h-3.5 w-3.5" /> {t("newGroupBtn")}
                       </Button>
                     </>
                   ) : tab === "direct" ? (
@@ -722,8 +742,8 @@ export function ChatWidget({ userId }: { userId: string }) {
                         <MessageCircle className="h-6 w-6 text-primary" />
                       </div>
                       <div>
-                        <p className="font-medium text-sm">No direct messages</p>
-                        <p className="mt-1 text-muted-foreground text-xs">Start a conversation with a colleague</p>
+                        <p className="font-medium text-sm">{t("widget.noDirect")}</p>
+                        <p className="mt-1 text-muted-foreground text-xs">{t("widget.noDirectHint")}</p>
                       </div>
                       <Button
                         size="sm"
@@ -731,7 +751,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                         className="h-8 gap-1.5 text-xs"
                         onClick={() => setView({ kind: "new-dm" })}
                       >
-                        <Edit className="h-3.5 w-3.5" /> New Message
+                        <Edit className="h-3.5 w-3.5" /> {t("newMessageBtn")}
                       </Button>
                     </>
                   ) : (
@@ -740,8 +760,8 @@ export function ChatWidget({ userId }: { userId: string }) {
                         <MessageCircle className="h-6 w-6 text-muted-foreground" />
                       </div>
                       <div>
-                        <p className="font-medium text-sm">No conversations</p>
-                        <p className="mt-1 text-muted-foreground text-xs">Message a colleague or create a group</p>
+                        <p className="font-medium text-sm">{t("noConversationsPanel")}</p>
+                        <p className="mt-1 text-muted-foreground text-xs">{t("widget.noConversationsHint")}</p>
                       </div>
                     </>
                   )}
@@ -755,7 +775,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                       <>
                         {filtered[0]?.type !== "group" && (
                           <p className="px-4 py-1.5 font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
-                            Direct
+                            {t("widget.directTab")}
                           </p>
                         )}
                         {filtered.map((conv, i) => {
@@ -765,7 +785,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                             <React.Fragment key={conv.id}>
                               {showGroupDivider && (
                                 <p className="px-4 pt-3 pb-1.5 font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
-                                  Groups
+                                  {t("groupsTab")}
                                 </p>
                               )}
                               <ConvItem
@@ -806,7 +826,7 @@ export function ChatWidget({ userId }: { userId: string }) {
               <ScrollArea className="flex-1 px-3 py-3">
                 {messages.length === 0 && (
                   <div className="flex justify-center py-8">
-                    <p className="text-muted-foreground text-xs">No messages yet. Say hello!</p>
+                    <p className="text-muted-foreground text-xs">{t("noMessagesYet")}</p>
                   </div>
                 )}
                 <div className="space-y-2">
@@ -841,7 +861,9 @@ export function ChatWidget({ userId }: { userId: string }) {
                             {msg.content}
                           </div>
                           {(!sameAuthor || i === messages.length - 1) && (
-                            <span className="px-1 text-[9px] text-muted-foreground">{formatTime(msg.createdAt)}</span>
+                            <span className="px-1 text-[9px] text-muted-foreground">
+                              {formatTime(msg.createdAt, format, t)}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -862,7 +884,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                       handleSend();
                     }
                   }}
-                  placeholder="Write a message…"
+                  placeholder={t("typeMessage")}
                   className="h-9 text-sm"
                   disabled={sending}
                   autoFocus
@@ -888,7 +910,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                   <Input
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
-                    placeholder="Search people…"
+                    placeholder={t("widget.searchPeople")}
                     className="h-8 pl-8 text-sm"
                     autoFocus
                   />
@@ -896,7 +918,7 @@ export function ChatWidget({ userId }: { userId: string }) {
               </div>
               <ScrollArea className="flex-1">
                 {filteredUsers.length === 0 ? (
-                  <p className="py-10 text-center text-muted-foreground text-xs">No users found</p>
+                  <p className="py-10 text-center text-muted-foreground text-xs">{t("widget.noUsers")}</p>
                 ) : (
                   filteredUsers.map((u) => (
                     <button
@@ -928,7 +950,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                 <Input
                   value={groupName}
                   onChange={(e) => setGroupName(e.target.value)}
-                  placeholder="Group name…"
+                  placeholder={t("groupNamePlaceholder")}
                   className="h-8 text-sm"
                   autoFocus
                 />
@@ -937,7 +959,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                   <Input
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
-                    placeholder="Add members…"
+                    placeholder={t("widget.addMembers")}
                     className="h-8 pl-8 text-sm"
                   />
                 </div>
@@ -993,7 +1015,7 @@ export function ChatWidget({ userId }: { userId: string }) {
                   disabled={!groupName.trim() || selectedIds.length === 0}
                 >
                   <Plus className="h-4 w-4" />
-                  Create Group ({selectedIds.length} member{selectedIds.length !== 1 ? "s" : ""})
+                  {t("widget.createGroupWithCount", { count: selectedIds.length })}
                 </Button>
               </div>
             </div>

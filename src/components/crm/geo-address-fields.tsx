@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
-
+import { useTranslations } from "next-intl";
 import { type Control, Controller, type UseFormSetValue, type UseFormWatch } from "react-hook-form";
 
 import { Input } from "@/components/ui/input";
@@ -55,8 +54,8 @@ export interface GeoAddressFieldsProps {
   labels: GeoAddressLabels;
 }
 
-export function GeoAddressFields({ control, setValue, watch, errors, labels }: GeoAddressFieldsProps) {
-  useEffect(() => {}, [setValue, watch]);
+export function GeoAddressFields({ control, errors, labels }: GeoAddressFieldsProps) {
+  const t = useTranslations("geoAddress");
 
   return (
     <>
@@ -67,7 +66,7 @@ export function GeoAddressFields({ control, setValue, watch, errors, labels }: G
           name="street"
           render={({ field }) => (
             <F label={labels.street} error={errors?.street?.message}>
-              <Input {...field} value={field.value ?? ""} placeholder="Via Roma 1" />
+              <Input {...field} value={field.value ?? ""} placeholder={t("streetPlaceholder")} />
             </F>
           )}
         />
@@ -80,7 +79,7 @@ export function GeoAddressFields({ control, setValue, watch, errors, labels }: G
           name="country"
           render={({ field }) => (
             <F label={labels.country} error={errors?.country?.message}>
-              <Input {...field} value={field.value ?? ""} placeholder="Italy" />
+              <Input {...field} value={field.value ?? ""} placeholder={t("countryPlaceholder")} />
             </F>
           )}
         />
@@ -93,7 +92,7 @@ export function GeoAddressFields({ control, setValue, watch, errors, labels }: G
           name="city"
           render={({ field }) => (
             <F label={labels.city} error={errors?.city?.message}>
-              <Input {...field} value={field.value ?? ""} placeholder="Milan" />
+              <Input {...field} value={field.value ?? ""} placeholder={t("cityPlaceholder")} />
             </F>
           )}
         />

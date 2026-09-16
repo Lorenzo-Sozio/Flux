@@ -5,9 +5,9 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { format } from "date-fns";
-import { it } from "date-fns/locale";
+import { enUS, it } from "date-fns/locale";
 import { CalendarDays, CalendarIcon, Loader2, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createTask } from "@/actions/tasks";
@@ -58,6 +58,8 @@ function DateTimePicker({
   showTime: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const t = useTranslations("tasks.modal");
+  const dateLocale = useLocale() === "it" ? it : enUS;
   const selected = value ? new Date(value) : undefined;
 
   return (
@@ -76,7 +78,7 @@ function DateTimePicker({
               >
                 <CalendarIcon className="h-3 w-3 shrink-0 text-muted-foreground" />
                 <span className="flex-1 text-left">
-                  {selected ? format(selected, "d MMM yyyy", { locale: it }) : "—"}
+                  {selected ? format(selected, "d MMM yyyy", { locale: dateLocale }) : "—"}
                 </span>
               </button>
             </PopoverTrigger>
@@ -88,7 +90,7 @@ function DateTimePicker({
                   onChange(date ? format(date, "yyyy-MM-dd") : undefined);
                   setOpen(false);
                 }}
-                locale={it}
+                locale={dateLocale}
                 captionLayout="dropdown"
               />
             </PopoverContent>
@@ -97,7 +99,7 @@ function DateTimePicker({
             <button
               type="button"
               onClick={() => onChange(undefined)}
-              aria-label="Cancella data"
+              aria-label={t("clearDate")}
               className="absolute right-1.5 rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <X className="h-3 w-3" />

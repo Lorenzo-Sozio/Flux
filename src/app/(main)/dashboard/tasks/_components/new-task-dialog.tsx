@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { it } from "date-fns/locale";
+import { enUS, it } from "date-fns/locale";
 import {
   AlertCircle,
   Building2,
@@ -29,7 +29,7 @@ import {
   UserSearch,
   X,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -46,6 +46,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { useOpenOnNew } from "@/hooks/use-open-on-new";
 import { cn } from "@/lib/utils";
 
 // ─── Schema ────────────────────────────────────────────────────────────────────
@@ -71,28 +72,29 @@ type FormValues = z.infer<typeof schema>;
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
 const PRIORITY_CONFIG = {
-  blocker: { label: "Bloccante", color: "#dc2626" },
-  critical: { label: "Critica", color: "#ea580c" },
-  high: { label: "Alta", color: "#ef4444" },
-  normal: { label: "Normale", color: "#6366f1" },
-  low: { label: "Bassa", color: "#94a3b8" },
+  blocker: { labelKey: "priorities.blocker", color: "#dc2626" },
+  critical: { labelKey: "priorities.critical", color: "#ea580c" },
+  high: { labelKey: "priorities.high", color: "#ef4444" },
+  normal: { labelKey: "priorities.normal", color: "#6366f1" },
+  low: { labelKey: "priorities.low", color: "#94a3b8" },
 } as const;
 
 const STATUS_CONFIG = {
-  todo: { label: "Da fare", icon: AlertCircle, color: "text-slate-500" },
-  in_progress: { label: "In corso", icon: Clock, color: "text-blue-500" },
-  done: { label: "Completata", icon: CheckSquare, color: "text-emerald-500" },
+  todo: { labelKey: "statuses.todo", icon: AlertCircle, color: "text-slate-500" },
+  in_progress: { labelKey: "statuses.inProgress", icon: Clock, color: "text-blue-500" },
+  done: { labelKey: "statuses.done", icon: CheckSquare, color: "text-emerald-500" },
 } as const;
 
 type EntityType = "contact" | "company" | "lead" | "deal" | "ticket";
 type EntityOption = { id: string; label: string; sub?: string };
 
-const ENTITY_TYPES: { value: EntityType; label: string; icon: React.ElementType }[] = [
-  { value: "contact", label: "Contatto", icon: UserCircle },
-  { value: "company", label: "Azienda", icon: Building2 },
-  { value: "lead", label: "Lead", icon: UserSearch },
-  { value: "deal", label: "Trattativa", icon: Kanban },
-  { value: "ticket", label: "Ticket", icon: Headphones },
+// labelKey and searchKey are message keys under `tasks`, translated at render time.
+const ENTITY_TYPES: { value: EntityType; labelKey: string; searchKey: string; icon: React.ElementType }[] = [
+  { value: "contact", labelKey: "dialog.linkContact", searchKey: "dialog.searchContacts", icon: UserCircle },
+  { value: "company", labelKey: "dialog.linkCompany", searchKey: "dialog.searchCompanies", icon: Building2 },
+  { value: "lead", labelKey: "dialog.linkLead", searchKey: "dialog.searchLeads", icon: UserSearch },
+  { value: "deal", labelKey: "dialog.linkDeal", searchKey: "dialog.searchDeals", icon: Kanban },
+  { value: "ticket", labelKey: "newTaskDialog.linkTicket", searchKey: "newTaskDialog.searchTickets", icon: Headphones },
 ];
 
 function EntityPicker({
@@ -108,10 +110,13 @@ function EntityPicker({
   selectedId: string | null;
   onSelect: (id: string | null) => void;
 }) {
+  const t = useTranslations("tasks");
+  const tc = useTranslations("common");
   const [popoverOpen, setPopoverOpen] = useState(false);
   const selected = options.find((o) => o.id === selectedId) ?? null;
-  const TypeIcon = ENTITY_TYPES.find((t) => t.value === entityType)?.icon ?? UserCircle;
-  const typeLabel = ENTITY_TYPES.find((t) => t.value === entityType)?.label ?? "";
+  const TypeIcon = ENTITY_TYPES.find((et) => et.value === entityType)?.icon ?? UserCircle;
+  const searchKey = ENTITY_TYPES.find((et) => et.value === entityType)?.searchKey;
+  const searchLabel = searchKey ? t(searchKey) : "";
 
   return (
     <div className="space-y-2">
@@ -138,7 +143,7 @@ function EntityPicker({
               )}
             >
               <Icon className="h-3 w-3 shrink-0" />
-              <span className="hidden sm:inline">{et.label}</span>
+              <span className="hidden sm:inline">{t(et.labelKey)}</span>
             </button>
           );
         })}
@@ -163,7 +168,7 @@ function EntityPicker({
                 {selected.sub && <span className="truncate text-muted-foreground text-xs">{selected.sub}</span>}
               </span>
             ) : (
-              <span className="text-muted-foreground">Cerca {typeLabel.toLowerCase()}…</span>
+              <span className="text-muted-foreground">{searchLabel}</span>
             )}
             <div className="ml-2 flex shrink-0 items-center gap-1">
               {selected && (
@@ -184,9 +189,9 @@ function EntityPicker({
         </PopoverTrigger>
         <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
           <Command>
-            <CommandInput placeholder={`Cerca ${typeLabel.toLowerCase()}…`} />
+            <CommandInput placeholder={searchLabel} />
             <CommandList>
-              <CommandEmpty>Nessun risultato.</CommandEmpty>
+              <CommandEmpty>{tc("noResults")}</CommandEmpty>
               <CommandGroup>
                 {options.map((opt) => (
                   <CommandItem
@@ -257,6 +262,8 @@ function DatePicker({
   showTime?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const t = useTranslations("tasks.modal");
+  const dateLocale = useLocale() === "it" ? it : enUS;
   const selected = value ? new Date(value) : undefined;
 
   return (
@@ -275,7 +282,7 @@ function DatePicker({
             >
               <CalendarIcon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
               <span className="flex-1 text-left">
-                {selected ? format(selected, "d MMM yyyy", { locale: it }) : placeholder}
+                {selected ? format(selected, "d MMM yyyy", { locale: dateLocale }) : placeholder}
               </span>
             </button>
           </PopoverTrigger>
@@ -287,7 +294,7 @@ function DatePicker({
                 onChange(date ? format(date, "yyyy-MM-dd") : undefined);
                 setOpen(false);
               }}
-              locale={it}
+              locale={dateLocale}
               captionLayout="dropdown"
             />
           </PopoverContent>
@@ -296,7 +303,7 @@ function DatePicker({
           <button
             type="button"
             onClick={() => onChange(undefined)}
-            aria-label="Cancella data"
+            aria-label={t("clearDate")}
             className="absolute right-1.5 rounded-sm p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
@@ -318,6 +325,8 @@ function DatePicker({
 // ─── Props ─────────────────────────────────────────────────────────────────────
 
 interface Props {
+  /** Open when the page is reached with ?new=true. One per page. */
+  openOnNew?: boolean;
   users: { id: string; name: string | null }[];
   tasks: { id: string; title: string; depth: number }[];
   leads: { id: string; firstName: string; lastName: string }[];
@@ -367,9 +376,11 @@ export function NewTaskDialog({
   currentUserId,
   onCreated,
   defaultTicketId,
+  openOnNew = false,
 }: Props) {
   const t = useTranslations("tasks");
   const [open, setOpen] = useState(false);
+  useOpenOnNew(openOnNew, setOpen);
   const [allDay, setAllDay] = useState(true);
   const [startTime, setStartTime] = useState("09:00");
   const [dueTime, setDueTime] = useState("18:00");
@@ -593,7 +604,7 @@ export function NewTaskDialog({
 
               {/* ── Tab 1: Dettagli ──────────────────────────────────────────── */}
               <TabsContent value="details" className="mt-0 space-y-4">
-                <F label={t("dialog.titleLabel")} required error={e.title?.message}>
+                <F label={t("dialog.titleLabel")} required error={e.title ? t("modal.titleRequired") : undefined}>
                   <Input
                     {...register("title")}
                     placeholder={t("dialog.titlePlaceholder")}
@@ -632,7 +643,7 @@ export function NewTaskDialog({
                                 <SelectItem key={key} value={key}>
                                   <span className="flex items-center gap-2">
                                     <Icon className={cn("h-3.5 w-3.5", cfg.color)} />
-                                    {cfg.label}
+                                    {t(cfg.labelKey)}
                                   </span>
                                 </SelectItem>
                               );
@@ -665,7 +676,7 @@ export function NewTaskDialog({
                                     className="h-2 w-2 shrink-0 rounded-full"
                                     style={{ backgroundColor: cfg.color }}
                                   />
-                                  {cfg.label}
+                                  {t(cfg.labelKey)}
                                 </span>
                               </SelectItem>
                             ))}
@@ -688,7 +699,7 @@ export function NewTaskDialog({
                     )}
                   >
                     <CalendarDays className="h-3.5 w-3.5" />
-                    Tutto il giorno
+                    {t("modal.allDay")}
                   </button>
                 </div>
 
@@ -840,7 +851,7 @@ export function NewTaskDialog({
                               <span
                                 className="h-2.5 w-2.5 shrink-0 rounded-full"
                                 style={{ backgroundColor: priorityCfg.color }}
-                                title={priorityCfg.label}
+                                title={t(priorityCfg.labelKey)}
                               />
                             )}
                             <button
@@ -915,7 +926,7 @@ export function NewTaskDialog({
                                               className="h-2 w-2 shrink-0 rounded-full"
                                               style={{ backgroundColor: cfg.color }}
                                             />
-                                            {cfg.label}
+                                            {t(cfg.labelKey)}
                                           </span>
                                         </SelectItem>
                                       ))}

@@ -6,7 +6,7 @@ import Link from "next/link";
 
 import { isWeekend } from "date-fns";
 import { BarChart3, ExternalLink, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -128,6 +128,7 @@ interface Props {
 
 export function WorkloadPanel({ viewDate, onClose }: Props) {
   const t = useTranslations("tasks.gantt");
+  const locale = useLocale();
   const rawTasks = useGanttStore((s) => s.rawTasks);
 
   const visibleDays = useMemo(() => getNextWorkingDays(viewDate, VISIBLE_DAYS), [viewDate]);
@@ -138,7 +139,7 @@ export function WorkloadPanel({ viewDate, onClose }: Props) {
   const week2Start = visibleDays[7];
   const periodEnd = visibleDays[visibleDays.length - 1];
 
-  const fmtShort = (d: Date) => d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+  const fmtShort = (d: Date) => d.toLocaleDateString(locale, { day: "2-digit", month: "short" });
 
   // 320px beside the chart is the whole of a phone. Below lg it is a full-width
   // strip under the chart instead of a column beside it.
@@ -197,56 +198,56 @@ export function WorkloadPanel({ viewDate, onClose }: Props) {
                     isToday ? "font-bold text-primary" : "text-muted-foreground/60",
                   )}
                 >
-                  {d.toLocaleDateString(undefined, { weekday: "narrow" })}
+                  {d.toLocaleDateString(locale, { weekday: "narrow" })}
                 </div>
               );
             })}
           </div>
         </div>
       </div>
-      users.length === 0 ? (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center text-muted-foreground">
-        <BarChart3 className="h-8 w-8 opacity-20" aria-hidden="true" />
-        <p className="text-xs">{t("workloadNoData")}</p>
-      </div>
+      {users.length === 0 ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 text-center text-muted-foreground">
+          <BarChart3 className="h-8 w-8 opacity-20" aria-hidden="true" />
+          <p className="text-xs">{t("workloadNoData")}</p>
+        </div>
       ) : (
-      <div className="flex-1 overflow-y-auto py-1">
-        {users.map((user) => (
-          <div key={user.userId} className="flex items-center py-1.5 pl-3">
-            {/* User info — 76px */}
-            <div className="flex w-[76px] shrink-0 items-center gap-1.5 overflow-hidden">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-muted font-bold text-[8px] text-muted-foreground">
-                {user.initials}
-              </span>
-              <span className="truncate font-medium text-[11px]">{user.name.split(" ")[0]}</span>
+        <div className="flex-1 overflow-y-auto py-1">
+          {users.map((user) => (
+            <div key={user.userId} className="flex items-center py-1.5 pl-3">
+              {/* User info — 76px */}
+              <div className="flex w-[76px] shrink-0 items-center gap-1.5 overflow-hidden">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border bg-muted font-bold text-[8px] text-muted-foreground">
+                  {user.initials}
+                </span>
+                <span className="truncate font-medium text-[11px]">{user.name.split(" ")[0]}</span>
+              </div>
+              {/* Day cells — 14px each with 1px gap (14×14+13×1 = 209px) */}
+              <div className="flex gap-px">
+                {visibleDays.map((d) => {
+                  const ds = toDateStr(d);
+                  const hours = user.dayHours[ds] ?? 0;
+                  const isToday = ds === todayStr;
+                  return (
+                    <div
+                      key={ds}
+                      className={cn(
+                        "h-5 w-[14px] shrink-0 rounded-[2px]",
+                        cellBg(hours),
+                        isToday && "ring-1 ring-primary ring-offset-[1px]",
+                      )}
+                      title={
+                        hours > 0
+                          ? `${user.name} · ${d.toLocaleDateString(locale, { weekday: "short", day: "2-digit", month: "short" })} · ${hours.toFixed(1)}h`
+                          : undefined
+                      }
+                    />
+                  );
+                })}
+              </div>
             </div>
-            {/* Day cells — 14px each with 1px gap (14×14+13×1 = 209px) */}
-            <div className="flex gap-px">
-              {visibleDays.map((d) => {
-                const ds = toDateStr(d);
-                const hours = user.dayHours[ds] ?? 0;
-                const isToday = ds === todayStr;
-                return (
-                  <div
-                    key={ds}
-                    className={cn(
-                      "h-5 w-[14px] shrink-0 rounded-[2px]",
-                      cellBg(hours),
-                      isToday && "ring-1 ring-primary ring-offset-[1px]",
-                    )}
-                    title={
-                      hours > 0
-                        ? `${user.name} · ${d.toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short" })} · ${hours.toFixed(1)}h`
-                        : undefined
-                    }
-                  />
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
-      )
+          ))}
+        </div>
+      )}
       <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-t px-4 py-2">
         {[
           { bg: "bg-emerald-300/70 dark:bg-emerald-600/50", label: "≤50%" },

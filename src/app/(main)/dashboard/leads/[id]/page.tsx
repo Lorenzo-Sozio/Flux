@@ -159,6 +159,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
       getTranslations("leads"),
       getTranslations("entityDetail"),
     ]);
+  const tc = await getTranslations("common");
 
   const leadTypeName = lead.leadTypeId ? (allCompanyTypes.find((t) => t.id === lead.leadTypeId)?.name ?? null) : null;
   const leadCategoryName = lead.leadCategoryId
@@ -189,7 +190,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <div className="flex flex-col gap-6">
-      <RecordVisit type="lead" name={fullName || "Lead"} href={`/dashboard/leads/${leadId}`} />
+      <RecordVisit type="lead" id={leadId} label={fullName || lead.email || leadId} sub={lead.companyName ?? null} />
 
       {/* ── Hero ── */}
       <Card>
@@ -492,7 +493,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base text-emerald-700 dark:text-emerald-400">
                   <CheckCircle2Icon className="h-4 w-4" />
-                  Convertito in
+                  {t("detail.convertedTo")}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
@@ -525,7 +526,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 )}
                 {lead.convertedAt && (
                   <p className="border-t pt-1 text-[10px] text-muted-foreground">
-                    Convertito il <FormattedDate date={lead.convertedAt} />
+                    {t.rich("detail.convertedOn", { date: () => <FormattedDate date={lead.convertedAt} /> })}
                   </p>
                 )}
               </CardContent>
@@ -625,7 +626,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                             <button
                               type="submit"
                               className="p-1 text-muted-foreground transition-colors hover:text-destructive"
-                              title="Delete"
+                              title={tc("delete")}
                             >
                               <Trash2Icon className="h-3.5 w-3.5" />
                             </button>

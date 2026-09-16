@@ -119,6 +119,7 @@ export function CompanyModal({
 }) {
   const t = useTranslations("companies");
   const tc = useTranslations("common");
+  const tf = useTranslations("recordForm");
   const [open, setOpen] = useState(false);
   const [duplicates, setDuplicates] = useState<Awaited<ReturnType<typeof checkCompanyDuplicates>>>([]);
   const [pendingPayload, setPendingPayload] = useState<Record<string, unknown> | null>(null);
@@ -279,7 +280,7 @@ export function CompanyModal({
           toast.error(result.message, {
             action: isPlanLimit(result)
               ? {
-                  label: "Upgrade",
+                  label: tf("upgrade"),
                   onClick: () => {
                     window.location.href = "/dashboard/settings/billing";
                   },
@@ -297,7 +298,7 @@ export function CompanyModal({
           toast.error(result.message, {
             action: isPlanLimit(result)
               ? {
-                  label: "Upgrade",
+                  label: tf("upgrade"),
                   onClick: () => {
                     window.location.href = "/dashboard/settings/billing";
                   },
@@ -373,7 +374,7 @@ export function CompanyModal({
                     variant="ghost"
                     size="icon"
                     type="button"
-                    title="Apri scheda completa"
+                    title={tf("openFullRecord")}
                     className="h-8 w-8 shrink-0"
                   >
                     <ArrowUpRightIcon className="h-4 w-4" />
@@ -424,6 +425,7 @@ export function CompanyModal({
                 <TabsContent value="info" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                   <div className="col-span-1 sm:col-span-2">
                     <F label={tc("name")} required error={e.name?.message}>
+                      {/* i18n-ignore: an example value, the same in both languages */}
                       <Input {...register("name")} placeholder="Acme Corp" />
                     </F>
                   </div>
@@ -502,7 +504,7 @@ export function CompanyModal({
                     />
                   </F>
                   <F label={t("industry")} error={e.industry?.message}>
-                    <Input {...register("industry")} placeholder="Technology" />
+                    <Input {...register("industry")} placeholder={t("modal.industryPlaceholder")} />
                   </F>
                   <F label={t("form.employeeCount")} error={e.employeeCount?.message}>
                     <Input {...register("employeeCount")} type="number" min={0} placeholder="0" />
@@ -519,14 +521,14 @@ export function CompanyModal({
                   <F label={tc("email")} error={e.mainEmail?.message}>
                     <Input {...register("mainEmail")} type="email" placeholder="info@acme.com" />
                   </F>
-                  <F label="LinkedIn URL" error={e.linkedinUrl?.message}>
+                  <F label={t("modal.linkedinUrl")} error={e.linkedinUrl?.message}>
                     <Input {...register("linkedinUrl")} placeholder="https://linkedin.com/company/…" />
                   </F>
                   <div className="col-span-1 sm:col-span-2">
                     <F label={tc("description")} error={e.description?.message}>
                       <Textarea
                         {...register("description")}
-                        placeholder="Brief description of the company…"
+                        placeholder={t("modal.descriptionPlaceholder")}
                         className="min-h-[80px] resize-y"
                       />
                     </F>
@@ -569,7 +571,7 @@ export function CompanyModal({
                   </F>
                   <div className="col-span-1 sm:col-span-2">
                     <F label={t("form.tags")} error={e.tags?.message}>
-                      <Input {...register("tags")} placeholder="tech, enterprise, key-account" />
+                      <Input {...register("tags")} placeholder={t("modal.tagsPlaceholder")} />
                     </F>
                   </div>
                 </TabsContent>
@@ -594,9 +596,11 @@ export function CompanyModal({
                 {/* ── Billing Tab ──────────────────────────────────────────── */}
                 <TabsContent value="billing" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                   <F label={t("form.vatNumber")} error={e.vatNumber?.message}>
+                    {/* i18n-ignore: an example value, the same in both languages */}
                     <Input {...register("vatNumber")} placeholder="IT01234567890" />
                   </F>
                   <F label={t("form.sdiCode")} error={e.sdiCode?.message}>
+                    {/* i18n-ignore: an example value, the same in both languages */}
                     <Input {...register("sdiCode")} placeholder="XXXXXXX" />
                   </F>
                   <F label={t("form.fiscalCode")} error={e.fiscalCode?.message}>
@@ -625,11 +629,8 @@ export function CompanyModal({
                     <p className="text-muted-foreground text-xs">{t("form.languageHint")}</p>
                   </F>
                   <div className="col-span-1 sm:col-span-2 rounded-md border bg-muted/30 px-4 py-3 text-muted-foreground text-xs">
-                    <p className="mb-1 font-medium text-foreground">Italian e-invoicing</p>
-                    <p>
-                      The <strong>SDI Code</strong> (Codice Destinatario) is the 7-character code used for electronic
-                      invoice routing via the Sistema di Interscambio.
-                    </p>
+                    <p className="mb-1 font-medium text-foreground">{t("modal.einvoicingTitle")}</p>
+                    <p>{t.rich("modal.einvoicingBody", { strong: (chunks) => <strong>{chunks}</strong> })}</p>
                   </div>
                 </TabsContent>
               </Tabs>
@@ -638,7 +639,7 @@ export function CompanyModal({
             {duplicates.length > 0 && pendingPayload && (
               <div className="border-t bg-amber-50 px-6 py-4 dark:bg-amber-950/30">
                 <p className="mb-2 font-semibold text-amber-800 text-sm dark:text-amber-300">
-                  Similar companies already exist:
+                  {t("modal.similarExist")}
                 </p>
                 <ul className="mb-3 space-y-1.5">
                   {duplicates.map((d) => (
@@ -661,7 +662,7 @@ export function CompanyModal({
                           onClick={() => setMergeTargetId(d.id)}
                         >
                           <GitMerge className="mr-1 h-3 w-3" />
-                          Merge
+                          {tf("merge")}
                         </Button>
                       )}
                     </li>
@@ -677,10 +678,10 @@ export function CompanyModal({
                       setPendingPayload(null);
                     }}
                   >
-                    Go back
+                    {tf("goBack")}
                   </Button>
                   <Button type="button" size="sm" onClick={() => saveCompany(pendingPayload)}>
-                    Save anyway
+                    {tf("saveAnyway")}
                   </Button>
                 </div>
               </div>

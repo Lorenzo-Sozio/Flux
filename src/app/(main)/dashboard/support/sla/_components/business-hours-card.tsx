@@ -131,6 +131,7 @@ export function BusinessHoursCard({
           <Label htmlFor="tz" className="text-xs">
             {t("timeZone")}
           </Label>
+          {/* i18n-ignore: an example value, the same in both languages */}
           <Input id="tz" value={timeZone} onChange={(e) => setTimeZone(e.target.value)} placeholder="Europe/Rome" />
           <p className="text-muted-foreground text-xs">{t("timeZoneHint")}</p>
         </div>

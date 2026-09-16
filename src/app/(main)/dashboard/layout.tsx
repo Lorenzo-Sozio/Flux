@@ -10,6 +10,7 @@ import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sideb
 import { auth } from "@/auth";
 import { ChatWidget } from "@/components/chat/chat-widget";
 import { RecentlyVisited } from "@/components/crm/recently-visited";
+import { WorkspaceScopeProvider } from "@/components/crm/workspace-scope";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
 import { OfflineBanner } from "@/components/pwa/offline-banner";
@@ -23,7 +24,8 @@ import { CurrencyProvider } from "@/contexts/currency-context";
 import { platformDb } from "@/db";
 import { tenantMembers, tenants, users } from "@/db/schema";
 import { getTenantEntitlements } from "@/lib/auth-guard";
-import { normalizeTenantRole } from "@/lib/permissions";
+import { ENTITIES, entityInPlan } from "@/lib/entities";
+import { can, normalizeTenantRole } from "@/lib/permissions";
 import { SIDEBAR_COLLAPSIBLE_VALUES, SIDEBAR_VARIANT_VALUES } from "@/lib/preferences/layout";
 import { getDb } from "@/lib/tenant-context";
 import { cn } from "@/lib/utils";
@@ -98,6 +100,14 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
     enabledModules: entitlements?.enabledModules,
   });
 
+  // What quick create and the palette may offer, decided here with the same role and
+  // plan as the menu: strings only, so it can cross into the client components.
+  const tenantRole = normalizeTenantRole(member.role);
+  const enabledModules = entitlements?.enabledModules ?? null;
+  const creatable = ENTITIES.filter(
+    (e) => e.create && can(tenantRole, e.create.capability) && entityInPlan(e, enabledModules),
+  ).map((e) => e.type);
+
   const cookieStore = await cookies();
   const userNotifications = session?.user?.id ? await getNotificationsAction() : [];
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
@@ -107,68 +117,77 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
   ]);
 
   return (
-    <CurrencyProvider>
-      {/* ⚠️ Here and not in the root layout: it calls a server action that needs
+    <WorkspaceScopeProvider scope={tenant.id}>
+      <CurrencyProvider>
+        {/* ⚠️ Here and not in the root layout: it calls a server action that needs
           a session and a workspace, and the root layout also wraps the login
           page and the public quote page, where `getDb()` throws by design. */}
-      <PushSubscriptionKeeper />
-      <SidebarProvider defaultOpen={defaultOpen}>
-        <AppSidebar user={user} navAccess={navAccess} variant={variant} collapsible={collapsible} />
-        <SidebarInset
-          className={cn(
-            "overflow-hidden",
-            "[html[data-content-layout=centered]_&]:mx-auto! [html[data-content-layout=centered]_&]:max-w-screen-2xl!",
-            "max-[113rem]:peer-data-[variant=inset]:mr-2! min-[101rem]:peer-data-[variant=inset]:peer-data-[state=collapsed]:mr-auto!",
-          )}
-        >
-          <header
+        <PushSubscriptionKeeper />
+        <SidebarProvider defaultOpen={defaultOpen}>
+          <AppSidebar
+            user={user}
+            navAccess={navAccess}
+            creatable={creatable}
+            variant={variant}
+            collapsible={collapsible}
+          />
+          <SidebarInset
             className={cn(
-              "flex h-12 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12",
-              "[html[data-navbar-style=sticky]_&]:sticky [html[data-navbar-style=sticky]_&]:top-0 [html[data-navbar-style=sticky]_&]:z-50 [html[data-navbar-style=sticky]_&]:overflow-hidden [html[data-navbar-style=sticky]_&]:rounded-t-[inherit] [html[data-navbar-style=sticky]_&]:bg-background/50 [html[data-navbar-style=sticky]_&]:backdrop-blur-md",
+              "overflow-hidden",
+              "[html[data-content-layout=centered]_&]:mx-auto! [html[data-content-layout=centered]_&]:max-w-screen-2xl!",
+              "max-[113rem]:peer-data-[variant=inset]:mr-2! min-[101rem]:peer-data-[variant=inset]:peer-data-[state=collapsed]:mr-auto!",
             )}
           >
-            <div className="flex w-full items-center justify-between px-4 lg:px-6">
-              <div className="flex min-w-0 items-center gap-1 lg:gap-2">
-                {/* Below md the bottom bar opens the menu, and the trigger would
+            <header
+              className={cn(
+                "flex h-12 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12",
+                "[html[data-navbar-style=sticky]_&]:sticky [html[data-navbar-style=sticky]_&]:top-0 [html[data-navbar-style=sticky]_&]:z-50 [html[data-navbar-style=sticky]_&]:overflow-hidden [html[data-navbar-style=sticky]_&]:rounded-t-[inherit] [html[data-navbar-style=sticky]_&]:bg-background/50 [html[data-navbar-style=sticky]_&]:backdrop-blur-md",
+              )}
+            >
+              <div className="flex w-full items-center justify-between px-4 lg:px-6">
+                <div className="flex min-w-0 items-center gap-1 lg:gap-2">
+                  {/* Below md the bottom bar opens the menu, and the trigger would
                     be a second control for the same thing in the hardest corner
                     of the screen to reach one-handed. */}
-                {/*
+                  {/*
                   ⚠️ First on the left, at every width, because that is the edge
                   the panel comes out of. It lived here, moved to the last slot
                   of the bottom bar for a while, and that was wrong twice over: a
                   control on the right that opens a panel on the left, and a
                   fifth of the bar spent on a menu instead of a destination.
                 */}
-                <MenuTrigger />
-                <Separator
-                  orientation="vertical"
-                  className="mx-2 hidden data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center md:block"
-                />
-                {/* Installed, there is no address bar and no tab title, so the
+                  <MenuTrigger />
+                  <Separator
+                    orientation="vertical"
+                    className="mx-2 hidden data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center md:block"
+                  />
+                  {/* Installed, there is no address bar and no tab title, so the
                     app has to say what it is somewhere. */}
-                <span className="truncate font-semibold text-sm md:hidden">{APP_CONFIG.name}</span>
-                {/* The palette offers verbs now, so it needs to know which are allowed. */}
-                <SearchDialog tenantRole={normalizeTenantRole(member.role)} />
-              </div>
-              <div className="flex shrink-0 items-center gap-1 md:gap-2">
-                {/* Desktop conveniences. Recently-visited duplicates the browser
+                  <span className="truncate font-semibold text-sm md:hidden">{APP_CONFIG.name}</span>
+                  {/* The palette offers verbs now, so it needs to know which are allowed. */}
+                  <SearchDialog tenantRole={tenantRole} enabledModules={enabledModules} />
+                </div>
+                <div className="flex shrink-0 items-center gap-1 md:gap-2">
+                  {/* Desktop conveniences. Recently-visited duplicates the browser
                     history a phone already has, and the layout controls configure
                     a sidebar that does not exist below md. */}
-                <div className="hidden items-center gap-2 md:flex">
-                  <RecentlyVisited />
+                  <div className="hidden items-center gap-2 md:flex">
+                    <RecentlyVisited />
+                  </div>
+                  {session?.user?.id && (
+                    <NotificationCenter notifications={userNotifications} userId={session.user.id} />
+                  )}
+                  <div className="hidden items-center gap-2 md:flex">
+                    <CurrencySwitcher />
+                    <LocaleSwitcher />
+                    <LayoutControls />
+                  </div>
+                  <ThemeSwitcher />
                 </div>
-                {session?.user?.id && <NotificationCenter notifications={userNotifications} userId={session.user.id} />}
-                <div className="hidden items-center gap-2 md:flex">
-                  <CurrencySwitcher />
-                  <LocaleSwitcher />
-                  <LayoutControls />
-                </div>
-                <ThemeSwitcher />
               </div>
-            </div>
-          </header>
-          <OfflineBanner />
-          {/*
+            </header>
+            <OfflineBanner />
+            {/*
             ⚠️ **This wrapper is the only owner of page padding.** It used to add
             p-4/p-6 on top of the p-6 that most pages set on their own root, so a
             375px phone spent 40px of its width on margins twice over. Pages
@@ -177,14 +196,15 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
             The bottom padding is the tab bar, which is fixed and would otherwise
             cover the last row of every scrollable page.
           */}
-          <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-[calc(var(--mobile-nav-height)+var(--safe-bottom)+1rem)] md:p-6 md:pb-6">
-            {children}
-          </div>
-        </SidebarInset>
-        <MobileTabBar navAccess={navAccess} />
-        <InstallPrompt />
-        {session?.user?.id && <ChatWidget userId={session.user.id} />}
-      </SidebarProvider>
-    </CurrencyProvider>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-[calc(var(--mobile-nav-height)+var(--safe-bottom)+1rem)] md:p-6 md:pb-6">
+              {children}
+            </div>
+          </SidebarInset>
+          <MobileTabBar navAccess={navAccess} />
+          <InstallPrompt />
+          {session?.user?.id && <ChatWidget userId={session.user.id} />}
+        </SidebarProvider>
+      </CurrencyProvider>
+    </WorkspaceScopeProvider>
   );
 }

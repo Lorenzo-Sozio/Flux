@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { TrendingUp } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { useCurrency } from "@/hooks/use-currency";
@@ -22,6 +23,7 @@ interface Props {
 }
 
 export function MonthTargetCard({ myTarget, wonThisMonth, monthLabel }: Props) {
+  const t = useTranslations("crm.monthTarget");
   const { formatAmount } = useCurrency();
   const target = parseFloat(myTarget?.targetAmount ?? "0");
   const pct = target > 0 ? Math.min(100, Math.round((wonThisMonth / target) * 100)) : null;
@@ -36,7 +38,7 @@ export function MonthTargetCard({ myTarget, wonThisMonth, monthLabel }: Props) {
               <TrendingUp className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="font-medium text-sm">Obiettivo del mese</p>
+              <p className="font-medium text-sm">{t("title")}</p>
               <p className="capitalize text-muted-foreground text-xs">{monthLabel}</p>
             </div>
           </div>
@@ -45,7 +47,7 @@ export function MonthTargetCard({ myTarget, wonThisMonth, monthLabel }: Props) {
             <div className="flex items-center justify-between text-sm">
               <span className="font-semibold">{formatAmount(wonThisMonth, { noDecimals: true })}</span>
               <span className="text-muted-foreground">
-                {target > 0 ? `su ${formatAmount(target, { noDecimals: true })}` : "Nessun target impostato"}
+                {target > 0 ? t("ofTarget", { amount: formatAmount(target, { noDecimals: true }) }) : t("noTarget")}
               </span>
             </div>
             {target > 0 && colors && (
@@ -58,7 +60,7 @@ export function MonthTargetCard({ myTarget, wonThisMonth, monthLabel }: Props) {
           {pct != null && colors && (
             <div className="shrink-0 text-right">
               <span className={`font-bold text-lg ${colors.text}`}>{pct}%</span>
-              <p className="text-muted-foreground text-xs">del target</p>
+              <p className="text-muted-foreground text-xs">{t("percentOfTarget")}</p>
             </div>
           )}
         </CardContent>

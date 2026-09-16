@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { Clock, Pause, Play, Trash2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteTimeLog, getTimeLogs, logHoursManual, startTimer, stopTimer } from "@/actions/tasks";
@@ -46,6 +47,8 @@ interface Props {
 const STORAGE_KEY = (id: string) => `task_timer_${id}`;
 
 export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHoursChanged }: Props) {
+  const t = useTranslations("tasks.timer");
+  const locale = useLocale();
   const [logs, setLogs] = useState<TimeLog[]>([]);
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -94,7 +97,7 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
       setElapsed(0);
       setRunning(true);
     } catch {
-      toast.error("Failed to start timer.");
+      toast.error(t("startFailed"));
     }
   };
 
@@ -109,16 +112,16 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
       const updated = await getTimeLogs(taskId);
       setLogs(updated);
       onHoursChanged?.();
-      toast.success("Time logged.");
+      toast.success(t("timeLogged"));
     } catch {
-      toast.error("Failed to stop timer.");
+      toast.error(t("stopFailed"));
     }
   };
 
   const handleManualLog = async () => {
     const h = parseFloat(manualHours);
     if (!h || h <= 0) {
-      toast.error("Enter valid hours.");
+      toast.error(t("invalidHours"));
       return;
     }
     try {
@@ -129,9 +132,9 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
       setManualNote("");
       setShowManual(false);
       onHoursChanged?.();
-      toast.success("Hours logged.");
+      toast.success(t("hoursLogged"));
     } catch {
-      toast.error("Failed to log hours.");
+      toast.error(t("logFailed"));
     }
   };
 
@@ -141,7 +144,7 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
       setLogs((prev) => prev.filter((l) => l.id !== logId));
       onHoursChanged?.();
     } catch {
-      toast.error("Failed to delete log.");
+      toast.error(t("deleteFailed"));
     }
   };
 
@@ -155,16 +158,18 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
       <div className="flex items-center gap-4 text-xs">
         <div className="flex items-center gap-1">
           <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-          <span className="text-muted-foreground">Est:</span>
+          <span className="text-muted-foreground">{t("estimated")}</span>
           <span className="font-medium">{estHrs !== null ? `${estHrs}h` : "—"}</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="text-muted-foreground">Actual:</span>
+          <span className="text-muted-foreground">{t("actual")}</span>
           <span className={cn("font-medium tabular-nums", overBudget && "text-destructive")}>
             {actHrs > 0 ? `${actHrs}h` : "0h"}
           </span>
           {overBudget && (
-            <span className="text-destructive text-[10px]">({((actHrs / estHrs!) * 100 - 100).toFixed(0)}% over)</span>
+            <span className="text-destructive text-[10px]">
+              {t("overBudget", { pct: ((actHrs / estHrs!) * 100 - 100).toFixed(0) })}
+            </span>
           )}
         </div>
       </div>
@@ -178,13 +183,13 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
             </span>
             <Button type="button" size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={handleStop}>
               <Pause className="h-3 w-3" />
-              Stop
+              {t("stop")}
             </Button>
           </>
         ) : (
           <Button type="button" size="sm" variant="outline" className="h-7 gap-1.5 text-xs" onClick={handleStart}>
             <Play className="h-3 w-3" />
-            Start Timer
+            {t("start")}
           </Button>
         )}
         {!running && (
@@ -195,7 +200,7 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
             className="h-7 text-xs text-muted-foreground"
             onClick={() => setShowManual((v) => !v)}
           >
-            + Log manually
+            {t("logManually")}
           </Button>
         )}
       </div>
@@ -209,17 +214,17 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
             min="0.25"
             value={manualHours}
             onChange={(e) => setManualHours(e.target.value)}
-            placeholder="Hours (e.g. 1.5)"
+            placeholder={t("hoursPlaceholder")}
             className="h-7 text-xs w-28"
           />
           <Input
             value={manualNote}
             onChange={(e) => setManualNote(e.target.value)}
-            placeholder="Note (optional)"
+            placeholder={t("notePlaceholder")}
             className="h-7 text-xs flex-1"
           />
           <Button type="button" size="sm" className="h-7 text-xs" onClick={handleManualLog}>
-            Log
+            {t("log")}
           </Button>
           <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setShowManual(false)}>
             ✕
@@ -239,7 +244,7 @@ export function TaskTimer({ taskId, userId, estimatedHours, actualHours, onHours
               <span className="truncate flex-1">{log.userName ?? log.userId}</span>
               {log.note && <span className="truncate max-w-[100px] italic">{log.note}</span>}
               <span className="shrink-0">
-                {new Date(log.createdAt).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
+                {new Date(log.createdAt).toLocaleDateString(locale, { day: "2-digit", month: "short" })}
               </span>
               <button
                 type="button"

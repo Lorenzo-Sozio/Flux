@@ -19,7 +19,7 @@ import {
   UserIcon,
   UsersIcon,
 } from "lucide-react";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { createActivity, getActivitiesByCompany } from "@/actions/activities";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
@@ -85,6 +85,8 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const hasAddressInfo = !!(company.street || company.city || company.state || company.zipCode || company.country);
   const hasContactInfo = !!(company.mainEmail || company.mainPhone || company.website);
   const tI = await getTranslations("invoicing");
+  const tc = await getTranslations("common");
+  const locale = await getLocale();
   // The province travels in `state`, the field the address form already has.
   const invoiceGaps = customerGaps({ ...company, province: company.state });
 
@@ -106,7 +108,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="flex flex-col gap-6">
-      <RecordVisit type="company" name={company.name || "Company"} href={`/dashboard/companies/${companyId}`} />
+      <RecordVisit type="company" id={companyId} label={company.name} sub={company.city ?? null} />
 
       {/* ── Hero ── */}
       <Card>
@@ -246,13 +248,13 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                 <InfoRow label={tD("fieldEmployees")}>
                   <span className="flex items-center gap-1.5">
                     <UsersIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                    {company.employeeCount.toLocaleString()}
+                    {company.employeeCount.toLocaleString(locale)}
                   </span>
                 </InfoRow>
               )}
               {company.annualRevenue && (
                 <InfoRow label={tD("fieldRevenue")}>
-                  {Number(company.annualRevenue).toLocaleString(undefined, {
+                  {Number(company.annualRevenue).toLocaleString(locale, {
                     style: "currency",
                     currency: "EUR",
                     maximumFractionDigits: 0,
@@ -481,7 +483,7 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                             <button
                               type="submit"
                               className="p-1 text-muted-foreground transition-colors hover:text-destructive"
-                              title="Delete"
+                              title={tc("delete")}
                             >
                               <Trash2Icon className="h-3.5 w-3.5" />
                             </button>

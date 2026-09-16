@@ -46,7 +46,8 @@ const COMMON_SMTP_CONFIGS = [
     label: "Gmail",
     host: "smtp.gmail.com",
     port: 587,
-    note: "STARTTLS — requires App Password",
+    // A key under settings.email.form, translated at render time.
+    noteKey: "gmailNote",
   },
   {
     label: "Outlook / Microsoft 365",
@@ -69,6 +70,7 @@ const COMMON_SMTP_CONFIGS = [
 
 export default function EmailSettingsPage() {
   const t = useTranslations("settings.email");
+  const tForm = useTranslations("settings.email.form");
   const [settings, setSettings] = useState<Settings>(DEFAULT);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -95,7 +97,7 @@ export default function EmailSettingsPage() {
       await saveEmailSettings(settings);
       toast.success(t("savedSuccess"));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Could not save the email settings.");
+      toast.error(err instanceof Error ? err.message : tForm("saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -315,7 +317,11 @@ export default function EmailSettingsPage() {
                       <Server className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground/70" />
                       <span>
                         <strong className="text-foreground/90">{cfg.label}:</strong> {cfg.host} : {cfg.port}
-                        {cfg.note ? ` (${cfg.note})` : ""}
+                        {"noteKey" in cfg && cfg.noteKey
+                          ? ` (${tForm(cfg.noteKey)})`
+                          : "note" in cfg && cfg.note
+                            ? ` (${cfg.note})`
+                            : ""}
                       </span>
                     </li>
                   ))}
@@ -342,7 +348,7 @@ export default function EmailSettingsPage() {
                 id="from-name"
                 value={settings.fromName}
                 onChange={(e) => set("fromName", e.target.value)}
-                placeholder="My Company"
+                placeholder={tForm("fromNamePlaceholder")}
                 className="w-full"
               />
             </div>
@@ -380,7 +386,7 @@ export default function EmailSettingsPage() {
               type="email"
               value={testTo}
               onChange={(e) => setTestTo(e.target.value)}
-              placeholder="your@email.com"
+              placeholder={tForm("testToPlaceholder")}
               className="w-full flex-1"
             />
             <Button variant="outline" onClick={handleTest} disabled={testing} className="shrink-0 gap-2">

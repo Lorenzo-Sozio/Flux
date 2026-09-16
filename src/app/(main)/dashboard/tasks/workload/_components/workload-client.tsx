@@ -19,7 +19,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import type { DateRange } from "react-day-picker";
 import { toast } from "sonner";
 
@@ -143,8 +143,8 @@ function suggestMinDueDate(task: WorkloadTaskEntry): Date {
   return addWorkingDays(today, minWorkDays);
 }
 
-function formatDate(d: Date): string {
-  return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
+function formatDate(d: Date, locale: string): string {
+  return d.toLocaleDateString(locale, { day: "2-digit", month: "short" });
 }
 
 function toLocalStr(d: Date): string {
@@ -173,6 +173,8 @@ function TaskCard({
   rescheduling: boolean;
   onReschedule: (taskId: string, newDate: Date) => void;
 }) {
+  const t = useTranslations("tasks.workload");
+  const locale = useLocale();
   const taskPct = cellHours > 0 ? task.hours / cellHours : 0;
   const minDate = suggestMinDueDate(task);
   const minDateStr = toLocalStr(minDate);
@@ -191,12 +193,12 @@ function TaskCard({
         <span className="flex-1 font-medium text-xs leading-snug">{task.title}</span>
         <div className="flex shrink-0 items-center gap-1">
           <span className="rounded bg-muted px-1.5 py-0.5 font-semibold text-[10px] tabular-nums">
-            {task.hours.toFixed(1)}h/g
+            {t("hoursPerDay", { hours: task.hours.toFixed(1) })}
           </span>
           <Link
             href={`/dashboard/tasks?task=${task.id}`}
             className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            title="Apri attività"
+            title={t("openTask")}
           >
             <ExternalLink className="h-3 w-3" />
           </Link>
@@ -216,17 +218,19 @@ function TaskCard({
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="flex items-center gap-1 text-muted-foreground">
               <CalendarClock className="h-3 w-3 shrink-0" />
-              Suggerita dal sistema:
+              {t("suggested")}
             </span>
             <span className="flex items-center gap-1.5">
-              <strong className="font-semibold text-orange-700 dark:text-orange-400">{formatDate(minDate)}</strong>
+              <strong className="font-semibold text-orange-700 dark:text-orange-400">
+                {formatDate(minDate, locale)}
+              </strong>
               {pickedDate !== minDateStr && (
                 <button
                   type="button"
                   onClick={() => setPickedDate(minDateStr)}
                   className="text-[10px] text-muted-foreground underline underline-offset-2 hover:text-orange-700 dark:hover:text-orange-400"
                 >
-                  ripristina
+                  {t("restore")}
                 </button>
               )}
             </span>
@@ -246,18 +250,21 @@ function TaskCard({
               className="flex shrink-0 items-center gap-1 rounded bg-orange-500/10 px-2 py-1 font-medium text-[10px] text-orange-700 transition-colors hover:bg-orange-500/20 disabled:opacity-50 dark:text-orange-400"
             >
               {rescheduling ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Zap className="h-2.5 w-2.5" />}
-              Applica
+              {t("apply")}
             </button>
           </div>
           <p className="mt-1.5 text-[10px] text-muted-foreground">
-            {task.estimatedHours.toFixed(0)}h stimate · {Math.ceil(task.estimatedHours / 8)} gg lavorativi min.
+            {t("estimateHint", {
+              hours: task.estimatedHours.toFixed(0),
+              days: Math.ceil(task.estimatedHours / 8),
+            })}
           </p>
         </div>
       )}
       {showReschedule && !needsPostpone && (
         <p className="mt-0.5 flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400">
           <CalendarClock className="h-3 w-3" />
-          Scadenza adeguata al carico stimato
+          {t("dueDateFits")}
         </p>
       )}
     </div>
@@ -268,6 +275,9 @@ function TaskCard({
 
 export function WorkloadClient({ matrix, startDate }: Props) {
   const t = useTranslations("tasks.workload");
+  const tTasks = useTranslations("tasks");
+  const tc = useTranslations("common");
+  const locale = useLocale();
   const router = useRouter();
   const [, startRouterTransition] = useTransition();
 
@@ -330,7 +340,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
       const newMatrix = await getWorkloadMatrix(start, end);
       setCurrentMatrix(newMatrix);
     } catch {
-      toast.error("Errore nel caricamento dei dati");
+      toast.error(t("loadError"));
     } finally {
       setIsFetching(false);
     }
@@ -392,12 +402,12 @@ export function WorkloadClient({ matrix, startDate }: Props) {
     try {
       const res = await rescheduleTaskDueDate(taskId, newDate);
       if (!res.success) throw new Error(res.error);
-      toast.success(`Scadenza spostata al ${formatDate(newDate)}`);
+      toast.success(t("dueDateMoved", { date: formatDate(newDate, locale) }));
       setSelected(null);
       fetchMatrix(periodStart, periodEnd);
       startRouterTransition(() => router.refresh());
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Aggiornamento fallito");
+      toast.error(err instanceof Error ? err.message : tc("updateError"));
     } finally {
       setReschedulingIds((prev) => {
         const next = new Set(prev);
@@ -418,7 +428,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
       }
     }
     if (taskMap.size === 0) {
-      toast.info("Nessuna attività da posticipare");
+      toast.info(t("nothingToPostpone"));
       return;
     }
     setResolvingAll(true);
@@ -427,8 +437,8 @@ export function WorkloadClient({ matrix, startDate }: Props) {
         [...taskMap.values()].map(({ task, newDate }) => rescheduleTaskDueDate(task.id, newDate)),
       );
       const failed = results.filter((r) => !r.success).length;
-      if (failed > 0) toast.error(`${failed} attività non aggiornate`);
-      else toast.success(`${taskMap.size} attività ripianificate`);
+      if (failed > 0) toast.error(t("rescheduleFailed", { count: failed }));
+      else toast.success(t("rescheduled", { count: taskMap.size }));
       setSelected(null);
       setShowConflicts(false);
       fetchMatrix(periodStart, periodEnd);
@@ -476,7 +486,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
               onClick={handleToday}
               disabled={isCurrentRange || isFetching}
             >
-              Oggi
+              {tTasks("today")}
             </Button>
 
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrev} disabled={isFetching}>
@@ -492,9 +502,9 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                     <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
                   )}
                   <span>
-                    {periodStart.toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
+                    {periodStart.toLocaleDateString(locale, { day: "2-digit", month: "short" })}
                     {" – "}
-                    {periodEnd.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}
+                    {periodEnd.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" })}
                   </span>
                 </Button>
               </PopoverTrigger>
@@ -528,7 +538,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
               )}
             >
               <AlertTriangle className="h-3 w-3" />
-              {totalConflicts} {totalConflicts === 1 ? "giorno in sovraccarico" : "giorni in sovraccarico"}
+              {t("overbookedDays", { count: totalConflicts })}
             </button>
           )}
         </div>
@@ -570,7 +580,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/60 backdrop-blur-[1px]">
               <div className="flex items-center gap-2 rounded-lg border bg-card px-4 py-2.5 shadow-md text-sm text-muted-foreground">
                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                Caricamento…
+                {tc("loading")}
               </div>
             </div>
           )}
@@ -600,7 +610,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                       >
                         {t("weekLabel", { week: wi + 1 })}
                         <span className="ml-1.5 font-normal opacity-60">
-                          {week[0].toLocaleDateString(undefined, { day: "2-digit", month: "2-digit" })}
+                          {week[0].toLocaleDateString(locale, { day: "2-digit", month: "2-digit" })}
                         </span>
                       </th>
                     ))}
@@ -623,10 +633,10 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                         >
                           <div className="flex flex-col items-center gap-0.5">
                             <span className="text-[9px] uppercase opacity-60">
-                              {d.toLocaleDateString(undefined, { weekday: "short" })}
+                              {d.toLocaleDateString(locale, { weekday: "short" })}
                             </span>
                             <span className="font-medium text-[11px]">
-                              {d.toLocaleDateString(undefined, { day: "2-digit" })}
+                              {d.toLocaleDateString(locale, { day: "2-digit" })}
                             </span>
                             {isToday && <span className="h-1 w-1 rounded-full bg-indigo-500" />}
                           </div>
@@ -705,7 +715,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                 <div className="flex shrink-0 items-center justify-between border-b bg-red-50/50 px-4 py-3 dark:bg-red-950/10">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    <p className="font-semibold text-sm">Sovraccarichi rilevati</p>
+                    <p className="font-semibold text-sm">{t("conflictsTitle")}</p>
                     <span className="rounded-full bg-red-100 px-1.5 py-0.5 font-bold text-[10px] text-red-700 dark:bg-red-900/40 dark:text-red-400">
                       {totalConflicts}
                     </span>
@@ -733,11 +743,9 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                     ) : (
                       <Zap className="h-3.5 w-3.5 text-orange-500" />
                     )}
-                    Posticipa tutti i sovraccarichi
+                    {t("postponeAll")}
                   </Button>
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">
-                    Sposta le scadenze al minimo necessario per ≤8h/giorno
-                  </p>
+                  <p className="mt-1.5 text-[10px] text-muted-foreground">{t("postponeAllHint")}</p>
                 </div>
 
                 <div className="flex-1 space-y-4 overflow-y-auto px-4 py-3">
@@ -751,7 +759,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                           <span className="font-medium text-[11px]">{conflict.userName}</span>
                           <span className="text-muted-foreground text-[11px]">·</span>
                           <span className="text-[11px] text-muted-foreground capitalize">
-                            {new Date(`${conflict.date}T00:00:00`).toLocaleDateString(undefined, {
+                            {new Date(`${conflict.date}T00:00:00`).toLocaleDateString(locale, {
                               weekday: "short",
                               day: "2-digit",
                               month: "short",
@@ -793,7 +801,7 @@ export function WorkloadClient({ matrix, startDate }: Props) {
                       <p className="font-semibold text-sm">{selected.userName}</p>
                     </div>
                     <p className="text-muted-foreground text-xs capitalize">
-                      {new Date(`${selected.date}T00:00:00`).toLocaleDateString(undefined, {
+                      {new Date(`${selected.date}T00:00:00`).toLocaleDateString(locale, {
                         weekday: "long",
                         day: "2-digit",
                         month: "long",

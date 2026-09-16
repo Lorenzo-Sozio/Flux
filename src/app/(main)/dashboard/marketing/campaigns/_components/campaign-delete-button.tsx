@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { TrashIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteMarketingCampaign } from "@/actions/marketing";
@@ -13,17 +14,18 @@ interface CampaignDeleteButtonProps {
 }
 
 export function CampaignDeleteButton({ campaignId }: CampaignDeleteButtonProps) {
+  const t = useTranslations("marketing.campaigns.deleteButton");
   const [loading, setLoading] = useState(false);
 
   async function handleDelete() {
-    if (!confirm("Are you sure you want to delete this campaign?")) return;
+    if (!confirm(t("confirm"))) return;
 
     setLoading(true);
     try {
       await deleteMarketingCampaign(campaignId);
-      toast.success("Campaign deleted successfully");
+      toast.success(t("success"));
     } catch (error) {
-      toast.error("Failed to delete campaign");
+      toast.error(t("failed"));
     } finally {
       setLoading(false);
     }

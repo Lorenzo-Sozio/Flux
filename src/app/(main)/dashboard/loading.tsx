@@ -11,12 +11,15 @@
  * shape of nearly every screen here, so the transition lands roughly where the
  * content will, instead of jumping.
  */
+import { useTranslations } from "next-intl";
+
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function DashboardLoading() {
+  const t = useTranslations("common");
   return (
     <div className="space-y-6" aria-busy="true" aria-live="polite">
-      <span className="sr-only">Loading…</span>
+      <span className="sr-only">{t("loading")}</span>
 
       <div className="flex items-center justify-between gap-4">
         <div className="space-y-2">

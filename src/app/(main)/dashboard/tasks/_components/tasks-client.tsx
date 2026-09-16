@@ -27,7 +27,7 @@ import {
   User,
   UserCheck,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteTask, updateTaskStatus } from "@/actions/tasks";
@@ -139,10 +139,13 @@ const BOARD_COLUMN_COLORS: Record<BoardColId, string> = {
   done: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
 };
 
-function entityLink(task: Task): { label: string; href: string; icon: React.ElementType } | null {
+function entityLink(
+  task: Task,
+  t: (key: string) => string,
+): { label: string; href: string; icon: React.ElementType } | null {
   if (task.ticketId)
     return {
-      label: task.ticketNumber ? `#${task.ticketNumber}` : "Ticket",
+      label: task.ticketNumber ? `#${task.ticketNumber}` : t("newTaskDialog.linkTicket"),
       href: `/dashboard/support/tickets/${task.ticketId}`,
       icon: Headphones,
     };
@@ -159,8 +162,12 @@ function entityLink(task: Task): { label: string; href: string; icon: React.Elem
       icon: UserCheck,
     };
   if (task.companyId)
-    return { label: task.companyName ?? "Company", href: `/dashboard/companies/${task.companyId}`, icon: Building2 };
-  if (task.dealId) return { label: "Deal", href: `/dashboard/pipeline`, icon: Kanban };
+    return {
+      label: task.companyName ?? t("dialog.linkCompany"),
+      href: `/dashboard/companies/${task.companyId}`,
+      icon: Building2,
+    };
+  if (task.dealId) return { label: t("dialog.linkDeal"), href: `/dashboard/pipeline`, icon: Kanban };
   return null;
 }
 
@@ -199,10 +206,11 @@ function TaskCard({
   defaultOpen?: boolean;
 }) {
   const t = useTranslations("tasks");
+  const locale = useLocale();
   const overdue = isOverdue(task);
   const today = isDueToday(task);
   const done = task.status === "done";
-  const entity = entityLink(task);
+  const entity = entityLink(task, t);
   const priorityKey = task.priority as "low" | "normal" | "high" | "critical" | "blocker";
   const priorityLabel = t(`priorities.${priorityKey}`);
   const PriorityIcon = PRIORITY_ICON[task.priority] ?? Minus;
@@ -264,7 +272,7 @@ function TaskCard({
                 )}
               >
                 {overdue && <AlertCircle className="-mt-0.5 mr-0.5 inline h-2.5 w-2.5" />}
-                {new Date(task.dueDate).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
+                {new Date(task.dueDate).toLocaleDateString(locale, { day: "2-digit", month: "short" })}
               </span>
             )}
             {entity && (
@@ -290,7 +298,7 @@ function TaskCard({
             {(task.blockedByDeps ?? 0) > 0 && (
               <span className="flex items-center gap-0.5 font-medium text-[10px] text-destructive">
                 <Lock className="h-2.5 w-2.5" />
-                Blocked
+                {t("listView.blocked")}
               </span>
             )}
           </div>
@@ -377,6 +385,7 @@ export function TasksClient({
   initialOpenTaskId,
 }: Props) {
   const t = useTranslations("tasks");
+  const locale = useLocale();
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [tasks, setTasks] = useState(initialTasks);
@@ -443,12 +452,12 @@ export function TasksClient({
       await Promise.all([...selected].map((id) => updateTaskStatus(id, "done")));
       setTasks((prev) => prev.map((tk) => (selected.has(tk.id) ? { ...tk, status: "done" } : tk)));
       setSelected(new Set());
-      toast.success(t("createSuccess"));
+      toast.success(t("updateSuccess"));
     });
   };
 
   const handleBulkDelete = async () => {
-    if (!confirm(`Delete ${selected.size} tasks?`)) return;
+    if (!confirm(t("listView.confirmBulkDelete", { count: selected.size }))) return;
     startTransition(async () => {
       await Promise.all([...selected].map((id) => deleteTask(id)));
       setTasks((prev) => prev.filter((tk) => !selected.has(tk.id)));
@@ -567,6 +576,7 @@ export function TasksClient({
               tickets={tickets}
               currentUserId={currentUserId}
               onCreated={handleCreated}
+              openOnNew
             />
           </div>
         </div>
@@ -833,7 +843,7 @@ export function TasksClient({
                     const overdue = isOverdue(task);
                     const today = isDueToday(task);
                     const done = task.status === "done";
-                    const entity = entityLink(task);
+                    const entity = entityLink(task, t);
                     const priorityClass = PRIORITY_CLASS[task.priority] ?? PRIORITY_CLASS.normal;
                     const priorityLabel = t(
                       `priorities.${task.priority as "low" | "normal" | "high" | "critical" | "blocker"}`,
@@ -873,7 +883,7 @@ export function TasksClient({
                                 {(task.blockedByDeps ?? 0) > 0 && (
                                   <span className="flex shrink-0 items-center gap-0.5 font-medium text-[10px] text-destructive">
                                     <Lock className="h-2.5 w-2.5" />
-                                    Blocked
+                                    {t("listView.blocked")}
                                   </span>
                                 )}
                               </div>
@@ -904,7 +914,7 @@ export function TasksClient({
                                     )}
                                   >
                                     {overdue && <AlertCircle className="h-3 w-3" />}
-                                    {new Date(task.dueDate).toLocaleDateString(undefined, {
+                                    {new Date(task.dueDate).toLocaleDateString(locale, {
                                       day: "2-digit",
                                       month: "short",
                                     })}
@@ -972,7 +982,7 @@ export function TasksClient({
                               )}
                             >
                               {overdue && <AlertCircle className="-mt-0.5 mr-1 inline h-3 w-3" />}
-                              {new Date(task.dueDate).toLocaleDateString(undefined, {
+                              {new Date(task.dueDate).toLocaleDateString(locale, {
                                 day: "2-digit",
                                 month: "short",
                                 year: "numeric",

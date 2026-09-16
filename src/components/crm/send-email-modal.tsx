@@ -19,7 +19,7 @@ import { sanitizeEmailHtml } from "@/lib/sanitize-email-html";
 import { cn } from "@/lib/utils";
 
 const emailSchema = z.object({
-  subject: z.string().min(1, "Subject is required"),
+  subject: z.string().min(1),
 });
 
 type EmailFormValues = z.infer<typeof emailSchema>;
@@ -47,6 +47,7 @@ export function SendEmailModal({
   ownerId?: string;
 }) {
   const tc = useTranslations("common");
+  const t = useTranslations("marketing.sendEmailModal");
   const [open, setOpen] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [mode, setMode] = useState<Mode>("preview");
@@ -95,7 +96,7 @@ export function SendEmailModal({
   // ─── Template selection ────────────────────────────────────────────────────
 
   const handleTemplateSelect = (templateId: string) => {
-    const template = safeTemplates.find((t) => t.id === templateId);
+    const template = safeTemplates.find((tpl) => tpl.id === templateId);
     if (!template) return;
     form.setValue("subject", resolvePlaceholders(template.subject || ""));
     setBody(resolvePlaceholders(template.body || ""));
@@ -121,13 +122,13 @@ export function SendEmailModal({
   const onSubmit = async (data: EmailFormValues) => {
     const finalBody = mode === "preview" && previewRef.current ? previewRef.current.innerHTML : body;
     if (!finalBody.trim()) {
-      toast.error("Email body cannot be empty.");
+      toast.error(t("emptyBody"));
       return;
     }
     // A record with no address is the one case this dialog cannot do anything
     // about, and it used to send to `undefined`.
     if (!entity.email) {
-      toast.error("This record has no email address.");
+      toast.error(t("noAddress"));
       return;
     }
     try {
@@ -140,10 +141,10 @@ export function SendEmailModal({
         contactId: entity.firstName && !entity.companyName ? entity.id : undefined,
         ownerId,
       });
-      toast.success("Email sent successfully!");
+      toast.success(t("sent"));
       handleOpen(false);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to send email.";
+      const msg = err instanceof Error ? err.message : t("sendFailed");
       toast.error(msg);
     } finally {
       setIsSending(false);
@@ -188,7 +189,9 @@ export function SendEmailModal({
       <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:h-[88dvh] sm:max-w-[820px]">
         {/* ── Header ───────────────────────────────────────────────────────── */}
         <DialogHeader className="shrink-0 border-b px-4 md:px-6 pt-6 pb-4">
-          <DialogTitle className="text-lg">{recipientName ? `New Email — ${recipientName}` : "New Email"}</DialogTitle>
+          <DialogTitle className="text-lg">
+            {recipientName ? t("titleWithRecipient", { name: recipientName }) : t("title")}
+          </DialogTitle>
           {entity.email && <p className="mt-0.5 font-normal text-muted-foreground text-sm">{entity.email}</p>}
         </DialogHeader>
 
@@ -199,16 +202,16 @@ export function SendEmailModal({
             {safeTemplates.length > 0 && (
               <div className="flex items-center gap-0 border-b px-6 py-2.5">
                 <span className="w-20 shrink-0 font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                  Template
+                  {t("templateLabel")}
                 </span>
                 <Select onValueChange={handleTemplateSelect}>
                   <SelectTrigger className="h-8 flex-1 border-0 bg-transparent pl-0 text-sm shadow-none focus:ring-0">
-                    <SelectValue placeholder="Choose a template…" />
+                    <SelectValue placeholder={t("templatePlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {safeTemplates.map((t) => (
-                      <SelectItem key={t.id} value={t.id}>
-                        {t.name}
+                    {safeTemplates.map((tpl) => (
+                      <SelectItem key={tpl.id} value={tpl.id}>
+                        {tpl.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -219,16 +222,16 @@ export function SendEmailModal({
             {/* Subject row */}
             <div className="flex items-center gap-0 px-6 py-2.5">
               <span className="w-20 shrink-0 font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                Subject
+                {tc("subject")}
               </span>
               <Input
                 {...form.register("subject")}
-                placeholder="Write a subject…"
+                placeholder={t("subjectPlaceholder")}
                 className="h-8 flex-1 border-0 bg-transparent pl-0 font-medium text-sm shadow-none placeholder:font-normal focus-visible:ring-0"
               />
             </div>
             {form.formState.errors.subject && (
-              <p className="px-6 pb-2 text-destructive text-xs">{form.formState.errors.subject.message}</p>
+              <p className="px-6 pb-2 text-destructive text-xs">{t("subjectRequired")}</p>
             )}
           </div>
 
@@ -252,11 +255,11 @@ export function SendEmailModal({
               >
                 {m === "preview" ? (
                   <>
-                    <EyeIcon className="h-3.5 w-3.5" /> Preview
+                    <EyeIcon className="h-3.5 w-3.5" /> {tc("preview")}
                   </>
                 ) : (
                   <>
-                    <CodeIcon className="h-3.5 w-3.5" /> Edit HTML
+                    <CodeIcon className="h-3.5 w-3.5" /> {t("editHtml")}
                   </>
                 )}
               </button>
@@ -267,12 +270,12 @@ export function SendEmailModal({
               {mode === "preview" ? (
                 <>
                   <PencilIcon className="h-2.5 w-2.5" />
-                  Click on text to edit
+                  {t("clickToEdit")}
                 </>
               ) : (
                 <>
                   <EyeIcon className="h-2.5 w-2.5" />
-                  Changes reflected in Preview
+                  {t("changesReflected")}
                 </>
               )}
             </span>
@@ -316,11 +319,9 @@ export function SendEmailModal({
                     <MailIcon className="h-6 w-6 opacity-50" />
                   </div>
                   <div>
-                    <p className="font-medium text-sm">No content yet</p>
+                    <p className="font-medium text-sm">{t("noContent")}</p>
                     <p className="mt-0.5 text-muted-foreground text-xs">
-                      {safeTemplates.length > 0
-                        ? "Select a template above or switch to HTML to compose"
-                        : "Switch to HTML to write your email"}
+                      {safeTemplates.length > 0 ? t("noContentWithTemplates") : t("noContentNoTemplates")}
                     </p>
                   </div>
                 </div>
@@ -331,7 +332,7 @@ export function SendEmailModal({
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
-              placeholder={"<!-- Paste or write your HTML here -->\n<p>Hello {{firstName}},</p>"}
+              placeholder={`<!-- ${t("htmlComment")} -->\n<p>${t("htmlGreeting", { name: "{{firstName}}" })}</p>`}
               spellCheck={false}
               className={cn(
                 "absolute inset-0 h-full w-full resize-none",
@@ -347,15 +348,18 @@ export function SendEmailModal({
           <div className="flex shrink-0 items-center justify-between gap-3 border-t bg-background px-6 py-3">
             {/* Placeholder reference — unobtrusive, left side */}
             <p className="hidden text-[10px] text-muted-foreground sm:block">
-              Tip: use <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{firstName}}"}</code>,{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{lastName}}"}</code>,{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono">{"{{companyName}}"}</code> as placeholders
+              {t.rich("tip", {
+                first: "{{firstName}}",
+                last: "{{lastName}}",
+                company: "{{companyName}}",
+                code: (chunks) => <code className="rounded bg-muted px-1 py-0.5 font-mono">{chunks}</code>,
+              })}
             </p>
 
             <div className="ml-auto flex items-center gap-2">
               <Button type="button" variant="ghost" size="sm" onClick={() => handleOpen(false)} className="gap-1.5">
                 <XIcon className="h-3.5 w-3.5" />
-                Discard
+                {t("discard")}
               </Button>
               <Button type="submit" size="sm" disabled={isSending} className="gap-1.5">
                 {isSending ? (
@@ -363,7 +367,7 @@ export function SendEmailModal({
                 ) : (
                   <SendIcon className="h-3.5 w-3.5" />
                 )}
-                Send
+                {tc("send")}
               </Button>
             </div>
           </div>

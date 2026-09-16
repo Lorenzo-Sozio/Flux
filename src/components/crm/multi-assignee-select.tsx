@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 import { Plus, Users, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { addTaskAssignee, getTaskAssignees, removeTaskAssignee } from "@/actions/tasks";
@@ -26,12 +27,8 @@ const ROLE_COLORS: Record<string, string> = {
   informed: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400",
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  responsible: "Responsible (R)",
-  accountable: "Accountable (A)",
-  consulted: "Consulted (C)",
-  informed: "Informed (I)",
-};
+// Labels live under assignees.roles.<role>.
+const ROLES = ["responsible", "accountable", "consulted", "informed"] as const;
 
 const ROLE_SHORT: Record<string, string> = {
   responsible: "R",
@@ -46,6 +43,8 @@ interface Props {
 }
 
 export function MultiAssigneeSelect({ taskId, users }: Props) {
+  const t = useTranslations("assignees");
+  const tc = useTranslations("common");
   const [assignees, setAssignees] = useState<Assignee[]>([]);
   const [adding, setAdding] = useState(false);
   const [selectedUser, setSelectedUser] = useState("_none");
@@ -55,7 +54,9 @@ export function MultiAssigneeSelect({ taskId, users }: Props) {
   useEffect(() => {
     getTaskAssignees(taskId)
       .then(setAssignees)
-      .catch(() => {});
+      .catch(() => {
+        // An empty list is what a failed read looks like here.
+      });
   }, [taskId]);
 
   const handleAdd = async () => {
@@ -69,7 +70,7 @@ export function MultiAssigneeSelect({ taskId, users }: Props) {
       setSelectedUser("_none");
       setSelectedRole("responsible");
     } catch {
-      toast.error("Failed to add assignee.");
+      toast.error(t("addFailed"));
     } finally {
       setLoading(false);
     }
@@ -80,7 +81,7 @@ export function MultiAssigneeSelect({ taskId, users }: Props) {
       await removeTaskAssignee(taskId, userId);
       setAssignees((prev) => prev.filter((a) => a.userId !== userId));
     } catch {
-      toast.error("Failed to remove assignee.");
+      toast.error(t("removeFailed"));
     }
   };
 
@@ -91,7 +92,7 @@ export function MultiAssigneeSelect({ taskId, users }: Props) {
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium flex items-center gap-1.5">
           <Users className="h-3.5 w-3.5 text-muted-foreground" />
-          RACI Assignees
+          {t("raciTitle")}
         </span>
         {!adding && availableUsers.length > 0 && (
           <Button
@@ -102,14 +103,12 @@ export function MultiAssigneeSelect({ taskId, users }: Props) {
             onClick={() => setAdding(true)}
           >
             <Plus className="h-3 w-3" />
-            Add
+            {tc("add")}
           </Button>
         )}
       </div>
 
-      {assignees.length === 0 && !adding && (
-        <p className="text-xs text-muted-foreground/60 pl-1">No RACI assignees yet.</p>
-      )}
+      {assignees.length === 0 && !adding && <p className="text-xs text-muted-foreground/60 pl-1">{t("raciEmpty")}</p>}
 
       <div className="space-y-1">
         {assignees.map((a) => (
@@ -141,14 +140,14 @@ export function MultiAssigneeSelect({ taskId, users }: Props) {
             <div className="flex-1 min-w-0">
               <SearchableSelect
                 options={[
-                  { value: "_none", label: "Select user…" },
+                  { value: "_none", label: t("selectUser") },
                   ...availableUsers.map((u) => ({ value: u.id, label: u.name ?? u.id })),
                 ]}
                 value={selectedUser}
                 onChange={setSelectedUser}
-                placeholder="Select user…"
-                searchPlaceholder="Search users…"
-                emptyText="No users found."
+                placeholder={t("selectUser")}
+                searchPlaceholder={t("searchUsers")}
+                emptyText={t("noUsers")}
               />
             </div>
             <Select value={selectedRole} onValueChange={setSelectedRole}>
@@ -156,9 +155,9 @@ export function MultiAssigneeSelect({ taskId, users }: Props) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(ROLE_LABELS).map(([val, label]) => (
+                {ROLES.map((val) => (
                   <SelectItem key={val} value={val}>
-                    <span className={cn("text-xs px-1 rounded", ROLE_COLORS[val])}>{label}</span>
+                    <span className={cn("text-xs px-1 rounded", ROLE_COLORS[val])}>{t(`roles.${val}`)}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -172,7 +171,7 @@ export function MultiAssigneeSelect({ taskId, users }: Props) {
               onClick={handleAdd}
               disabled={loading || selectedUser === "_none"}
             >
-              Add
+              {tc("add")}
             </Button>
             <Button
               type="button"
@@ -184,7 +183,7 @@ export function MultiAssigneeSelect({ taskId, users }: Props) {
                 setSelectedUser("_none");
               }}
             >
-              Cancel
+              {tc("cancel")}
             </Button>
           </div>
         </div>

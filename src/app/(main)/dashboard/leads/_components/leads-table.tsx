@@ -64,6 +64,7 @@ interface Props {
 export function LeadsTable({ leads, users, canEdit, narrowed, categories = [], companyTypes = [] }: Props) {
   const t = useTranslations("leads");
   const te = useTranslations("emptyStates");
+  const tr = useTranslations("recordTable");
   const tc = useTranslations("common");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
@@ -204,7 +205,7 @@ export function LeadsTable({ leads, users, canEdit, narrowed, categories = [], c
                 <TableRow>
                   {canEdit && (
                     <TableHead className="w-10">
-                      <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label="Select all" />
+                      <Checkbox checked={allSelected} onCheckedChange={toggleAll} aria-label={tc("selectAll")} />
                     </TableHead>
                   )}
                   <TableHead>{t("columns.name")}</TableHead>
@@ -229,7 +230,7 @@ export function LeadsTable({ leads, users, canEdit, narrowed, categories = [], c
                         <Checkbox
                           checked={selected.has(lead.id)}
                           onCheckedChange={() => toggle(lead.id)}
-                          aria-label={`Select ${lead.firstName} ${lead.lastName}`}
+                          aria-label={tr("selectRecord", { name: `${lead.firstName} ${lead.lastName}` })}
                         />
                       </TableCell>
                     )}

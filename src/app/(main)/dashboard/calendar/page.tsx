@@ -982,7 +982,7 @@ export default async function CalendarPage({
 
           <SubscribeDialog />
 
-          <AppointmentDialog defaultDate={dateParam ? `${dateParam}T09:00` : undefined} />
+          <AppointmentDialog defaultDate={dateParam ? `${dateParam}T09:00` : undefined} openOnNew />
         </div>
       </div>
 

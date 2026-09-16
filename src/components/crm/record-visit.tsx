@@ -2,28 +2,33 @@
 
 import { useEffect } from "react";
 
-export type HistoryItem = {
-  type: "contact" | "lead" | "company" | "deal";
-  name: string;
-  href: string;
-  visitedAt: number;
-};
+import { type EntityType, entityHref } from "@/lib/entities";
+import { rememberRecord } from "@/lib/recent-records";
 
-const STORAGE_KEY = "flux_crm_history";
-const MAX_ITEMS = 15;
+import { useWorkspaceScope } from "./workspace-scope";
 
-export function RecordVisit({ type, name, href }: { type: HistoryItem["type"]; name: string; href: string }) {
+/**
+ * Put on a record's detail page: opening it is what makes it recent.
+ *
+ * ⚠️ `entities.test.ts` reads every `[id]/page.tsx` under the dashboard and fails
+ * when one does not render this, so a new kind of record cannot quietly stay out
+ * of the recents list.
+ */
+export function RecordVisit({
+  type,
+  id,
+  label,
+  sub,
+}: {
+  type: EntityType;
+  id: string;
+  label: string;
+  sub?: string | null;
+}) {
+  const scope = useWorkspaceScope();
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const existing: HistoryItem[] = raw ? JSON.parse(raw) : [];
-      const filtered = existing.filter((item) => item.href !== href);
-      const next: HistoryItem[] = [{ type, name, href, visitedAt: Date.now() }, ...filtered].slice(0, MAX_ITEMS);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      // localStorage may be unavailable (private browsing, SSR guard)
-    }
-  }, [type, name, href]);
-
+    if (!id || !label) return;
+    rememberRecord(scope, { type, id, label, sub: sub ?? null, url: entityHref(type, id) });
+  }, [scope, type, id, label, sub]);
   return null;
 }

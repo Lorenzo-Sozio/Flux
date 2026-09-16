@@ -19,7 +19,7 @@ import {
   UserCog,
   Users,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import {
@@ -172,6 +172,8 @@ export function UsersClient({
   const t = useTranslations("users");
   const tc = useTranslations("common");
   const tr = useTranslations("roles");
+  const tu = useTranslations("users.usersClient");
+  const format = useFormatter();
   const [users, setUsers] = useState(initialUsers);
   const [invitations] = useState(initialInvitations);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -222,7 +224,7 @@ export function UsersClient({
         return;
       }
 
-      toast.success(`${t("inviteDialog.send")} → ${inviteEmail}`);
+      toast.success(tu("inviteSent", { email: inviteEmail }));
       setInviteOpen(false);
       setInviteEmail("");
       setInviteRole("editor");
@@ -265,11 +267,11 @@ export function UsersClient({
 
   const handleChangePassword = async () => {
     if (newPw !== confirmPw) {
-      toast.error("Passwords do not match.");
+      toast.error(tu("passwordsMismatch"));
       return;
     }
     if (newPw.length < 8) {
-      toast.error("Password must be at least 8 characters.");
+      toast.error(tu("passwordMin"));
       return;
     }
     setIsChangingPw(true);
@@ -279,7 +281,7 @@ export function UsersClient({
         toast.error(result.error);
         return;
       }
-      toast.success("Password changed successfully.");
+      toast.success(tu("passwordChanged"));
       setChangePwOpen(false);
       setCurrentPw("");
       setNewPw("");
@@ -298,11 +300,11 @@ export function UsersClient({
     try {
       const result = await adminSendPasswordResetAction(user.id);
       if (result.success) {
-        toast.success(`${t("resetFallback.title")} → ${user.email}`);
+        toast.success(tu("resetSent", { email: user.email ?? "" }));
         setResetTarget(null);
       } else if ("resetUrl" in result && result.resetUrl) {
         setResetFallbackUrl(result.resetUrl as string);
-        toast.warning("Email not delivered — copy the link below.");
+        toast.warning(tu("resetNotDelivered"));
       } else if ("error" in result) {
         toast.error(result.error as string);
         setResetTarget(null);
@@ -405,7 +407,7 @@ export function UsersClient({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            title="Change password"
+                            title={tu("changePassword")}
                             onClick={() => setChangePwOpen(true)}
                           >
                             <KeyRound className="h-3.5 w-3.5" />
@@ -418,7 +420,7 @@ export function UsersClient({
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                                title="Send password reset"
+                                title={tu("sendPasswordReset")}
                                 onClick={() => handleAdminSendReset(user)}
                                 disabled={isSendingReset && resetTarget?.id === user.id}
                               >
@@ -430,7 +432,7 @@ export function UsersClient({
                               size="icon"
                               className="h-7 w-7 text-destructive hover:text-destructive"
                               onClick={() => handleDelete(user.id)}
-                              title="Delete user"
+                              title={tu("deleteUser")}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -471,11 +473,11 @@ export function UsersClient({
                     <TableCell className="font-medium">{inv.email}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className="capitalize">
-                        {inv.role}
+                        {tr.has(`roleLabel.${inv.role}`) ? tr(`roleLabel.${inv.role}`) : inv.role}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground text-xs">
-                      {new Date(inv.expiresAt).toLocaleDateString()}
+                      {format.dateTime(new Date(inv.expiresAt), { dateStyle: "short" })}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -622,7 +624,7 @@ export function UsersClient({
                     .filter((r) => r !== "owner")
                     .map((r) => (
                       <SelectItem key={r} value={r} className="capitalize">
-                        {r}
+                        {tr(`roleLabel.${r}`)}
                       </SelectItem>
                     ))}
                 </SelectContent>
@@ -745,8 +747,10 @@ export function UsersClient({
           <DialogHeader>
             <DialogTitle>{t("resetFallback.title")}</DialogTitle>
             <DialogDescription>
-              The reset link was generated but could not be emailed to <strong>{resetTarget?.email}</strong>. Share it
-              manually:
+              {tu.rich("resetFallbackDesc", {
+                email: resetTarget?.email ?? "",
+                strong: (chunks) => <strong>{chunks}</strong>,
+              })}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">

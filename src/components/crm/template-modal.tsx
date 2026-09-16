@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createEmailTemplate, updateEmailTemplate } from "@/actions/marketing";
@@ -39,15 +40,15 @@ interface TemplateModalProps {
   onSuccess?: () => void;
 }
 
-const CATEGORIES = [
-  { value: "general", label: "General" },
-  { value: "welcome", label: "Welcome" },
-  { value: "followup", label: "Follow-up" },
-  { value: "promotional", label: "Promotional" },
-  { value: "transactional", label: "Transactional" },
-];
+/** Labels live under marketing.templateCategories.<value>. */
+const CATEGORIES = ["general", "welcome", "followup", "promotional", "transactional"] as const;
 
 export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
+  const t = useTranslations("marketing.templateModal");
+  const tm = useTranslations("marketing");
+  const tc = useTranslations("common");
+  // Markup is not language; only the greeting inside it is.
+  const htmlPlaceholder = `<div style="font-family: Arial, sans-serif; padding: 20px;"><h1>${t("htmlGreeting", { name: "{{nome}}" })}</h1></div>`;
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("editor");
@@ -70,10 +71,10 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
     try {
       if (template) {
         await updateEmailTemplate(template.id, formData);
-        toast.success("Template updated successfully");
+        toast.success(t("updated"));
       } else {
         await createEmailTemplate(formData);
-        toast.success("Template created successfully");
+        toast.success(t("created"));
       }
       setOpen(false);
       setFormData({
@@ -88,7 +89,7 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
       });
       onSuccess?.();
     } catch (_error) {
-      toast.error("Failed to save template");
+      toast.error(t("saveFailed"));
     } finally {
       setLoading(false);
     }
@@ -107,7 +108,7 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
   const removeTag = (tag: string) => {
     setFormData({
       ...formData,
-      tags: formData.tags.filter((t) => t !== tag),
+      tags: formData.tags.filter((existing) => existing !== tag),
     });
   };
 
@@ -123,19 +124,15 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
           <>📝</>
         ) : (
           <>
-            <span>➕</span> New Template
+            <span>➕</span> {tm("templates.newTemplate")}
           </>
         )}
       </Button>
 
       <DialogContent className="flex flex-col p-0 sm:!max-w-7xl sm:w-[90vw]">
         <DialogHeader className="flex-shrink-0 border-b px-8 py-6">
-          <DialogTitle className="text-2xl">
-            {template ? "Edit Email Template" : "Create New Email Template"}
-          </DialogTitle>
-          <DialogDescription>
-            Design a professional email template with HTML support and dynamic placeholders.
-          </DialogDescription>
+          <DialogTitle className="text-2xl">{template ? t("editTitle") : t("createTitle")}</DialogTitle>
+          <DialogDescription>{t("description")}</DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex flex-1 flex-col gap-4 overflow-y-auto px-8 pb-6">
@@ -143,11 +140,11 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
           <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
             <div className="space-y-2">
               <Label htmlFor="name" className="font-semibold text-sm">
-                Template Name *
+                {t("nameLabel")} *
               </Label>
               <Input
                 id="name"
-                placeholder="e.g., Welcome Email"
+                placeholder={t("namePlaceholder")}
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="h-9 text-sm"
@@ -157,7 +154,7 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
 
             <div className="space-y-2">
               <Label htmlFor="category" className="font-semibold text-sm">
-                Category
+                {tc("category")}
               </Label>
               <select
                 id="category"
@@ -166,8 +163,8 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
                 className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
               >
                 {CATEGORIES.map((cat) => (
-                  <option key={cat.value} value={cat.value}>
-                    {cat.label}
+                  <option key={cat} value={cat}>
+                    {tm(`templateCategories.${cat}`)}
                   </option>
                 ))}
               </select>
@@ -175,11 +172,11 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
 
             <div className="space-y-2 xl:col-span-2">
               <Label htmlFor="subject" className="font-semibold text-sm">
-                Subject Line *
+                {t("subjectLabel")} *
               </Label>
               <Input
                 id="subject"
-                placeholder="e.g., Welcome to Flux, {{nome}}!"
+                placeholder={t("subjectPlaceholder", { name: "{{nome}}" })}
                 value={formData.subject}
                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                 className="h-9 text-sm"
@@ -199,7 +196,7 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
                   onChange={(e) => setFormData({ ...formData, isHtml: e.target.checked })}
                   className="h-4 w-4 cursor-pointer"
                 />
-                <span className="font-semibold">{formData.isHtml ? "HTML" : "Plain Text"}</span>
+                <span className="font-semibold">{formData.isHtml ? "HTML" : t("plainText")}</span>
               </Label>
             </div>
           </div>
@@ -207,11 +204,11 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
           {/* Description */}
           <div className="space-y-2">
             <Label htmlFor="description" className="font-semibold text-sm">
-              Description (Internal Notes)
+              {t("descriptionLabel")}
             </Label>
             <Textarea
               id="description"
-              placeholder="Internal notes about this template, usage guidelines, target audience..."
+              placeholder={t("descriptionPlaceholder")}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="h-20 resize-none text-sm"
@@ -220,10 +217,10 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
 
           {/* Tags */}
           <div className="space-y-2">
-            <Label className="font-semibold text-sm">Tags (Organization)</Label>
+            <Label className="font-semibold text-sm">{t("tagsLabel")}</Label>
             <div className="flex gap-2">
               <Input
-                placeholder="Add tag (e.g., sales, onboarding, q2-2026) and press Enter"
+                placeholder={t("tagPlaceholder")}
                 value={tagInput}
                 onChange={(e) => setTagInput(e.target.value)}
                 onKeyPress={(e) => {
@@ -235,7 +232,7 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
                 className="h-9 flex-1 text-sm"
               />
               <Button type="button" variant="outline" onClick={addTag} className="h-9 px-4 text-sm">
-                Add Tag
+                {t("addTag")}
               </Button>
             </div>
             {formData.tags.length > 0 && (
@@ -259,13 +256,13 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
             <Tabs defaultValue="visual" value={activeTab} onValueChange={setActiveTab} className="flex h-full flex-col">
               <TabsList className="w-full justify-start rounded-none border-b bg-muted/50">
                 <TabsTrigger value="visual" className="font-semibold text-sm">
-                  ✏️ Visual Editor
+                  ✏️ {t("tabVisual")}
                 </TabsTrigger>
                 <TabsTrigger value="editor" className="font-semibold text-sm">
-                  📝 HTML Source
+                  📝 {t("tabHtml")}
                 </TabsTrigger>
                 <TabsTrigger value="preview" className="font-semibold text-sm">
-                  👁️ Preview
+                  👁️ {tc("preview")}
                 </TabsTrigger>
               </TabsList>
 
@@ -274,7 +271,7 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
                 <RichTextEditor
                   value={formData.body}
                   onChange={(html) => setFormData((f) => ({ ...f, body: html }))}
-                  placeholder="Write your email content using the toolbar above…"
+                  placeholder={t("bodyPlaceholder")}
                   className="min-h-[320px] border-0"
                 />
               </TabsContent>
@@ -282,7 +279,7 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
               {/* HTML Source */}
               <TabsContent value="editor" className="min-h-0 flex-1 overflow-auto">
                 <Textarea
-                  placeholder='<div style="font-family: Arial, sans-serif; padding: 20px;"><h1>Hello {{nome}}!</h1></div>'
+                  placeholder={htmlPlaceholder}
                   value={formData.body}
                   onChange={(e) => setFormData({ ...formData, body: e.target.value })}
                   className="h-full min-h-[320px] w-full resize-none rounded-none border-0 p-4 font-mono text-sm"
@@ -321,10 +318,10 @@ export function TemplateModal({ template, onSuccess }: TemplateModalProps) {
 
           <DialogFooter className="gap-2">
             <Button type="button" variant="outline" onClick={() => setOpen(false)} className="h-10 px-6 text-sm">
-              Cancel
+              {tc("cancel")}
             </Button>
             <Button type="submit" disabled={loading} className="h-10 px-6 font-semibold text-sm">
-              {loading ? "Saving..." : template ? "Update Template" : "Create Template"}
+              {loading ? tc("saving") : template ? t("update") : t("create")}
             </Button>
           </DialogFooter>
         </form>

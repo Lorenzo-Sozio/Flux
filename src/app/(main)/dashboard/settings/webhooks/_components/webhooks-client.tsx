@@ -258,7 +258,7 @@ export function WebhooksClient({ webhooks: initial, currentUserId }: Props) {
             <div className="space-y-1.5">
               <Label>{t("dialog.nameLabel")}</Label>
               <Input
-                placeholder="e.g. Slack notifications"
+                placeholder={t("form.namePlaceholder")}
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               />

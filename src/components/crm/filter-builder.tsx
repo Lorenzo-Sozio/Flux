@@ -622,19 +622,19 @@ export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, 
     try {
       const parsed = JSON.parse(criteria) as FilterTree;
       if (parsed.version === 1) setTree(parsed);
-      else toast.error("Invalid filter format.");
+      else toast.error(t("presets.invalidFormat"));
     } catch {
-      toast.error("Could not load filter.");
+      toast.error(t("presets.loadFailed"));
     }
   };
 
   const handleSave = async () => {
     if (!saveName.trim()) {
-      toast.error("Enter a name for this filter.");
+      toast.error(t("presets.nameRequired"));
       return;
     }
     if (countActive(tree.conditions) === 0) {
-      toast.error("No active conditions to save.");
+      toast.error(t("presets.noConditions"));
       return;
     }
     setSaving(true);
@@ -646,9 +646,9 @@ export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, 
         { id: Math.random().toString(36), name: saveName.trim(), criteria: JSON.stringify(tree) },
       ]);
       setSaveName("");
-      toast.success("Filter saved.");
+      toast.success(t("presets.saved"));
     } catch {
-      toast.error("Failed to save filter.");
+      toast.error(t("presets.saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -658,9 +658,9 @@ export function FilterBuilder({ entityType, fields, savedFilters: initialSaved, 
     try {
       await deleteCustomFilter(id);
       setSaved((prev) => prev.filter((f) => f.id !== id));
-      toast.success("Filter deleted.");
+      toast.success(t("presets.deleted"));
     } catch {
-      toast.error("Failed to delete filter.");
+      toast.error(t("presets.deleteFailed"));
     }
   };
 

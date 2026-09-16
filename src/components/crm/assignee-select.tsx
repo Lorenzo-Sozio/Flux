@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { useTranslations } from "next-intl";
+
 import { getAllUsers } from "@/actions/crm";
 import { getGroupsForSelect } from "@/actions/user-groups";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -36,7 +38,9 @@ interface Props {
 type UserOption = { id: string; name: string | null; email: string | null };
 type GroupOption = { id: string; name: string; color: string; memberCount: number };
 
-export function AssigneeSelect({ value, onChange, disabled, placeholder = "— Unassigned —" }: Props) {
+export function AssigneeSelect({ value, onChange, disabled, placeholder: placeholderProp }: Props) {
+  const t = useTranslations("assignees");
+  const placeholder = placeholderProp ?? t("unassigned");
   const [users, setUsers] = useState<UserOption[]>([]);
   const [groups, setGroups] = useState<GroupOption[]>([]);
 
@@ -52,7 +56,7 @@ export function AssigneeSelect({ value, onChange, disabled, placeholder = "— U
     ...groups.map((g) => ({
       value: `g:${g.id}`,
       label: g.name,
-      sublabel: `Group · ${g.memberCount} member${g.memberCount !== 1 ? "s" : ""}`,
+      sublabel: t("groupMembers", { count: g.memberCount }),
     })),
     ...users.map((u) => ({
       value: `u:${u.id}`,
@@ -68,8 +72,8 @@ export function AssigneeSelect({ value, onChange, disabled, placeholder = "— U
       onChange={onChange}
       disabled={disabled}
       placeholder={placeholder}
-      searchPlaceholder="Search users and groups…"
-      emptyText="No results found."
+      searchPlaceholder={t("searchUsersAndGroups")}
+      emptyText={t("noResults")}
     />
   );
 }

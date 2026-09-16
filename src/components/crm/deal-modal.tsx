@@ -205,7 +205,7 @@ export function DealModal({
                   variant="ghost"
                   size="icon"
                   type="button"
-                  title="Apri scheda completa"
+                  title={t("dealModal.openFullRecord")}
                   className="h-8 w-8 shrink-0"
                 >
                   <ArrowUpRightIcon className="h-4 w-4" />
@@ -239,7 +239,7 @@ export function DealModal({
               {/* ── Deal Tab ──────────────────────────────────────────────── */}
               <TabsContent value="deal" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                 <div className="col-span-1 sm:col-span-2">
-                  <F label={t("modal.fieldDealName")} required error={e.name?.message}>
+                  <F label={t("modal.fieldDealName")} required error={e.name ? t("dealModal.nameRequired") : undefined}>
                     <Input {...register("name")} placeholder={t("modal.namePlaceholder")} />
                   </F>
                 </div>
@@ -303,7 +303,11 @@ export function DealModal({
               {/* ── Pipeline Tab ──────────────────────────────────────────── */}
               <TabsContent value="details" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                 <div className="col-span-1 sm:col-span-2">
-                  <F label={t("modal.fieldStageLabel")} required error={e.stageId?.message}>
+                  <F
+                    label={t("modal.fieldStageLabel")}
+                    required
+                    error={e.stageId ? t("dealModal.stageRequired") : undefined}
+                  >
                     <Controller
                       control={control}
                       name="stageId"
@@ -330,7 +334,10 @@ export function DealModal({
                     />
                   </F>
                 </div>
-                <F label={t("modal.fieldProbability")} error={e.probability?.message}>
+                <F
+                  label={t("modal.fieldProbability")}
+                  error={e.probability ? t("dealModal.probabilityRange") : undefined}
+                >
                   <Input {...register("probability")} type="number" placeholder="0" min={0} max={100} />
                 </F>
                 <F label={t("modal.fieldExpectedClose")} error={e.expectedCloseDate?.message}>

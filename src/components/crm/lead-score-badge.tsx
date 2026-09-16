@@ -1,3 +1,5 @@
+import { useTranslations } from "next-intl";
+
 import { getScoreTier, SCORE_TIER_CONFIG } from "@/lib/lead-score";
 
 interface Props {
@@ -6,17 +8,18 @@ interface Props {
 }
 
 export function LeadScoreBadge({ score, showValue = true }: Props) {
+  const t = useTranslations("leadScore");
   if (score == null) return null;
   const tier = getScoreTier(score);
-  const { label, className } = SCORE_TIER_CONFIG[tier];
+  const { className } = SCORE_TIER_CONFIG[tier];
 
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${className}`}
-      title={`Lead score: ${score}/100`}
+      title={t("title", { score })}
     >
       {showValue && <span className="tabular-nums">{score}</span>}
-      <span>{label}</span>
+      <span>{t(`tiers.${tier}`)}</span>
     </span>
   );
 }

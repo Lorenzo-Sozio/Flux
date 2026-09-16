@@ -19,6 +19,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
+import type { EntityType } from "@/lib/entities";
 import { applyNavAccess, type NavAccess } from "@/navigation/sidebar/filter-nav";
 import { accountPlacement, sidebarItems, sidebarPlacement } from "@/navigation/sidebar/sidebar-items";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
@@ -29,8 +30,9 @@ import { NavUser } from "./nav-user";
 export function AppSidebar({
   user,
   navAccess,
+  creatable,
   ...props
-}: React.ComponentProps<typeof Sidebar> & { user: any; navAccess: NavAccess }) {
+}: React.ComponentProps<typeof Sidebar> & { user: any; navAccess: NavAccess; creatable: EntityType[] }) {
   // The menu — icons included — is imported here, on the client, and never
   // travels. Only the server's verdict about it does.
   const navGroups = useMemo(() => applyNavAccess(sidebarItems, navAccess), [navAccess]);
@@ -67,7 +69,7 @@ export function AppSidebar({
       <SidebarContent>
         {/* Filtered by the layout against the viewer's role and plan; the full
             list used to be rendered to everybody (audit rilievi D-08, U-02). */}
-        <NavMain items={mainGroups} />
+        <NavMain items={mainGroups} creatable={creatable} />
 
         {/*
           ⚠️ Administration is the account menu from md up — a dropdown under the

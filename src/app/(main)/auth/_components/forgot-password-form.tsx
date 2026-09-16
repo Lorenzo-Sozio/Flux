@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslations } from "next-intl";
@@ -13,21 +13,26 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-const formSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address." }),
-});
+const makeFormSchema = (emailInvalid: string) =>
+  z.object({
+    email: z.string().email({ message: emailInvalid }),
+  });
+
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 export function ForgotPasswordForm() {
   const t = useTranslations("auth.forgotPassword");
+  const tValidation = useTranslations("auth.validation");
+  const formSchema = useMemo(() => makeFormSchema(tValidation("emailInvalid")), [tValidation]);
   const [sent, setSent] = useState(false);
   const [isPending, setIsPending] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { email: "" },
   });
 
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+  const onSubmit = async (data: FormValues) => {
     setIsPending(true);
     try {
       await forgotPasswordAction(data.email);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -17,23 +17,31 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 
-const formSchema = z.object({
-  email: z.string().email({ message: "Please enter a valid email address." }),
-  password: z.string().min(1, { message: "Password is required." }),
-  remember: z.boolean().optional(),
-});
+const makeFormSchema = (emailInvalid: string, passwordRequired: string) =>
+  z.object({
+    email: z.string().email({ message: emailInvalid }),
+    password: z.string().min(1, { message: passwordRequired }),
+    remember: z.boolean().optional(),
+  });
+
+type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
 export function LoginForm() {
   const router = useRouter();
   const t = useTranslations("auth.login");
+  const tValidation = useTranslations("auth.validation");
   const [isPending, setIsPending] = useState(false);
+  const formSchema = useMemo(
+    () => makeFormSchema(tValidation("emailInvalid"), tValidation("passwordRequired")),
+    [tValidation],
+  );
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { email: "", password: "", remember: false },
   });
 
-  const onSubmit = async (data: z.infer<typeof formSchema>) => {
+  const onSubmit = async (data: FormValues) => {
     setIsPending(true);
     try {
       const result = await signIn("credentials", {

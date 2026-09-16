@@ -5,164 +5,84 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 
 import { Command as CommandPrimitive } from "cmdk";
-import {
-  ArrowRight,
-  Building2,
-  CheckSquare,
-  Clock,
-  Contact,
-  CornerDownLeft,
-  FileText,
-  Headphones,
-  Kanban,
-  Loader2,
-  Plus,
-  Search,
-  ShoppingCart,
-  Sunrise,
-  Swords,
-  Users,
-} from "lucide-react";
-import { useTranslations } from "next-intl";
+import { BarChart3, Clock, CornerDownLeft, Loader2, Plus, Search, Swords } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 
+import { EntityBadgeIcon, entityIcon } from "@/components/crm/entity-icon";
+import { useWorkspaceScope } from "@/components/crm/workspace-scope";
 import { Button } from "@/components/ui/button";
-import {
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-} from "@/components/ui/command";
+import { CommandDialog, CommandEmpty, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
+import { ENTITIES, ENTITY_GROUPS, type EntityGroup, type EntityType, entityInPlan } from "@/lib/entities";
 import { matchCommands, PALETTE_COMMANDS, type PaletteCommand } from "@/lib/palette-commands";
 import { can, type TenantRole } from "@/lib/permissions";
 import { type RecentRecord, readRecentRecords, rememberRecord } from "@/lib/recent-records";
+import type { SearchHit } from "@/lib/search/providers";
+import { cn } from "@/lib/utils";
 
-type SearchResult = {
-  id: string;
-  label: string;
-  sub?: string | null;
-  url: string;
-  entity: string;
-};
+type Group = { type: EntityType; hits: SearchHit[] };
+type Filter = "all" | EntityGroup;
 
-type SearchResults = {
-  contacts: SearchResult[];
-  leads: SearchResult[];
-  companies: SearchResult[];
-  deals: SearchResult[];
-  tickets: SearchResult[];
-  quotes: SearchResult[];
-  orders: SearchResult[];
-};
+const NAV_ICONS: Record<string, React.ElementType> = { dashboard: BarChart3, "win-loss": Swords };
 
-/** The pure command list names its icon; this is where the name becomes one. */
-const COMMAND_ICONS: Record<string, React.ReactNode> = {
-  FileText: <FileText className="h-4 w-4" />,
-  ShoppingCart: <ShoppingCart className="h-4 w-4" />,
-  Contact: <Contact className="h-4 w-4" />,
-  Users: <Users className="h-4 w-4" />,
-  Building2: <Building2 className="h-4 w-4" />,
-  Kanban: <Kanban className="h-4 w-4" />,
-  Headphones: <Headphones className="h-4 w-4" />,
-  CheckSquare: <CheckSquare className="h-4 w-4" />,
-  Sunrise: <Sunrise className="h-4 w-4" />,
-  Swords: <Swords className="h-4 w-4" />,
-};
-
-export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
+/**
+ * The palette: find any record, run any verb.
+ *
+ * ⚠️ Driven by src/lib/entities.ts. It kept its own tables of seven entities —
+ * icons, badges, groups, quick links — so invoices, contracts, credit notes and
+ * the rest never appeared, whatever the search route returned.
+ *
+ * The chips narrow the search to one section, which is what makes it usable once
+ * a word ("Rossi") matches a contact, three quotes, two invoices and a ticket.
+ */
+export function SearchDialog({
+  tenantRole,
+  enabledModules,
+}: {
+  tenantRole?: TenantRole;
+  /** The plan's modules; null when not known, which hides nothing. */
+  enabledModules?: string[] | null;
+}) {
   const t = useTranslations("search");
+  const te = useTranslations("entities");
+  const format = useFormatter();
   const router = useRouter();
+  const scope = useWorkspaceScope();
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
-  const [results, setResults] = React.useState<SearchResults | null>(null);
+  const [filter, setFilter] = React.useState<Filter>("all");
+  const [groups, setGroups] = React.useState<Group[] | null>(null);
   const [loading, setLoading] = React.useState(false);
   const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestRef = React.useRef(0);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [recent, setRecent] = React.useState<RecentRecord[]>([]);
 
-  /** Only the verbs this person is allowed to use. */
+  /** Sections this person can search at all: what they may read, in their plan. */
+  const sections = React.useMemo(
+    () =>
+      ENTITY_GROUPS.filter((g) =>
+        ENTITIES.some((e) => e.group === g && can(tenantRole ?? null, e.read) && entityInPlan(e, enabledModules)),
+      ),
+    [tenantRole, enabledModules],
+  );
+
   const allow = React.useCallback(
-    (capability?: Parameters<typeof can>[1]) => (capability ? can(tenantRole ?? null, capability) : true),
-    [tenantRole],
+    (command: PaletteCommand) =>
+      (command.capability ? can(tenantRole ?? null, command.capability) : true) &&
+      (!command.module || !enabledModules || enabledModules.includes(command.module)),
+    [tenantRole, enabledModules],
   );
-
-  const commandMatches = React.useMemo(
-    () => matchCommands(query, allow, (command) => t(`commands.${command.labelKey}` as never)),
-    [query, allow, t],
+  const commandLabel = React.useCallback(
+    (command: PaletteCommand) =>
+      command.entity ? te(`types.${command.entity}.new` as never) : t(`commands.${command.labelKey}` as never),
+    [t, te],
   );
-  const idleCommands = React.useMemo(() => PALETTE_COMMANDS.filter((c) => allow(c.capability)).slice(0, 6), [allow]);
-
-  const ENTITY_CONFIG: Record<string, { icon: React.ReactNode; badge: string; badgeClass: string; href: string }> = {
-    contact: {
-      icon: <Contact className="h-4 w-4" />,
-      badge: t("badges.contact"),
-      badgeClass: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
-      href: "/dashboard/contacts",
-    },
-    lead: {
-      icon: <Users className="h-4 w-4" />,
-      badge: t("badges.lead"),
-      badgeClass: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
-      href: "/dashboard/leads",
-    },
-    company: {
-      icon: <Building2 className="h-4 w-4" />,
-      badge: t("badges.company"),
-      badgeClass: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
-      href: "/dashboard/companies",
-    },
-    deal: {
-      icon: <Kanban className="h-4 w-4" />,
-      badge: t("badges.deal"),
-      badgeClass: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
-      href: "/dashboard/pipeline",
-    },
-    ticket: {
-      icon: <Headphones className="h-4 w-4" />,
-      badge: t("badges.ticket"),
-      badgeClass: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300",
-      href: "/dashboard/support/tickets",
-    },
-    quote: {
-      icon: <FileText className="h-4 w-4" />,
-      badge: t("badges.quote"),
-      badgeClass: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300",
-      href: "/dashboard/sales/quotes",
-    },
-    order: {
-      icon: <ShoppingCart className="h-4 w-4" />,
-      badge: t("badges.order"),
-      badgeClass: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300",
-      href: "/dashboard/sales/orders",
-    },
-  };
-
-  const QUICK_LINKS: { label: string; entity: string }[] = [
-    { label: t("groups.contacts"), entity: "contact" },
-    { label: t("groups.leads"), entity: "lead" },
-    { label: t("groups.companies"), entity: "company" },
-    { label: t("groups.deals"), entity: "deal" },
-    { label: t("groups.tickets"), entity: "ticket" },
-    { label: t("groups.quotes"), entity: "quote" },
-    { label: t("groups.orders"), entity: "order" },
-  ];
-
-  const groups: { key: keyof SearchResults; label: string }[] = [
-    { key: "contacts", label: t("groups.contacts") },
-    { key: "leads", label: t("groups.leads") },
-    { key: "companies", label: t("groups.companies") },
-    { key: "deals", label: t("groups.deals") },
-    { key: "tickets", label: t("groups.tickets") },
-    { key: "quotes", label: t("groups.quotes") },
-    { key: "orders", label: t("groups.orders") },
-  ];
+  const commandMatches = React.useMemo(() => matchCommands(query, allow, commandLabel), [query, allow, commandLabel]);
+  const createCommands = React.useMemo(() => PALETTE_COMMANDS.filter((c) => c.entity && allow(c)), [allow]);
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      // ⌘K is the shortcut every comparable product uses, and it is what someone
-      // arriving from one of them will press. ⌘J stays bound as well so nobody who
-      // learned the old one has it taken away (audit rilievo U-03).
+      // ⌘K is what every comparable product uses; ⌘J stays for whoever learnt it.
       if ((e.key === "k" || e.key === "j") && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setOpen((o) => !o);
@@ -175,55 +95,82 @@ export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
   React.useEffect(() => {
     if (open) {
       setTimeout(() => inputRef.current?.focus(), 50);
-      // Read on open rather than on mount: another tab may have moved things.
-      setRecent(readRecentRecords());
+      setRecent(readRecentRecords(scope).slice(0, 6));
     }
-  }, [open]);
+  }, [open, scope]);
 
-  const search = React.useCallback(async (q: string) => {
+  const search = React.useCallback(async (q: string, f: Filter) => {
     if (q.length < 2) {
-      setResults(null);
+      setGroups(null);
       return;
     }
+    const request = ++requestRef.current;
     setLoading(true);
     try {
-      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
-      setResults(data.results);
+      const types =
+        f === "all"
+          ? ""
+          : ENTITIES.filter((e) => e.group === f)
+              .map((e) => e.type)
+              .join(",");
+      const res = await fetch(`/api/search?q=${encodeURIComponent(q)}${types ? `&types=${types}` : ""}`);
+      const data = (await res.json()) as { groups?: Group[] };
+      // A slow answer to an older query must not replace a newer one.
+      if (request === requestRef.current) setGroups(data.groups ?? []);
     } catch {
-      setResults(null);
+      if (request === requestRef.current) setGroups(null);
     } finally {
-      setLoading(false);
+      if (request === requestRef.current) setLoading(false);
     }
   }, []);
 
   const handleValueChange = (val: string) => {
     setQuery(val);
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => search(val), 250);
+    debounceRef.current = setTimeout(() => search(val, filter), 250);
+  };
+
+  const chooseFilter = (f: Filter) => {
+    setFilter(f);
+    search(query, f);
+    inputRef.current?.focus();
   };
 
   const handleClose = () => {
     setOpen(false);
     setQuery("");
-    setResults(null);
+    setGroups(null);
+    setFilter("all");
   };
 
-  const handleSelect = (url: string) => {
+  const go = (url: string) => {
     handleClose();
     router.push(url);
   };
 
-  /** Opening a record from here is what makes it recent. */
-  const openRecord = (item: { id: string; label: string; sub?: string | null; url: string; entity: string }) => {
-    rememberRecord(item);
-    handleSelect(item.url);
+  const openHit = (hit: SearchHit) => {
+    // Documents open on their parent record, which records its own visit.
+    if (hit.type !== "document") {
+      rememberRecord(scope, { type: hit.type, id: hit.id, label: hit.label, sub: hit.sub, url: hit.url });
+    }
+    go(hit.url);
   };
 
-  const runCommand = (command: PaletteCommand) => handleSelect(command.href);
+  const hitDetail = (hit: SearchHit) => {
+    const parts: string[] = [];
+    if (hit.sub) parts.push(hit.sub);
+    if (hit.type === "document" && hit.status) {
+      parts.push(te("attachedTo", { type: te(`types.${hit.status}.one` as never) }));
+    } else if (hit.status && te.has(`statuses.${hit.status}` as never)) {
+      parts.push(te(`statuses.${hit.status}` as never));
+    }
+    if (hit.amount) {
+      parts.push(format.number(Number(hit.amount.value), { style: "currency", currency: hit.amount.currency }));
+    }
+    return parts.join(" · ");
+  };
 
-  const hasResults = results && groups.some((g) => results[g.key]?.length > 0);
-  const totalCount = results ? groups.reduce((acc, g) => acc + (results[g.key]?.length ?? 0), 0) : 0;
+  const total = groups?.reduce((n, g) => n + g.hits.length, 0) ?? 0;
 
   return (
     <>
@@ -234,7 +181,6 @@ export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
       >
         <Search data-icon="inline-start" />
         {t("buttonLabel")}
-        {/* There is no ⌘ on a phone. */}
         <kbd className="hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-medium text-[10px] sm:inline-flex">
           <span className="text-xs">⌘</span>K
         </kbd>
@@ -246,15 +192,9 @@ export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
           if (!v) handleClose();
           else setOpen(true);
         }}
-        className="sm:max-w-[620px]"
+        className="sm:max-w-[680px]"
       >
-        {/* ⚠️ `size-full` on the palette and `flex-1` on the list: inside a
-            full-screen dialog the palette was content-height, so the keyboard
-            hints sat halfway down the screen with dead white below them. */}
         <CommandPrimitive shouldFilter={false} className="flex size-full flex-col">
-          {/* Search input. The right padding is the close button's — it is
-              always drawn below sm, and without the room it lay across the
-              placeholder. */}
           <div className="flex shrink-0 items-center gap-3 border-b py-3.5 pr-12 pl-4 sm:pr-4">
             <div className="flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
               {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Search className="h-5 w-5" />}
@@ -271,141 +211,135 @@ export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
                 type="button"
                 onClick={() => {
                   setQuery("");
-                  setResults(null);
+                  setGroups(null);
                   inputRef.current?.focus();
                 }}
-                className="shrink-0 rounded-sm text-muted-foreground text-xs ring-offset-background transition-colors hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                className="shrink-0 rounded-sm text-muted-foreground text-xs transition-colors hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 {t("clear")}
               </button>
             )}
           </div>
 
-          {/* Results list */}
-          <CommandList className="max-h-[420px] overflow-y-auto">
-            {/* Idle state */}
+          {/* Where to look. Wraps instead of scrolling, so no section is out of sight. */}
+          {sections.length > 1 && (
+            <fieldset
+              className="flex shrink-0 flex-wrap items-center gap-1 border-b px-3 py-2"
+              aria-label={te("search.filterLabel")}
+            >
+              {(["all", ...sections] as Filter[]).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  aria-pressed={filter === f}
+                  onClick={() => chooseFilter(f)}
+                  className={cn(
+                    "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
+                    filter === f ? "border-primary bg-primary text-primary-foreground" : "hover:bg-muted",
+                  )}
+                >
+                  {f === "all" ? te("search.all") : te(`groups.${f}` as never)}
+                </button>
+              ))}
+            </fieldset>
+          )}
+
+          <CommandList className="max-h-[min(460px,60dvh)] overflow-y-auto">
             {!query && (
-              <div className="p-4">
-                {/*
-                  What was open twenty minutes ago, before anything else. The list
-                  of module index pages below it is the sidebar again in a smaller
-                  box, and only helps somebody who has not been anywhere yet.
-                */}
+              <div className="space-y-4 p-4">
                 {recent.length > 0 && (
-                  <div className="mb-4">
+                  <div>
                     <p className="mb-2 flex items-center gap-1.5 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                      <Clock className="h-3 w-3" /> Recent
+                      <Clock className="h-3 w-3" /> {te("search.recent")}
                     </p>
                     <div className="space-y-0.5">
-                      {recent.map((item) => {
-                        const cfg = ENTITY_CONFIG[item.entity];
-                        return (
-                          <button
-                            type="button"
-                            key={item.id}
-                            onClick={() => openRecord(item)}
-                            className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted"
-                          >
-                            <span
-                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${cfg?.badgeClass ?? ""}`}
-                            >
-                              {cfg?.icon}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="block truncate font-medium text-sm leading-tight">{item.label}</span>
-                              {item.sub && (
-                                <span className="mt-0.5 block truncate text-muted-foreground text-xs leading-tight">
-                                  {item.sub}
-                                </span>
-                              )}
-                            </span>
-                            <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* The verbs. Searching found nouns, and only nouns. */}
-                {idleCommands.length > 0 && (
-                  <div className="mb-4">
-                    <p className="mb-2 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                      Create
-                    </p>
-                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                      {idleCommands.map((command) => (
+                      {recent.map((item) => (
                         <button
                           type="button"
-                          key={command.id}
-                          onClick={() => runCommand(command)}
-                          className="flex items-center gap-2.5 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-left text-sm transition-colors hover:border-border hover:bg-muted"
+                          key={`${item.type}:${item.id}`}
+                          onClick={() => {
+                            rememberRecord(scope, item);
+                            go(item.url);
+                          }}
+                          className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-muted"
                         >
-                          <span className="text-muted-foreground">{COMMAND_ICONS[command.icon]}</span>
-                          <span className="truncate font-medium">{t(`commands.${command.labelKey}` as never)}</span>
+                          <EntityBadgeIcon type={item.type} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate font-medium text-sm leading-tight">{item.label}</span>
+                            <span className="mt-0.5 block truncate text-muted-foreground text-xs leading-tight">
+                              {[te(`types.${item.type}.one` as never), item.sub].filter(Boolean).join(" · ")}
+                            </span>
+                          </span>
+                          <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground/40" />
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
 
-                <p className="mb-3 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                  {t("quickAccess")}
-                </p>
-                <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
-                  {QUICK_LINKS.map(({ label, entity }) => {
-                    const cfg = ENTITY_CONFIG[entity];
-                    return (
-                      <button
-                        type="button"
-                        key={entity}
-                        onClick={() => handleSelect(cfg.href)}
-                        className="flex items-center gap-2.5 rounded-lg border border-border/50 bg-muted/30 px-3 py-2.5 text-left text-sm transition-colors hover:border-border hover:bg-muted"
-                      >
-                        <span className="text-muted-foreground">{cfg.icon}</span>
-                        <span className="font-medium">{label}</span>
-                        <ArrowRight className="ml-auto h-3.5 w-3.5 text-muted-foreground/40" />
-                      </button>
-                    );
-                  })}
-                </div>
+                {/* Every verb, by section: the list grows with the registry, not with this file. */}
+                {createCommands.length > 0 && (
+                  <div>
+                    <p className="mb-2 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                      {te("search.create")}
+                    </p>
+                    <div className="space-y-2">
+                      {ENTITY_GROUPS.map((g) => {
+                        const inGroup = createCommands.filter((c) => c.group === g);
+                        if (inGroup.length === 0) return null;
+                        return (
+                          <div key={g}>
+                            <p className="mb-1 px-1 text-[11px] text-muted-foreground">{te(`groups.${g}` as never)}</p>
+                            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+                              {inGroup.map((command) => {
+                                const Icon = entityIcon(command.entity ?? "");
+                                return (
+                                  <button
+                                    type="button"
+                                    key={command.id}
+                                    onClick={() => go(command.href)}
+                                    className="flex items-center gap-2.5 rounded-lg border border-border/50 bg-muted/30 px-3 py-2 text-left text-sm transition-colors hover:border-border hover:bg-muted"
+                                  >
+                                    <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <span className="truncate font-medium">{commandLabel(command)}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Typing but < 2 chars */}
             {query.length === 1 && (
               <div className="py-8 text-center text-muted-foreground text-sm">{t("keepTyping")}</div>
             )}
 
-            {/* No results */}
-            {!loading && query.length >= 2 && !hasResults && commandMatches.length === 0 && (
+            {!loading && query.length >= 2 && total === 0 && commandMatches.length === 0 && (
               <CommandEmpty>
                 <div className="py-6">
                   <p className="text-muted-foreground text-sm">
                     {t("noResults")} <span className="font-medium text-foreground">&ldquo;{query}&rdquo;</span>
                   </p>
-                  {/*
-                    Not finding something is usually the moment you wanted to make
-                    it. Offering that here is the difference between a dead end and
-                    the next step.
-                  */}
-                  {allow("record:write") ? (
+                  {createCommands.length > 0 ? (
                     <div className="mt-4 flex flex-wrap justify-center gap-1.5">
-                      {["new-contact", "new-lead", "new-company"].map((id) => {
-                        const command = PALETTE_COMMANDS.find((c) => c.id === id);
-                        if (!command || !allow(command.capability)) return null;
-                        return (
+                      {createCommands
+                        .filter((c) => (filter === "all" ? c.group === "crm" : c.group === filter))
+                        .map((command) => (
                           <button
                             type="button"
-                            key={id}
-                            onClick={() => runCommand(command)}
+                            key={command.id}
+                            onClick={() => go(command.href)}
                             className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm transition-colors hover:bg-muted"
                           >
                             <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-                            {t(`commands.${command.labelKey}` as never)}
+                            {commandLabel(command)}
                           </button>
-                        );
-                      })}
+                        ))}
                     </div>
                   ) : (
                     <p className="mt-1 text-muted-foreground/60 text-xs">{t("noResultsTip")}</p>
@@ -414,88 +348,65 @@ export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
               </CommandEmpty>
             )}
 
-            {/*
-              The verbs, above the records. Typing "ord" should offer to write one
-              as readily as it offers the ones already written.
-            */}
             {query.length >= 1 && commandMatches.length > 0 && (
-              <CommandGroup heading="Actions">
-                {commandMatches.map((command) => (
-                  <CommandItem
-                    key={command.id}
-                    value={`cmd-${command.id}`}
-                    onSelect={() => runCommand(command)}
-                    className="flex items-center gap-3 px-3 py-2.5"
-                  >
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                      {COMMAND_ICONS[command.icon] ?? <Plus className="h-4 w-4" />}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate font-medium text-sm">
-                      {t(`commands.${command.labelKey}` as never)}
-                    </span>
-                    <span className="shrink-0 text-[11px] text-muted-foreground">
-                      {t(`commandGroups.${command.groupKey}` as never)}
-                    </span>
-                  </CommandItem>
-                ))}
+              <CommandGroup heading={te("search.actions")}>
+                {commandMatches.map((command) => {
+                  const Icon = command.entity ? entityIcon(command.entity) : (NAV_ICONS[command.id] ?? Plus);
+                  return (
+                    <CommandItem
+                      key={command.id}
+                      value={`cmd-${command.id}`}
+                      onSelect={() => go(command.href)}
+                      className="flex items-center gap-3 px-3 py-2.5"
+                    >
+                      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                        <Icon className="h-4 w-4" />
+                      </span>
+                      <span className="min-w-0 flex-1 truncate font-medium text-sm">{commandLabel(command)}</span>
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {te(`groups.${command.group}` as never)}
+                      </span>
+                    </CommandItem>
+                  );
+                })}
               </CommandGroup>
             )}
 
-            {/* Results */}
-            {hasResults && (
+            {total > 0 && (
               <>
                 <div className="flex items-center justify-between px-4 pt-3 pb-1">
                   <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
                     {t("resultsHeading")}
                   </p>
-                  <span className="text-muted-foreground text-xs">{t("foundCount", { count: totalCount })}</span>
+                  <span className="text-muted-foreground text-xs">{t("foundCount", { count: total })}</span>
                 </div>
-                {groups.map((group, idx) => {
-                  const items = results?.[group.key];
-                  if (!items?.length) return null;
-                  return (
-                    <React.Fragment key={group.key}>
-                      {idx > 0 && <CommandSeparator />}
-                      <CommandGroup heading={group.label}>
-                        {items.map((item) => {
-                          const cfg = ENTITY_CONFIG[item.entity];
-                          return (
-                            <CommandItem
-                              key={item.id}
-                              value={item.id}
-                              onSelect={() => openRecord(item)}
-                              className="flex items-center gap-3 px-3 py-2.5"
-                            >
-                              <span
-                                className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${cfg?.badgeClass ?? ""}`}
-                              >
-                                {cfg?.icon}
-                              </span>
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate font-medium text-sm leading-tight">{item.label}</p>
-                                {item.sub && (
-                                  <p className="mt-0.5 truncate text-muted-foreground text-xs leading-tight">
-                                    {item.sub}
-                                  </p>
-                                )}
-                              </div>
-                              <span
-                                className={`shrink-0 rounded-full px-2 py-0.5 font-medium text-[11px] ${cfg?.badgeClass ?? ""}`}
-                              >
-                                {cfg?.badge}
-                              </span>
-                            </CommandItem>
-                          );
-                        })}
-                      </CommandGroup>
-                    </React.Fragment>
-                  );
-                })}
+                {groups?.map((group) => (
+                  <CommandGroup key={group.type} heading={te(`types.${group.type}.other` as never)}>
+                    {group.hits.map((hit) => {
+                      const detail = hitDetail(hit);
+                      return (
+                        <CommandItem
+                          key={`${hit.type}:${hit.id}`}
+                          value={`${hit.type}:${hit.id}`}
+                          onSelect={() => openHit(hit)}
+                          className="flex items-center gap-3 px-3 py-2.5"
+                        >
+                          <EntityBadgeIcon type={hit.type} />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium text-sm leading-tight">{hit.label}</p>
+                            {detail && (
+                              <p className="mt-0.5 truncate text-muted-foreground text-xs leading-tight">{detail}</p>
+                            )}
+                          </div>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                ))}
               </>
             )}
           </CommandList>
 
-          {/* Footer — four keyboard hints, hidden where there is no keyboard. */}
           <div className="hidden shrink-0 items-center gap-4 border-t bg-muted/30 px-4 py-2.5 text-[11px] text-muted-foreground sm:flex">
             <span className="flex items-center gap-1">
               <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">↑↓</kbd> {t("navigate")}
@@ -507,7 +418,7 @@ export function SearchDialog({ tenantRole }: { tenantRole?: TenantRole }) {
               <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">esc</kbd> {t("close")}
             </span>
             <span className="ml-auto flex items-center gap-1">
-              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">⌘J</kbd> {t("toggle")}
+              <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">⌘K</kbd> {t("toggle")}
             </span>
           </div>
         </CommandPrimitive>

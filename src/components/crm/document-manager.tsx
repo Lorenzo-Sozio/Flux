@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ExternalLink, File, FileImage, FileText, Loader2, Paperclip, Trash2, Upload } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +38,8 @@ function fmtSize(bytes: number | null) {
 }
 
 export function DocumentManager({ entityType, entityId }: Props) {
+  const t = useTranslations("documents");
+  const format = useFormatter();
   const [docs, setDocs] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -49,11 +52,11 @@ export function DocumentManager({ entityType, entityId }: Props) {
       const data = await res.json();
       setDocs(data.documents ?? []);
     } catch {
-      toast.error("Failed to load documents.");
+      toast.error(t("manager.loadFailed"));
     } finally {
       setLoading(false);
     }
-  }, [entityType, entityId]);
+  }, [entityType, entityId, t]);
 
   useEffect(() => {
     fetchDocs();
@@ -61,7 +64,7 @@ export function DocumentManager({ entityType, entityId }: Props) {
 
   const uploadFile = async (file: File) => {
     if (file.size > 10 * 1024 * 1024) {
-      toast.error("File too large (max 10 MB).");
+      toast.error(t("tooLarge", { mb: 10 }));
       return;
     }
     setUploading(true);
@@ -75,14 +78,14 @@ export function DocumentManager({ entityType, entityId }: Props) {
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error ?? "Upload failed.");
+        toast.error(data.error ?? t("uploadFailed"));
         return;
       }
 
       setDocs((prev) => [...prev, data.document]);
-      toast.success(`"${file.name}" uploaded.`);
+      toast.success(t("manager.uploaded", { name: file.name }));
     } catch {
-      toast.error("Upload failed.");
+      toast.error(t("uploadFailed"));
     } finally {
       setUploading(false);
     }
@@ -102,13 +105,13 @@ export function DocumentManager({ entityType, entityId }: Props) {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"?`)) return;
+    if (!confirm(t("manager.confirmDelete", { name }))) return;
     try {
       await fetch(`/api/documents?id=${id}`, { method: "DELETE" });
       setDocs((prev) => prev.filter((d) => d.id !== id));
-      toast.success("Document deleted.");
+      toast.success(t("manager.deleted"));
     } catch {
-      toast.error("Failed to delete document.");
+      toast.error(t("manager.deleteFailed"));
     }
   };
 
@@ -118,7 +121,7 @@ export function DocumentManager({ entityType, entityId }: Props) {
         <CardTitle className="flex items-center justify-between text-sm">
           <span className="flex items-center gap-2">
             <Paperclip className="h-4 w-4" />
-            Attachments
+            {t("manager.title")}
             {docs.length > 0 && <Badge variant="secondary">{docs.length}</Badge>}
           </span>
           <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} disabled={uploading}>
@@ -127,14 +130,15 @@ export function DocumentManager({ entityType, entityId }: Props) {
             ) : (
               <Upload className="mr-2 h-3.5 w-3.5" />
             )}
-            Upload
+            {t("upload")}
           </Button>
           <input ref={fileRef} type="file" className="hidden" onChange={handleFileChange} />
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
         {/* Drop Zone */}
-        <div
+        <button
+          type="button"
           onDragOver={(e) => {
             e.preventDefault();
             setDragOver(true);
@@ -142,14 +146,14 @@ export function DocumentManager({ entityType, entityId }: Props) {
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
           onClick={() => fileRef.current?.click()}
-          className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed py-5 text-sm text-muted-foreground transition-colors ${
+          className={`flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed py-5 text-sm text-muted-foreground transition-colors ${
             dragOver ? "border-primary bg-primary/5" : "border-muted hover:border-muted-foreground/40 hover:bg-muted/30"
           }`}
         >
           <Upload className="mb-1 h-5 w-5" />
-          <span>Drop files here or click to upload</span>
-          <span className="text-xs">Max 10 MB · PDF, images, documents</span>
-        </div>
+          <span>{t("manager.dropzone")}</span>
+          <span className="text-xs">{t("manager.accepted", { mb: 10 })}</span>
+        </button>
 
         {/* Document List */}
         {loading ? (
@@ -157,7 +161,7 @@ export function DocumentManager({ entityType, entityId }: Props) {
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : docs.length === 0 ? (
-          <p className="py-2 text-center text-xs text-muted-foreground">No attachments yet.</p>
+          <p className="py-2 text-center text-xs text-muted-foreground">{t("manager.empty")}</p>
         ) : (
           <div className="divide-y rounded-md border">
             {docs.map((doc) => (
@@ -166,7 +170,8 @@ export function DocumentManager({ entityType, entityId }: Props) {
                 <div className="flex-1 min-w-0">
                   <p className="truncate text-sm font-medium">{doc.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {fmtSize(doc.size)} · {new Date(doc.createdAt).toLocaleDateString()}
+                    {fmtSize(doc.size)} ·{" "}
+                    {format.dateTime(new Date(doc.createdAt), { year: "numeric", month: "numeric", day: "numeric" })}
                   </p>
                 </div>
                 <a
@@ -178,6 +183,7 @@ export function DocumentManager({ entityType, entityId }: Props) {
                   <ExternalLink className="h-3.5 w-3.5" />
                 </a>
                 <button
+                  type="button"
                   onClick={() => handleDelete(doc.id, doc.name)}
                   className="text-muted-foreground hover:text-destructive"
                 >

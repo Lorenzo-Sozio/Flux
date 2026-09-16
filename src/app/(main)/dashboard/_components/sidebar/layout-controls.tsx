@@ -110,9 +110,7 @@ export function LayoutControls() {
           <div className="space-y-1.5">
             <h4 className="font-medium text-sm leading-none">{t("title")}</h4>
             <p className="text-muted-foreground text-xs">{t("subtitle")}</p>
-            <p className="font-medium text-muted-foreground text-xs">
-              *Preferences use cookies by default. You can switch between cookies, localStorage, or no storage in code.
-            </p>
+            <p className="font-medium text-muted-foreground text-xs">{t("panel.storageNote")}</p>
           </div>
           <div className="space-y-3 **:data-[slot=toggle-group]:w-full **:data-[slot=toggle-group-item]:flex-1 **:data-[slot=toggle-group-item]:text-xs">
             <div className="space-y-1">

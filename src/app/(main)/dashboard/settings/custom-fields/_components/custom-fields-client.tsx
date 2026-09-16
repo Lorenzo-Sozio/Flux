@@ -216,7 +216,7 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
             <div className="space-y-1.5">
               <Label>{t("dialog.fieldNameLabel")}</Label>
               <Input
-                placeholder="e.g. LinkedIn URL"
+                placeholder={t("form.namePlaceholder")}
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
               />
@@ -265,7 +265,7 @@ export function CustomFieldsClient({ fields: initialFields, currentUserId }: Pro
               <div className="space-y-1.5">
                 <Label>{t("dialog.optionsLabel")}</Label>
                 <Input
-                  placeholder="Option A, Option B, Option C"
+                  placeholder={t("form.optionsPlaceholder")}
                   value={form.options}
                   onChange={(e) => setForm((f) => ({ ...f, options: e.target.value }))}
                 />

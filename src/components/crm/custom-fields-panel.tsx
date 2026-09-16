@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Loader2, Save, Settings2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import type { EntityType } from "@/actions/custom-fields";
@@ -34,6 +35,8 @@ interface Props {
 }
 
 export function CustomFieldsPanel({ entityType, entityId, definitions, values }: Props) {
+  const t = useTranslations("customFieldsPanel");
+  const tc = useTranslations("common");
   const valueMap = Object.fromEntries(values.map((v) => [v.fieldId, v.value ?? ""]));
   const [fieldValues, setFieldValues] = useState<Record<string, string>>(valueMap);
   const [saving, setSaving] = useState(false);
@@ -48,9 +51,9 @@ export function CustomFieldsPanel({ entityType, entityId, definitions, values }:
       for (const [fieldId, value] of Object.entries(fieldValues)) {
         await upsertCustomFieldValue({ fieldId, entityType, entityId, value });
       }
-      toast.success("Custom fields saved.");
+      toast.success(t("saved"));
     } catch {
-      toast.error("Failed to save custom fields.");
+      toast.error(t("saveFailed"));
     } finally {
       setSaving(false);
     }
@@ -61,7 +64,7 @@ export function CustomFieldsPanel({ entityType, entityId, definitions, values }:
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm">
           <Settings2 className="h-4 w-4" />
-          Custom Fields
+          {t("title")}
           <Badge variant="secondary" className="text-[10px]">
             {definitions.length}
           </Badge>
@@ -74,10 +77,10 @@ export function CustomFieldsPanel({ entityType, entityId, definitions, values }:
 
           return (
             <div key={def.id} className="space-y-1">
-              <label className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground">
+              <p className="text-[10px] uppercase font-semibold tracking-wide text-muted-foreground">
                 {def.name}
                 {def.isRequired && <span className="text-destructive ml-1">*</span>}
-              </label>
+              </p>
 
               {(def.fieldType === "text" || def.fieldType === "url") && (
                 <Input
@@ -114,8 +117,8 @@ export function CustomFieldsPanel({ entityType, entityId, definitions, values }:
                   className="w-full h-8 rounded-md border border-input bg-background px-3 text-sm"
                 >
                   <option value="">—</option>
-                  <option value="true">Yes</option>
-                  <option value="false">No</option>
+                  <option value="true">{tc("yes")}</option>
+                  <option value="false">{tc("no")}</option>
                 </select>
               )}
 
@@ -125,7 +128,7 @@ export function CustomFieldsPanel({ entityType, entityId, definitions, values }:
                   onChange={(e) => setVal(def.id, e.target.value)}
                   className="w-full h-8 rounded-md border border-input bg-background px-3 text-sm"
                 >
-                  <option value="">Select…</option>
+                  <option value="">{t("selectPlaceholder")}</option>
                   {options.map((opt) => (
                     <option key={opt} value={opt}>
                       {opt}
@@ -161,7 +164,7 @@ export function CustomFieldsPanel({ entityType, entityId, definitions, values }:
 
         <Button size="sm" onClick={handleSave} disabled={saving} className="w-full mt-2">
           {saving ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
-          Save Custom Fields
+          {t("save")}
         </Button>
       </CardContent>
     </Card>

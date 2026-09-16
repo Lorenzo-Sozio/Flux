@@ -173,7 +173,7 @@ export default function TicketsListPage() {
               <span className="max-sm:sr-only">{t("macros")}</span>
             </Link>
           </Button>
-          <CreateTicketButton />
+          <CreateTicketButton openOnNew />
         </div>
       </div>
 

@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { CheckCircle, Copy, KeyRound, TriangleAlert } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { mintTenantApiKey, revokeTenantApiKey } from "@/actions/tenant-api-key";
@@ -22,6 +23,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
  * configuration stops.
  */
 export function ApiKeyClient({ exists, tenantId }: { exists: boolean; tenantId: string }) {
+  const t = useTranslations("settings.apiKey");
   const [chiave, setChiave] = useState<string | null>(null);
   const [ceLa, setCeLa] = useState(exists);
   const [inCorso, setInCorso] = useState(false);
@@ -40,7 +42,7 @@ export function ApiKeyClient({ exists, tenantId }: { exists: boolean; tenantId: 
       setChiave(key);
       setCeLa(true);
     } catch {
-      toast.error("Non sono riuscito a creare la chiave.");
+      toast.error(t("createFailed"));
     } finally {
       setInCorso(false);
     }
@@ -52,9 +54,9 @@ export function ApiKeyClient({ exists, tenantId }: { exists: boolean; tenantId: 
       await revokeTenantApiKey();
       setChiave(null);
       setCeLa(false);
-      toast.success("Chiave revocata: le chiamate con quella chiave smettono subito.");
+      toast.success(t("revoked"));
     } catch {
-      toast.error("Non sono riuscito a revocare la chiave.");
+      toast.error(t("revokeFailed"));
     } finally {
       setInCorso(false);
     }
@@ -66,22 +68,19 @@ export function ApiKeyClient({ exists, tenantId }: { exists: boolean; tenantId: 
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <KeyRound className="size-4" />
-            Chiave API
+            {t("title")}
           </CardTitle>
-          <CardDescription>
-            Serve a un sistema esterno per scrivere qui dentro: contatti, note, campi raccolti. Non è la password di
-            nessuno, ed è legata a questa attività.
-          </CardDescription>
+          <CardDescription>{t("description")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           {chiave && (
             <Alert>
               <AlertDescription className="flex flex-col gap-2">
-                <span className="font-medium">Copiala adesso: non te la mostrerò più.</span>
+                <span className="font-medium">{t("copyNow")}</span>
                 <code className="bg-muted block overflow-x-auto rounded p-2 font-mono text-xs">{chiave}</code>
                 <Button size="sm" variant="outline" className="w-fit" onClick={() => copia(chiave, "chiave")}>
                   {copiato === "chiave" ? <CheckCircle className="size-3.5" /> : <Copy className="size-3.5" />}
-                  Copia la chiave
+                  {t("copyKey")}
                 </Button>
               </AlertDescription>
             </Alert>
@@ -89,20 +88,17 @@ export function ApiKeyClient({ exists, tenantId }: { exists: boolean; tenantId: 
 
           {ceLa && !chiave && (
             <Alert>
-              <AlertDescription>
-                Una chiave esiste già. Non si può rileggere: se l&apos;hai persa, creane una nuova — quella vecchia
-                smette di funzionare nello stesso momento.
-              </AlertDescription>
+              <AlertDescription>{t("exists")}</AlertDescription>
             </Alert>
           )}
 
           <div className="flex flex-wrap gap-2">
             <Button size="sm" disabled={inCorso} onClick={conia}>
-              {ceLa ? "Crea una chiave nuova" : "Crea la chiave"}
+              {ceLa ? t("createNew") : t("create")}
             </Button>
             {ceLa && (
               <Button size="sm" variant="outline" disabled={inCorso} onClick={revoca}>
-                Revoca
+                {t("revoke")}
               </Button>
             )}
           </div>
@@ -110,8 +106,7 @@ export function ApiKeyClient({ exists, tenantId }: { exists: boolean; tenantId: 
           {ceLa && (
             <p className="text-muted-foreground flex items-start gap-2 text-xs">
               <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-              Creandone una nuova, quella di prima smette di funzionare subito: l&apos; integrazione che la usa va
-              aggiornata nello stesso momento.
+              {t("rotateWarning")}
             </p>
           )}
         </CardContent>
@@ -119,16 +114,14 @@ export function ApiKeyClient({ exists, tenantId }: { exists: boolean; tenantId: 
 
       <Card>
         <CardHeader>
-          <CardTitle>Identificativo di questa attività</CardTitle>
-          <CardDescription>
-            Serve a comporre l&apos;indirizzo a cui un sistema esterno manda i propri eventi.
-          </CardDescription>
+          <CardTitle>{t("tenantIdTitle")}</CardTitle>
+          <CardDescription>{t("tenantIdDescription")}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-2">
           <code className="bg-muted block overflow-x-auto rounded p-2 font-mono text-xs">{tenantId}</code>
           <Button size="sm" variant="outline" className="w-fit" onClick={() => copia(tenantId, "id")}>
             {copiato === "id" ? <CheckCircle className="size-3.5" /> : <Copy className="size-3.5" />}
-            Copia l&apos;identificativo
+            {t("copyTenantId")}
           </Button>
         </CardContent>
       </Card>

@@ -5,7 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 
 import { ArrowLeft, CalendarIcon, ChevronLeft, ChevronRight, PanelRight } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -39,6 +39,8 @@ export function GanttToolbar({
   conflictCount,
 }: Props) {
   const t = useTranslations("tasks.gantt");
+  const tTasks = useTranslations("tasks");
+  const locale = useLocale();
   const [popoverOpen, setPopoverOpen] = useState(false);
 
   const rawTasks = useGanttStore((s) => s.rawTasks);
@@ -94,13 +96,13 @@ export function GanttToolbar({
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm" className="h-8 px-3" onClick={handleToday} disabled={isToday}>
-              Oggi
+              {tTasks("today")}
             </Button>
             <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="h-8 gap-1.5 px-3 font-normal text-sm">
                   <CalendarIcon className="h-3.5 w-3.5 text-muted-foreground" />
-                  {viewDate.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" })}
+                  {viewDate.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" })}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">

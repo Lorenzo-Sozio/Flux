@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { type BusySlot, getColleagueAvailability } from "@/actions/appointments";
 
@@ -46,6 +47,8 @@ function overlaps(slots: BusySlot[], h: number, m: number): boolean {
 }
 
 export function AvailabilityPicker({ userIds, users, date, onSelect }: Props) {
+  const t = useTranslations("appointment.availability");
+  const tc = useTranslations("common");
   const userIdsKey = userIds.join(",");
   const [busy, setBusy] = useState<Record<string, BusySlot[]>>({});
   const [loading, setLoading] = useState(false);
@@ -76,7 +79,7 @@ export function AvailabilityPicker({ userIds, users, date, onSelect }: Props) {
       <table className="w-full text-xs">
         <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
           <tr>
-            <th className="px-2 py-2 text-left font-semibold text-muted-foreground text-xs">Ora</th>
+            <th className="px-2 py-2 text-left font-semibold text-muted-foreground text-xs">{t("time")}</th>
             {visibleUsers.map((u) => (
               <th key={u.id} className="max-w-[80px] truncate px-2 py-2 text-center font-semibold text-xs">
                 {u.name ?? "?"}
@@ -98,14 +101,14 @@ export function AvailabilityPicker({ userIds, users, date, onSelect }: Props) {
                       <span
                         role="img"
                         className="inline-block h-2.5 w-2.5 rounded-full bg-red-400"
-                        title="Occupato"
-                        aria-label="Occupato"
+                        title={t("busy")}
+                        aria-label={t("busy")}
                       />
                     ) : (
                       <span
                         role="img"
                         className="inline-block h-2.5 w-2.5 rounded-full bg-green-400"
-                        aria-label="Libero"
+                        aria-label={t("free")}
                       />
                     )}
                   </td>
@@ -122,7 +125,7 @@ export function AvailabilityPicker({ userIds, users, date, onSelect }: Props) {
                       }}
                       className="rounded bg-green-100 px-2 py-0.5 font-medium text-[10px] text-green-700 transition-colors hover:bg-green-200 dark:bg-green-950/40 dark:text-green-300 dark:hover:bg-green-950/60"
                     >
-                      Seleziona
+                      {tc("select")}
                     </button>
                   )}
                 </td>

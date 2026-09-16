@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Check, ChevronsUpDown, PlusCircleIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -42,13 +43,19 @@ export function CreatableLookupCombobox({
   items,
   onAddItem,
   onCreate,
-  placeholder = "Select…",
-  searchPlaceholder = "Search…",
-  createPrefix = "Create",
-  clearLabel = "Clear selection",
-  creatingLabel = "Creating…",
+  placeholder: placeholderProp,
+  searchPlaceholder: searchPlaceholderProp,
+  createPrefix: createPrefixProp,
+  clearLabel: clearLabelProp,
+  creatingLabel: creatingLabelProp,
   disabled = false,
 }: CreatableLookupComboboxProps) {
+  const t = useTranslations("lookupCombobox");
+  const placeholder = placeholderProp ?? t("select");
+  const searchPlaceholder = searchPlaceholderProp ?? t("search");
+  const createPrefix = createPrefixProp ?? t("create");
+  const clearLabel = clearLabelProp ?? t("clearSelection");
+  const creatingLabel = creatingLabelProp ?? t("creating");
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -109,7 +116,7 @@ export function CreatableLookupCombobox({
         <Command shouldFilter={false}>
           <CommandInput placeholder={searchPlaceholder} value={search} onValueChange={setSearch} />
           <CommandList>
-            {filtered.length === 0 && !showCreate && <CommandEmpty>No results found.</CommandEmpty>}
+            {filtered.length === 0 && !showCreate && <CommandEmpty>{t("noResults")}</CommandEmpty>}
             <CommandGroup>
               {value && (
                 <CommandItem

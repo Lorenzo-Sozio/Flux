@@ -84,18 +84,26 @@ export function ConvertLeadButton({ leadId, leadName, companyName, activityCount
 
         {/* What will be created */}
         <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Verrà creato</p>
+          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {t("convert.willCreate")}
+          </p>
           <div className="flex items-center gap-2">
             <UserIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
             <span>
-              Contatto: <span className="font-medium">{leadName}</span>
+              {t.rich("convert.contactLine", {
+                name: leadName,
+                b: (chunks) => <span className="font-medium">{chunks}</span>,
+              })}
             </span>
           </div>
           {companyName && (
             <div className="flex items-center gap-2">
               <BuildingIcon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
               <span>
-                Azienda: <span className="font-medium">{companyName}</span>
+                {t.rich("convert.companyLine", {
+                  name: companyName,
+                  b: (chunks) => <span className="font-medium">{chunks}</span>,
+                })}
               </span>
             </div>
           )}
@@ -105,22 +113,18 @@ export function ConvertLeadButton({ leadId, leadName, companyName, activityCount
         {hasHistory && (
           <div className="space-y-1.5 rounded-lg border bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800 p-3 text-sm">
             <p className="text-xs font-semibold uppercase tracking-wider text-blue-600 dark:text-blue-400">
-              Storia migrata al nuovo cliente
+              {t("convert.historyMigrated")}
             </p>
             {activityCount > 0 && (
               <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
                 <ActivityIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                <span>
-                  {activityCount} {activityCount === 1 ? "attività" : "attività"}
-                </span>
+                <span>{t("convert.activityCount", { count: activityCount })}</span>
               </div>
             )}
             {taskCount > 0 && (
               <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
                 <CheckSquareIcon className="h-3.5 w-3.5 flex-shrink-0" />
-                <span>
-                  {taskCount} {taskCount === 1 ? "task" : "task"}
-                </span>
+                <span>{t("convert.taskCount", { count: taskCount })}</span>
               </div>
             )}
           </div>
@@ -134,9 +138,7 @@ export function ConvertLeadButton({ leadId, leadName, companyName, activityCount
             <Label htmlFor="create-deal" className="text-sm font-medium">
               {t("convertCreateDeal")}
             </Label>
-            <p className="text-xs text-muted-foreground">
-              Crea un'opportunità nella pipeline collegata a questo cliente
-            </p>
+            <p className="text-xs text-muted-foreground">{t("convert.createDealHint")}</p>
           </div>
           <Switch
             id="create-deal"

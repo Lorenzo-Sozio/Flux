@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslations } from "next-intl";
 import {
   Bar,
   BarChart,
@@ -70,7 +71,8 @@ export function ForecastBarChart({ months, currency }: { months: MonthBucket[]; 
 }
 
 export function OwnerPieChart({ byOwner, currency }: { byOwner: OwnerBucket[]; currency: string }) {
-  if (byOwner.length === 0) return <p className="text-sm text-muted-foreground text-center py-8">No data</p>;
+  const t = useTranslations("pipeline");
+  if (byOwner.length === 0) return <p className="text-sm text-muted-foreground text-center py-8">{t("noData")}</p>;
 
   const data = byOwner.map((o) => ({ name: o.name, value: Math.round(o.weighted) }));
 

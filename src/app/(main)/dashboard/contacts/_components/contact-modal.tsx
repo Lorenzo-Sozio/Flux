@@ -108,6 +108,7 @@ function _Section({ title }: { title: string }) {
 export function ContactModal({ contact, children }: { contact?: any; children: React.ReactNode }) {
   const t = useTranslations("contacts");
   const tc = useTranslations("common");
+  const tf = useTranslations("recordForm");
   const [open, setOpen] = useState(false);
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [duplicates, setDuplicates] = useState<Awaited<ReturnType<typeof checkContactDuplicates>>>([]);
@@ -251,7 +252,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
           toast.error(result.message, {
             action: isPlanLimit(result)
               ? {
-                  label: "Upgrade",
+                  label: tf("upgrade"),
                   onClick: () => {
                     window.location.href = "/dashboard/settings/billing";
                   },
@@ -269,7 +270,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
           toast.error(result.message, {
             action: isPlanLimit(result)
               ? {
-                  label: "Upgrade",
+                  label: tf("upgrade"),
                   onClick: () => {
                     window.location.href = "/dashboard/settings/billing";
                   },
@@ -340,7 +341,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                     variant="ghost"
                     size="icon"
                     type="button"
-                    title="Apri scheda completa"
+                    title={tf("openFullRecord")}
                     className="h-8 w-8 shrink-0"
                   >
                     <ArrowUpRightIcon className="h-4 w-4" />
@@ -390,16 +391,16 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                 {/* ── Info Tab ─────────────────────────────────────────────── */}
                 <TabsContent value="info" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                   <F label={t("firstName")} required error={e.firstName?.message}>
-                    <Input {...register("firstName")} placeholder="Mario" />
+                    <Input {...register("firstName")} placeholder={tf("firstNamePlaceholder")} />
                   </F>
                   <F label={t("lastName")} required error={e.lastName?.message}>
-                    <Input {...register("lastName")} placeholder="Rossi" />
+                    <Input {...register("lastName")} placeholder={tf("lastNamePlaceholder")} />
                   </F>
                   <F label={tc("email")} error={e.email?.message}>
-                    <Input {...register("email")} type="email" placeholder="mario@example.com" />
+                    <Input {...register("email")} type="email" placeholder={tf("emailPlaceholder")} />
                   </F>
                   <F label={t("jobTitle")} error={e.jobTitle?.message}>
-                    <Input {...register("jobTitle")} placeholder="Sales Manager" />
+                    <Input {...register("jobTitle")} placeholder={tf("jobTitlePlaceholder")} />
                   </F>
                   <F label={tc("phone")} error={e.phone?.message}>
                     <Input {...register("phone")} type="tel" placeholder="+39 0464 1234567" />
@@ -408,7 +409,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                     <Input {...register("mobile")} type="tel" placeholder="+39 345 1234567" />
                   </F>
                   <F label={t("department")} error={e.department?.message}>
-                    <Input {...register("department")} placeholder="Sales, Marketing…" />
+                    <Input {...register("department")} placeholder={t("modal.departmentPlaceholder")} />
                   </F>
                   <F label={t("linkedIn")} error={e.linkedinUrl?.message}>
                     <Input {...register("linkedinUrl")} placeholder="https://linkedin.com/in/…" />
@@ -493,7 +494,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                     <Input {...register("leadScore")} type="number" min={0} max={100} placeholder="0" />
                   </F>
                   <F label={t("form.tags")} error={e.tags?.message}>
-                    <Input {...register("tags")} placeholder="tech, startup, b2b" />
+                    <Input {...register("tags")} placeholder={tf("tagsPlaceholder")} />
                   </F>
                   <div className="col-span-1 sm:col-span-2">
                     <Controller
@@ -545,7 +546,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
             {duplicates.length > 0 && pendingPayload && (
               <div className="border-t bg-amber-50 px-6 py-4 dark:bg-amber-950/30">
                 <p className="mb-2 font-semibold text-amber-800 text-sm dark:text-amber-300">
-                  Similar contacts already exist:
+                  {t("modal.similarExist")}
                 </p>
                 <ul className="mb-3 space-y-1.5">
                   {duplicates.map((d) => (
@@ -567,7 +568,7 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                           onClick={() => setMergeTargetId(d.id)}
                         >
                           <GitMerge className="mr-1 h-3 w-3" />
-                          Merge
+                          {tf("merge")}
                         </Button>
                       )}
                     </li>
@@ -583,10 +584,10 @@ export function ContactModal({ contact, children }: { contact?: any; children: R
                       setPendingPayload(null);
                     }}
                   >
-                    Go back
+                    {tf("goBack")}
                   </Button>
                   <Button type="button" size="sm" onClick={() => saveContact(pendingPayload)}>
-                    Save anyway
+                    {tf("saveAnyway")}
                   </Button>
                 </div>
               </div>

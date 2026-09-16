@@ -36,6 +36,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useOpenOnNew } from "@/hooks/use-open-on-new";
 
 import { AvailabilityPicker } from "./availability-picker";
 
@@ -63,6 +64,8 @@ type ConferenceType = "none" | "jitsi" | "custom";
 interface Props {
   defaultDate?: string; // yyyy-MM-ddTHH:mm
   trigger?: React.ReactNode; // custom trigger; if omitted a default button is rendered
+  /** Open when the page is reached with ?new=true. One per page. */
+  openOnNew?: boolean;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -105,6 +108,7 @@ function ParticipantSearch({
   const [manualName, setManualName] = useState("");
   const [manualEmail, setManualEmail] = useState("");
   const [tab, setTab] = useState<"search" | "manual">("search");
+  const t = useTranslations("appointment");
 
   const existingEmails = new Set(existing.map((e) => e.email));
 
@@ -164,7 +168,7 @@ function ParticipantSearch({
               : "border-border text-muted-foreground hover:border-primary/50"
           }`}
         >
-          Cerca
+          {t("fields.participantsSearch")}
         </button>
         <button
           type="button"
@@ -175,14 +179,14 @@ function ParticipantSearch({
               : "border-border text-muted-foreground hover:border-primary/50"
           }`}
         >
-          Inserimento manuale
+          {t("fields.participantsManual")}
         </button>
       </div>
 
       {tab === "search" && (
         <div className="relative">
           <Input
-            placeholder="Nome, email..."
+            placeholder={t("fields.participantsSearchPlaceholder")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="h-8 text-sm"
@@ -216,13 +220,13 @@ function ParticipantSearch({
       {tab === "manual" && (
         <div className="flex gap-2">
           <Input
-            placeholder="Nome"
+            placeholder={t("fields.participantsNamePlaceholder")}
             value={manualName}
             onChange={(e) => setManualName(e.target.value)}
             className="h-8 text-sm"
           />
           <Input
-            placeholder="Email"
+            placeholder={t("fields.participantsEmailPlaceholder")}
             type="email"
             value={manualEmail}
             onChange={(e) => setManualEmail(e.target.value)}
@@ -236,7 +240,7 @@ function ParticipantSearch({
             onClick={() => {
               if (!manualName.trim() || !manualEmail.trim()) return;
               if (existingEmails.has(manualEmail.trim())) {
-                toast.error("Partecipante già aggiunto");
+                toast.error(t("dialog.alreadyAdded"));
                 return;
               }
               onAdd({
@@ -258,10 +262,13 @@ function ParticipantSearch({
 
 // ─── Main Dialog ──────────────────────────────────────────────────────────────
 
-export function AppointmentDialog({ defaultDate, trigger }: Props) {
+export function AppointmentDialog({ defaultDate, trigger, openOnNew = false }: Props) {
   const tCal = useTranslations("calendar");
+  const t = useTranslations("appointment");
+  const tc = useTranslations("common");
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  useOpenOnNew(openOnNew, setOpen);
   const [isPending, startTransition] = useTransition();
 
   // Form state
@@ -347,17 +354,17 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      toast.error("Il titolo è obbligatorio");
+      toast.error(t("titleRequired"));
       return;
     }
     if (!startAt || !endAt) {
-      toast.error("Data e ora sono obbligatorie");
+      toast.error(t("dateRequired"));
       return;
     }
     const s = new Date(startAt);
     const en = new Date(endAt);
     if (en <= s) {
-      toast.error("La data di fine deve essere dopo quella di inizio");
+      toast.error(t("endBeforeStart"));
       return;
     }
 
@@ -377,38 +384,27 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
         });
 
         // Always confirm the appointment was saved
-        toast.success("Appuntamento creato.");
+        toast.success(t("dialog.created"));
 
         // Separate toast for invite outcome
         const { inviteStatus } = result;
         if (inviteStatus.noProvider) {
-          toast.warning(
-            "Nessun provider email configurato — gli inviti non sono stati inviati. Verifica le impostazioni email.",
-            { duration: 6000 },
-          );
+          toast.warning(t("dialog.noProvider"), { duration: 6000 });
         } else if (inviteStatus.sent > 0 && inviteStatus.failed === 0) {
-          toast.success(
-            inviteStatus.sent === 1
-              ? "1 invito inviato con successo."
-              : `${inviteStatus.sent} inviti inviati con successo.`,
-          );
+          toast.success(t("dialog.invitesSent", { count: inviteStatus.sent }));
         } else if (inviteStatus.sent > 0 && inviteStatus.failed > 0) {
-          toast.warning(
-            `${inviteStatus.sent} invit${inviteStatus.sent === 1 ? "o inviato" : "i inviati"}, ${inviteStatus.failed} non consegnati.`,
-            { duration: 6000 },
-          );
+          toast.warning(t("dialog.invitesPartial", { sent: inviteStatus.sent, failed: inviteStatus.failed }), {
+            duration: 6000,
+          });
         } else if (inviteStatus.failed > 0) {
-          toast.error(
-            `Impossibile inviare gli inviti (${inviteStatus.failed} error${inviteStatus.failed === 1 ? "e" : "i"}).`,
-            { duration: 6000 },
-          );
+          toast.error(t("dialog.invitesFailed", { count: inviteStatus.failed }), { duration: 6000 });
         }
 
         setOpen(false);
         reset();
         router.refresh();
       } catch {
-        toast.error("Errore nella creazione dell'appuntamento");
+        toast.error(t("errorCreate"));
       }
     });
   };
@@ -441,19 +437,19 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <CalendarCheck className="h-5 w-5 text-amber-500" />
-              Nuovo appuntamento
+              {tCal("newAppointment")}
             </DialogTitle>
           </DialogHeader>
 
           <form onSubmit={handleSubmit} className="space-y-5 py-2">
             {/* Title */}
             <div className="space-y-1.5">
-              <Label htmlFor="apt-title">Titolo *</Label>
+              <Label htmlFor="apt-title">{t("fields.titleLabel")} *</Label>
               <Input
                 id="apt-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Riunione con cliente…"
+                placeholder={t("fields.titlePlaceholder")}
                 autoFocus
               />
             </div>
@@ -462,7 +458,7 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="apt-start" className="flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5" /> Inizio *
+                  <Clock className="h-3.5 w-3.5" /> {t("fields.startLabel")} *
                 </Label>
                 <input
                   id="apt-start"
@@ -473,7 +469,7 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="apt-end">Fine *</Label>
+                <Label htmlFor="apt-end">{t("fields.endLabel")} *</Label>
                 <input
                   id="apt-end"
                   type="datetime-local"
@@ -489,8 +485,10 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
               <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 dark:border-amber-800 dark:bg-amber-950/30">
                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
                 <div className="text-amber-800 text-sm dark:text-amber-300">
-                  <span className="font-semibold">Possibile sovrapposizione</span> con:{" "}
-                  {conflicts.map((c) => c.title).join(", ")}
+                  {t.rich("dialog.conflict", {
+                    strong: (chunks) => <span className="font-semibold">{chunks}</span>,
+                    titles: conflicts.map((c) => c.title).join(", "),
+                  })}
                 </div>
               </div>
             )}
@@ -498,37 +496,41 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
             {/* Location */}
             <div className="space-y-1.5">
               <Label htmlFor="apt-location" className="flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5" /> Luogo (opzionale)
+                <MapPin className="h-3.5 w-3.5" /> {t("fields.locationLabel")}
               </Label>
               <Input
                 id="apt-location"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="Indirizzo fisico o URL…"
+                placeholder={t("fields.locationPlaceholder")}
               />
             </div>
 
             {/* Conference */}
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5">
-                <Video className="h-3.5 w-3.5" /> Videoconferenza
+                <Video className="h-3.5 w-3.5" /> {t("fields.conferenceLabel")}
               </Label>
               <div className="flex gap-2">
-                {(["none", "jitsi", "custom"] as ConferenceType[]).map((t) => {
-                  const LABELS = { none: "Nessuna", jitsi: "Genera link Jitsi", custom: "Link personalizzato" };
+                {(["none", "jitsi", "custom"] as ConferenceType[]).map((ct) => {
+                  const LABELS = {
+                    none: t("fields.conferenceNone"),
+                    jitsi: t("fields.conferenceJitsi"),
+                    custom: t("fields.conferenceCustom"),
+                  };
                   return (
                     <button
-                      key={t}
+                      key={ct}
                       type="button"
-                      onClick={() => setConferenceType(t)}
+                      onClick={() => setConferenceType(ct)}
                       className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 font-medium text-xs transition-all ${
-                        conferenceType === t
+                        conferenceType === ct
                           ? "border-primary bg-primary/5 text-primary"
                           : "border-border text-muted-foreground hover:border-primary/40"
                       }`}
                     >
-                      {t === "jitsi" && <Link2 className="h-3 w-3" />}
-                      {LABELS[t]}
+                      {ct === "jitsi" && <Link2 className="h-3 w-3" />}
+                      {LABELS[ct]}
                     </button>
                   );
                 })}
@@ -536,7 +538,7 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
               {conferenceType === "jitsi" && (
                 <p className="flex items-center gap-1.5 text-muted-foreground text-xs">
                   <Check className="h-3 w-3 text-green-500" />
-                  Un link Jitsi Meet verrà generato automaticamente e incluso nell'invito.
+                  {t("dialog.jitsiHint")}
                 </p>
               )}
               {conferenceType === "custom" && (
@@ -552,13 +554,13 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
             {/* Description / notes */}
             <div className="space-y-1.5">
               <Label htmlFor="apt-desc" className="flex items-center gap-1.5">
-                <FileText className="h-3.5 w-3.5" /> Note / Descrizione
+                <FileText className="h-3.5 w-3.5" /> {t("fields.notesLabel")}
               </Label>
               <Textarea
                 id="apt-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Agenda, argomenti da trattare…"
+                placeholder={t("fields.notesPlaceholder")}
                 rows={3}
                 className="resize-none text-sm"
               />
@@ -566,26 +568,26 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
 
             {/* Reminder */}
             <div className="space-y-1.5">
-              <Label htmlFor="apt-reminder">Promemoria</Label>
+              <Label htmlFor="apt-reminder">{t("fields.reminderLabel")}</Label>
               <select
                 id="apt-reminder"
                 value={reminderMinutes ?? ""}
                 onChange={(e) => setReminderMinutes(e.target.value ? Number(e.target.value) : null)}
                 className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
               >
-                <option value="">Nessun promemoria</option>
-                <option value="15">15 minuti prima</option>
-                <option value="30">30 minuti prima</option>
-                <option value="60">1 ora prima</option>
-                <option value="120">2 ore prima</option>
-                <option value="1440">1 giorno prima</option>
+                <option value="">{t("fields.reminderNone")}</option>
+                <option value="15">{t("fields.reminder15")}</option>
+                <option value="30">{t("fields.reminder30")}</option>
+                <option value="60">{t("fields.reminder60")}</option>
+                <option value="120">{t("fields.reminder120")}</option>
+                <option value="1440">{t("fields.reminder1440")}</option>
               </select>
             </div>
 
             {/* Participants */}
             <div className="space-y-2">
               <Label className="flex items-center gap-1.5">
-                <Users className="h-3.5 w-3.5" /> Partecipanti
+                <Users className="h-3.5 w-3.5" /> {t("fields.participantsLabel")}
               </Label>
 
               {/* Added attendees */}
@@ -603,7 +605,7 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
                       <span className="text-muted-foreground">{a.email}</span>
                       {a.userId && (
                         <Badge variant="outline" className="h-4 px-1 py-0 text-[10px]">
-                          interno
+                          {t("fields.participantsInternal")}
                         </Badge>
                       )}
                       <button
@@ -625,11 +627,7 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
                 onAdd={(a) => setAttendees((prev) => [...prev, a])}
               />
 
-              {attendees.length === 0 && (
-                <p className="text-muted-foreground text-xs">
-                  Nessun partecipante aggiunto. Puoi inviare inviti anche senza partecipanti.
-                </p>
-              )}
+              {attendees.length === 0 && <p className="text-muted-foreground text-xs">{t("dialog.noParticipants")}</p>}
             </div>
 
             {/* Colleague availability */}
@@ -642,7 +640,7 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
                 >
                   <span className="flex items-center gap-2">
                     <CalendarCheck className="h-3.5 w-3.5 text-amber-500" />
-                    Verifica disponibilità colleghi
+                    {t("dialog.checkAvailability")}
                   </span>
                   {showAvailability ? (
                     <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -667,12 +665,12 @@ export function AppointmentDialog({ defaultDate, trigger }: Props) {
 
             <DialogFooter className="gap-2">
               <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-                Annulla
+                {tc("cancel")}
               </Button>
               <Button type="submit" disabled={isPending} className="gap-2">
                 {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 <CalendarCheck className="h-4 w-4" />
-                Crea e invia inviti
+                {t("submit")}
               </Button>
             </DialogFooter>
           </form>

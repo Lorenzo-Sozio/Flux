@@ -5,7 +5,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { Clock, Pencil, Plus, Trash2, Zap } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteAutomationRule, toggleAutomationRuleActive } from "@/actions/automation";
@@ -80,6 +80,8 @@ function getScheduledTrigger(triggerOn: string[] | null): string | null {
 
 export function AutomationClient({ rules, canEdit }: Props) {
   const t = useTranslations("automation");
+  const tCommon = useTranslations("common");
+  const locale = useLocale();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -94,9 +96,13 @@ export function AutomationClient({ rules, canEdit }: Props) {
       return t("cron.daily", { hour, minute: minute.padStart(2, "0") });
     }
     if (dayOfMonth === "*" && dayOfWeek !== "*") {
-      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
       const dayNum = parseInt(dayOfWeek, 10);
-      return t("cron.weekly", { day: days[dayNum] ?? "??", hour, minute: minute.padStart(2, "0") });
+      // 4 January 1970 was a Sunday, so day N of the cron week is 4 + N January 1970.
+      const day =
+        dayNum >= 0 && dayNum <= 6
+          ? new Intl.DateTimeFormat(locale, { weekday: "long", timeZone: "UTC" }).format(Date.UTC(1970, 0, 4 + dayNum))
+          : "??";
+      return t("cron.weekly", { day, hour, minute: minute.padStart(2, "0") });
     }
     if (hour === "*/6") return t("cron.every6h");
     if (hour === "*/4") return t("cron.every4h");
@@ -274,7 +280,7 @@ export function AutomationClient({ rules, canEdit }: Props) {
                       checked={rule.isActive}
                       onCheckedChange={() => handleToggle(rule.id, rule.isActive)}
                       disabled={isPending}
-                      title={rule.isActive ? "Disable" : "Enable"}
+                      title={rule.isActive ? tCommon("disable") : tCommon("enable")}
                     />
 
                     <RuleModal rule={rule} onSaved={() => router.refresh()}>
@@ -299,7 +305,7 @@ export function AutomationClient({ rules, canEdit }: Props) {
                           <AlertDialogDescription>{t("deleteDesc", { name: rule.name })}</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogCancel>{tCommon("cancel")}</AlertDialogCancel>
                           <AlertDialogAction
                             className="bg-destructive hover:bg-destructive/90"
                             onClick={() => handleDelete(rule.id)}

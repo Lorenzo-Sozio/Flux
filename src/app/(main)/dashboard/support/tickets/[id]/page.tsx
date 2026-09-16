@@ -1,4 +1,5 @@
 import { getMacros, getTicketById } from "@/actions/support";
+import { RecordVisit } from "@/components/crm/record-visit";
 
 import { TicketDetail } from "./_components/ticket-detail";
 
@@ -15,5 +16,10 @@ import { TicketDetail } from "./_components/ticket-detail";
 export default async function TicketDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const [ticket, macros] = await Promise.all([getTicketById(id).catch(() => null), getMacros().catch(() => [])]);
-  return <TicketDetail id={id} initialTicket={ticket} initialMacros={macros} />;
+  return (
+    <>
+      {ticket && <RecordVisit type="ticket" id={id} label={ticket.subject} sub={ticket.ticketNumber} />}
+      <TicketDetail id={id} initialTicket={ticket} initialMacros={macros} />
+    </>
+  );
 }

@@ -7,6 +7,7 @@ import { getTranslations } from "next-intl/server";
 import { getQuoteById } from "@/actions/quotes";
 import { auth } from "@/auth";
 import { QuoteDetail } from "@/components/crm/quote-detail";
+import { RecordVisit } from "@/components/crm/record-visit";
 import { documentLanguage } from "@/lib/document-language";
 
 interface Props {
@@ -24,6 +25,7 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
   // it — while the server action, which asks for `quote:approve`, would have
   // allowed them. See the two role scales in CLAUDE.md.
   const tenantRole = session?.user?.tenantRole ?? null;
+  const t = await getTranslations("quotes.detail");
 
   let quote: Awaited<ReturnType<typeof getQuoteById>>;
   try {
@@ -45,13 +47,14 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
 
   return (
     <div className="flex flex-col gap-6">
+      <RecordVisit type="quote" id={quote.id} label={quote.quoteNumber} sub={quote.company?.name ?? null} />
       <div>
         <Link
           href="/dashboard/sales/quotes"
           className="inline-flex items-center gap-1 text-muted-foreground text-sm transition-colors hover:text-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
-          Back to Quotes
+          {t("backToQuotes")}
         </Link>
       </div>
       <QuoteDetail

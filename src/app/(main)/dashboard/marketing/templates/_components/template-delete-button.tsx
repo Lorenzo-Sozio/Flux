@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { TrashIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteEmailTemplate } from "@/actions/marketing";
@@ -13,17 +14,18 @@ interface TemplateDeleteButtonProps {
 }
 
 export function TemplateDeleteButton({ templateId }: TemplateDeleteButtonProps) {
+  const t = useTranslations("marketing.templates.deleteButton");
   const [loading, setLoading] = useState(false);
 
   async function handleDelete() {
-    if (!confirm("Are you sure you want to delete this template?")) return;
+    if (!confirm(t("confirm"))) return;
 
     setLoading(true);
     try {
       await deleteEmailTemplate(templateId);
-      toast.success("Template deleted successfully");
+      toast.success(t("success"));
     } catch (error) {
-      toast.error("Failed to delete template");
+      toast.error(t("failed"));
     } finally {
       setLoading(false);
     }

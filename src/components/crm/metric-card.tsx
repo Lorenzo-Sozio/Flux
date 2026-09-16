@@ -1,4 +1,5 @@
 import type { LucideIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -19,6 +20,7 @@ export function MetricCard({
   trend = "neutral",
   className = "",
 }: MetricCardProps) {
+  const t = useTranslations("metricCard");
   return (
     <Card className={className}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -30,7 +32,7 @@ export function MetricCard({
         {description && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{description}</p>}
         {trend !== "neutral" && (
           <div className={`text-xs font-medium mt-2 ${trend === "up" ? "text-green-600" : "text-red-600"}`}>
-            {trend === "up" ? "↑" : "↓"} vs last month
+            {trend === "up" ? "↑" : "↓"} {t("vsLastMonth")}
           </div>
         )}
       </CardContent>

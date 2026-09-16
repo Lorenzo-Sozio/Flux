@@ -212,7 +212,7 @@ export function TerritoriesClient({ initial }: { initial: Territory[] }) {
                 <Input
                   id="probe-country"
                   className="mt-1.5"
-                  placeholder="Italia"
+                  placeholder={t("form.countryPlaceholder")}
                   value={probe.country}
                   onChange={(e) => setProbe((p) => ({ ...p, country: e.target.value }))}
                 />
@@ -317,6 +317,7 @@ export function TerritoriesClient({ initial }: { initial: Territory[] }) {
 
             <div className="space-y-1.5">
               <Label htmlFor="territory-states">{t("statesLabel")}</Label>
+              {/* i18n-ignore: an example value, the same in both languages */}
               <Textarea
                 id="territory-states"
                 rows={4}

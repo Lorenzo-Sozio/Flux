@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 
 import { CheckCircle2, ChevronDown, ChevronRight, Circle, Loader2, Plus, Trash2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createSubtask, deleteTask, updateTaskStatus } from "@/actions/tasks";
@@ -30,6 +31,8 @@ interface Props {
 }
 
 export function SubtaskList({ parentId, parentDepth, subtasks: initial, onChanged }: Props) {
+  const t = useTranslations("tasks");
+  const locale = useLocale();
   const [subtasks, setSubtasks] = useState(initial);
   const [collapsed, setCollapsed] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -60,12 +63,12 @@ export function SubtaskList({ parentId, parentDepth, subtasks: initial, onChange
     startTransition(async () => {
       try {
         await createSubtask(parentId, { title: newTitle.trim() });
-        toast.success("Subtask created.");
+        toast.success(t("subtaskCreated"));
         setNewTitle("");
         setAdding(false);
         onChanged();
       } catch (e: unknown) {
-        toast.error(e instanceof Error ? e.message : "Failed to create subtask.");
+        toast.error(e instanceof Error ? e.message : t("subtaskList.createFailed"));
       }
     });
   };
@@ -81,9 +84,12 @@ export function SubtaskList({ parentId, parentDepth, subtasks: initial, onChange
           className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
           {collapsed ? <ChevronRight className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-          {subtasks.length} subtask{subtasks.length !== 1 ? "s" : ""}
+          {t("subtaskList.count", { count: subtasks.length })}
           <span className="ml-1 text-muted-foreground/60">
-            ({subtasks.filter((s) => s.status === "done").length}/{subtasks.length} done)
+            {t("subtaskList.doneOf", {
+              done: subtasks.filter((s) => s.status === "done").length,
+              total: subtasks.length,
+            })}
           </span>
         </button>
       )}
@@ -116,7 +122,7 @@ export function SubtaskList({ parentId, parentDepth, subtasks: initial, onChange
               </span>
               {sub.dueDate && (
                 <span className="text-[10px] text-muted-foreground shrink-0">
-                  {new Date(sub.dueDate).toLocaleDateString(undefined, { day: "2-digit", month: "short" })}
+                  {new Date(sub.dueDate).toLocaleDateString(locale, { day: "2-digit", month: "short" })}
                 </span>
               )}
               <button
@@ -145,7 +151,7 @@ export function SubtaskList({ parentId, parentDepth, subtasks: initial, onChange
                     setNewTitle("");
                   }
                 }}
-                placeholder="Subtask title…"
+                placeholder={t("subtaskPlaceholder")}
                 className="h-7 text-xs"
                 autoFocus
               />
@@ -171,7 +177,7 @@ export function SubtaskList({ parentId, parentDepth, subtasks: initial, onChange
               className="flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
             >
               <Plus className="h-3 w-3" />
-              Add subtask
+              {t("addSubtask")}
             </button>
           )}
         </div>

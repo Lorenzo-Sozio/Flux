@@ -5,7 +5,6 @@ import { useEffect, useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { format } from "date-fns";
 import {
   CheckCircle2,
   Clock,
@@ -19,7 +18,7 @@ import {
   Trash2,
   TrendingUp,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteQuoteAction, type getQuoteStats, type listQuotes } from "@/actions/quotes";
@@ -54,6 +53,8 @@ import { cn } from "@/lib/utils";
 
 type Quote = Awaited<ReturnType<typeof listQuotes>>["rows"][number];
 type Stats = Awaited<ReturnType<typeof getQuoteStats>>;
+
+const DATE_FORMAT = { day: "numeric", month: "short", year: "numeric" } as const;
 
 /** The person a quote names, when it names one. */
 function contactNameOf(quote: Quote): string | null {
@@ -117,7 +118,7 @@ function QuoteRowMenu({
         )}
         <DropdownMenuItem onClick={() => window.open(`/api/quotes/${quote.id}`, "_blank")}>
           <Printer className="mr-2 h-3.5 w-3.5" />
-          Print / PDF
+          {t("list.printPdf")}
         </DropdownMenuItem>
         {quote.status === "draft" && (
           <>
@@ -159,6 +160,7 @@ export function QuotesClient({
 }) {
   const t = useTranslations("quotes");
   const tc = useTranslations("common");
+  const formatter = useFormatter();
   const { formatMoney } = useCurrency();
   const router = useRouter();
   const pathname = usePathname();
@@ -228,7 +230,7 @@ export function QuotesClient({
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                  {tc("total")} {t("title")}
+                  {t("list.statTotal")}
                 </p>
                 <p className="mt-1 font-bold text-2xl">{stats.total}</p>
               </div>
@@ -276,7 +278,7 @@ export function QuotesClient({
             <div className="flex items-center justify-between">
               <div>
                 <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                  {tc("value")} {tc("total")}
+                  {t("list.statValue")}
                 </p>
                 {/* One line per currency. A workspace quoting in two of them has
                     two totals, and adding them together gives a number that is
@@ -315,18 +317,18 @@ export function QuotesClient({
               />
               <Select value={statusFilter} onValueChange={setStatusFilter}>
                 <SelectTrigger className="h-8 w-[150px] text-sm">
-                  <SelectValue placeholder="All statuses" />
+                  <SelectValue placeholder={t("list.allStatuses")} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">{tc("all")}</SelectItem>
                   <SelectItem value="draft">{t("statuses.draft")}</SelectItem>
                   <SelectItem value="pending_approval">{t("statuses.pending_approval")}</SelectItem>
                   <SelectItem value="sent">{t("statuses.sent")}</SelectItem>
-                  <SelectItem value="viewed">{tc("view")}</SelectItem>
+                  <SelectItem value="viewed">{t("statuses.viewed")}</SelectItem>
                   <SelectItem value="accepted">{t("statuses.accepted")}</SelectItem>
                   <SelectItem value="declined">{t("statuses.declined")}</SelectItem>
                   <SelectItem value="expired">{t("statuses.expired")}</SelectItem>
-                  <SelectItem value="converted">{tc("completed")}</SelectItem>
+                  <SelectItem value="converted">{t("statuses.converted")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -382,7 +384,7 @@ export function QuotesClient({
                           label: t("columns.expires"),
                           value: quote.expiresAt ? (
                             <span className={expired ? "font-medium text-destructive" : undefined}>
-                              {format(new Date(quote.expiresAt), "MMM d, yyyy")}
+                              {formatter.dateTime(new Date(quote.expiresAt), DATE_FORMAT)}
                             </span>
                           ) : null,
                         },
@@ -438,12 +440,12 @@ export function QuotesClient({
                               {formatMoney(quote.totalAmount, quote.currency)}
                             </TableCell>
                             <TableCell className="text-muted-foreground text-sm">
-                              {format(new Date(quote.issuedAt), "MMM d, yyyy")}
+                              {formatter.dateTime(new Date(quote.issuedAt), DATE_FORMAT)}
                             </TableCell>
                             <TableCell className="text-sm">
                               {quote.expiresAt ? (
                                 <span className={isExpired ? "font-medium text-destructive" : "text-muted-foreground"}>
-                                  {format(new Date(quote.expiresAt), "MMM d, yyyy")}
+                                  {formatter.dateTime(new Date(quote.expiresAt), DATE_FORMAT)}
                                 </span>
                               ) : (
                                 <span className="text-muted-foreground">—</span>

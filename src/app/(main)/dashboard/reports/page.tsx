@@ -1,5 +1,6 @@
 import { subDays } from "date-fns";
 import { BarChart3 } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 import {
   getActivityByAction,
@@ -18,6 +19,7 @@ import { ReportsClient } from "./_components/reports-client";
 
 export default async function ReportsPage() {
   await requirePageCapability("report:read", "/dashboard/reports");
+  const t = await getTranslations("reports.overviewPage");
 
   const defaultFrom = subDays(new Date(), 29).toISOString().split("T")[0];
   const defaultTo = new Date().toISOString().split("T")[0];
@@ -41,11 +43,9 @@ export default async function ReportsPage() {
       <div>
         <h1 className="flex items-center gap-2 font-bold text-2xl tracking-tight">
           <BarChart3 className="h-6 w-6 text-primary" />
-          Reports & Analytics
+          {t("title")}
         </h1>
-        <p className="mt-1 text-muted-foreground text-sm">
-          Monitor user activity, performance metrics, and campaign results. Admin only.
-        </p>
+        <p className="mt-1 text-muted-foreground text-sm">{t("subtitle")}</p>
       </div>
 
       <ReportsClient

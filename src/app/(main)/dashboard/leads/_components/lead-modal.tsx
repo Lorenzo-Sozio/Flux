@@ -130,6 +130,7 @@ export function LeadModal({
 }) {
   const t = useTranslations("leads");
   const tc = useTranslations("common");
+  const tf = useTranslations("recordForm");
   const [open, setOpen] = useState(false);
   const [duplicates, setDuplicates] = useState<Awaited<ReturnType<typeof checkLeadDuplicates>>>([]);
   const [pendingPayload, setPendingPayload] = useState<Record<string, unknown> | null>(null);
@@ -281,7 +282,7 @@ export function LeadModal({
           toast.error(result.message, {
             action: isPlanLimit(result)
               ? {
-                  label: "Upgrade",
+                  label: tf("upgrade"),
                   onClick: () => {
                     window.location.href = "/dashboard/settings/billing";
                   },
@@ -299,7 +300,7 @@ export function LeadModal({
           toast.error(result.message, {
             action: isPlanLimit(result)
               ? {
-                  label: "Upgrade",
+                  label: tf("upgrade"),
                   onClick: () => {
                     window.location.href = "/dashboard/settings/billing";
                   },
@@ -368,7 +369,7 @@ export function LeadModal({
                     variant="ghost"
                     size="icon"
                     type="button"
-                    title="Apri scheda completa"
+                    title={tf("openFullRecord")}
                     className="h-8 w-8 shrink-0"
                   >
                     <ArrowUpRightIcon className="h-4 w-4" />
@@ -418,16 +419,16 @@ export function LeadModal({
                 {/* ── Info Tab ─────────────────────────────────────────────── */}
                 <TabsContent value="info" className="mt-0 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-4">
                   <F label={tc("firstName")} required error={e.firstName?.message}>
-                    <Input {...register("firstName")} placeholder="Mario" />
+                    <Input {...register("firstName")} placeholder={tf("firstNamePlaceholder")} />
                   </F>
                   <F label={tc("lastName")} required error={e.lastName?.message}>
-                    <Input {...register("lastName")} placeholder="Rossi" />
+                    <Input {...register("lastName")} placeholder={tf("lastNamePlaceholder")} />
                   </F>
                   <F label={tc("email")} error={e.email?.message}>
-                    <Input {...register("email")} type="email" placeholder="mario@example.com" />
+                    <Input {...register("email")} type="email" placeholder={tf("emailPlaceholder")} />
                   </F>
                   <F label={tc("jobTitle")} error={e.jobTitle?.message}>
-                    <Input {...register("jobTitle")} placeholder="Sales Manager" />
+                    <Input {...register("jobTitle")} placeholder={tf("jobTitlePlaceholder")} />
                   </F>
                   <F label={tc("phone")} error={e.phone?.message}>
                     <Input {...register("phone")} type="tel" placeholder="+39 0464 1234567" />
@@ -436,10 +437,11 @@ export function LeadModal({
                     <Input {...register("mobile")} type="tel" placeholder="+39 345 1234567" />
                   </F>
                   <F label={t("form.companyName")} error={e.companyName?.message}>
+                    {/* i18n-ignore: an example value, the same in both languages */}
                     <Input {...register("companyName")} placeholder="Acme Corp" />
                   </F>
                   <F label={tc("industry")} error={e.industry?.message}>
-                    <Input {...register("industry")} placeholder="Technology, Finance…" />
+                    <Input {...register("industry")} placeholder={t("modal.industryPlaceholder")} />
                   </F>
                   <div className="col-span-1 sm:col-span-2">
                     <F label={tc("website")} error={e.website?.message}>
@@ -561,7 +563,7 @@ export function LeadModal({
                   </F>
                   <div className="col-span-1 sm:col-span-2">
                     <F label={t("form.tags")} error={e.tags?.message}>
-                      <Input {...register("tags")} placeholder="tech, startup, b2b" />
+                      <Input {...register("tags")} placeholder={tf("tagsPlaceholder")} />
                     </F>
                   </div>
                   <div className="col-span-1 sm:col-span-2">
@@ -614,7 +616,7 @@ export function LeadModal({
             {duplicates.length > 0 && pendingPayload && (
               <div className="border-t bg-amber-50 px-6 py-4 dark:bg-amber-950/30">
                 <p className="mb-2 font-semibold text-amber-800 text-sm dark:text-amber-300">
-                  Similar leads already exist:
+                  {t("modal.similarExist")}
                 </p>
                 <ul className="mb-3 space-y-1.5">
                   {duplicates.map((d) => (
@@ -636,7 +638,7 @@ export function LeadModal({
                           onClick={() => setMergeTargetId(d.id)}
                         >
                           <GitMerge className="mr-1 h-3 w-3" />
-                          Merge
+                          {tf("merge")}
                         </Button>
                       )}
                     </li>
@@ -652,10 +654,10 @@ export function LeadModal({
                       setPendingPayload(null);
                     }}
                   >
-                    Go back
+                    {tf("goBack")}
                   </Button>
                   <Button type="button" size="sm" onClick={() => saveLead(pendingPayload)}>
-                    Save anyway
+                    {tf("saveAnyway")}
                   </Button>
                 </div>
               </div>
@@ -792,18 +794,26 @@ function QuickConvertButton({ lead }: { lead: any }) {
         </DialogHeader>
 
         <div className="space-y-2 rounded-lg border bg-muted/30 p-3 text-sm">
-          <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">Verrà creato</p>
+          <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wider">
+            {t("convert.willCreate")}
+          </p>
           <div className="flex items-center gap-2">
             <UserIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
             <span>
-              Contatto: <span className="font-medium">{leadName}</span>
+              {t.rich("convert.contactLine", {
+                name: leadName,
+                b: (chunks) => <span className="font-medium">{chunks}</span>,
+              })}
             </span>
           </div>
           {lead.companyName && (
             <div className="flex items-center gap-2">
               <BuildingIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
               <span>
-                Azienda: <span className="font-medium">{lead.companyName}</span>
+                {t.rich("convert.companyLine", {
+                  name: lead.companyName,
+                  b: (chunks) => <span className="font-medium">{chunks}</span>,
+                })}
               </span>
             </div>
           )}
@@ -816,9 +826,7 @@ function QuickConvertButton({ lead }: { lead: any }) {
             <Label htmlFor="quick-create-deal" className="font-medium text-sm">
               {t("convertCreateDeal")}
             </Label>
-            <p className="text-muted-foreground text-xs">
-              Crea un'opportunità nella pipeline collegata a questo cliente
-            </p>
+            <p className="text-muted-foreground text-xs">{t("convert.createDealHint")}</p>
           </div>
           <Switch
             id="quick-create-deal"

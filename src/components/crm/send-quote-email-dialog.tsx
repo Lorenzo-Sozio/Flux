@@ -2,6 +2,7 @@ import React, { useState } from "react";
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -13,11 +14,20 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
+/** The shape only; the messages shown to the user come from `sendQuoteEmailSchema(t)`. */
 const SendQuoteEmailSchema = z.object({
-  toEmail: z.string().email("Invalid email address"),
-  subject: z.string().min(1, "Subject is required"),
+  toEmail: z.string().email(),
+  subject: z.string().min(1),
   message: z.string().optional(),
 });
+
+function sendQuoteEmailSchema(t: (key: "invalidEmail" | "subjectRequired") => string) {
+  return z.object({
+    toEmail: z.string().email(t("invalidEmail")),
+    subject: z.string().min(1, t("subjectRequired")),
+    message: z.string().optional(),
+  });
+}
 
 interface SendQuoteEmailDialogProps {
   open: boolean;
@@ -49,14 +59,15 @@ export function SendQuoteEmailDialog({
   descriptionText,
   submitLabel,
 }: SendQuoteEmailDialogProps) {
+  const t = useTranslations("quotes.sendEmail");
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<z.infer<typeof SendQuoteEmailSchema>>({
-    resolver: zodResolver(SendQuoteEmailSchema),
+    resolver: zodResolver(sendQuoteEmailSchema(t)),
     defaultValues: {
       toEmail: defaultTo ?? "",
-      subject: defaultSubject ?? "Your Quote",
-      message: defaultMessage ?? "Please review the attached quote and let me know if you have any questions.",
+      subject: defaultSubject ?? t("defaultSubject"),
+      message: defaultMessage ?? t("defaultMessage"),
     },
   });
 
@@ -67,21 +78,21 @@ export function SendQuoteEmailDialog({
     if (!open) return;
     form.reset({
       toEmail: defaultTo ?? "",
-      subject: defaultSubject ?? "Your Quote",
-      message: defaultMessage ?? "Please review the attached quote and let me know if you have any questions.",
+      subject: defaultSubject ?? t("defaultSubject"),
+      message: defaultMessage ?? t("defaultMessage"),
     });
-  }, [open, defaultTo, defaultSubject, defaultMessage, form]);
+  }, [open, defaultTo, defaultSubject, defaultMessage, form, t]);
 
   async function onSubmit(data: z.infer<typeof SendQuoteEmailSchema>) {
     setIsLoading(true);
     try {
       await sendQuoteEmailAction(quoteId, data.toEmail, data.subject, data.message || "");
-      toast.success("Quote sent successfully");
+      toast.success(t("sent"));
       onOpenChange(false);
       form.reset();
       onSuccess?.();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to send quote");
+      toast.error(error instanceof Error ? error.message : t("sendFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -91,10 +102,8 @@ export function SendQuoteEmailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{title ?? "Send Quote via Email"}</DialogTitle>
-          <DialogDescription>
-            {descriptionText ?? "Send this quote to your customer for review and approval"}
-          </DialogDescription>
+          <DialogTitle>{title ?? t("title")}</DialogTitle>
+          <DialogDescription>{descriptionText ?? t("description")}</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -104,9 +113,9 @@ export function SendQuoteEmailDialog({
               name="toEmail"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Recipient Email</FormLabel>
+                  <FormLabel>{t("recipient")}</FormLabel>
                   <FormControl>
-                    <Input type="email" placeholder="customer@example.com" {...field} />
+                    <Input type="email" placeholder={t("recipientPlaceholder")} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -118,9 +127,9 @@ export function SendQuoteEmailDialog({
               name="subject"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email Subject</FormLabel>
+                  <FormLabel>{t("subject")}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Your Quote" {...field} />
+                    <Input placeholder={t("subjectPlaceholder")} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -132,9 +141,9 @@ export function SendQuoteEmailDialog({
               name="message"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Message (Optional)</FormLabel>
+                  <FormLabel>{t("message")}</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Add a personal message to include in the email..." {...field} rows={4} />
+                    <Textarea placeholder={t("messagePlaceholder")} {...field} rows={4} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -143,11 +152,11 @@ export function SendQuoteEmailDialog({
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
+                {t("cancel")}
               </Button>
               <Button type="submit" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {submitLabel ?? "Send Quote"}
+                {submitLabel ?? t("submit")}
               </Button>
             </div>
           </form>

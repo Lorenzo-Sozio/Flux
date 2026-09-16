@@ -20,6 +20,7 @@ import {
   UserRoundCheck,
   Zap,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -55,40 +56,39 @@ import { parseScheduledTrigger, SCHEDULED_TRIGGER_PREFIX } from "./scheduler-uti
 
 // ── Update-field options per entity ──────────────────────────────────────────
 
+/**
+ * Labels are looked up at render time: `fields.<labelKey ?? value>` for the field and
+ * `options.<entity>.<field>.<value>` for an option (source options come from
+ * `common.sources`). `label` on an option is a literal that is not language.
+ */
 type UpdField = {
   value: string;
-  label: string;
+  labelKey?: string;
   kind: "enum" | "number" | "text" | "textarea";
-  options?: { value: string; label: string }[];
+  options?: { value: string; label?: string; emoji?: string }[];
 };
 
 const SOURCE_OPTIONS = [
-  { value: "website", label: "Website" },
-  { value: "referral", label: "Referral" },
-  { value: "linkedin", label: "LinkedIn" },
-  { value: "cold_outreach", label: "Cold Outreach" },
-  { value: "trade_show", label: "Trade Show" },
-  { value: "advertisement", label: "Advertisement" },
-  { value: "email_campaign", label: "Email Campaign" },
-  { value: "other", label: "Other" },
-];
+  "website",
+  "referral",
+  "linkedin",
+  "cold_outreach",
+  "trade_show",
+  "advertisement",
+  "email_campaign",
+  "other",
+].map((value) => ({ value }));
 
 const UPDATE_FIELDS_BY_ENTITY: Record<string, UpdField[]> = {
   deal: [
     {
       value: "status",
-      label: "Status",
       kind: "enum",
-      options: [
-        { value: "open", label: "Open" },
-        { value: "won", label: "Won" },
-        { value: "lost", label: "Lost" },
-      ],
+      options: [{ value: "open" }, { value: "won" }, { value: "lost" }],
     },
-    { value: "probability", label: "Probability (%)", kind: "number" },
+    { value: "probability", kind: "number" },
     {
       value: "currency",
-      label: "Currency",
       kind: "enum",
       options: [
         { value: "EUR", label: "EUR (€)" },
@@ -96,82 +96,67 @@ const UPDATE_FIELDS_BY_ENTITY: Record<string, UpdField[]> = {
         { value: "GBP", label: "GBP (£)" },
       ],
     },
-    { value: "notes", label: "Notes", kind: "textarea" },
+    { value: "notes", kind: "textarea" },
   ],
   lead: [
     {
       value: "status",
-      label: "Status",
       kind: "enum",
       options: [
-        { value: "new", label: "New" },
-        { value: "contacting", label: "Contacting" },
-        { value: "engaged", label: "Engaged" },
-        { value: "qualified", label: "Qualified" },
-        { value: "unqualified", label: "Unqualified" },
+        { value: "new" },
+        { value: "contacting" },
+        { value: "engaged" },
+        { value: "qualified" },
+        { value: "unqualified" },
       ],
     },
     {
       value: "rating",
-      label: "Rating",
       kind: "enum",
       options: [
-        { value: "hot", label: "🔥 Hot" },
-        { value: "warm", label: "☀️ Warm" },
-        { value: "cold", label: "❄️ Cold" },
+        { value: "hot", emoji: "🔥" },
+        { value: "warm", emoji: "☀️" },
+        { value: "cold", emoji: "❄️" },
       ],
     },
-    { value: "source", label: "Source", kind: "enum", options: SOURCE_OPTIONS },
-    { value: "leadScore", label: "Lead Score (0–100)", kind: "number" },
-    { value: "notes", label: "Notes", kind: "textarea" },
+    { value: "source", kind: "enum", options: SOURCE_OPTIONS },
+    { value: "leadScore", labelKey: "leadScoreRange", kind: "number" },
+    { value: "notes", kind: "textarea" },
   ],
   contact: [
-    { value: "status", label: "Status", kind: "text" },
-    { value: "source", label: "Source", kind: "enum", options: SOURCE_OPTIONS },
-    { value: "jobTitle", label: "Job Title", kind: "text" },
-    { value: "leadScore", label: "Lead Score (0–100)", kind: "number" },
-    { value: "notes", label: "Notes", kind: "textarea" },
+    { value: "status", kind: "text" },
+    { value: "source", kind: "enum", options: SOURCE_OPTIONS },
+    { value: "jobTitle", kind: "text" },
+    { value: "leadScore", labelKey: "leadScoreRange", kind: "number" },
+    { value: "notes", kind: "textarea" },
   ],
   company: [
-    { value: "status", label: "Status", kind: "text" },
+    { value: "status", kind: "text" },
     {
       value: "type",
-      label: "Type",
       kind: "enum",
-      options: [
-        { value: "prospect", label: "Prospect" },
-        { value: "customer", label: "Customer" },
-        { value: "partner", label: "Partner" },
-        { value: "vendor", label: "Vendor" },
-      ],
+      options: [{ value: "prospect" }, { value: "customer" }, { value: "partner" }, { value: "vendor" }],
     },
-    { value: "industry", label: "Industry", kind: "text" },
+    { value: "industry", kind: "text" },
   ],
   ticket: [
     {
       value: "status",
-      label: "Status",
       kind: "enum",
       options: [
-        { value: "new", label: "New" },
-        { value: "open", label: "Open" },
-        { value: "in_progress", label: "In Progress" },
-        { value: "waiting", label: "Waiting" },
-        { value: "on_hold", label: "On Hold" },
-        { value: "resolved", label: "Resolved" },
-        { value: "closed", label: "Closed" },
+        { value: "new" },
+        { value: "open" },
+        { value: "in_progress" },
+        { value: "waiting" },
+        { value: "on_hold" },
+        { value: "resolved" },
+        { value: "closed" },
       ],
     },
     {
       value: "priority",
-      label: "Priority",
       kind: "enum",
-      options: [
-        { value: "low", label: "Low" },
-        { value: "normal", label: "Normal" },
-        { value: "high", label: "High" },
-        { value: "urgent", label: "Urgent" },
-      ],
+      options: [{ value: "low" }, { value: "normal" }, { value: "high" }, { value: "urgent" }],
     },
   ],
   // Only what a rule has any business rewriting on an order: its state and the
@@ -179,90 +164,66 @@ const UPDATE_FIELDS_BY_ENTITY: Record<string, UpdField[]> = {
   order: [
     {
       value: "status",
-      label: "Status",
       kind: "enum",
-      options: [
-        { value: "draft", label: "Draft" },
-        { value: "processing", label: "Processing" },
-        { value: "completed", label: "Completed" },
-        { value: "cancelled", label: "Cancelled" },
-      ],
+      options: [{ value: "draft" }, { value: "processing" }, { value: "completed" }, { value: "cancelled" }],
     },
-    { value: "notes", label: "Notes", kind: "textarea" },
+    { value: "notes", kind: "textarea" },
   ],
 };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const ENTITY_META: Record<string, { label: string; emoji: string }> = {
-  deal: { label: "Deal", emoji: "💼" },
-  lead: { label: "Lead", emoji: "🎯" },
-  contact: { label: "Contact", emoji: "👤" },
-  company: { label: "Company", emoji: "🏢" },
-  ticket: { label: "Ticket", emoji: "🎫" },
-  order: { label: "Order", emoji: "🛒" },
+const ENTITY_EMOJI: Record<string, string> = {
+  deal: "💼",
+  lead: "🎯",
+  contact: "👤",
+  company: "🏢",
+  ticket: "🎫",
+  order: "🛒",
 };
 
-const OPERATOR_LABELS: Record<string, string> = {
-  equals: "equals",
-  not_equals: "does not equal",
-  greater_than: "greater than",
-  less_than: "less than",
-  greater_than_or_equal: "≥ at least",
-  less_than_or_equal: "≤ at most",
-  contains: "contains",
-  not_contains: "does not contain",
-  is_empty: "is empty",
-  is_not_empty: "is not empty",
-  changed: "changed",
-  changed_to: "changed to",
-  changed_from: "changed from",
-};
-
-const ACTION_META: Record<string, { label: string; icon: React.ReactNode; color: string; bg: string }> = {
+const ACTION_META: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
   create_task: {
-    label: "Create Task",
     icon: <CheckSquare className="h-4 w-4" />,
     color: "text-blue-600 dark:text-blue-400",
     bg: "bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800",
   },
   send_notification: {
-    label: "Send Notification",
     icon: <Bell className="h-4 w-4" />,
     color: "text-violet-600 dark:text-violet-400",
     bg: "bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800",
   },
   send_email: {
-    label: "Send Email",
     icon: <Mail className="h-4 w-4" />,
     color: "text-emerald-600 dark:text-emerald-400",
     bg: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800",
   },
   send_webhook: {
-    label: "Send Webhook",
     icon: <Send className="h-4 w-4" />,
     color: "text-slate-600 dark:text-slate-400",
     bg: "bg-slate-50 dark:bg-slate-950/30 border-slate-200 dark:border-slate-800",
   },
   update_field: {
-    label: "Update Field",
     icon: <PencilLine className="h-4 w-4" />,
     color: "text-amber-600 dark:text-amber-400",
     bg: "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800",
   },
   assign_owner: {
-    label: "Assign Owner (round robin)",
     icon: <UserRoundCheck className="h-4 w-4" />,
     color: "text-sky-600 dark:text-sky-400",
     bg: "bg-sky-50 dark:bg-sky-950/30 border-sky-200 dark:border-sky-800",
   },
   enroll_in_sequence: {
-    label: "Enroll in Sequence",
     icon: <ListOrdered className="h-4 w-4" />,
     color: "text-teal-600 dark:text-teal-400",
     bg: "bg-teal-50 dark:bg-teal-950/30 border-teal-200 dark:border-teal-800",
   },
 };
+
+/** Merge-field examples shown in hints and placeholders: syntax, not language, so outside the messages. */
+const MERGE_FIELDS_EMAIL = "deal.name, contact.email, owner.name, contact.firstName";
+const MERGE_FIELDS_WEBHOOK = "deal.name, contact.email, owner.name, deal.amount";
+const MERGE_TOKEN = "{{merge.fields}}";
 
 /**
  * The prefix of a condition on something an assistant collected.
@@ -291,9 +252,10 @@ function PeoplePicker({
   onChange: (next: string[]) => void;
   idPrefix: string;
 }) {
+  const t = useTranslations("automation.ruleBuilder");
   return (
     <div className="max-h-56 space-y-1 overflow-y-auto rounded border bg-background p-2">
-      {users.length === 0 && <p className="px-1 py-2 text-muted-foreground text-xs">Loading people…</p>}
+      {users.length === 0 && <p className="px-1 py-2 text-muted-foreground text-xs">{t("assign.loadingPeople")}</p>}
       {users.map((u) => {
         const position = value.indexOf(u.id);
         const inputId = `${idPrefix}-${u.id}`;
@@ -420,6 +382,9 @@ interface RuleModalProps {
 }
 
 export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
+  const t = useTranslations("automation.ruleBuilder");
+  const tAutomation = useTranslations("automation");
+  const tCommon = useTranslations("common");
   const [open, setOpen] = useState(false);
   const [userList, setUserList] = useState<{ id: string; name: string | null; email: string | null }[]>([]);
   const [territoryList, setTerritoryList] = useState<{ id: string; name: string }[]>([]);
@@ -496,6 +461,20 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
   const _conditionLogic = watch("conditionLogic");
   const entityFields = ENTITY_FIELDS[targetEntity] ?? [];
 
+  // Labels: the registry in types.ts carries English labels; a translation wins when one exists.
+  const fieldLabel = (key: string, fallback?: string) =>
+    t.has(`fields.${key}`) ? t(`fields.${key}`) : (fallback ?? key);
+  const optionLabel = (field: string, opt: { value: string; label?: string; emoji?: string }) => {
+    const key = `options.${targetEntity}.${field}.${opt.value}`;
+    const text =
+      field === "source" && tCommon.has(`sources.${opt.value}`)
+        ? tCommon(`sources.${opt.value}`)
+        : t.has(key)
+          ? t(key)
+          : (opt.label ?? opt.value);
+    return opt.emoji ? `${opt.emoji} ${text}` : text;
+  };
+
   // Tab-level error detection
   const tabErrors = {
     details: !!e.name,
@@ -509,17 +488,17 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
       if (isEditing) {
         const res = await updateAutomationRule(rule.id, data);
         if (!res.success) throw new Error(res.error);
-        toast.success("Rule updated.");
+        toast.success(tAutomation("updateSuccess"));
       } else {
         const res = await createAutomationRule(data);
         if (!res.success) throw new Error(res.error);
-        toast.success("Rule created.");
+        toast.success(tAutomation("createSuccess"));
       }
       setOpen(false);
       form.reset(EMPTY_DEFAULTS);
       onSaved?.();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save rule.");
+      toast.error(err instanceof Error && err.message ? err.message : t("saveFailed"));
     }
   });
 
@@ -537,7 +516,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
         <DialogHeader className="border-b px-4 md:px-6 pt-6 pb-4">
           <DialogTitle className="flex items-center gap-2 text-lg">
             <Zap className="h-5 w-5 text-yellow-500" />
-            {isEditing ? `Edit Rule — ${rule.name}` : "New Automation Rule"}
+            {isEditing ? t("titleEdit", { name: rule.name }) : t("titleNew")}
           </DialogTitle>
         </DialogHeader>
 
@@ -547,36 +526,36 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
               <TabsList className="mb-5 w-full">
                 <TabsTrigger value="details" className="relative flex-1 gap-1.5">
                   <Zap className="h-3.5 w-3.5" />
-                  Details
+                  {t("tabs.details")}
                   <TabDot has={tabErrors.details} />
                 </TabsTrigger>
                 <TabsTrigger value="trigger" className="relative flex-1 gap-1.5">
                   <RocketIcon className="h-3.5 w-3.5" />
-                  Trigger
+                  {t("tabs.trigger")}
                   <TabDot has={tabErrors.trigger} />
                 </TabsTrigger>
                 <TabsTrigger value="conditions" className="relative flex-1 gap-1.5">
                   <GitMergeIcon className="h-3.5 w-3.5" />
-                  Conditions
+                  {t("tabs.conditions")}
                   <TabDot has={tabErrors.conditions} />
                 </TabsTrigger>
                 <TabsTrigger value="actions" className="relative flex-1 gap-1.5">
                   <CheckSquare className="h-3.5 w-3.5" />
-                  Actions
+                  {t("tabs.actions")}
                   <TabDot has={tabErrors.actions} />
                 </TabsTrigger>
               </TabsList>
 
               {/* ── Tab 1: Details ──────────────────────────────────────── */}
               <TabsContent value="details" className="mt-0 space-y-4">
-                <F label="Rule Name" required error={e.name?.message}>
-                  <Input {...register("name")} placeholder="e.g. Legal Review on Large Proposal" />
+                <F label={t("details.name")} required error={e.name?.message}>
+                  <Input {...register("name")} placeholder={t("details.namePlaceholder")} />
                 </F>
-                <F label="Description">
+                <F label={t("details.description")}>
                   <Textarea
                     {...register("description")}
                     rows={3}
-                    placeholder="Optional — describe what this rule does…"
+                    placeholder={t("details.descriptionPlaceholder")}
                     className="resize-none"
                   />
                 </F>
@@ -586,9 +565,9 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                   render={({ field }) => (
                     <div className="flex items-center justify-between rounded-lg border px-4 py-3">
                       <div>
-                        <p className="font-medium text-sm">Active</p>
+                        <p className="font-medium text-sm">{t("details.active")}</p>
                         <p className="text-muted-foreground text-xs">
-                          {field.value ? "Rule will fire automatically" : "Rule is currently paused"}
+                          {field.value ? t("details.activeOn") : t("details.activeOff")}
                         </p>
                       </div>
                       <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -599,14 +578,13 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
 
               {/* ── Tab 2: Trigger ──────────────────────────────────────── */}
               <TabsContent value="trigger" className="mt-0 space-y-5">
-                <F label="Entity" required>
+                <F label={t("trigger.entity")} required>
                   <Controller
                     control={control}
                     name="targetEntity"
                     render={({ field }) => (
                       <div className="mt-0.5 grid grid-cols-3 gap-2">
                         {TARGET_ENTITIES.map((e) => {
-                          const meta = ENTITY_META[e];
                           return (
                             <button
                               key={e}
@@ -625,8 +603,8 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                   : "border-border text-muted-foreground hover:border-muted-foreground/40 hover:text-foreground",
                               )}
                             >
-                              <span className="text-xl leading-none">{meta.emoji}</span>
-                              {meta.label}
+                              <span className="text-xl leading-none">{ENTITY_EMOJI[e]}</span>
+                              {tAutomation(`entities.${e}`)}
                             </button>
                           );
                         })}
@@ -635,7 +613,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                   />
                 </F>
 
-                <F label="Fire when" required error={e.triggerOn?.message as string | undefined}>
+                <F label={t("trigger.fireWhen")} required error={e.triggerOn?.message as string | undefined}>
                   <div className="mt-0.5 grid grid-cols-2 gap-2">
                     {TRIGGER_EVENTS.map((ev) => (
                       <Controller
@@ -664,10 +642,10 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                 className="pointer-events-none"
                               />
                               {ev === "onCreate"
-                                ? "Record Created"
+                                ? t("trigger.onCreate")
                                 : ev === "onUpdate"
-                                  ? "Record Updated"
-                                  : "SLA Breach"}
+                                  ? t("trigger.onUpdate")
+                                  : t("trigger.slaBreach")}
                             </button>
                           );
                         }}
@@ -678,7 +656,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
 
                 {/* ── Scheduled Triggers ── */}
                 <div className="mt-4 border-t pt-4">
-                  <p className="mb-3 font-semibold text-muted-foreground text-xs">Or schedule this automation:</p>
+                  <p className="mb-3 font-semibold text-muted-foreground text-xs">{t("trigger.orSchedule")}</p>
                   <div className="space-y-3">
                     <Controller
                       control={control}
@@ -700,7 +678,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
 
                         return (
                           <div className="space-y-2">
-                            <span className="font-medium text-xs">Daily Schedule (time)</span>
+                            <span className="font-medium text-xs">{t("trigger.dailySchedule")}</span>
                             <div className="flex gap-2">
                               <Input
                                 type="time"
@@ -727,13 +705,13 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                     );
                                   }}
                                 >
-                                  Remove
+                                  {tCommon("remove")}
                                 </Button>
                               )}
                             </div>
                             {scheduledTrigger && (
                               <p className="text-emerald-600 text-xs dark:text-emerald-400">
-                                Scheduled daily at {timeValue}
+                                {t("trigger.scheduledAt", { time: timeValue })}
                               </p>
                             )}
                           </div>
@@ -749,8 +727,8 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                 <div className="space-y-3">
                   {conditionFields.length === 0 ? (
                     <div className="rounded border border-dashed bg-muted/30 py-8 text-center text-muted-foreground text-sm">
-                      <p>Nessuna condizione aggiunta</p>
-                      <p className="mt-1 text-xs">Clicca il pulsante sottostante per iniziare</p>
+                      <p>{t("conditions.empty")}</p>
+                      <p className="mt-1 text-xs">{t("conditions.emptyHint")}</p>
                     </div>
                   ) : (
                     conditionFields.map((field, index) => {
@@ -819,21 +797,21 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                       onValueChange={(v) => f.onChange(v === RACCOLTO ? RACCOLTO : v)}
                                     >
                                       <SelectTrigger className="h-8 flex-1 text-xs">
-                                        <SelectValue placeholder="Select field..." />
+                                        <SelectValue placeholder={t("conditions.selectField")} />
                                       </SelectTrigger>
                                       <SelectContent>
                                         {entityFields.map((ef) => (
                                           <SelectItem key={ef.key} value={ef.key}>
-                                            {ef.label}
+                                            {fieldLabel(ef.key, ef.label)}
                                           </SelectItem>
                                         ))}
-                                        <SelectItem value={RACCOLTO}>Informazione raccolta…</SelectItem>
+                                        <SelectItem value={RACCOLTO}>{t("conditions.collected")}</SelectItem>
                                       </SelectContent>
                                     </Select>
                                     {raccolto && (
                                       <Input
                                         className="h-8 flex-1 text-xs"
-                                        placeholder="nome del campo (es. budget)"
+                                        placeholder={t("conditions.collectedPlaceholder")}
                                         value={String(f.value ?? "").slice(RACCOLTO.length)}
                                         onChange={(e) => f.onChange(RACCOLTO + e.target.value.trim())}
                                       />
@@ -856,12 +834,12 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                   }}
                                 >
                                   <SelectTrigger className="h-8 w-40 flex-shrink-0 text-xs">
-                                    <SelectValue placeholder="Operator..." />
+                                    <SelectValue placeholder={t("conditions.operatorPlaceholder")} />
                                   </SelectTrigger>
                                   <SelectContent>
                                     {allowedOps.map((op) => (
                                       <SelectItem key={op} value={op}>
-                                        {OPERATOR_LABELS[op] ?? op}
+                                        {t.has(`operators.${op}`) ? t(`operators.${op}`) : op}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -878,12 +856,12 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                   render={({ field: f }) => (
                                     <Select value={String(f.value ?? "")} onValueChange={f.onChange}>
                                       <SelectTrigger className="h-8 w-32 flex-shrink-0 text-xs">
-                                        <SelectValue placeholder="Value..." />
+                                        <SelectValue placeholder={t("conditions.valuePlaceholder")} />
                                       </SelectTrigger>
                                       <SelectContent>
                                         {fieldDef.options?.map((opt) => (
                                           <SelectItem key={opt.value} value={opt.value}>
-                                            {opt.label}
+                                            {optionLabel(fieldDef.key, opt)}
                                           </SelectItem>
                                         ))}
                                       </SelectContent>
@@ -893,7 +871,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                               ) : (
                                 <Input
                                   className="h-8 w-32 flex-shrink-0 text-xs"
-                                  placeholder="Value..."
+                                  placeholder={t("conditions.valuePlaceholder")}
                                   type={fieldDef?.type === "number" ? "number" : "text"}
                                   {...register(`conditions.${index}.value`)}
                                 />
@@ -933,7 +911,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                     }
                   >
                     <Plus className="mr-1.5 h-3.5 w-3.5" />
-                    Aggiungi Condizione
+                    {t("conditions.add")}
                   </Button>
                 </div>
 
@@ -944,7 +922,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                       <span className="inline-flex h-5 w-5 items-center justify-center rounded border border-border transition-transform group-open:rotate-90">
                         ▶
                       </span>
-                      🔧 Logica Avanzata (Parentesi & Operatori)
+                      {t("conditions.advanced")}
                     </summary>
                     <div className="mt-4 space-y-4 pt-4">
                       <ConditionExpressionEditor
@@ -964,7 +942,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
               {/* ── Tab 4: Actions ──────────────────────────────────────── */}
               <TabsContent value="actions" className="mt-0 space-y-3">
                 {actionFields.length === 0 && (
-                  <p className="py-4 text-center text-muted-foreground text-sm">No actions yet. Add at least one.</p>
+                  <p className="py-4 text-center text-muted-foreground text-sm">{t("actions.empty")}</p>
                 )}
                 {actionFields.map((field, index) => {
                   const actionType = watch(`actions.${index}.type`);
@@ -1047,7 +1025,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                   {Object.entries(ACTION_META).map(([k, v]) => (
                                     <SelectItem key={k} value={k} className="text-sm">
                                       <span className="flex items-center gap-2">
-                                        {v.icon} {v.label}
+                                        {v.icon} {t(`actionTypes.${k}`)}
                                       </span>
                                     </SelectItem>
                                   ))}
@@ -1074,17 +1052,17 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                       {actionType === "create_task" && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
                           <div className="col-span-1 sm:col-span-2">
-                            <F label="Task Title" required error={actionErrs?.title?.message}>
+                            <F label={t("task.title")} required error={actionErrs?.title?.message}>
                               <Input
                                 className="h-8 bg-background text-sm"
-                                placeholder="e.g. Legal Review"
+                                placeholder={t("task.titlePlaceholder")}
                                 // biome-ignore lint/suspicious/noExplicitAny: dynamic RHF path
                                 {...register(`actions.${index}.params.title` as any)}
                               />
                             </F>
                           </div>
 
-                          <F label="Assign to">
+                          <F label={t("task.assignTo")}>
                             <Controller
                               control={control}
                               // biome-ignore lint/suspicious/noExplicitAny: dynamic RHF path
@@ -1095,10 +1073,10 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                   onValueChange={(v) => f.onChange(v === "__unassigned__" ? "" : v)}
                                 >
                                   <SelectTrigger className="h-8 bg-background text-sm">
-                                    <SelectValue placeholder="— Unassigned —" />
+                                    <SelectValue placeholder={t("task.unassigned")} />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="__unassigned__">— Unassigned —</SelectItem>
+                                    <SelectItem value="__unassigned__">{t("task.unassigned")}</SelectItem>
                                     {userList.map((u) => (
                                       <SelectItem key={u.id} value={u.id}>
                                         {u.name ?? u.email}
@@ -1110,7 +1088,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                             />
                           </F>
 
-                          <F label="Priority">
+                          <F label={t("task.priority")}>
                             <Controller
                               control={control}
                               // biome-ignore lint/suspicious/noExplicitAny: dynamic RHF path
@@ -1121,9 +1099,9 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                     <SelectValue />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="low">🟢 Low</SelectItem>
-                                    <SelectItem value="normal">🟡 Normal</SelectItem>
-                                    <SelectItem value="high">🔴 High</SelectItem>
+                                    <SelectItem value="low">🟢 {t("task.priorityLow")}</SelectItem>
+                                    <SelectItem value="normal">🟡 {t("task.priorityNormal")}</SelectItem>
+                                    <SelectItem value="high">🔴 {t("task.priorityHigh")}</SelectItem>
                                   </SelectContent>
                                 </Select>
                               )}
@@ -1131,28 +1109,28 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                           </F>
 
                           <div className="col-span-1 sm:col-span-2">
-                            <F label="Due in (days)" error={actionErrs?.dueDateDays?.message}>
+                            <F label={t("task.dueIn")} error={actionErrs?.dueDateDays?.message}>
                               <div className="relative">
                                 <Input
                                   type="number"
                                   min={0}
                                   max={365}
-                                  placeholder="e.g. 3"
+                                  placeholder={t("task.dueInPlaceholder")}
                                   className="h-8 bg-background pr-16 text-sm"
                                   {...register(`actions.${index}.params.dueDateDays` as any, { valueAsNumber: true })}
                                 />
                                 <span className="-translate-y-1/2 pointer-events-none absolute top-1/2 right-3 text-muted-foreground text-xs">
-                                  days
+                                  {t("task.days")}
                                 </span>
                               </div>
                             </F>
                           </div>
 
                           <div className="col-span-1 sm:col-span-2">
-                            <F label="Description">
+                            <F label={t("task.description")}>
                               <Textarea
                                 rows={2}
-                                placeholder="Optional task description…"
+                                placeholder={t("task.descriptionPlaceholder")}
                                 className="resize-none bg-background text-sm"
                                 {...register(`actions.${index}.params.description` as any)}
                               />
@@ -1164,7 +1142,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                       {/* ── send_notification params ── */}
                       {actionType === "send_notification" && (
                         <div className="space-y-3">
-                          <F label="Notify" error={actionErrs?.userId?.message}>
+                          <F label={t("notification.notify")} error={actionErrs?.userId?.message}>
                             <Controller
                               control={control}
                               name={`actions.${index}.params.userId` as any}
@@ -1176,13 +1154,16 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                   <SelectContent>
                                     <SelectItem value="entity_owner">
                                       <span className="flex items-center gap-2">
-                                        👤 Record Owner <span className="text-muted-foreground text-xs">(dynamic)</span>
+                                        👤 {t("notification.recordOwner")}{" "}
+                                        <span className="text-muted-foreground text-xs">
+                                          {t("notification.dynamic")}
+                                        </span>
                                       </span>
                                     </SelectItem>
                                     {userList.length > 0 && (
                                       <>
                                         <div className="px-2 py-1 font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
-                                          Specific User
+                                          {t("notification.specificUser")}
                                         </div>
                                         {userList.map((u) => (
                                           <SelectItem key={u.id} value={u.id}>
@@ -1196,17 +1177,17 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                               )}
                             />
                           </F>
-                          <F label="Title" required error={actionErrs?.title?.message}>
+                          <F label={t("notification.title")} required error={actionErrs?.title?.message}>
                             <Input
                               className="h-8 bg-background text-sm"
-                              placeholder="e.g. Deal needs attention"
+                              placeholder={t("notification.titlePlaceholder")}
                               {...register(`actions.${index}.params.title` as any)}
                             />
                           </F>
-                          <F label="Message" error={actionErrs?.message?.message}>
+                          <F label={t("notification.message")} error={actionErrs?.message?.message}>
                             <Textarea
                               rows={2}
-                              placeholder="Notification body…"
+                              placeholder={t("notification.messagePlaceholder")}
                               className="resize-none bg-background text-sm"
                               {...register(`actions.${index}.params.message` as any)}
                             />
@@ -1227,7 +1208,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                 <div className="space-y-1.5">
                                   <div className="flex items-center justify-between">
                                     <span className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                                      Email Template
+                                      {t("email.template")}
                                     </span>
                                     {activeTpl && (
                                       <button
@@ -1237,7 +1218,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                         }}
                                         className="text-[11px] text-muted-foreground underline hover:text-destructive"
                                       >
-                                        Clear
+                                        {t("email.clearTemplate")}
                                       </button>
                                     )}
                                   </div>
@@ -1257,14 +1238,14 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                     }}
                                   >
                                     <SelectTrigger className="h-8 bg-background text-sm">
-                                      <SelectValue placeholder="— No template (manual) —" />
+                                      <SelectValue placeholder={t("email.noTemplate")} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="__none__">— No template (manual) —</SelectItem>
+                                      <SelectItem value="__none__">{t("email.noTemplate")}</SelectItem>
                                       {templateList.length > 0 && (
                                         <>
                                           <div className="px-2 py-1 font-semibold text-[10px] text-muted-foreground uppercase tracking-wider">
-                                            Templates
+                                            {t("email.templates")}
                                           </div>
                                           {templateList.map((t) => (
                                             <SelectItem key={t.id} value={t.id}>
@@ -1282,8 +1263,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                   </Select>
                                   {activeTpl && (
                                     <p className="rounded border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] text-emerald-600 dark:border-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-400">
-                                      ✓ Template content will be loaded at execution time — subject &amp; body below are
-                                      editable overrides.
+                                      {t("email.templateNote")}
                                     </p>
                                   )}
                                 </div>
@@ -1293,10 +1273,10 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
 
                           <div className="h-px bg-border/50" />
 
-                          <F label="To" required error={actionErrs?.to?.message}>
+                          <F label={t("email.to")} required error={actionErrs?.to?.message}>
                             <Input
                               className="h-8 bg-background text-sm"
-                              placeholder="e.g. {{contact.email}} or email@example.com"
+                              placeholder={t("email.toPlaceholder", { example: "{{contact.email}}" })}
                               {...register(`actions.${index}.params.to` as any)}
                             />
                           </F>
@@ -1304,29 +1284,29 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                             <F label="CC">
                               <Input
                                 className="h-8 bg-background text-sm"
-                                placeholder="Optional, comma-separated"
+                                placeholder={t("email.optionalCsv")}
                                 {...register(`actions.${index}.params.cc` as any)}
                               />
                             </F>
                             <F label="BCC">
                               <Input
                                 className="h-8 bg-background text-sm"
-                                placeholder="Optional, comma-separated"
+                                placeholder={t("email.optionalCsv")}
                                 {...register(`actions.${index}.params.bcc` as any)}
                               />
                             </F>
                           </div>
-                          <F label="Subject" error={actionErrs?.subject?.message}>
+                          <F label={t("email.subject")} error={actionErrs?.subject?.message}>
                             <Input
                               className="h-8 bg-background text-sm"
-                              placeholder="e.g. Deal {{deal.name}} needs review"
+                              placeholder={t("email.subjectPlaceholder", { name: "{{deal.name}}" })}
                               {...register(`actions.${index}.params.subject` as any)}
                             />
                           </F>
-                          <F label="Body (HTML)" error={actionErrs?.body?.message}>
+                          <F label={t("email.body")} error={actionErrs?.body?.message}>
                             <Textarea
                               rows={5}
-                              placeholder="HTML content with {{merge.fields}}…"
+                              placeholder={t("email.bodyPlaceholder", { fields: MERGE_TOKEN })}
                               className="resize-none bg-background font-mono text-sm text-xs"
                               {...register(`actions.${index}.params.body` as any)}
                             />
@@ -1338,7 +1318,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                               render={({ field: f }) => (
                                 <div className="flex items-center gap-2 rounded border px-3 py-2">
                                   <Checkbox checked={f.value ?? false} onCheckedChange={f.onChange} />
-                                  <span className="text-xs">Track Opens</span>
+                                  <span className="text-xs">{t("email.trackOpens")}</span>
                                 </div>
                               )}
                             />
@@ -1348,13 +1328,13 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                               render={({ field: f }) => (
                                 <div className="flex items-center gap-2 rounded border px-3 py-2">
                                   <Checkbox checked={f.value ?? false} onCheckedChange={f.onChange} />
-                                  <span className="text-xs">Track Clicks</span>
+                                  <span className="text-xs">{t("email.trackClicks")}</span>
                                 </div>
                               )}
                             />
                           </div>
                           <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
-                            💡 Merge fields: deal.name, contact.email, owner.name, contact.firstName, etc.
+                            {t("email.mergeFields", { fields: MERGE_FIELDS_EMAIL })}
                           </p>
                         </div>
                       )}
@@ -1362,16 +1342,16 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                       {/* ── send_webhook params ── */}
                       {actionType === "send_webhook" && (
                         <div className="space-y-3">
-                          <F label="Webhook URL" required error={actionErrs?.url?.message}>
+                          <F label={t("webhook.url")} required error={actionErrs?.url?.message}>
                             <Input
                               className="h-8 bg-background text-sm"
-                              placeholder="https://example.com/webhook (supports {{merge.fields}})"
+                              placeholder={t("webhook.urlPlaceholder", { fields: MERGE_TOKEN })}
                               {...register(`actions.${index}.params.url` as any)}
                             />
                           </F>
 
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
-                            <F label="HTTP Method">
+                            <F label={t("webhook.method")}>
                               <Controller
                                 control={control}
                                 name={`actions.${index}.params.method` as any}
@@ -1392,7 +1372,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                               />
                             </F>
 
-                            <F label="Timeout (ms)">
+                            <F label={t("webhook.timeout")}>
                               <Input
                                 type="number"
                                 className="h-8 bg-background text-sm"
@@ -1402,16 +1382,18 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                             </F>
                           </div>
 
-                          <F label="Request Body (JSON with {{merge.fields}})">
+                          <F label={t("webhook.body", { fields: MERGE_TOKEN })}>
                             <Textarea
                               className="min-h-24 bg-background font-mono text-sm"
-                              placeholder='{"message": "Deal {{deal.name}} is {{deal.status}}"}'
+                              placeholder={JSON.stringify({
+                                message: t("webhook.bodyExample", { name: "{{deal.name}}", status: "{{deal.status}}" }),
+                              }).replace(":", ": ")}
                               {...register(`actions.${index}.params.body` as any)}
                             />
                           </F>
 
                           <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
-                            💡 Merge fields: deal.name, contact.email, owner.name, deal.amount, etc.
+                            {t("webhook.mergeFields", { fields: MERGE_FIELDS_WEBHOOK })}
                           </p>
                         </div>
                       )}
@@ -1421,7 +1403,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                         <div className="space-y-4">
                           {!isOwnedEntity(targetEntity) && (
                             <p className="rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive text-xs">
-                              This record type has no owner. Choose leads, contacts, companies or deals as the target.
+                              {t("assign.noOwner")}
                             </p>
                           )}
 
@@ -1444,11 +1426,9 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                   <div className="flex items-center justify-between gap-2">
                                     <div className="min-w-0">
                                       <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                                        Routes
+                                        {t("assign.routes")}
                                       </p>
-                                      <p className="text-[11px] text-muted-foreground">
-                                        Tried from the top; the first that matches the record decides who takes turns.
-                                      </p>
+                                      <p className="text-[11px] text-muted-foreground">{t("assign.routesHint")}</p>
                                     </div>
                                     <Button
                                       type="button"
@@ -1467,7 +1447,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                         ])
                                       }
                                     >
-                                      <Plus className="h-3 w-3" /> Add route
+                                      <Plus className="h-3 w-3" /> {t("assign.addRoute")}
                                     </Button>
                                   </div>
                                   {actionErrs?.routes?.message && (
@@ -1478,7 +1458,9 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                     return (
                                       <div key={route.id} className="space-y-3 rounded-lg border bg-background/60 p-3">
                                         <div className="flex items-center justify-between gap-2">
-                                          <span className="font-semibold text-xs">Route {i + 1}</span>
+                                          <span className="font-semibold text-xs">
+                                            {t("assign.route", { n: i + 1 })}
+                                          </span>
                                           <div className="flex gap-1">
                                             <Button
                                               type="button"
@@ -1487,7 +1469,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                               className="h-6 w-6"
                                               disabled={i === 0}
                                               onClick={() => move(i, -1)}
-                                              aria-label="Move route up"
+                                              aria-label={t("assign.moveUp")}
                                             >
                                               <ArrowUp className="h-3 w-3" />
                                             </Button>
@@ -1498,7 +1480,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                               className="h-6 w-6"
                                               disabled={i === routes.length - 1}
                                               onClick={() => move(i, 1)}
-                                              aria-label="Move route down"
+                                              aria-label={t("assign.moveDown")}
                                             >
                                               <ArrowDown className="h-3 w-3" />
                                             </Button>
@@ -1508,7 +1490,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                               size="icon"
                                               className="h-6 w-6 text-muted-foreground hover:text-destructive"
                                               onClick={() => f.onChange(routes.filter((_, j) => j !== i))}
-                                              aria-label="Remove route"
+                                              aria-label={t("assign.remove")}
                                             >
                                               <Trash2 className="h-3 w-3" />
                                             </Button>
@@ -1517,10 +1499,10 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                         {routeErr?.message && (
                                           <p className="text-destructive text-xs">{routeErr.message}</p>
                                         )}
-                                        <F label="In any of these territories">
+                                        <F label={t("assign.territories")}>
                                           {territoryList.length === 0 ? (
                                             <p className="text-[11px] text-muted-foreground">
-                                              No territories yet — define them in Settings → Territories.
+                                              {t("assign.noTerritories")}
                                             </p>
                                           ) : (
                                             <div className="flex flex-wrap gap-x-3 gap-y-1">
@@ -1549,15 +1531,15 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                             </div>
                                           )}
                                         </F>
-                                        <F label="With source (comma separated)">
+                                        <F label={t("assign.sources")}>
                                           <ListInput
                                             id={`route-${index}-${route.id}-sources`}
                                             value={route.sources}
                                             onChange={(sources) => put(i, { sources })}
-                                            placeholder="e.g. website, trade fair"
+                                            placeholder={t("assign.sourcesPlaceholder")}
                                           />
                                         </F>
-                                        <F label="Share out among, in this order" required>
+                                        <F label={t("assign.shareAmong")} required>
                                           <PeoplePicker
                                             users={userList}
                                             value={route.userIds}
@@ -1582,8 +1564,8 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                 label={
                                   // biome-ignore lint/suspicious/noExplicitAny: dynamic RHF path
                                   (watch(`actions.${index}.params.routes` as any) as unknown[] | undefined)?.length
-                                    ? "Everyone else, in turn (optional)"
-                                    : "Share out among, in this order"
+                                    ? t("assign.everyoneElse")
+                                    : t("assign.shareAmong")
                                 }
                                 error={actionErrs?.userIds?.message}
                               >
@@ -1603,15 +1585,12 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                             render={({ field: f }) => (
                               <div className="flex items-center gap-2 rounded border bg-background px-3 py-2">
                                 <Checkbox checked={f.value ?? false} onCheckedChange={f.onChange} />
-                                <span className="text-xs">Reassign records that already have an owner</span>
+                                <span className="text-xs">{t("assign.overwrite")}</span>
                               </div>
                             )}
                           />
                           <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
-                            💡 Each route keeps its own turn. People who have left the workspace are skipped, and a
-                            route whose people have all left passes the record on to the next. A record no route takes
-                            goes to "everyone else", or stays unassigned if nobody is ticked there. A record someone has
-                            already claimed stays with them unless reassigning is ticked.
+                            {t("assign.hint")}
                           </p>
                         </div>
                       )}
@@ -1621,10 +1600,10 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                         <div className="space-y-2">
                           {targetEntity !== "lead" && targetEntity !== "contact" ? (
                             <p className="rounded border border-destructive/40 bg-destructive/5 p-2 text-destructive text-xs">
-                              Sequences write to leads and contacts. Choose one of them as the target.
+                              {t("sequence.wrongEntity")}
                             </p>
                           ) : (
-                            <F label="Sequence" required error={actionErrs?.sequenceId?.message}>
+                            <F label={t("sequence.label")} required error={actionErrs?.sequenceId?.message}>
                               <Controller
                                 control={control}
                                 // biome-ignore lint/suspicious/noExplicitAny: dynamic RHF path
@@ -1632,13 +1611,11 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                 render={({ field: f }) => {
                                   const options = sequenceList.filter((x) => x.entity === targetEntity);
                                   return options.length === 0 ? (
-                                    <p className="text-muted-foreground text-xs">
-                                      No active sequence for this record type — create one in Marketing → Sequences.
-                                    </p>
+                                    <p className="text-muted-foreground text-xs">{t("sequence.none")}</p>
                                   ) : (
                                     <Select value={f.value ?? ""} onValueChange={f.onChange}>
                                       <SelectTrigger className="h-8 bg-background text-sm">
-                                        <SelectValue placeholder="Choose a sequence…" />
+                                        <SelectValue placeholder={t("sequence.placeholder")} />
                                       </SelectTrigger>
                                       <SelectContent>
                                         {options.map((x) => (
@@ -1654,8 +1631,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                             </F>
                           )}
                           <p className="rounded bg-muted/50 p-2 text-[11px] text-muted-foreground">
-                            💡 A record already in the sequence, without an email address, or unsubscribed is skipped
-                            rather than logged as a failure.
+                            {t("sequence.hint")}
                           </p>
                         </div>
                       )}
@@ -1664,7 +1640,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                       {actionType === "update_field" && (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
                           {/* Field selector — context-aware per entity */}
-                          <F label="Field" error={actionErrs?.field?.message}>
+                          <F label={t("update.field")} error={actionErrs?.field?.message}>
                             <Controller
                               control={control}
                               name={`actions.${index}.params.field` as any}
@@ -1683,7 +1659,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                   <SelectContent>
                                     {updFields.map((uf) => (
                                       <SelectItem key={uf.value} value={uf.value}>
-                                        {uf.label}
+                                        {fieldLabel(uf.labelKey ?? uf.value)}
                                       </SelectItem>
                                     ))}
                                   </SelectContent>
@@ -1693,7 +1669,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                           </F>
 
                           {/* Value — adapts to the selected field's kind */}
-                          <F label="New Value" required error={actionErrs?.value?.message}>
+                          <F label={t("update.newValue")} required error={actionErrs?.value?.message}>
                             {updFieldDef?.kind === "enum" && updFieldDef.options ? (
                               <Controller
                                 control={control}
@@ -1701,12 +1677,12 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                 render={({ field: f }) => (
                                   <Select value={f.value ?? ""} onValueChange={f.onChange}>
                                     <SelectTrigger className="h-8 bg-background text-sm">
-                                      <SelectValue placeholder="Select…" />
+                                      <SelectValue placeholder={t("update.selectPlaceholder")} />
                                     </SelectTrigger>
                                     <SelectContent>
                                       {updFieldDef.options?.map((opt) => (
                                         <SelectItem key={opt.value} value={opt.value}>
-                                          {opt.label}
+                                          {optionLabel(updFieldDef.value, opt)}
                                         </SelectItem>
                                       ))}
                                     </SelectContent>
@@ -1723,13 +1699,13 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                             ) : updFieldDef?.kind === "textarea" ? (
                               <Textarea
                                 rows={2}
-                                placeholder="Text…"
+                                placeholder={t("update.textPlaceholder")}
                                 className="resize-none bg-background text-sm"
                                 {...register(`actions.${index}.params.value` as any)}
                               />
                             ) : (
                               <Input
-                                placeholder="Value"
+                                placeholder={t("update.valuePlaceholder")}
                                 className="h-8 bg-background text-sm"
                                 {...register(`actions.${index}.params.value` as any)}
                               />
@@ -1753,7 +1729,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                     } as any)
                   }
                 >
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Action
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> {t("actions.add")}
                 </Button>
               </TabsContent>
             </Tabs>
@@ -1761,11 +1737,11 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
 
           <DialogFooter className="border-t bg-muted/30 px-4 md:px-6 py-4">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
-              Cancel
+              {tCommon("cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting} className="min-w-[120px]">
               {isSubmitting && <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />}
-              {isEditing ? "Save Changes" : "Create Rule"}
+              {isEditing ? t("saveChanges") : t("createRule")}
             </Button>
           </DialogFooter>
         </form>
