@@ -3,7 +3,13 @@ import { after } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { invoices } from "@/db/schema";
-import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
+import {
+  EntitlementError,
+  ForbiddenError,
+  requireCapability,
+  requirePlanModule,
+  UnauthenticatedError,
+} from "@/lib/auth-guard";
 import { type ArchiveKind, archiveInvoice, readInvoiceFile } from "@/lib/invoice-archive";
 import { getDb } from "@/lib/tenant-context";
 
@@ -14,8 +20,18 @@ import { getDb } from "@/lib/tenant-context";
  * archive written after issuing can have failed, and this is the next chance.
  */
 export async function invoiceFileResponse(id: string, kind: ArchiveKind): Promise<Response> {
-  await requireCapability("record:read");
-  await requirePlanModule("sales");
+  // ⚠️ The guards throw, and a route handler that lets them go answers 500: a
+  // signed-out download looked like a server fault instead of a 401.
+  try {
+    await requireCapability("record:read");
+    await requirePlanModule("sales");
+  } catch (err) {
+    if (err instanceof UnauthenticatedError) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (err instanceof ForbiddenError || err instanceof EntitlementError) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
+    throw err;
+  }
   const db = await getDb();
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
 
