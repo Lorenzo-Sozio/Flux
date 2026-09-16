@@ -1,17 +1,17 @@
 import Link from "next/link";
 
+import { Plus } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
-import { getInvoiceStartOptions, getInvoices, getStampDutySummary } from "@/actions/invoices";
+import { getInvoices, getStampDutySummary } from "@/actions/invoices";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getActor } from "@/lib/auth-guard";
 import { italianToday } from "@/lib/invoice-draft";
 import { requirePageCapability } from "@/lib/page-guard";
 import { can } from "@/lib/permissions";
-
-import { NewInvoiceDialog } from "./_components/new-invoice-dialog";
 
 export default async function InvoicesPage() {
   await requirePageCapability("record:read", "/dashboard/sales/invoices");
@@ -22,7 +22,6 @@ export default async function InvoicesPage() {
     getTranslations("invoices"),
     getActor(),
   ]);
-  const startOptions = can(actor, "invoice:write") ? await getInvoiceStartOptions() : null;
   const euro = (n: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(n);
   const money = (value: string, currency: string) =>
     new Intl.NumberFormat("it-IT", { style: "currency", currency }).format(Number(value));
@@ -34,7 +33,14 @@ export default async function InvoicesPage() {
           <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
           <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
-        {startOptions && <NewInvoiceDialog options={startOptions} />}
+        {can(actor, "invoice:write") && (
+          <Button asChild className="shrink-0 gap-2">
+            <Link href="/dashboard/sales/invoices/new">
+              <Plus className="h-4 w-4" />
+              {t("newInvoice")}
+            </Link>
+          </Button>
+        )}
       </div>
       <Card>
         <CardContent className="p-0">

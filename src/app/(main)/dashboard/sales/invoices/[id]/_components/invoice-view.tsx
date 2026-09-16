@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-import { CircleAlert, Plus, Trash2 } from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -32,28 +32,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { PAYMENT_METHODS } from "@/lib/invoice-draft";
-import { draftProblems, NATURE_CODES } from "@/lib/invoice-rules";
-import { assessStampDuty, STAMP_DUTY_AMOUNT, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
+import { draftProblems } from "@/lib/invoice-rules";
+import { assessStampDuty, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
+
+import { asDraftLines, type EditableLine, num } from "../../_components/invoice-lines";
+import { InvoiceLinesTable, InvoiceTotals } from "../../_components/invoice-parts";
 
 type Data = NonNullable<Awaited<ReturnType<typeof getInvoice>>>;
-
-interface Line {
-  key: string;
-  productId: string | null;
-  description: string;
-  quantity: string;
-  unitPrice: string;
-  discountPercent: string;
-  taxPercent: string;
-  nature: string;
-}
-
-const NO_NATURE = "none";
-const num = (v: string) => Number(v.replace(",", ".")) || 0;
 
 export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite: boolean; canIssue: boolean }) {
   const t = useTranslations("invoices");
@@ -71,11 +59,11 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
   const [stampNote, setStampNote] = useState(invoice.stampDutyNote ?? "");
   const [paymentMethod, setPaymentMethod] = useState(invoice.paymentMethod);
   const [notes, setNotes] = useState(invoice.notes ?? "");
-  const [lines, setLines] = useState<Line[]>(() => {
+  const [lines, setLines] = useState<EditableLine[]>(() => {
     // An issued invoice is read from what was frozen when it was issued.
     const source = isDraft
       ? data.items.map((i) => ({ ...i, quantity: Number(i.quantity), unitPrice: Number(i.unitPrice) }))
-      : ((invoice.linesSnapshot as Line[] | null) ?? []);
+      : ((invoice.linesSnapshot as EditableLine[] | null) ?? []);
     return source.map((l, i) => ({
       key: `l${i}`,
       productId: (l as { productId?: string | null }).productId ?? null,
@@ -95,18 +83,7 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
   const [refused, setRefused] = useState<IssueBlockers | null>(null);
   const blockers = refused ?? data.blockers;
 
-  const draftLines = useMemo(
-    () =>
-      lines.map((l) => ({
-        description: l.description,
-        quantity: num(l.quantity),
-        unitPrice: num(l.unitPrice),
-        discountPercent: num(l.discountPercent),
-        taxPercent: num(l.taxPercent),
-        nature: l.nature || null,
-      })),
-    [lines],
-  );
+  const draftLines = useMemo(() => asDraftLines(lines), [lines]);
   // A draft decides the stamp live from its lines; an issued invoice shows what was frozen.
   const stamp = assessStampDuty(draftLines, num(discount), stampMode);
   const stampApplied = isDraft ? stamp.applied : invoice.stampDuty;
@@ -132,10 +109,6 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
       setter(v);
       setDirty(true);
     };
-  const putLine = (i: number, patch: Partial<Line>) => {
-    setLines((all) => all.map((l, j) => (j === i ? { ...l, ...patch } : l)));
-    setDirty(true);
-  };
 
   const save = async (): Promise<number | null> => {
     const result = await saveInvoiceDraft(invoice.id, revision, {
@@ -146,15 +119,7 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
       stampDutyNote: stampNote,
       paymentMethod,
       notes,
-      lines: lines.map((l) => ({
-        productId: l.productId,
-        description: l.description,
-        quantity: num(l.quantity),
-        unitPrice: num(l.unitPrice),
-        discountPercent: num(l.discountPercent),
-        taxPercent: num(l.taxPercent),
-        nature: l.nature || null,
-      })),
+      lines: draftLines,
     });
     if (!result.ok) {
       toast.error(result.error);
@@ -297,136 +262,18 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
         <CardHeader className="pb-2">
           <CardTitle className="text-base">{t("lines")}</CardTitle>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-56">{t("description")}</TableHead>
-                <TableHead className="w-24 text-right">{t("quantity")}</TableHead>
-                <TableHead className="w-28 text-right">{t("unitPrice")}</TableHead>
-                <TableHead className="w-20 text-right">{t("discount")}</TableHead>
-                <TableHead className="w-20 text-right">{t("vat")}</TableHead>
-                <TableHead className="w-40">{t("nature")}</TableHead>
-                <TableHead className="w-28 text-right">{t("net")}</TableHead>
-                {editable && <TableHead className="w-10" />}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lines.map((l, i) => (
-                <TableRow key={l.key}>
-                  <TableCell>
-                    {editable ? (
-                      <Input
-                        aria-label={t("description")}
-                        value={l.description}
-                        onChange={(e) => putLine(i, { description: e.target.value })}
-                      />
-                    ) : (
-                      l.description
-                    )}
-                  </TableCell>
-                  {(["quantity", "unitPrice", "discountPercent", "taxPercent"] as const).map((f) => (
-                    <TableCell key={f} className="text-right tabular-nums">
-                      {editable ? (
-                        <Input
-                          aria-label={t(f === "discountPercent" ? "discount" : f === "taxPercent" ? "vat" : f)}
-                          inputMode="decimal"
-                          className="text-right"
-                          value={l[f]}
-                          onChange={(e) => putLine(i, { [f]: e.target.value })}
-                        />
-                      ) : (
-                        l[f]
-                      )}
-                    </TableCell>
-                  ))}
-                  <TableCell>
-                    {editable && num(l.taxPercent) === 0 ? (
-                      <Select
-                        value={l.nature || NO_NATURE}
-                        onValueChange={(v) => putLine(i, { nature: v === NO_NATURE ? "" : v })}
-                      >
-                        <SelectTrigger aria-label={t("nature")} className="h-9 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={NO_NATURE}>{t("chooseNature")}</SelectItem>
-                          {Object.entries(NATURE_CODES).map(([code, label]) => (
-                            <SelectItem key={code} value={code}>
-                              {code} — {label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className="font-mono text-xs">{l.nature || "—"}</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{money(totals.details[i]?.total ?? 0)}</TableCell>
-                  {editable && (
-                    <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        aria-label={t("removeLine")}
-                        onClick={() => {
-                          setLines((all) => all.filter((_, j) => j !== i));
-                          setDirty(true);
-                        }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-              {rechargeLine && (
-                <TableRow className="bg-muted/30 text-muted-foreground">
-                  <TableCell>
-                    {t("stampLine")}
-                    <span className="ml-2 text-[11px]">({t("stampLineAuto")})</span>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">1</TableCell>
-                  <TableCell className="text-right tabular-nums">{STAMP_DUTY_AMOUNT}</TableCell>
-                  <TableCell className="text-right tabular-nums">0</TableCell>
-                  <TableCell className="text-right tabular-nums">0</TableCell>
-                  <TableCell>
-                    <span className="font-mono text-xs">N1</span>
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">{money(STAMP_DUTY_AMOUNT)}</TableCell>
-                  {editable && <TableCell />}
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-          {editable && (
-            <div className="p-3">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1"
-                onClick={() => {
-                  setLines((all) => [
-                    ...all,
-                    {
-                      key: `n${Date.now()}`,
-                      productId: null,
-                      description: "",
-                      quantity: "1",
-                      unitPrice: "0",
-                      discountPercent: "0",
-                      taxPercent: "22",
-                      nature: "",
-                    },
-                  ]);
-                  setDirty(true);
-                }}
-              >
-                <Plus className="h-3.5 w-3.5" /> {t("addLine")}
-              </Button>
-            </div>
-          )}
+        <CardContent className="p-0">
+          <InvoiceLinesTable
+            lines={lines}
+            onChange={(next) => {
+              setLines(next);
+              setDirty(true);
+            }}
+            editable={editable}
+            totals={totals}
+            rechargeLine={Boolean(rechargeLine)}
+            money={money}
+          />
         </CardContent>
       </Card>
 
@@ -552,30 +399,8 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="space-y-2 p-4 text-sm tabular-nums">
-            <div className="flex justify-between">
-              <span>{t("subtotal")}</span>
-              <span>{money(totals.subtotal)}</span>
-            </div>
-            {totals.discountAmount > 0 && (
-              <div className="flex justify-between">
-                <span>{t("documentDiscount")}</span>
-                <span>−{money(totals.discountAmount)}</span>
-              </div>
-            )}
-            {totals.summary.map((r) => (
-              <div key={`${r.rate}-${r.nature ?? ""}`} className="flex justify-between text-muted-foreground">
-                <span>
-                  {t("vat")} {r.rate}% {r.nature ? `(${r.nature}) ` : ""}
-                  {t("on")} {money(r.taxable)}
-                </span>
-                <span>{money(r.tax)}</span>
-              </div>
-            ))}
-            <div className="flex justify-between border-t pt-2 font-semibold">
-              <span>{t("total")}</span>
-              <span>{money(totals.total)}</span>
-            </div>
+          <CardContent className="p-4">
+            <InvoiceTotals totals={totals} money={money} />
           </CardContent>
         </Card>
       </div>

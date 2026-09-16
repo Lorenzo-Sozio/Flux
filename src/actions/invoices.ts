@@ -173,24 +173,94 @@ export async function getInvoice(id: string) {
 
 // ─── Drafts ───────────────────────────────────────────────────────────────────
 
-/** A draft from an order; an existing draft for that order is returned rather than duplicated. */
-export async function createInvoiceFromOrder(
-  orderId: string,
-): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const actor = await requireCapability("invoice:write");
+/**
+ * Everything the new-invoice page needs, in one round trip: the customers with the
+ * fiscal fields an invoice checks, the orders still to invoice, and the issuer's gaps.
+ *
+ * ⚠️ An order counts as invoiced once an invoice for it is issued. One with only a
+ * draft stays in the list and carries that draft's id, so the page can offer to open
+ * it rather than start a second one.
+ */
+export async function getNewInvoiceData() {
+  await requireCapability("invoice:write");
   await requirePlanModule("sales");
   const db = await getDb();
+  const [open, companyRows, productRows, [issuer]] = await Promise.all([
+    db
+      .select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        total: orders.totalAmount,
+        currency: orders.currency,
+        companyId: orders.companyId,
+        companyName: companies.name,
+        createdAt: orders.createdAt,
+        draftId: sql<
+          string | null
+        >`(SELECT i.id FROM invoice i WHERE i.order_id = ${orders.id} AND i.document_type = 'TD01' AND i.status = 'draft' LIMIT 1)`,
+      })
+      .from(orders)
+      .leftJoin(companies, eq(companies.id, orders.companyId))
+      .where(
+        and(
+          sql`${orders.status} <> 'cancelled'`,
+          sql`${orders.companyId} IS NOT NULL`,
+          sql`NOT EXISTS (SELECT 1 FROM invoice i WHERE i.order_id = ${orders.id} AND i.document_type = 'TD01' AND i.status = 'issued')`,
+        ),
+      )
+      .orderBy(desc(orders.createdAt))
+      .limit(300),
+    db
+      .select({
+        id: companies.id,
+        name: companies.name,
+        vatNumber: companies.vatNumber,
+        fiscalCode: companies.fiscalCode,
+        sdiCode: companies.sdiCode,
+        pec: companies.pec,
+        street: companies.street,
+        zipCode: companies.zipCode,
+        city: companies.city,
+        province: companies.state,
+        country: companies.country,
+      })
+      .from(companies)
+      .orderBy(asc(companies.name))
+      .limit(2000),
+    db
+      .select({
+        id: products.id,
+        name: products.name,
+        sku: products.sku,
+        price: products.price,
+        taxPercent: products.taxPercent,
+      })
+      .from(products)
+      .where(eq(products.isActive, true))
+      .orderBy(asc(products.name))
+      .limit(2000),
+    tolerateUnmigrated(
+      "invoice_issuer",
+      () => db.select().from(invoiceIssuers).where(eq(invoiceIssuers.id, "workspace")),
+      [],
+    ),
+  ]);
+  return {
+    orders: open.map((o) => ({ ...o, createdAt: o.createdAt.toISOString().slice(0, 10) })),
+    companies: companyRows,
+    products: productRows.map((p) => ({ ...p, price: Number(p.price), taxPercent: Number(p.taxPercent ?? 0) })),
+    issuerGaps: issuerGaps(issuer ?? {}),
+    rechargeStamp: Boolean(issuer?.rechargeStampDuty),
+  };
+}
 
+/** An order's lines and terms, as the new-invoice page fills them in. */
+export async function getOrderForInvoice(orderId: string) {
+  await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
   const [order] = await db.select().from(orders).where(eq(orders.id, orderId));
-  if (!order) return { ok: false, error: "This order no longer exists." };
-  if (!order.companyId) return { ok: false, error: "An invoice needs the order to have a company." };
-
-  const [existing] = await db
-    .select({ id: invoices.id })
-    .from(invoices)
-    .where(and(eq(invoices.orderId, orderId), eq(invoices.status, "draft"), eq(invoices.documentType, "TD01")));
-  if (existing) return { ok: true, id: existing.id };
-
+  if (!order) return null;
   const items = await db
     .select({
       productId: orderItems.productId,
@@ -204,112 +274,70 @@ export async function createInvoiceFromOrder(
     .from(orderItems)
     .leftJoin(products, eq(products.id, orderItems.productId))
     .where(eq(orderItems.orderId, orderId));
-  if (items.length === 0) return { ok: false, error: "This order has no lines to invoice." };
+  return {
+    companyId: order.companyId,
+    currency: order.currency,
+    discountPercent: Number(order.discountPercent ?? 0),
+    lines: linesFromOrder(items),
+  };
+}
 
-  const lines = linesFromOrder(items);
-  const discountPercent = Number(order.discountPercent ?? 0);
-  const final = finalLines(lines, discountPercent, "auto", await issuerRecharges(db));
-  const totals = totalsOf(final.lines, discountPercent);
+/**
+ * A new invoice, written whole: customer, lines and terms in one call, saved as a draft.
+ *
+ * The page then issues it with the revision returned here, so "Issue" is one click
+ * for the person and still goes through the one statement that assigns numbers.
+ */
+export async function createInvoice(
+  input: DraftInput & { companyId: string; orderId?: string | null; currency?: string },
+): Promise<{ ok: true; id: string; revision: number } | { ok: false; error: string; existingId?: string }> {
+  const actor = await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const cleaned = cleanDraft(input);
+  if (!cleaned.ok) return cleaned;
+  const { lines, ...header } = cleaned.value;
+  const db = await getDb();
+
+  const [company] = await db.select({ id: companies.id }).from(companies).where(eq(companies.id, input.companyId));
+  if (!company) return { ok: false, error: "Choose the customer to invoice." };
+
+  const orderId = input.orderId || null;
+  if (orderId) {
+    const [draft] = await db
+      .select({ id: invoices.id })
+      .from(invoices)
+      .where(and(eq(invoices.orderId, orderId), eq(invoices.status, "draft"), eq(invoices.documentType, "TD01")));
+    if (draft) return { ok: false, error: "This order already has a draft invoice.", existingId: draft.id };
+  }
+
+  const final = finalLines(lines, header.discountPercent, header.stampDutyMode, await issuerRecharges(db));
+  const totals = totalsOf(final.lines, header.discountPercent);
   const [row] = await db
     .insert(invoices)
     .values({
       documentType: "TD01",
       orderId,
-      companyId: order.companyId,
-      currency: order.currency,
-      discountPercent: String(discountPercent),
-      dueDate: addDays(italianToday(), 30),
+      companyId: company.id,
+      currency: input.currency || "EUR",
+      series: header.series,
+      dueDate: header.dueDate,
+      discountPercent: String(header.discountPercent),
+      stampDuty: final.stamp.applied,
+      stampDutyMode: header.stampDutyMode,
+      stampDutyNote: header.stampDutyNote,
+      paymentMethod: header.paymentMethod,
+      notes: header.notes,
       subtotal: String(totals.subtotal),
       discountAmount: String(totals.discountAmount),
       taxableAmount: String(totals.taxableAmount),
       taxAmount: String(totals.taxAmount),
       total: String(totals.total),
-      stampDuty: final.stamp.applied,
       createdBy: actor.userId,
     })
-    .returning({ id: invoices.id });
+    .returning({ id: invoices.id, revision: invoices.revision });
   await writeLines(db, row.id, lines);
   revalidatePath(LIST);
-  return { ok: true, id: row.id };
-}
-
-/**
- * What a new invoice can start from: the orders not yet invoiced, and every company
- * for an invoice written line by line.
- *
- * ⚠️ An order counts as invoiced once an invoice for it is issued. One with only a
- * draft stays in the list, and picking it opens that draft instead of a second one.
- */
-export async function getInvoiceStartOptions() {
-  await requireCapability("invoice:write");
-  await requirePlanModule("sales");
-  const db = await getDb();
-  const [open, companyRows, [issuer]] = await Promise.all([
-    db
-      .select({
-        id: orders.id,
-        orderNumber: orders.orderNumber,
-        total: orders.totalAmount,
-        currency: orders.currency,
-        status: orders.status,
-        companyId: orders.companyId,
-        companyName: companies.name,
-        createdAt: orders.createdAt,
-      })
-      .from(orders)
-      .leftJoin(companies, eq(companies.id, orders.companyId))
-      .where(
-        and(
-          sql`${orders.status} <> 'cancelled'`,
-          sql`${orders.companyId} IS NOT NULL`,
-          sql`NOT EXISTS (SELECT 1 FROM invoice i WHERE i.order_id = ${orders.id} AND i.document_type = 'TD01' AND i.status = 'issued')`,
-        ),
-      )
-      .orderBy(desc(orders.createdAt))
-      .limit(300),
-    db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(asc(companies.name)).limit(2000),
-    tolerateUnmigrated(
-      "invoice_issuer",
-      () => db.select().from(invoiceIssuers).where(eq(invoiceIssuers.id, "workspace")),
-      [],
-    ),
-  ]);
-  return {
-    orders: open.map((o) => ({ ...o, createdAt: o.createdAt.toISOString().slice(0, 10) })),
-    companies: companyRows,
-    issuerReady: issuerGaps(issuer ?? {}).length === 0,
-  };
-}
-
-/** A draft with no order behind it: one empty line for the company, filled in on the draft page. */
-export async function createBlankInvoice(
-  companyId: string,
-): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const actor = await requireCapability("invoice:write");
-  await requirePlanModule("sales");
-  const db = await getDb();
-  const [company] = await db.select({ id: companies.id }).from(companies).where(eq(companies.id, companyId));
-  if (!company) return { ok: false, error: "Choose the company to invoice." };
-
-  const [row] = await db
-    .insert(invoices)
-    .values({
-      documentType: "TD01",
-      companyId,
-      currency: "EUR",
-      discountPercent: "0",
-      dueDate: addDays(italianToday(), 30),
-      subtotal: "0",
-      discountAmount: "0",
-      taxableAmount: "0",
-      taxAmount: "0",
-      total: "0",
-      createdBy: actor.userId,
-    })
-    .returning({ id: invoices.id });
-  await writeLines(db, row.id, [{ description: "", quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 22 }]);
-  revalidatePath(LIST);
-  return { ok: true, id: row.id };
+  return { ok: true, id: row.id, revision: row.revision };
 }
 
 /**

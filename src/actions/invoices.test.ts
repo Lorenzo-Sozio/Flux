@@ -20,7 +20,9 @@ function body(name: string): string {
 
 describe("who may do what", () => {
   for (const [name, capability] of [
-    ["createInvoiceFromOrder", "invoice:write"],
+    ["createInvoice", "invoice:write"],
+    ["getNewInvoiceData", "invoice:write"],
+    ["getOrderForInvoice", "invoice:write"],
     ["saveInvoiceDraft", "invoice:write"],
     ["deleteInvoiceDraft", "invoice:write"],
     ["issueInvoiceAction", "invoice:issue"],
