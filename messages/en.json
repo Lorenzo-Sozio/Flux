@@ -3807,7 +3807,7 @@
   "invoices": {
     "title": "Invoices",
     "subtitle": "Invoices and credit notes. A draft has no number: it gets one when issued, in order and without gaps.",
-    "empty": "No invoices yet. Create one from an order's page.",
+    "empty": "No invoices yet. Create one from an order, or write it line by line with “New invoice”.",
     "number": "Number",
     "date": "Date",
     "customer": "Customer",
@@ -3900,6 +3900,22 @@
     "f24Code": "F24 tax code",
     "payBy": "Pay by",
     "deferred": "deferred",
-    "downloadXml": "Download XML"
+    "downloadXml": "Download XML",
+    "newInvoice": "New invoice",
+    "newTitle": "New invoice",
+    "newSubtitle": "Start from an order already recorded, or write the lines by hand.",
+    "fromOrder": "From an order",
+    "blank": "Blank invoice",
+    "chooseOrder": "Choose the order…",
+    "searchOrder": "Search by number or customer…",
+    "noOrders": "No orders to invoice.",
+    "fromOrderHint": "Lines, discount and customer are copied from the order. If that order already has a draft, that draft opens.",
+    "chooseCompany": "Choose the company…",
+    "searchCompany": "Search a company…",
+    "noCompanies": "No companies.",
+    "blankHint": "A draft opens with one empty line: description, quantity, price and VAT are filled in on the invoice page.",
+    "createDraft": "Create draft",
+    "issuerMissing": "Before issuing, the issuer details (VAT number, tax regime, address) must be filled in. The draft can be prepared anyway.",
+    "issuerSettings": "Open Settings › Invoicing"
   }
 }

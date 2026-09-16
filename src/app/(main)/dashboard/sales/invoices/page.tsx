@@ -2,26 +2,39 @@ import Link from "next/link";
 
 import { getTranslations } from "next-intl/server";
 
-import { getInvoices, getStampDutySummary } from "@/actions/invoices";
+import { getInvoiceStartOptions, getInvoices, getStampDutySummary } from "@/actions/invoices";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getActor } from "@/lib/auth-guard";
 import { italianToday } from "@/lib/invoice-draft";
 import { requirePageCapability } from "@/lib/page-guard";
+import { can } from "@/lib/permissions";
+
+import { NewInvoiceDialog } from "./_components/new-invoice-dialog";
 
 export default async function InvoicesPage() {
   await requirePageCapability("record:read", "/dashboard/sales/invoices");
   const year = Number(italianToday().slice(0, 4));
-  const [rows, stamps, t] = await Promise.all([getInvoices(), getStampDutySummary(year), getTranslations("invoices")]);
+  const [rows, stamps, t, actor] = await Promise.all([
+    getInvoices(),
+    getStampDutySummary(year),
+    getTranslations("invoices"),
+    getActor(),
+  ]);
+  const startOptions = can(actor, "invoice:write") ? await getInvoiceStartOptions() : null;
   const euro = (n: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(n);
   const money = (value: string, currency: string) =>
     new Intl.NumberFormat("it-IT", { style: "currency", currency }).format(Number(value));
 
   return (
     <div className="space-y-6">
-      <div className="min-w-0">
-        <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
-        <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
+          <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
+        </div>
+        {startOptions && <NewInvoiceDialog options={startOptions} />}
       </div>
       <Card>
         <CardContent className="p-0">

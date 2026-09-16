@@ -234,6 +234,85 @@ export async function createInvoiceFromOrder(
 }
 
 /**
+ * What a new invoice can start from: the orders not yet invoiced, and every company
+ * for an invoice written line by line.
+ *
+ * ⚠️ An order counts as invoiced once an invoice for it is issued. One with only a
+ * draft stays in the list, and picking it opens that draft instead of a second one.
+ */
+export async function getInvoiceStartOptions() {
+  await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  const [open, companyRows, [issuer]] = await Promise.all([
+    db
+      .select({
+        id: orders.id,
+        orderNumber: orders.orderNumber,
+        total: orders.totalAmount,
+        currency: orders.currency,
+        status: orders.status,
+        companyId: orders.companyId,
+        companyName: companies.name,
+        createdAt: orders.createdAt,
+      })
+      .from(orders)
+      .leftJoin(companies, eq(companies.id, orders.companyId))
+      .where(
+        and(
+          sql`${orders.status} <> 'cancelled'`,
+          sql`${orders.companyId} IS NOT NULL`,
+          sql`NOT EXISTS (SELECT 1 FROM invoice i WHERE i.order_id = ${orders.id} AND i.document_type = 'TD01' AND i.status = 'issued')`,
+        ),
+      )
+      .orderBy(desc(orders.createdAt))
+      .limit(300),
+    db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(asc(companies.name)).limit(2000),
+    tolerateUnmigrated(
+      "invoice_issuer",
+      () => db.select().from(invoiceIssuers).where(eq(invoiceIssuers.id, "workspace")),
+      [],
+    ),
+  ]);
+  return {
+    orders: open.map((o) => ({ ...o, createdAt: o.createdAt.toISOString().slice(0, 10) })),
+    companies: companyRows,
+    issuerReady: issuerGaps(issuer ?? {}).length === 0,
+  };
+}
+
+/** A draft with no order behind it: one empty line for the company, filled in on the draft page. */
+export async function createBlankInvoice(
+  companyId: string,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const actor = await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  const [company] = await db.select({ id: companies.id }).from(companies).where(eq(companies.id, companyId));
+  if (!company) return { ok: false, error: "Choose the company to invoice." };
+
+  const [row] = await db
+    .insert(invoices)
+    .values({
+      documentType: "TD01",
+      companyId,
+      currency: "EUR",
+      discountPercent: "0",
+      dueDate: addDays(italianToday(), 30),
+      subtotal: "0",
+      discountAmount: "0",
+      taxableAmount: "0",
+      taxAmount: "0",
+      total: "0",
+      createdBy: actor.userId,
+    })
+    .returning({ id: invoices.id });
+  await writeLines(db, row.id, [{ description: "", quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 22 }]);
+  revalidatePath(LIST);
+  return { ok: true, id: row.id };
+}
+
+/**
  * Saves a draft at the revision the editor loaded.
  *
  * ⚠️ The revision is bumped first and conditionally: an edit that arrives after the

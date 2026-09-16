@@ -3807,7 +3807,7 @@
   "invoices": {
     "title": "Fatture",
     "subtitle": "Fatture e note di credito. Una bozza non ha numero: lo riceve all'emissione, in ordine e senza buchi.",
-    "empty": "Nessuna fattura. Si crea dalla pagina di un ordine.",
+    "empty": "Nessuna fattura ancora. Creane una da un ordine o scrivila riga per riga con «Nuova fattura».",
     "number": "Numero",
     "date": "Data",
     "customer": "Cliente",
@@ -3900,6 +3900,22 @@
     "f24Code": "Codice tributo F24",
     "payBy": "Da versare entro",
     "deferred": "rinviato",
-    "downloadXml": "Scarica XML"
+    "downloadXml": "Scarica XML",
+    "newInvoice": "Nuova fattura",
+    "newTitle": "Nuova fattura",
+    "newSubtitle": "Parti da un ordine già registrato, oppure scrivi le righe a mano.",
+    "fromOrder": "Da un ordine",
+    "blank": "Fattura libera",
+    "chooseOrder": "Scegli l'ordine…",
+    "searchOrder": "Cerca per numero o cliente…",
+    "noOrders": "Nessun ordine da fatturare.",
+    "fromOrderHint": "Righe, sconto e cliente vengono copiati dall'ordine. Se esiste già una bozza per quell'ordine, si apre quella.",
+    "chooseCompany": "Scegli l'azienda…",
+    "searchCompany": "Cerca un'azienda…",
+    "noCompanies": "Nessuna azienda.",
+    "blankHint": "Si apre una bozza con una riga vuota: descrizione, quantità, prezzo e IVA li scrivi nella pagina della fattura.",
+    "createDraft": "Crea bozza",
+    "issuerMissing": "Prima di emettere serve compilare i dati di chi fattura (partita IVA, regime, sede). La bozza si può preparare comunque.",
+    "issuerSettings": "Apri Impostazioni › Fatturazione"
   }
 }
