@@ -27,6 +27,7 @@ type Order = {
   orderNumber: string;
   status: string;
   totalAmount: string;
+  currency: string;
   orderDate: Date;
   createdAt: Date;
   companyId: string | null;
@@ -45,7 +46,7 @@ type Stats = {
   processing: number;
   completed: number;
   cancelled: number;
-  revenue: number;
+  revenue: { currency: string; amount: number }[];
 };
 
 // ── Status CSS classes (no labels — translated in render) ─────────────────────
@@ -83,7 +84,7 @@ export function OrdersClient({
   const t = useTranslations("orders");
   const te = useTranslations("emptyStates");
   const tc = useTranslations("common");
-  const { formatAmount } = useCurrency();
+  const { formatMoney } = useCurrency();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -148,7 +149,10 @@ export function OrdersClient({
     },
     {
       labelKey: "stats.revenue",
-      value: formatAmount(stats.revenue ?? 0),
+      // Grouped by currency: adding euro and dollar totals gives a number true in neither.
+      value: stats.revenue.length
+        ? stats.revenue.map((r) => formatMoney(r.amount, r.currency, { noDecimals: true })).join(" · ")
+        : formatMoney(0, "EUR", { noDecimals: true }),
       filter: null,
       icon: TrendingUp,
       color: "text-violet-500",
@@ -263,7 +267,9 @@ export function OrdersClient({
                 title: <span className="font-mono">{order.orderNumber}</span>,
                 subtitle: customerOf(order),
                 badge: (
-                  <span className="font-semibold text-sm tabular-nums">{formatAmount(Number(order.totalAmount))}</span>
+                  <span className="font-semibold text-sm tabular-nums">
+                    {formatMoney(order.totalAmount, order.currency)}
+                  </span>
                 ),
                 fields: [
                   { label: t("columns.date"), value: formatDate(order.orderDate) },
@@ -361,7 +367,9 @@ export function OrdersClient({
                           </Select>
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <span className="font-semibold tabular-nums">{formatAmount(Number(order.totalAmount))}</span>
+                          <span className="font-semibold tabular-nums">
+                            {formatMoney(order.totalAmount, order.currency)}
+                          </span>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100">

@@ -16,6 +16,7 @@ import { ContractFormSchema, type ContractFormValues } from "@/actions/contracts
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -56,7 +57,7 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
   const t = useTranslations("contracts");
   const tf = useTranslations("contracts.form");
   const router = useRouter();
-  const { formatAmount } = useCurrency();
+  const { formatMoney } = useCurrency();
   const [saving, setSaving] = useState(false);
 
   const form = useForm<ContractFormValues>({
@@ -175,7 +176,9 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
           <div className="flex items-center gap-2">
             <div className="mr-2 hidden items-baseline gap-2 sm:flex">
               <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("monthly")}</span>
-              <span className="font-bold text-base tabular-nums">{formatAmount(preview.monthly)}</span>
+              <span className="font-bold text-base tabular-nums">
+                {formatMoney(preview.monthly, values.currency || "EUR")}
+              </span>
             </div>
             <Button type="button" variant="ghost" onClick={() => router.push("/dashboard/sales/contracts")}>
               {t("cancel")}
@@ -329,7 +332,7 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
                     <FormItem>
                       {label("currency")}
                       <FormControl>
-                        <Input {...field} maxLength={3} className="h-9 uppercase" />
+                        <CurrencySelect value={field.value ?? "EUR"} onChange={field.onChange} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -363,11 +366,13 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
               <div className="rounded-md bg-muted/50 p-3 text-sm">
                 <div className="flex items-baseline justify-between">
                   <span className="text-muted-foreground text-xs uppercase tracking-wide">{tf("perMonth")}</span>
-                  <span className="font-semibold tabular-nums">{formatAmount(preview.monthly)}</span>
+                  <span className="font-semibold tabular-nums">
+                    {formatMoney(preview.monthly, values.currency || "EUR")}
+                  </span>
                 </div>
                 <div className="mt-1 flex items-baseline justify-between">
                   <span className="text-muted-foreground text-xs uppercase tracking-wide">{tf("perYear")}</span>
-                  <span className="tabular-nums">{formatAmount(preview.monthly * 12)}</span>
+                  <span className="tabular-nums">{formatMoney(preview.monthly * 12, values.currency || "EUR")}</span>
                 </div>
               </div>
             </CardContent>

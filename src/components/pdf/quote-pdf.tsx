@@ -1,6 +1,16 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 
 import type { getQuoteById } from "@/actions/quotes";
+import {
+  DOCUMENT_LOCALE,
+  type DocumentLanguage,
+  formatDocumentDate,
+  formatDocumentMoney,
+  formatDocumentPercent,
+  QUOTE_TEXT,
+  quoteStatusText,
+} from "@/lib/document-language";
+import type { SellerIdentity } from "@/lib/seller-identity";
 
 type Quote = Awaited<ReturnType<typeof getQuoteById>>;
 
@@ -125,94 +135,101 @@ const BADGE_COLORS: Record<string, { bg: string; color: string }> = {
   converted: { bg: "#f0fdfa", color: "#0f766e" },
 };
 
-function money(value: string | null | undefined, currency: string) {
-  return `${currency} ${parseFloat(value ?? "0").toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function fmtDate(d: Date | string | null | undefined) {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
-}
-
 interface Props {
   quote: Quote;
-  sellerName?: string;
-  sellerEmail?: string;
+  seller: SellerIdentity;
+  /** The customer's language: see src/lib/document-language.ts. */
+  lang: DocumentLanguage;
 }
 
-export function QuotePDF({ quote, sellerName = "Flux CRM", sellerEmail }: Props) {
+/**
+ * The quote as the customer receives it.
+ *
+ * ⚠️ It was written entirely in English, whoever the customer, with amounts as
+ * "EUR 1,234.56" in the server's own locale and "Flux CRM" as the seller. The
+ * texts, the numbers and the dates now follow the customer's language, and the
+ * seller is the company making the offer.
+ */
+export function QuotePDF({ quote, seller, lang }: Props) {
+  const tx = QUOTE_TEXT[lang];
+  const money = (v: string | number | null | undefined) => formatDocumentMoney(v, quote.currency, lang);
+  const date = (v: Date | string | null | undefined) => formatDocumentDate(v, lang);
+  const pct = (v: string | number | null | undefined) => formatDocumentPercent(v, lang);
+
   const badge = BADGE_COLORS[quote.status] ?? BADGE_COLORS.draft;
   const contactName = quote.contact ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim() : null;
 
-  const subtotal = parseFloat(quote.subtotal ?? "0");
   const discountAmt = parseFloat(quote.discountAmount ?? "0");
   const taxAmt = parseFloat(quote.taxAmount ?? "0");
-  const total = parseFloat(quote.totalAmount ?? "0");
-
-  const today = fmtDate(new Date());
+  const company = quote.company;
+  const cityLine = company ? [company.zipCode, company.city, company.state].filter(Boolean).join(" ") : "";
 
   return (
-    <Document title={quote.quoteNumber} author={sellerName} subject="Quote & Proposal">
+    <Document
+      title={`${tx.documentTitle} ${quote.quoteNumber}`}
+      author={seller.name}
+      subject={tx.subtitle}
+      language={lang}
+    >
       <Page size="A4" style={s.page}>
         {/* ── Header ── */}
         <View style={s.header}>
-          <View>
-            <Text style={s.brandName}>{sellerName}</Text>
-            <Text style={s.brandSub}>Quote & Proposal</Text>
-            {sellerEmail && <Text style={[s.brandSub, { marginTop: 1 }]}>{sellerEmail}</Text>}
+          <View style={{ maxWidth: 300 }}>
+            <Text style={s.brandName}>{seller.name}</Text>
+            {seller.address && <Text style={s.brandSub}>{seller.address}</Text>}
+            {seller.vatNumber && (
+              <Text style={s.brandSub}>
+                {tx.vat} {seller.vatNumber}
+              </Text>
+            )}
+            {(seller.email || seller.phone) && (
+              <Text style={s.brandSub}>{[seller.email, seller.phone].filter(Boolean).join(" · ")}</Text>
+            )}
           </View>
           <View style={{ alignItems: "flex-end" }}>
+            <Text style={s.brandSub}>{tx.documentTitle.toUpperCase()}</Text>
             <Text style={s.quoteNum}>{quote.quoteNumber}</Text>
             <View style={[s.badge, { backgroundColor: badge.bg }]}>
-              <Text style={{ color: badge.color }}>{quote.status.toUpperCase()}</Text>
+              <Text style={{ color: badge.color }}>{quoteStatusText(quote.status, lang)}</Text>
             </View>
           </View>
         </View>
 
-        {/* ── Bill To / Quote Details ── */}
+        {/* ── Customer / details ── */}
         <View style={s.infoRow}>
-          {/* Bill To */}
           <View style={s.infoBlock}>
-            <Text style={s.sectionLabel}>Bill To</Text>
-            {quote.company && <Text style={s.infoLineBold}>{quote.company.name}</Text>}
-            {contactName && <Text style={s.infoLine}>{contactName}</Text>}
-            {quote.company?.mainEmail && <Text style={s.infoLine}>{quote.company.mainEmail}</Text>}
-            {quote.company?.mainPhone && <Text style={s.infoLine}>{quote.company.mainPhone}</Text>}
-            {quote.company?.street && <Text style={s.infoLine}>{quote.company.street}</Text>}
-            {(quote.company?.city || quote.company?.zipCode) && (
-              <Text style={s.infoLine}>{[quote.company.city, quote.company.zipCode].filter(Boolean).join(", ")}</Text>
+            <Text style={s.sectionLabel}>{tx.billTo}</Text>
+            {company && <Text style={s.infoLineBold}>{company.name}</Text>}
+            {contactName && (
+              <Text style={s.infoLine}>
+                {tx.contactPerson}: {contactName}
+              </Text>
             )}
-            {quote.company?.country && <Text style={s.infoLine}>{quote.company.country}</Text>}
-            {quote.company?.vatNumber && (
-              <Text style={[s.infoLine, { marginTop: 4, color: MUTED }]}>VAT: {quote.company.vatNumber}</Text>
+            {company?.street && <Text style={s.infoLine}>{company.street}</Text>}
+            {cityLine && <Text style={s.infoLine}>{cityLine}</Text>}
+            {company?.country && <Text style={s.infoLine}>{company.country}</Text>}
+            {company?.vatNumber && (
+              <Text style={[s.infoLine, { marginTop: 4, color: MUTED }]}>
+                {tx.vat} {company.vatNumber}
+              </Text>
             )}
           </View>
 
-          {/* Quote Details */}
           <View style={s.infoBlockRight}>
-            <Text style={s.sectionLabel}>Details</Text>
+            <Text style={s.sectionLabel}>{tx.details}</Text>
             <Text style={s.infoLine}>
-              <Text style={{ color: MUTED }}>Issued: </Text>
-              <Text style={{ fontFamily: "Helvetica-Bold" }}>{fmtDate(quote.issuedAt)}</Text>
+              <Text style={{ color: MUTED }}>{tx.issued} </Text>
+              <Text style={{ fontFamily: "Helvetica-Bold" }}>{date(quote.issuedAt)}</Text>
             </Text>
             {quote.expiresAt && (
               <Text style={s.infoLine}>
-                <Text style={{ color: MUTED }}>Expires: </Text>
-                <Text style={{ fontFamily: "Helvetica-Bold" }}>{fmtDate(quote.expiresAt)}</Text>
-              </Text>
-            )}
-            {quote.deal && (
-              <Text style={s.infoLine}>
-                <Text style={{ color: MUTED }}>Deal: </Text>
-                {quote.deal.name}
+                <Text style={{ color: MUTED }}>{tx.expires} </Text>
+                <Text style={{ fontFamily: "Helvetica-Bold" }}>{date(quote.expiresAt)}</Text>
               </Text>
             )}
             {quote.owner?.name && (
               <Text style={s.infoLine}>
-                <Text style={{ color: MUTED }}>Owner: </Text>
+                <Text style={{ color: MUTED }}>{tx.reference}: </Text>
                 {quote.owner.name}
               </Text>
             )}
@@ -221,30 +238,30 @@ export function QuotePDF({ quote, sellerName = "Flux CRM", sellerEmail }: Props)
 
         <View style={s.divider} />
 
-        {/* ── Items Table ── */}
-        <View style={s.tableHeader}>
+        {/* ── Lines ── */}
+        <View style={s.tableHeader} fixed>
           <View style={s.colDesc}>
-            <Text style={s.thText}>Description</Text>
+            <Text style={s.thText}>{tx.description}</Text>
           </View>
           <View style={s.colNum}>
-            <Text style={[s.thText, { textAlign: "right" }]}>Qty</Text>
+            <Text style={[s.thText, { textAlign: "right" }]}>{tx.quantity}</Text>
           </View>
           <View style={s.colNum2}>
-            <Text style={[s.thText, { textAlign: "right" }]}>Unit Price</Text>
+            <Text style={[s.thText, { textAlign: "right" }]}>{tx.unitPrice}</Text>
           </View>
           <View style={s.colNum}>
-            <Text style={[s.thText, { textAlign: "right" }]}>Disc.</Text>
+            <Text style={[s.thText, { textAlign: "right" }]}>{tx.discount}</Text>
           </View>
           <View style={s.colNum}>
-            <Text style={[s.thText, { textAlign: "right" }]}>Tax</Text>
+            <Text style={[s.thText, { textAlign: "right" }]}>{tx.tax}</Text>
           </View>
           <View style={s.colNum2}>
-            <Text style={[s.thText, { textAlign: "right" }]}>Total</Text>
+            <Text style={[s.thText, { textAlign: "right" }]}>{tx.lineTotal}</Text>
           </View>
         </View>
 
         {quote.items.map((item, i) => (
-          <View key={item.id} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]}>
+          <View key={item.id} style={[s.tableRow, i % 2 === 1 ? s.tableRowAlt : {}]} wrap={false}>
             <View style={s.colDesc}>
               <Text style={s.tdDesc}>{item.description}</Text>
               {item.product && item.product.name !== item.description && (
@@ -252,49 +269,56 @@ export function QuotePDF({ quote, sellerName = "Flux CRM", sellerEmail }: Props)
               )}
             </View>
             <View style={s.colNum}>
-              <Text style={[s.tdNum, { textAlign: "right" }]}>{item.quantity}</Text>
+              <Text style={[s.tdNum, { textAlign: "right" }]}>
+                {new Intl.NumberFormat(DOCUMENT_LOCALE[lang], { maximumFractionDigits: 3 }).format(item.quantity)}
+              </Text>
             </View>
             <View style={s.colNum2}>
-              <Text style={[s.tdNum, { textAlign: "right" }]}>{money(item.unitPrice, quote.currency)}</Text>
+              <Text style={[s.tdNum, { textAlign: "right" }]}>{money(item.unitPrice)}</Text>
             </View>
             <View style={s.colNum}>
               <Text style={[s.tdNum, { textAlign: "right" }]}>
-                {parseFloat(item.discountPercent ?? "0") > 0 ? `${item.discountPercent}%` : "—"}
+                {parseFloat(item.discountPercent ?? "0") > 0 ? pct(item.discountPercent) : "—"}
               </Text>
             </View>
             <View style={s.colNum}>
               <Text style={[s.tdNum, { textAlign: "right" }]}>
-                {parseFloat(item.taxPercent ?? "0") > 0 ? `${item.taxPercent}%` : "—"}
+                {parseFloat(item.taxPercent ?? "0") > 0 ? pct(item.taxPercent) : "—"}
               </Text>
             </View>
             <View style={s.colNum2}>
-              <Text style={[s.tdNum, s.tdBold, { textAlign: "right" }]}>{money(item.totalPrice, quote.currency)}</Text>
+              <Text style={[s.tdNum, s.tdBold, { textAlign: "right" }]}>{money(item.totalPrice)}</Text>
             </View>
           </View>
         ))}
 
         {/* ── Totals ── */}
-        <View style={s.totalsContainer}>
+        <View style={s.totalsContainer} wrap={false}>
           <View style={s.totalsInner}>
             <View style={s.totalsRow}>
-              <Text style={s.totalsLabel}>Subtotal</Text>
-              <Text style={s.totalsValue}>{money(String(subtotal), quote.currency)}</Text>
+              <Text style={s.totalsLabel}>{tx.subtotal}</Text>
+              <Text style={s.totalsValue}>{money(quote.subtotal)}</Text>
             </View>
             {discountAmt > 0 && (
               <View style={s.totalsRow}>
-                <Text style={s.totalsLabel}>Discount ({quote.discountPercent}%)</Text>
-                <Text style={[s.totalsValue, { color: "#d97706" }]}>−{money(String(discountAmt), quote.currency)}</Text>
+                <Text style={s.totalsLabel}>
+                  {tx.discountOn} ({pct(quote.discountPercent)})
+                </Text>
+                <Text style={[s.totalsValue, { color: "#d97706" }]}>-{money(discountAmt)}</Text>
               </View>
             )}
             {taxAmt > 0 && (
               <View style={s.totalsRow}>
-                <Text style={s.totalsLabel}>Tax ({quote.taxPercent}%)</Text>
-                <Text style={[s.totalsValue, { color: "#475569" }]}>+{money(String(taxAmt), quote.currency)}</Text>
+                <Text style={s.totalsLabel}>
+                  {tx.taxOn}
+                  {parseFloat(quote.taxPercent ?? "0") > 0 ? ` (${pct(quote.taxPercent)})` : ""}
+                </Text>
+                <Text style={[s.totalsValue, { color: "#475569" }]}>+{money(taxAmt)}</Text>
               </View>
             )}
             <View style={s.totalsFinalRow}>
-              <Text style={s.totalsFinalLabel}>Total</Text>
-              <Text style={[s.totalsFinalValue, { color: ACCENT }]}>{money(String(total), quote.currency)}</Text>
+              <Text style={s.totalsFinalLabel}>{tx.total}</Text>
+              <Text style={[s.totalsFinalValue, { color: ACCENT }]}>{money(quote.totalAmount)}</Text>
             </View>
           </View>
         </View>
@@ -302,7 +326,7 @@ export function QuotePDF({ quote, sellerName = "Flux CRM", sellerEmail }: Props)
         {/* ── Notes ── */}
         {quote.notes && (
           <View style={s.notesSection}>
-            <Text style={[s.sectionLabel, { marginBottom: 6 }]}>Notes</Text>
+            <Text style={[s.sectionLabel, { marginBottom: 6 }]}>{tx.notes}</Text>
             <Text style={s.notesText}>{quote.notes}</Text>
           </View>
         )}
@@ -310,10 +334,15 @@ export function QuotePDF({ quote, sellerName = "Flux CRM", sellerEmail }: Props)
         {/* ── Footer ── */}
         <View style={s.footer} fixed>
           <Text style={s.footerText}>
-            {sellerName} · {quote.quoteNumber}
+            {seller.name} · {quote.quoteNumber}
           </Text>
-          <Text style={s.footerText}>Generated {today}</Text>
-          <Text style={s.footerText} render={({ pageNumber, totalPages }) => `Page ${pageNumber} / ${totalPages}`} />
+          <Text style={s.footerText}>
+            {tx.generated} {date(new Date())}
+          </Text>
+          <Text
+            style={s.footerText}
+            render={({ pageNumber, totalPages }) => `${tx.page} ${pageNumber} / ${totalPages}`}
+          />
         </View>
       </Page>
     </Document>

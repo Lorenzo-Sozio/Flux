@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { ChevronLeft } from "lucide-react";
+import { getTranslations } from "next-intl/server";
 
 import { getQuoteById } from "@/actions/quotes";
 import { auth } from "@/auth";
 import { QuoteDetail } from "@/components/crm/quote-detail";
+import { documentLanguage } from "@/lib/document-language";
 
 interface Props {
   params: Promise<{ id: string }>;
@@ -30,6 +32,17 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
     notFound();
   }
 
+  // The follow-up drafts go to the customer, so they are written in the customer's
+  // language even when the dashboard is in the other one.
+  const customerLanguage = documentLanguage(quote.company);
+  const tCustomer = await getTranslations({ locale: customerLanguage, namespace: "quoteFollowUp" });
+  const customerDrafts = Object.fromEntries(
+    ["notOpened", "noAnswer", "expiring", "expired"].map((k) => [
+      k,
+      { subject: String(tCustomer.raw(`${k}Subject`)), body: String(tCustomer.raw(`${k}Body`)) },
+    ]),
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -41,7 +54,13 @@ export default async function QuoteDetailPage({ params, searchParams }: Props) {
           Back to Quotes
         </Link>
       </div>
-      <QuoteDetail quote={quote} autoOpenSend={send === "1"} tenantRole={tenantRole} />
+      <QuoteDetail
+        quote={quote}
+        autoOpenSend={send === "1"}
+        tenantRole={tenantRole}
+        customerLanguage={customerLanguage}
+        customerDrafts={customerDrafts}
+      />
     </div>
   );
 }

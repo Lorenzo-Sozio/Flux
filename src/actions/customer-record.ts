@@ -28,6 +28,8 @@ export interface CustomerRecordRow {
   sub: string | null;
   status: string;
   amount: number | null;
+  /** The currency the amount was written in; null where there is no amount. */
+  currency: string | null;
   href: string;
 }
 
@@ -87,6 +89,7 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
       id: deals.id,
       name: deals.name,
       amount: deals.amount,
+      currency: deals.currency,
       status: deals.status,
       expectedCloseDate: deals.expectedCloseDate,
     })
@@ -97,7 +100,13 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
 
   const quoteRows = modules.sales
     ? await db
-        .select({ id: quotes.id, number: quotes.quoteNumber, status: quotes.status, total: quotes.totalAmount })
+        .select({
+          id: quotes.id,
+          number: quotes.quoteNumber,
+          status: quotes.status,
+          total: quotes.totalAmount,
+          currency: quotes.currency,
+        })
         .from(quotes)
         .where(where({ companyId: quotes.companyId, contactId: quotes.contactId }))
         .orderBy(desc(quotes.createdAt))
@@ -106,7 +115,13 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
 
   const orderRows = modules.sales
     ? await db
-        .select({ id: orders.id, number: orders.orderNumber, status: orders.status, total: orders.totalAmount })
+        .select({
+          id: orders.id,
+          number: orders.orderNumber,
+          status: orders.status,
+          total: orders.totalAmount,
+          currency: orders.currency,
+        })
         .from(orders)
         .where(where({ companyId: orders.companyId, contactId: orders.contactId }))
         .orderBy(desc(orders.createdAt))
@@ -142,6 +157,7 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
       sub: r.expectedCloseDate ? new Date(r.expectedCloseDate).toISOString().slice(0, 10) : null,
       status: r.status,
       amount: Number(r.amount ?? 0),
+      currency: r.currency,
       href: `/dashboard/pipeline/${r.id}`,
     })),
   );
@@ -152,6 +168,7 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
       sub: null,
       status: r.status,
       amount: Number(r.total ?? 0),
+      currency: r.currency,
       href: `/dashboard/sales/quotes/${r.id}`,
     })),
   );
@@ -162,6 +179,7 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
       sub: null,
       status: r.status,
       amount: Number(r.total ?? 0),
+      currency: r.currency,
       href: `/dashboard/sales/orders/${r.id}`,
     })),
   );
@@ -172,6 +190,7 @@ export async function getCustomerRecord(scope: { companyId?: string; contactId?:
       sub: r.subject,
       status: r.breached ? "breached" : r.status,
       amount: null,
+      currency: null,
       href: `/dashboard/support/tickets/${r.id}`,
     })),
   );

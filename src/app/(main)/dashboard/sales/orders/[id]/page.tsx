@@ -203,7 +203,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   // slow save invites a second click, and a second click on "Close order" is a
   // second write of the same thing.
   const [isPending, startTransition] = useTransition();
-  const { formatAmount } = useCurrency();
+  const { formatMoney } = useCurrency();
 
   const [order, setOrder] = useState<OrderDetail>(null);
   const [products, setProducts] = useState<Product[]>([]);
@@ -380,9 +380,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                             )}
                           </td>
                           <td className="px-4 py-3 text-right tabular-nums">{item.quantity}</td>
-                          <td className="px-4 py-3 text-right tabular-nums">{formatAmount(Number(item.unitPrice))}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">
+                            {formatMoney(item.unitPrice, order.currency)}
+                          </td>
                           <td className="px-4 py-3 text-right font-semibold tabular-nums">
-                            {formatAmount(Number(item.totalPrice))}
+                            {formatMoney(item.totalPrice, order.currency)}
                           </td>
                           <td className="px-4 py-3">
                             <button
@@ -400,7 +402,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                           {t("totalCol")}
                         </td>
                         <td className="px-4 py-3 text-right font-bold text-base tabular-nums">
-                          {formatAmount(Number(order.totalAmount))}
+                          {formatMoney(order.totalAmount, order.currency)}
                         </td>
                         <td />
                       </tr>
@@ -504,11 +506,16 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <span className="flex items-center gap-1 text-muted-foreground text-xs">
                   <DollarSign className="h-3 w-3" /> {t("totalAmount")}
                 </span>
-                <span className="font-bold tabular-nums">{formatAmount(Number(order.totalAmount))}</span>
+                <span className="font-bold tabular-nums">{formatMoney(order.totalAmount, order.currency)}</span>
               </div>
 
               <div className="mb-4">
-                <PaymentsCard orderId={id} totalAmount={order.totalAmount} deliveredAt={order.deliveredAt ?? null} />
+                <PaymentsCard
+                  orderId={id}
+                  totalAmount={order.totalAmount}
+                  currency={order.currency}
+                  deliveredAt={order.deliveredAt ?? null}
+                />
               </div>
 
               {/* What the customer has said about it, if anything. */}

@@ -582,6 +582,28 @@ and this archive is not *conservazione sostitutiva*.
 `scripts/mutations/invoice-archive.json` breaks the conditional record, the
 hash check and the draft refusal.
 
+### Documents: the customer's language and the document's currency
+
+[src/lib/document-language.ts](src/lib/document-language.ts) decides both.
+
+⚠️⚠️ **A document follows the customer, not the reader.** The quote PDF, its print
+view, the public page, the quote email and the invoice courtesy copy read
+`company.language` ("it" | "en"; null means from the country: Italy or none is
+Italian). The dashboard follows the signed-in user's locale; these never do.
+The texts are in that file, not in messages/*.json, because react-pdf, HTML
+strings and emails have no next-intl — `document-language.test.ts` checks both
+languages carry every key.
+
+⚠️⚠️ **`formatAmount` converts; `formatMoney` does not.** `useCurrency().formatAmount`
+treats a number as EUR and converts it to the viewer's display currency, which
+is right for workspace totals and wrong for a document: a euro quote shown to a
+user whose switcher once said USD became a different number with a $ in front.
+Quotes, orders, contracts and invoices use `formatMoney(amount, doc.currency)`.
+Totals across documents are grouped by currency, never summed across them.
+
+⚠️ An invoice freezes the language in `customer_snapshot`, so a courtesy copy
+reprinted next year does not change language with the record.
+
 ### Mobile and the installable app (PWA)
 
 ```bash

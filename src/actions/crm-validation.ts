@@ -176,6 +176,10 @@ export const CompanySchema = z.object({
   sdiCode: optionalText,
   fiscalCode: optionalText,
   pec: optionalEmail,
+  // Empty means "from the country"; undefined leaves a partial update alone.
+  language: z
+    .union([z.enum(["it", "en"]), z.literal(""), z.literal("auto"), z.null(), z.undefined()])
+    .transform((v) => (v === undefined ? undefined : v === "it" || v === "en" ? v : null)),
   tags: tagList,
   companyCategoryId: optionalId,
   companyTypeId: optionalId,

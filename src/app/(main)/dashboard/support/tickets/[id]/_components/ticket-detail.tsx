@@ -642,7 +642,7 @@ function HistoryCard({ ticket }: { ticket: TicketRow }) {
 
 function OrderCard({ ticket, onLinked }: { ticket: TicketRow; onLinked: () => void }) {
   const t = useTranslations("support.tickets");
-  const { formatAmount } = useCurrency();
+  const { formatMoney } = useCurrency();
   const [orders, setOrders] = useState<Awaited<ReturnType<typeof getOrdersForTicket>>>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -686,7 +686,7 @@ function OrderCard({ ticket, onLinked }: { ticket: TicketRow; onLinked: () => vo
           >
             <span className="truncate font-medium text-xs">{ticket.order.orderNumber}</span>
             <span className="shrink-0 text-muted-foreground text-xs tabular-nums">
-              {formatAmount(Number(ticket.order.totalAmount ?? 0))}
+              {formatMoney(ticket.order.totalAmount, ticket.order.currency)}
             </span>
           </Link>
         )}

@@ -7,6 +7,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { InvoicePDF, type InvoicePdfData } from "@/components/pdf/invoice-pdf";
 import { invoices } from "@/db/schema";
+import { documentLanguage, INVOICE_TEXT } from "@/lib/document-language";
 import { type InvoiceLine, invoiceTotals } from "@/lib/fatturapa/totals";
 import {
   buildFatturaPaXml,
@@ -105,13 +106,18 @@ export function pdfDataOf(input: XmlInvoice): InvoicePdfData {
     customer: input.customer,
     totals: invoiceTotals(input.lines, input.discountPercent),
     originalInvoice: input.originalInvoice ?? null,
+    discountPercent: input.discountPercent,
+    // Frozen in the customer snapshot at issue; read from the country for invoices issued before.
+    lang: documentLanguage(input.customer as { language?: string | null; country?: string | null }),
   };
 }
 
 /** A file name a person recognises; the XML keeps the name SDI requires. */
 export function fileNameOf(input: XmlInvoice, kind: ArchiveKind): string {
   if (kind === "xml") return fatturaPaFileName(input);
-  const kindName = input.documentType === "TD04" ? "Nota-di-credito" : "Fattura";
+  const lang = documentLanguage(input.customer as { language?: string | null; country?: string | null });
+  const tx = INVOICE_TEXT[lang];
+  const kindName = (input.documentType === "TD04" ? tx.creditNote : tx.invoice).replace(/\s+/g, "-");
   return `${kindName}-${input.documentNumber.replace(/[^A-Za-z0-9-]/g, "-")}.pdf`;
 }
 

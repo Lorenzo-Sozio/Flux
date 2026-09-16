@@ -78,6 +78,7 @@ const companySchema = z.object({
   sdiCode: z.string().optional(),
   fiscalCode: z.string().optional(),
   pec: z.string().optional(),
+  language: z.string().optional(),
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
@@ -181,6 +182,7 @@ export function CompanyModal({
       sdiCode: company?.sdiCode || "",
       fiscalCode: company?.fiscalCode || "",
       pec: company?.pec || "",
+      language: company?.language || "auto",
     },
   });
 
@@ -243,6 +245,7 @@ export function CompanyModal({
         sdiCode: company.sdiCode || "",
         fiscalCode: company.fiscalCode || "",
         pec: company.pec || "",
+        language: company.language || "auto",
       });
     }
   }, [open, company, form.reset]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -323,6 +326,7 @@ export function CompanyModal({
       assigneeValue: undefined,
       companyCategoryId: data.companyCategoryId || null,
       companyTypeId: data.companyTypeId || null,
+      language: data.language === "it" || data.language === "en" ? data.language : null,
     };
 
     const found = await checkCompanyDuplicates({
@@ -600,6 +604,25 @@ export function CompanyModal({
                   </F>
                   <F label={t("form.pec")} error={e.pec?.message}>
                     <Input {...register("pec")} type="email" placeholder="fatture@pec.azienda.it" />
+                  </F>
+                  <F label={t("form.language")}>
+                    <Controller
+                      control={control}
+                      name="language"
+                      render={({ field }) => (
+                        <Select value={field.value || "auto"} onValueChange={field.onChange}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="auto">{t("form.languageAuto")}</SelectItem>
+                            <SelectItem value="it">Italiano</SelectItem>
+                            <SelectItem value="en">English</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    <p className="text-muted-foreground text-xs">{t("form.languageHint")}</p>
                   </F>
                   <div className="col-span-1 sm:col-span-2 rounded-md border bg-muted/30 px-4 py-3 text-muted-foreground text-xs">
                     <p className="mb-1 font-medium text-foreground">Italian e-invoicing</p>

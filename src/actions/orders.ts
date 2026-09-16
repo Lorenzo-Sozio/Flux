@@ -125,6 +125,7 @@ export async function getOrderById(id: string) {
       orderNumber: orders.orderNumber,
       status: orders.status,
       totalAmount: orders.totalAmount,
+      currency: orders.currency,
       // What has to be known to prepare it: pickup or delivery, when, where.
       notes: orders.notes,
       deliveredAt: orders.deliveredAt,
@@ -188,10 +189,17 @@ export async function getOrderStats() {
       processing: sql<number>`count(*) filter (where ${orders.status} = 'processing')::int`,
       completed: sql<number>`count(*) filter (where ${orders.status} = 'completed')::int`,
       cancelled: sql<number>`count(*) filter (where ${orders.status} = 'cancelled')::int`,
-      revenue: sql<number>`coalesce(sum(case when ${orders.status} = 'completed' then cast(${orders.totalAmount} as numeric) end), 0)`,
     })
     .from(orders);
-  return counts;
+  const revenue = await db
+    .select({
+      currency: orders.currency,
+      amount: sql<string>`coalesce(sum(cast(${orders.totalAmount} as numeric)), 0)`,
+    })
+    .from(orders)
+    .where(eq(orders.status, "completed"))
+    .groupBy(orders.currency);
+  return { ...counts, revenue: revenue.map((r) => ({ currency: r.currency, amount: Number(r.amount) })) };
 }
 
 // ── Mutations ─────────────────────────────────────────────────────────────────
@@ -703,6 +711,7 @@ export async function getOrderFormData() {
       .select({
         id: quotes.id,
         quoteNumber: quotes.quoteNumber,
+        currency: quotes.currency,
         companyId: quotes.companyId,
         contactId: quotes.contactId,
         totalAmount: quotes.totalAmount,
@@ -882,6 +891,7 @@ export async function listOrders(params: ListParams, status?: string) {
         orderNumber: orders.orderNumber,
         status: orders.status,
         totalAmount: orders.totalAmount,
+        currency: orders.currency,
         orderDate: orders.orderDate,
         createdAt: orders.createdAt,
         companyId: orders.companyId,

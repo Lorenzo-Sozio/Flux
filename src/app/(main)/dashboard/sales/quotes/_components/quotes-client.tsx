@@ -47,6 +47,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useCurrency } from "@/hooks/use-currency";
 import type { Page } from "@/lib/pagination";
 import { quoteStatusConfig } from "@/lib/quote-status";
 import { cn } from "@/lib/utils";
@@ -58,16 +59,6 @@ type Stats = Awaited<ReturnType<typeof getQuoteStats>>;
 function contactNameOf(quote: Quote): string | null {
   const name = `${quote.contactFirstName ?? ""} ${quote.contactLastName ?? ""}`.trim();
   return name || null;
-}
-
-/** A quote total, in the currency the quote itself was written in. */
-function quoteAmount(quote: Quote): string {
-  return parseFloat(quote.totalAmount ?? "0").toLocaleString(undefined, {
-    style: "currency",
-    currency: quote.currency || "EUR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
 }
 
 /**
@@ -168,6 +159,7 @@ export function QuotesClient({
 }) {
   const t = useTranslations("quotes");
   const tc = useTranslations("common");
+  const { formatMoney } = useCurrency();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -295,11 +287,7 @@ export function QuotesClient({
                 ) : (
                   stats.totals.map((sum) => (
                     <p key={sum.currency} className="mt-1 font-bold text-2xl tabular-nums">
-                      {sum.amount.toLocaleString(undefined, {
-                        style: "currency",
-                        currency: sum.currency || "EUR",
-                        maximumFractionDigits: 0,
-                      })}
+                      {formatMoney(sum.amount, sum.currency, { noDecimals: true })}
                     </p>
                   ))
                 )}
@@ -376,7 +364,11 @@ export function QuotesClient({
                       href: `/dashboard/sales/quotes/${quote.id}`,
                       title: <span className="font-mono">{quote.quoteNumber}</span>,
                       subtitle: [quote.companyName, contactName].filter(Boolean).join(" · ") || undefined,
-                      badge: <span className="font-semibold text-sm tabular-nums">{quoteAmount(quote)}</span>,
+                      badge: (
+                        <span className="font-semibold text-sm tabular-nums">
+                          {formatMoney(quote.totalAmount, quote.currency)}
+                        </span>
+                      ),
                       fields: [
                         {
                           label: t("columns.status"),
@@ -443,7 +435,7 @@ export function QuotesClient({
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right font-semibold text-sm tabular-nums">
-                              {quoteAmount(quote)}
+                              {formatMoney(quote.totalAmount, quote.currency)}
                             </TableCell>
                             <TableCell className="text-muted-foreground text-sm">
                               {format(new Date(quote.issuedAt), "MMM d, yyyy")}

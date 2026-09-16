@@ -662,7 +662,10 @@
       "selectIndustry": "Seleziona settore",
       "selectSize": "Seleziona dimensione",
       "fiscalCode": "Codice fiscale",
-      "pec": "PEC"
+      "pec": "PEC",
+      "language": "Lingua dei documenti",
+      "languageAuto": "Automatica dal paese",
+      "languageHint": "Preventivi, email e copie di cortesia delle fatture per questo cliente. Automatica: italiano per un indirizzo in Italia o senza paese, inglese negli altri casi."
     },
     "createSuccess": "Azienda creata.",
     "updateSuccess": "Azienda aggiornata.",
@@ -1673,7 +1676,8 @@
       "loadFailed": "Non è stato possibile caricare clienti e prodotti.",
       "needALine": "Aggiungi almeno una riga: scegli un prodotto oppure descrivi di cosa si tratta.",
       "created": "Ordine {number} creato.",
-      "createFailed": "Non è stato possibile creare l'ordine."
+      "createFailed": "Non è stato possibile creare l'ordine.",
+      "currency": "Valuta"
     },
     "detail": {
       "back": "Torna agli ordini",
@@ -2099,7 +2103,8 @@
       "updateFailed": "Non è stato possibile aggiornare il preventivo.",
       "termsTitle": "Validità e condizioni",
       "termsSubtitle": "Fino a quando vale, cosa si applica a tutto il documento e cosa legge il cliente sotto le cifre.",
-      "notes": "Note per il cliente"
+      "notes": "Note per il cliente",
+      "currency": "Valuta"
     },
     "sendSuccess": "Preventivo inviato.",
     "acceptSuccess": "Preventivo accettato.",

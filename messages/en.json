@@ -662,7 +662,10 @@
       "selectIndustry": "Select industry",
       "selectSize": "Select size",
       "fiscalCode": "Tax code",
-      "pec": "PEC"
+      "pec": "PEC",
+      "language": "Document language",
+      "languageAuto": "Automatic, from the country",
+      "languageHint": "Quotes, emails and invoice courtesy copies for this customer. Automatic: Italian for an address in Italy or with no country, English otherwise."
     },
     "createSuccess": "Company created.",
     "updateSuccess": "Company updated.",
@@ -1673,7 +1676,8 @@
       "loadFailed": "Could not load customers and products.",
       "needALine": "Add at least one line: pick a product or describe what it is for.",
       "created": "Order {number} created.",
-      "createFailed": "Could not create the order."
+      "createFailed": "Could not create the order.",
+      "currency": "Currency"
     },
     "detail": {
       "back": "Back to orders",
@@ -2099,7 +2103,8 @@
       "updateFailed": "Could not update the quote.",
       "termsTitle": "Validity and terms",
       "termsSubtitle": "How long it stands, what applies to the whole document, and what the customer reads under the figures.",
-      "notes": "Notes for the customer"
+      "notes": "Notes for the customer",
+      "currency": "Currency"
     },
     "sendSuccess": "Quote sent.",
     "acceptSuccess": "Quote accepted.",

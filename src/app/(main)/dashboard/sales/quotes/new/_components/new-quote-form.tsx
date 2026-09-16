@@ -17,6 +17,7 @@ import { CreateQuoteSchema } from "@/actions/quotes-validation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -83,7 +84,7 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
   const params = useSearchParams();
   const t = useTranslations("quotes.form");
   const tc = useTranslations("common");
-  const { formatAmount } = useCurrency();
+  const { formatMoney } = useCurrency();
 
   const data = initialData;
   const [submitting, setSubmitting] = useState(false);
@@ -99,6 +100,7 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
       notes: "",
       discountPercent: 0,
       taxPercent: 0,
+      currency: "EUR",
     },
   });
 
@@ -112,6 +114,8 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
   }, []);
 
   const items = form.watch("items");
+  // Every figure on the page is in the currency the quote is written in.
+  const currency = form.watch("currency") || "EUR";
   const companyId = form.watch("companyId");
   const headerDiscount = Number(form.watch("discountPercent")) || 0;
   const headerTax = Number(form.watch("taxPercent")) || 0;
@@ -214,7 +218,7 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
           <div className="flex items-center gap-2">
             <div className="mr-2 hidden items-baseline gap-2 sm:flex">
               <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("total")}</span>
-              <span className="font-bold text-base tabular-nums">{formatAmount(totals.total)}</span>
+              <span className="font-bold text-base tabular-nums">{formatMoney(totals.total, currency)}</span>
             </div>
             <Button type="button" variant="ghost" onClick={() => router.push("/dashboard/sales/quotes")}>
               {tc("cancel")}
@@ -382,7 +386,9 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
                             )}
                           </div>
                           <div className="flex items-center gap-1">
-                            <span className="mr-1 font-semibold text-sm tabular-nums">{formatAmount(lineTotal)}</span>
+                            <span className="mr-1 font-semibold text-sm tabular-nums">
+                              {formatMoney(lineTotal, currency)}
+                            </span>
                             <Button
                               type="button"
                               variant="ghost"
@@ -517,7 +523,7 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
                           />
 
                           <span className="hidden text-right font-semibold text-sm tabular-nums 2xl:block">
-                            {formatAmount(lineTotal)}
+                            {formatMoney(lineTotal, currency)}
                           </span>
 
                           <div className="hidden items-center justify-end 2xl:flex">
@@ -566,7 +572,20 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
                 <CardDescription>{t("termsSubtitle")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <FormField
+                    control={form.control}
+                    name="currency"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">{t("currency")}</FormLabel>
+                        <FormControl>
+                          <CurrencySelect value={field.value ?? "EUR"} onChange={field.onChange} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                   <FormField
                     control={form.control}
                     name="expiresAt"
@@ -659,7 +678,7 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
                 <CardContent className="space-y-2.5 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">{t("subtotal")}</span>
-                    <span className="tabular-nums">{formatAmount(totals.subtotal)}</span>
+                    <span className="tabular-nums">{formatMoney(totals.subtotal, currency)}</span>
                   </div>
 
                   {totals.discountAmount > 0 && (
@@ -667,20 +686,20 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
                       <span>
                         {t("discountAmount")} · {headerDiscount}%
                       </span>
-                      <span className="tabular-nums">−{formatAmount(totals.discountAmount)}</span>
+                      <span className="tabular-nums">−{formatMoney(totals.discountAmount, currency)}</span>
                     </div>
                   )}
 
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">{t("taxAmount")}</span>
-                    <span className="tabular-nums">{formatAmount(totals.taxAmount)}</span>
+                    <span className="tabular-nums">{formatMoney(totals.taxAmount, currency)}</span>
                   </div>
 
                   <Separator className="my-1" />
 
                   <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2.5">
                     <span className="font-semibold">{t("total")}</span>
-                    <span className="font-bold text-lg tabular-nums">{formatAmount(totals.total)}</span>
+                    <span className="font-bold text-lg tabular-nums">{formatMoney(totals.total, currency)}</span>
                   </div>
                 </CardContent>
                 <div className="px-6 pb-6">

@@ -28,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useCurrency } from "@/hooks/use-currency";
 import { addDays } from "@/lib/contract-terms";
 import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { customerGaps } from "@/lib/fiscal-ids";
@@ -72,6 +73,7 @@ export function NewInvoiceForm({
   const tn = useTranslations("invoices.new");
   const tI = useTranslations("invoicing");
   const router = useRouter();
+  const { formatMoney } = useCurrency();
 
   const [companyId, setCompanyId] = useState(initialOrder?.companyId ?? "");
   const [orderId, setOrderId] = useState(initialOrder?.id ?? "");
@@ -96,7 +98,7 @@ export function NewInvoiceForm({
   const stamp = assessStampDuty(draftLines, num(discount), stampMode);
   const rechargeLine = stamp.applied && data.rechargeStamp;
   const totals = invoiceTotals(withStampRecharge(draftLines, stamp.applied, data.rechargeStamp), num(discount));
-  const money = (n: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency }).format(n);
+  const money = (n: number) => formatMoney(n, currency);
 
   const customerProblems = company ? customerGaps(company) : [];
   const problems = [
@@ -287,7 +289,7 @@ export function NewInvoiceForm({
                       ...ordersForCustomer.map((o) => ({
                         value: o.id,
                         label: `${o.orderNumber} — ${o.companyName ?? "—"}`,
-                        sublabel: `${o.createdAt} · ${new Intl.NumberFormat("it-IT", { style: "currency", currency: o.currency }).format(Number(o.total))}${o.draftId ? ` · ${tn("hasDraft")}` : ""}`,
+                        sublabel: `${o.createdAt} · ${formatMoney(o.total, o.currency)}${o.draftId ? ` · ${tn("hasDraft")}` : ""}`,
                       })),
                     ]}
                     value={orderId || NO_ORDER}

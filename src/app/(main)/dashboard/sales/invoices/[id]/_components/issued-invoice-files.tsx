@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Archive, FileCode2, FileText, Loader2, Mail } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { archiveInvoiceAction, sendInvoiceCopy } from "@/actions/invoices";
@@ -21,11 +21,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const when = (iso: string | null) =>
+const when = (iso: string | null, locale: string) =>
   iso
-    ? new Intl.DateTimeFormat("it-IT", { dateStyle: "short", timeStyle: "short", timeZone: "Europe/Rome" }).format(
-        new Date(iso),
-      )
+    ? new Intl.DateTimeFormat(locale === "it" ? "it-IT" : "en-GB", {
+        dateStyle: "short",
+        timeStyle: "short",
+        timeZone: "Europe/Rome",
+      }).format(new Date(iso))
     : null;
 
 /**
@@ -49,6 +51,7 @@ export function IssuedInvoiceFiles({
 }) {
   const t = useTranslations("invoices.files");
   const router = useRouter();
+  const locale = useLocale();
   const [open, setOpen] = useState(false);
   const [to, setTo] = useState(emailedTo ?? customerEmail ?? "");
   const [sending, setSending] = useState(false);
@@ -107,7 +110,7 @@ export function IssuedInvoiceFiles({
       <div className="space-y-0.5 text-muted-foreground text-xs sm:text-right">
         {archivedAt ? (
           <p className="flex items-center gap-1 sm:justify-end">
-            <Archive className="h-3 w-3" /> {t("archivedOn", { when: when(archivedAt) ?? "" })}
+            <Archive className="h-3 w-3" /> {t("archivedOn", { when: when(archivedAt, locale) ?? "" })}
           </p>
         ) : (
           <p className="flex flex-wrap items-center gap-1 sm:justify-end">
@@ -119,7 +122,7 @@ export function IssuedInvoiceFiles({
             )}
           </p>
         )}
-        {emailedAt && emailedTo && <p>{t("emailedOn", { when: when(emailedAt) ?? "", to: emailedTo })}</p>}
+        {emailedAt && emailedTo && <p>{t("emailedOn", { when: when(emailedAt, locale) ?? "", to: emailedTo })}</p>}
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>

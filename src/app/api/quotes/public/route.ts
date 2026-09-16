@@ -12,13 +12,15 @@ import { type NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { quoteActivities, quotes } from "@/db/schema";
+import { documentLanguage } from "@/lib/document-language";
 import { announceQuoteDecision } from "@/lib/quote-events";
 import { checkRateLimit } from "@/lib/rate-limiter";
+import { sellerIdentity } from "@/lib/seller-identity";
 import { resolveTenantByProbe, type TenantDb } from "@/lib/tenant-resolve";
 import { PUBLIC_CONTACT_COLUMNS } from "@/lib/user-columns";
 
 /** Locates the workspace that issued this quote token. */
-async function resolveQuoteTenant(token: string): Promise<TenantDb | null> {
+async function resolveQuoteTenant(token: string): Promise<{ db: TenantDb; name: string } | null> {
   const resolved = await resolveTenantByProbe(`quote:${token}`, async (db) => {
     const row = await db.query.quotes.findFirst({
       where: eq(quotes.publicToken, token),
@@ -26,7 +28,7 @@ async function resolveQuoteTenant(token: string): Promise<TenantDb | null> {
     });
     return Boolean(row);
   });
-  return resolved?.db ?? null;
+  return resolved ? { db: resolved.db, name: resolved.tenant.name } : null;
 }
 
 function clientIp(h: Headers): string {
@@ -50,27 +52,33 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  const db = await resolveQuoteTenant(token);
-  if (!db) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const tenant = await resolveQuoteTenant(token);
+  if (!tenant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const { db } = tenant;
 
   const quote = await db.query.quotes.findFirst({
     where: eq(quotes.publicToken, token),
     with: {
-      company: true,
-      contact: true,
+      // ⚠️ Only what the page shows. `company: true` sent the whole record to anyone
+      // holding the link: annual revenue, lead score, owner, tags, internal notes.
+      company: { columns: { name: true, country: true, language: true, vatNumber: true } },
+      contact: { columns: { firstName: true, lastName: true } },
       owner: { columns: PUBLIC_CONTACT_COLUMNS },
-      items: { with: { product: true } },
+      items: { with: { product: { columns: { name: true } } } },
     },
   });
 
   if (!quote) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const seller = await sellerIdentity(db, tenant.name);
+  const extra = { language: documentLanguage(quote.company), sellerName: seller.name };
 
   // An expired quote is still readable — the customer should see why they can no
   // longer accept it — but it is recorded as expired rather than left claiming to
   // be open. Nothing set this status before, so `expired` was an unreachable state.
   if (isExpired(quote.expiresAt) && ["sent", "viewed"].includes(quote.status)) {
     await db.update(quotes).set({ status: "expired", updatedAt: new Date() }).where(eq(quotes.id, quote.id));
-    return NextResponse.json({ quote: { ...quote, status: "expired" } });
+    return NextResponse.json({ quote: { ...quote, ...extra, status: "expired" } });
   }
 
   // Mark as viewed the first time the recipient opens it
@@ -78,10 +86,10 @@ export async function GET(req: NextRequest) {
     const ip = headersList.get("x-forwarded-for") ?? undefined;
     await db.update(quotes).set({ viewedAt: new Date(), status: "viewed" }).where(eq(quotes.id, quote.id));
     await db.insert(quoteActivities).values({ quoteId: quote.id, type: "viewed", ipAddress: ip ?? undefined });
-    return NextResponse.json({ quote: { ...quote, status: "viewed", viewedAt: new Date() } });
+    return NextResponse.json({ quote: { ...quote, ...extra, status: "viewed", viewedAt: new Date() } });
   }
 
-  return NextResponse.json({ quote });
+  return NextResponse.json({ quote: { ...quote, ...extra } });
 }
 
 // POST /api/quotes/public  — accept or decline quote by public token
@@ -99,21 +107,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  const db = await resolveQuoteTenant(token);
-  if (!db) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const tenant = await resolveQuoteTenant(token);
+  if (!tenant) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const { db } = tenant;
 
   const quote = await db.query.quotes.findFirst({ where: eq(quotes.publicToken, token) });
   if (!quote) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (!["sent", "viewed"].includes(quote.status)) {
-    return NextResponse.json({ error: "Quote cannot be actioned in its current status" }, { status: 409 });
+    return NextResponse.json(
+      { error: "Quote cannot be actioned in its current status", code: "not_actionable" },
+      { status: 409 },
+    );
   }
 
   // An expiry date that is never checked is decoration: a quote could be accepted
   // months after it lapsed, at a price nobody still honours.
   if (isExpired(quote.expiresAt)) {
     await db.update(quotes).set({ status: "expired", updatedAt: new Date() }).where(eq(quotes.id, quote.id));
-    return NextResponse.json({ error: "This quote has expired. Please ask for an updated one." }, { status: 409 });
+    return NextResponse.json(
+      { error: "This quote has expired. Please ask for an updated one.", code: "expired" },
+      { status: 409 },
+    );
   }
 
   const ip = headersList.get("x-forwarded-for") ?? undefined;

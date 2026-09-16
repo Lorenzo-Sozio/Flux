@@ -54,7 +54,11 @@ export function ContractsClient({
 }) {
   const t = useTranslations("contracts");
   const router = useRouter();
-  const { formatAmount } = useCurrency();
+  const { formatMoney } = useCurrency();
+  const byCurrency = (factor: number) =>
+    data.mrr.length
+      ? data.mrr.map((m) => formatMoney(m.amount * factor, m.currency)).join(" · ")
+      : formatMoney(0, "EUR");
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const searchParams = useSearchParams();
@@ -108,7 +112,7 @@ export function ContractsClient({
             <CardTitle className="font-medium text-muted-foreground text-sm">{t("mrr")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="font-bold text-2xl tabular-nums">{formatAmount(data.mrr)}</div>
+            <div className="font-bold text-2xl tabular-nums">{byCurrency(1)}</div>
             <p className="mt-1 text-muted-foreground text-xs">{t("mrrDesc", { count: earning })}</p>
           </CardContent>
         </Card>
@@ -117,7 +121,7 @@ export function ContractsClient({
             <CardTitle className="font-medium text-muted-foreground text-sm">{t("arr")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="font-bold text-2xl tabular-nums">{formatAmount(data.mrr * 12)}</div>
+            <div className="font-bold text-2xl tabular-nums">{byCurrency(12)}</div>
             <p className="mt-1 text-muted-foreground text-xs">{t("arrDesc")}</p>
           </CardContent>
         </Card>
@@ -196,12 +200,14 @@ export function ContractsClient({
                         {row.autoRenew && <p className="mt-1 text-[11px] text-muted-foreground">{t("autoRenews")}</p>}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-right tabular-nums">
-                        {formatAmount(Number(row.amount))}
+                        {formatMoney(row.amount, row.currency)}
                         <span className="ml-1 text-muted-foreground text-xs">
                           / {t(`periods.${row.billingPeriod}`)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{formatAmount(row.monthly)}</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatMoney(row.monthly, row.currency)}
+                      </TableCell>
                       <TableCell className="whitespace-nowrap tabular-nums">{row.termEnd ?? "—"}</TableCell>
                       <TableCell
                         className={cn(

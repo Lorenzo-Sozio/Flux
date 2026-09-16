@@ -293,10 +293,12 @@ export interface CompanyInput {
   sdiCode: string | null;
   fiscalCode: string | null;
   pec: string | null;
+  language: "it" | "en" | null;
   tags: string[];
 }
 
 const COMPANY_TYPES = ["prospect", "customer", "partner", "vendor"] as const;
+const COMPANY_LANGUAGES = ["it", "en"] as const;
 
 export function validateCompanyInput(body: unknown): { errors: ValidationError[]; data: CompanyInput | null } {
   if (typeof body !== "object" || body === null) {
@@ -325,6 +327,7 @@ export function validateCompanyInput(body: unknown): { errors: ValidationError[]
     chkStr(b.sdiCode, "sdiCode", 10),
     chkStr(b.fiscalCode, "fiscalCode", 16),
     chkEmail(b.pec, "pec"),
+    chkEnum(b.language, "language", COMPANY_LANGUAGES),
   );
 
   if (errors.length > 0) return { errors, data: null };
@@ -353,6 +356,7 @@ export function validateCompanyInput(body: unknown): { errors: ValidationError[]
       sdiCode: str(b.sdiCode),
       fiscalCode: str(b.fiscalCode),
       pec: str(b.pec)?.toLowerCase() ?? null,
+      language: (str(b.language) as CompanyInput["language"]) ?? null,
       tags: parseTags(b.tags),
     },
   };
@@ -381,6 +385,7 @@ export function buildCompanyPayload(data: CompanyInput, ownerId: string | null) 
     sdiCode: data.sdiCode,
     fiscalCode: data.fiscalCode,
     pec: data.pec,
+    language: data.language,
     tags: data.tags,
     ownerId: ownerId ?? undefined,
   };

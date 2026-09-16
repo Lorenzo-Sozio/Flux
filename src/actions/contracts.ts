@@ -35,6 +35,16 @@ export type ContractRow = typeof contracts.$inferSelect & {
 
 export type ContractResult = { ok: true; id: string } | { ok: false; error: string };
 
+/** Monthly recurring revenue for each currency the contracts are written in, largest first. */
+function recurringByCurrency(rows: (typeof contracts.$inferSelect)[], on: string) {
+  const groups = new Map<string, (typeof contracts.$inferSelect)[]>();
+  for (const r of rows) groups.set(r.currency, [...(groups.get(r.currency) ?? []), r]);
+  return [...groups.entries()]
+    .map(([currency, list]) => ({ currency, amount: monthlyRecurringRevenue(list.map(termsOf), on) }))
+    .filter((g) => g.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
+}
+
 /** The views above the list: a phase, or "active", which also counts contracts not started yet. */
 function inView(row: ContractRow, view: string): boolean {
   if (view === "all") return true;
@@ -45,7 +55,8 @@ function inView(row: ContractRow, view: string): boolean {
 export interface ContractList {
   page: Page<ContractRow>;
   on: string;
-  mrr: number;
+  /** Per currency: contracts in two currencies have two recurring revenues, not one. */
+  mrr: { currency: string; amount: number }[];
   /** Counted over the whole workspace, not over the view or the page on screen. */
   renewalsDue: number;
   earning: number;
@@ -105,8 +116,8 @@ export async function getContracts(params: ListParams, view = "all"): Promise<Co
   return {
     page: toPage(matching.slice(start, start + params.pageSize), matching.length, params),
     on,
-    mrr: monthlyRecurringRevenue(
-      rows.map((r) => termsOf(r.contract)),
+    mrr: recurringByCurrency(
+      rows.map((r) => r.contract),
       on,
     ),
     renewalsDue: all.filter((r) => r.phase === "renewal_due").length,
@@ -121,7 +132,11 @@ export async function getContracts(params: ListParams, view = "all"): Promise<Co
  * ⚠️ Reads only contracts not cancelled or in draft; which of those are earning is
  * decided by the same function the contracts page uses.
  */
-export async function getRecurringRevenueSummary(): Promise<{ mrr: number; earning: number; renewalsDue: number }> {
+export async function getRecurringRevenueSummary(): Promise<{
+  mrr: { currency: string; amount: number }[];
+  earning: number;
+  renewalsDue: number;
+}> {
   await requireCapability("record:read");
   const db = await getDb();
   const on = today();
@@ -133,7 +148,7 @@ export async function getRecurringRevenueSummary(): Promise<{ mrr: number; earni
   const terms = rows.map(termsOf);
   const phases = terms.map((c) => contractPhase(c, on));
   return {
-    mrr: monthlyRecurringRevenue(terms, on),
+    mrr: recurringByCurrency(rows, on),
     earning: phases.filter((p) => p === "active" || p === "renewal_due").length,
     renewalsDue: phases.filter((p) => p === "renewal_due").length,
   };

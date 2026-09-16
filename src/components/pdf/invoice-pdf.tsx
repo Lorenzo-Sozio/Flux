@@ -1,9 +1,16 @@
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 
+import {
+  DOCUMENT_LOCALE,
+  type DocumentLanguage,
+  fill,
+  formatDocumentMoney,
+  INVOICE_TEXT,
+  PAYMENT_METHOD_TEXT,
+} from "@/lib/document-language";
 import type { InvoiceTotals } from "@/lib/fatturapa/totals";
 import type { XmlParty } from "@/lib/fatturapa/xml";
 import { TAX_REGIMES } from "@/lib/fiscal-ids";
-import { PAYMENT_METHODS } from "@/lib/invoice-draft";
 import { NATURE_CODES } from "@/lib/invoice-rules";
 
 /**
@@ -31,14 +38,14 @@ export interface InvoicePdfData {
   customer: XmlParty;
   totals: InvoiceTotals;
   originalInvoice?: { documentNumber: string; issueDate: string } | null;
+  discountPercent: number;
+  /** The customer's language, frozen in the snapshot when the invoice was issued. */
+  lang: DocumentLanguage;
 }
 
-export const COURTESY_NOTICE =
-  "Copia di cortesia priva di valore fiscale ai sensi dell'art. 21 del D.P.R. 633/1972. " +
-  "La fattura elettronica originale è quella trasmessa tramite il Sistema di Interscambio (SDI) " +
-  "ed è disponibile nell'area riservata del sito dell'Agenzia delle Entrate.";
-
-export const STAMP_NOTICE = "Imposta di bollo assolta in modo virtuale ai sensi dell'art. 6 del D.M. 17 giugno 2014.";
+/** The legal notices, in Italian: what an Italian customer's copy says, and what tests check. */
+export const COURTESY_NOTICE = INVOICE_TEXT.it.courtesyNotice;
+export const STAMP_NOTICE = INVOICE_TEXT.it.stampNotice;
 
 const INK = "#111827";
 const MUTED = "#6b7280";
@@ -103,6 +110,7 @@ const s = StyleSheet.create({
   pageNo: { fontSize: 7, color: MUTED },
 });
 
+/** dd/mm/yyyy in Italian, dd/mm/yyyy in British English too: the form an invoice date takes. */
 const day = (iso: string | null | undefined) => {
   if (!iso) return "—";
   const [y, m, d] = iso.slice(0, 10).split("-");
@@ -114,20 +122,25 @@ function address(p: XmlParty): string[] {
   return [p.street, cityLine, p.country && p.country !== "IT" ? p.country : null].filter(Boolean) as string[];
 }
 
-function ids(p: XmlParty): string[] {
+function ids(p: XmlParty, lang: DocumentLanguage): string[] {
+  const tx = INVOICE_TEXT[lang];
   const out: string[] = [];
-  if (p.vatNumber) out.push(`P.IVA ${p.vatNumber}`);
-  if (p.fiscalCode && p.fiscalCode !== p.vatNumber) out.push(`C.F. ${p.fiscalCode}`);
+  if (p.vatNumber) out.push(`${tx.vat} ${p.vatNumber}`);
+  if (p.fiscalCode && p.fiscalCode !== p.vatNumber) out.push(`${tx.fiscalCode} ${p.fiscalCode}`);
   return out;
 }
 
 export function InvoicePDF({ data }: { data: InvoicePdfData }) {
-  const money = (n: number) =>
-    new Intl.NumberFormat("it-IT", { style: "currency", currency: data.currency, useGrouping: "always" }).format(n);
+  const { lang } = data;
+  const tx = INVOICE_TEXT[lang];
+  const money = (n: number) => formatDocumentMoney(n, data.currency, lang);
   const qty = (n: number | null) =>
-    n === null ? "" : new Intl.NumberFormat("it-IT", { maximumFractionDigits: 3, useGrouping: "always" }).format(n);
+    n === null
+      ? ""
+      : new Intl.NumberFormat(DOCUMENT_LOCALE[lang], { maximumFractionDigits: 3, useGrouping: "always" }).format(n);
+  const pct = (n: number) => `${qty(n)}%`;
   const { issuer, customer, totals } = data;
-  const title = data.documentType === "TD04" ? "Nota di credito" : "Fattura";
+  const title = data.documentType === "TD04" ? tx.creditNote : tx.invoice;
   const regime = issuer.taxRegime ? `${issuer.taxRegime} · ${TAX_REGIMES[issuer.taxRegime] ?? ""}` : null;
   const rea = issuer.reaOffice && issuer.reaNumber ? `REA ${issuer.reaOffice}-${issuer.reaNumber}` : null;
   const natures = [...new Set(totals.summary.map((r) => r.nature).filter(Boolean))] as string[];
@@ -143,7 +156,7 @@ export function InvoicePDF({ data }: { data: InvoicePdfData }) {
                 {l}
               </Text>
             ))}
-            {ids(issuer).length > 0 && <Text style={s.line}>{ids(issuer).join(" · ")}</Text>}
+            {ids(issuer, lang).length > 0 && <Text style={s.line}>{ids(issuer, lang).join(" · ")}</Text>}
             {rea && <Text style={s.line}>{rea}</Text>}
             {(issuer.email || issuer.phone) && (
               <Text style={s.line}>{[issuer.email, issuer.phone].filter(Boolean).join(" · ")}</Text>
@@ -151,11 +164,18 @@ export function InvoicePDF({ data }: { data: InvoicePdfData }) {
           </View>
           <View style={s.docBox}>
             <Text style={s.docType}>{title}</Text>
-            <Text style={s.docNumber}>n. {data.documentNumber}</Text>
-            <Text style={s.docDate}>del {day(data.issueDate)}</Text>
+            <Text style={s.docNumber}>
+              {tx.number} {data.documentNumber}
+            </Text>
+            <Text style={s.docDate}>
+              {tx.dated} {day(data.issueDate)}
+            </Text>
             {data.originalInvoice && (
               <Text style={s.docDate}>
-                rif. fattura n. {data.originalInvoice.documentNumber} del {day(data.originalInvoice.issueDate)}
+                {fill(tx.creditNoteReference, {
+                  number: data.originalInvoice.documentNumber,
+                  date: day(data.originalInvoice.issueDate),
+                })}
               </Text>
             )}
           </View>
@@ -163,27 +183,31 @@ export function InvoicePDF({ data }: { data: InvoicePdfData }) {
 
         <View style={s.parties}>
           <View style={s.party}>
-            <Text style={s.label}>Cliente</Text>
+            <Text style={s.label}>{tx.customer}</Text>
             <Text style={[s.line, s.bold]}>{customer.name ?? customer.legalName ?? ""}</Text>
             {address(customer).map((l) => (
               <Text key={l} style={s.line}>
                 {l}
               </Text>
             ))}
-            {ids(customer).length > 0 && <Text style={s.line}>{ids(customer).join(" · ")}</Text>}
+            {ids(customer, lang).length > 0 && <Text style={s.line}>{ids(customer, lang).join(" · ")}</Text>}
           </View>
           <View style={s.party}>
-            <Text style={s.label}>Recapito SDI</Text>
+            <Text style={s.label}>{tx.sdiDelivery}</Text>
             {customer.sdiCode && customer.sdiCode !== "0000000" ? (
-              <Text style={s.line}>Codice destinatario {customer.sdiCode}</Text>
+              <Text style={s.line}>
+                {tx.recipientCode} {customer.sdiCode}
+              </Text>
             ) : customer.pec ? (
-              <Text style={s.line}>PEC {customer.pec}</Text>
+              <Text style={s.line}>
+                {tx.pec} {customer.pec}
+              </Text>
             ) : (
               <Text style={s.line}>—</Text>
             )}
             {regime && (
               <>
-                <Text style={[s.label, { marginTop: 8 }]}>Regime fiscale emittente</Text>
+                <Text style={[s.label, { marginTop: 8 }]}>{tx.issuerRegime}</Text>
                 <Text style={s.line}>{regime}</Text>
               </>
             )}
@@ -191,21 +215,23 @@ export function InvoicePDF({ data }: { data: InvoicePdfData }) {
         </View>
 
         <View style={s.thead} fixed>
-          <Text style={[s.th, s.cDesc]}>Descrizione</Text>
-          <Text style={[s.th, s.cQty]}>Q.tà</Text>
-          <Text style={[s.th, s.cPrice]}>Prezzo</Text>
-          <Text style={[s.th, s.cDisc]}>Sc. %</Text>
-          <Text style={[s.th, s.cVat]}>IVA</Text>
-          <Text style={[s.th, s.cTotal]}>Importo</Text>
+          <Text style={[s.th, s.cDesc]}>{tx.description}</Text>
+          <Text style={[s.th, s.cQty]}>{tx.quantity}</Text>
+          <Text style={[s.th, s.cPrice]}>{tx.price}</Text>
+          <Text style={[s.th, s.cDisc]}>{tx.discount}</Text>
+          <Text style={[s.th, s.cVat]}>{tx.rate}</Text>
+          <Text style={[s.th, s.cTotal]}>{tx.amount}</Text>
         </View>
         {totals.details.map((d, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: lines are an ordered, frozen list
           <View key={i} style={s.row} wrap={false}>
-            <Text style={s.cDesc}>{d.description}</Text>
+            <Text style={s.cDesc}>
+              {d.isDocumentDiscount ? fill(tx.documentDiscount, { percent: pct(data.discountPercent) }) : d.description}
+            </Text>
             <Text style={s.cQty}>{qty(d.quantity)}</Text>
             <Text style={s.cPrice}>{d.isDocumentDiscount ? "" : money(d.unitPrice)}</Text>
             <Text style={s.cDisc}>{d.discountPercent ? qty(d.discountPercent) : ""}</Text>
-            <Text style={s.cVat}>{d.nature ?? `${qty(d.rate)}%`}</Text>
+            <Text style={s.cVat}>{d.nature ?? pct(d.rate)}</Text>
             <Text style={s.cTotal}>{money(d.total)}</Text>
           </View>
         ))}
@@ -213,9 +239,13 @@ export function InvoicePDF({ data }: { data: InvoicePdfData }) {
         <View style={s.lower} wrap={false}>
           <View style={s.lowerLeft}>
             <View style={s.block}>
-              <Text style={s.label}>Pagamento</Text>
-              <Text style={s.line}>{PAYMENT_METHODS[data.paymentMethod] ?? data.paymentMethod}</Text>
-              {data.dueDate && <Text style={s.line}>Scadenza {day(data.dueDate)}</Text>}
+              <Text style={s.label}>{tx.payment}</Text>
+              <Text style={s.line}>{PAYMENT_METHOD_TEXT[lang][data.paymentMethod] ?? data.paymentMethod}</Text>
+              {data.dueDate && (
+                <Text style={s.line}>
+                  {tx.due} {day(data.dueDate)}
+                </Text>
+              )}
               {issuer.iban && (
                 <Text style={s.line}>
                   IBAN {issuer.iban}
@@ -225,7 +255,7 @@ export function InvoicePDF({ data }: { data: InvoicePdfData }) {
             </View>
             {natures.length > 0 && (
               <View style={s.block}>
-                <Text style={s.label}>Operazioni senza IVA</Text>
+                <Text style={s.label}>{tx.exemptOperations}</Text>
                 {natures.map((n) => (
                   <Text key={n} style={s.line}>
                     {n} · {NATURE_CODES[n] ?? ""}
@@ -235,38 +265,40 @@ export function InvoicePDF({ data }: { data: InvoicePdfData }) {
             )}
             {data.stampDuty && (
               <View style={s.block}>
-                <Text style={s.line}>{STAMP_NOTICE}</Text>
+                <Text style={s.line}>{tx.stampNotice}</Text>
               </View>
             )}
             {data.notes && (
               <View style={s.block}>
-                <Text style={s.label}>Note</Text>
+                <Text style={s.label}>{tx.notes}</Text>
                 <Text style={s.line}>{data.notes}</Text>
               </View>
             )}
           </View>
           <View style={s.lowerRight}>
             <View style={s.sumRow}>
-              <Text>Imponibile</Text>
+              <Text>{tx.taxable}</Text>
               <Text>{money(totals.taxableAmount)}</Text>
             </View>
             {totals.summary.map((r) => (
               <View key={`${r.rate}-${r.nature ?? ""}`} style={s.sumRow}>
                 <Text style={{ color: MUTED }}>
-                  {r.nature ? `${r.nature} su ${money(r.taxable)}` : `IVA ${qty(r.rate)}% su ${money(r.taxable)}`}
+                  {r.nature
+                    ? fill(tx.natureOn, { nature: r.nature, taxable: money(r.taxable) })
+                    : fill(tx.vatOn, { rate: pct(r.rate), taxable: money(r.taxable) })}
                 </Text>
                 <Text>{money(r.tax)}</Text>
               </View>
             ))}
             <View style={s.totalRow}>
-              <Text style={s.totalText}>Totale documento</Text>
+              <Text style={s.totalText}>{tx.documentTotal}</Text>
               <Text style={s.totalText}>{money(totals.total)}</Text>
             </View>
           </View>
         </View>
 
         <View style={s.footer} fixed>
-          <Text style={s.footerText}>{COURTESY_NOTICE}</Text>
+          <Text style={s.footerText}>{tx.courtesyNotice}</Text>
           <Text style={s.pageNo} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
         </View>
       </Page>

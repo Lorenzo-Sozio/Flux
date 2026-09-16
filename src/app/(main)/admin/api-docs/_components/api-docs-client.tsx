@@ -2415,6 +2415,15 @@ const GROUPS: ApiGroup[] = [
             example: "fatture@pec.acme.it",
           },
           {
+            name: "language",
+            in: "body",
+            required: false,
+            type: "string (it | en)",
+            description:
+              "Lingua dei documenti inviati al cliente: preventivo, stampa, pagina pubblica, email e copia di cortesia della fattura. Omesso o null: dedotta dal paese (italiano per l'Italia o senza paese, inglese altrimenti).",
+            example: "en",
+          },
+          {
             name: "source",
             in: "body",
             required: false,

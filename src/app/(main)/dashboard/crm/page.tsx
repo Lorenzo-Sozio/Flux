@@ -133,7 +133,7 @@ export default async function CRMPage() {
       getTodayView(),
 
       // Contracts are optional; a failure here reads as none rather than taking the page down.
-      getRecurringRevenueSummary().catch(() => ({ mrr: 0, earning: 0, renewalsDue: 0 })),
+      getRecurringRevenueSummary().catch(() => ({ mrr: [], earning: 0, renewalsDue: 0 })),
     ]);
 
   const agendaItems = today.agenda;
@@ -330,7 +330,18 @@ export default async function CRMPage() {
               <RepeatIcon className="h-4 w-4 text-emerald-500" />
             </CardHeader>
             <CardContent>
-              <div className="font-bold text-2xl">€{recurring.mrr.toLocaleString()}</div>
+              <div className="font-bold text-2xl tabular-nums">
+                {(recurring.mrr.length ? recurring.mrr : [{ currency: "EUR", amount: 0 }])
+                  .map((m) =>
+                    new Intl.NumberFormat(locale === "it" ? "it-IT" : "en-GB", {
+                      style: "currency",
+                      currency: m.currency,
+                      maximumFractionDigits: 0,
+                      useGrouping: "always",
+                    }).format(m.amount),
+                  )
+                  .join(" · ")}
+              </div>
               <p className="mt-1 text-muted-foreground text-xs">{t("contracts_mrrDesc")}</p>
             </CardContent>
           </Card>

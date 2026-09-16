@@ -86,6 +86,9 @@ export async function POST(req: NextRequest) {
       source: row.source?.trim() || "import",
       vatNumber: row.vatNumber?.trim() || row.vat_number?.trim() || null,
       sdiCode: row.sdiCode?.trim() || row.sdi_code?.trim() || null,
+      language: ["it", "en"].includes(row.language?.trim().toLowerCase() ?? "")
+        ? row.language.trim().toLowerCase()
+        : null,
       tags: row.tags
         ? row.tags
             .split(";")

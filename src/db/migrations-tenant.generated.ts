@@ -468,4 +468,12 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "emailed_to" text;\n',
     ],
   },
+  {
+    tag: "0026_in_their_own_language",
+    folderMillis: 1789800000000,
+    hash: "7860496c4d93c50e2e1fbd2e5fbd6eb5e6a48fd9ea431ebf3ad0fb398cd4d780",
+    sql: [
+      '-- The language a customer\'s documents are written in: quotes, their print view,\n-- public page and email, and the courtesy copy of an invoice. Null means "from the\n-- country", so existing customers need no backfill.\n--\n-- Additive and re-runnable, as every tenant migration has to be.\nALTER TABLE "company" ADD COLUMN IF NOT EXISTS "language" text;\n',
+    ],
+  },
 ];

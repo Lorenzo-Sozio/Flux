@@ -49,7 +49,7 @@ function Group({
   more: boolean;
   moreHref: string;
   moreLabel: string;
-  formatAmount: (n: number) => string;
+  formatAmount: (n: number, currency: string) => string;
 }) {
   if (rows.length === 0) return null;
 
@@ -74,7 +74,9 @@ function Group({
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 {row.amount !== null && (
-                  <span className="font-medium text-sm tabular-nums">{formatAmount(row.amount)}</span>
+                  <span className="font-medium text-sm tabular-nums">
+                    {formatAmount(row.amount, row.currency ?? "EUR")}
+                  </span>
                 )}
                 <Badge variant="outline" className={cn("h-5 text-[10px] capitalize", STATUS_TONE[row.status])}>
                   {row.status.replace(/_/g, " ")}
@@ -104,7 +106,8 @@ export function CustomerRecordPanel({
   contactId?: string;
 }) {
   const t = useTranslations("customerRecord");
-  const { formatAmount } = useCurrency();
+  const { formatMoney } = useCurrency();
+  const formatAmount = (n: number, currency: string) => formatMoney(n, currency);
 
   // Starting a quote, an order or a ticket from here carries the customer with
   // it. Without this the path was: read the customer, go to the module, find the

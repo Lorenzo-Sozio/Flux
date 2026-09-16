@@ -3,10 +3,18 @@ import { type NextRequest, NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
 import { auth } from "@/auth";
-import { APP_CONFIG } from "@/config/app-config";
 import { quotes } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
+import {
+  documentLanguage,
+  formatDocumentDate,
+  formatDocumentMoney,
+  formatDocumentPercent,
+  QUOTE_TEXT,
+  quoteStatusText,
+} from "@/lib/document-language";
 import { can } from "@/lib/permissions";
+import { sellerIdentity } from "@/lib/seller-identity";
 import { getDb } from "@/lib/tenant-context";
 import { USER_SUMMARY_COLUMNS } from "@/lib/user-columns";
 
@@ -42,28 +50,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const contactName = q.contact ? `${q.contact.firstName} ${q.contact.lastName}`.trim() : null;
 
-  // q is guaranteed non-null here (guarded above); non-null assertion needed
-  // because TypeScript can't narrow through closure boundaries.
-  const currency = q!.currency;
-  function money(value: string | null) {
-    return `${currency} ${parseFloat(value ?? "0").toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
-  }
-
-  const issueDate = new Date(q.issuedAt).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-  const expiryDate = q.expiresAt
-    ? new Date(q.expiresAt).toLocaleDateString(undefined, {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : null;
+  // The customer's language and the quote's own currency: this page is what gets printed and sent.
+  const lang = documentLanguage(q.company);
+  const tx = QUOTE_TEXT[lang];
+  const currency = q.currency;
+  const money = (value: string | number | null) => formatDocumentMoney(value, currency, lang);
+  const pct = (value: string | null) => formatDocumentPercent(value, lang);
+  const seller = await sellerIdentity(db);
+  const issueDate = formatDocumentDate(q.issuedAt, lang);
+  const expiryDate = q.expiresAt ? formatDocumentDate(q.expiresAt, lang) : null;
 
   const itemRows = q.items
     .map(
@@ -75,19 +70,19 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       </td>
       <td class="td-right">${item.quantity}</td>
       <td class="td-right">${money(item.unitPrice)}</td>
-      <td class="td-right">${parseFloat(item.discountPercent ?? "0") > 0 ? `${item.discountPercent}%` : "—"}</td>
-      <td class="td-right">${parseFloat(item.taxPercent ?? "0") > 0 ? `${item.taxPercent}%` : "—"}</td>
+      <td class="td-right">${parseFloat(item.discountPercent ?? "0") > 0 ? pct(item.discountPercent) : "—"}</td>
+      <td class="td-right">${parseFloat(item.taxPercent ?? "0") > 0 ? pct(item.taxPercent) : "—"}</td>
       <td class="td-right bold">${money(item.totalPrice)}</td>
     </tr>`,
     )
     .join("");
 
   const html = `<!DOCTYPE html>
-<html lang="en">
+<html lang="${lang}">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Quote ${esc(q.quoteNumber)}</title>
+  <title>${esc(tx.documentTitle)} ${esc(q.quoteNumber)}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; color: #111; background: #fff; padding: 40px; font-size: 14px; line-height: 1.5; }
@@ -134,36 +129,38 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   <div class="no-print" style="text-align:right;margin-bottom:20px;">
     <button onclick="window.print()" style="padding:8px 18px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;">
-      Print / Save as PDF
+      ${esc(tx.print)}
     </button>
   </div>
 
   <div class="header">
     <div>
-      <div class="brand">${APP_CONFIG.name}</div>
-      <div class="brand-sub">Quote &amp; Proposal</div>
+      <div class="brand">${esc(seller.name)}</div>
+      ${seller.address ? `<div class="brand-sub">${esc(seller.address)}</div>` : ""}
+      ${seller.vatNumber ? `<div class="brand-sub">${esc(tx.vat)} ${esc(seller.vatNumber)}</div>` : ""}
     </div>
     <div class="meta">
+      <div class="brand-sub">${esc(tx.documentTitle)}</div>
       <div class="quote-num">${esc(q.quoteNumber)}</div>
-      <div class="badge ${esc(q.status)}">${esc(q.status)}</div>
+      <div class="badge ${esc(q.status)}">${esc(quoteStatusText(q.status, lang))}</div>
     </div>
   </div>
 
   <div class="two-col">
     <div>
-      <div class="section-label">Customer</div>
+      <div class="section-label">${esc(tx.billTo)}</div>
       <div class="section-value">
         <strong>${esc(q.company?.name ?? "—")}</strong>
-        ${contactName ? `<br>${esc(contactName)}` : ""}
+        ${contactName ? `<br>${esc(tx.contactPerson)}: ${esc(contactName)}` : ""}
+        ${q.company?.vatNumber ? `<br><span class="sub">${esc(tx.vat)} ${esc(q.company.vatNumber)}</span>` : ""}
       </div>
     </div>
     <div style="text-align:right">
-      <div class="section-label">Details</div>
+      <div class="section-label">${esc(tx.details)}</div>
       <div class="section-value">
-        <div>Issued: <strong>${issueDate}</strong></div>
-        ${expiryDate ? `<div>Expires: <strong>${expiryDate}</strong></div>` : ""}
-        ${q.deal ? `<div>Deal: <strong>${esc(q.deal.name)}</strong></div>` : ""}
-        ${q.owner?.name ? `<div>Owner: <strong>${esc(q.owner.name)}</strong></div>` : ""}
+        <div>${esc(tx.issued)} <strong>${issueDate}</strong></div>
+        ${expiryDate ? `<div>${esc(tx.expires)} <strong>${expiryDate}</strong></div>` : ""}
+        ${q.owner?.name ? `<div>${esc(tx.reference)}: <strong>${esc(q.owner.name)}</strong></div>` : ""}
       </div>
     </div>
   </div>
@@ -171,12 +168,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   <table>
     <thead>
       <tr>
-        <th>Description</th>
-        <th style="text-align:right">Qty</th>
-        <th style="text-align:right">Unit Price</th>
-        <th style="text-align:right">Discount</th>
-        <th style="text-align:right">Tax</th>
-        <th style="text-align:right">Total</th>
+        <th>${esc(tx.description)}</th>
+        <th style="text-align:right">${esc(tx.quantity)}</th>
+        <th style="text-align:right">${esc(tx.unitPrice)}</th>
+        <th style="text-align:right">${esc(tx.discount)}</th>
+        <th style="text-align:right">${esc(tx.tax)}</th>
+        <th style="text-align:right">${esc(tx.lineTotal)}</th>
       </tr>
     </thead>
     <tbody>${itemRows}</tbody>
@@ -185,14 +182,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   <div class="totals">
     <div class="totals-inner">
       <div class="totals-row">
-        <span class="label">Subtotal</span>
+        <span class="label">${esc(tx.subtotal)}</span>
         <span class="value">${money(q.subtotal)}</span>
       </div>
       ${
         parseFloat(q.discountAmount ?? "0") > 0
           ? `
       <div class="totals-row discount">
-        <span class="label">Discount (${q.discountPercent}%)</span>
+        <span class="label">${esc(tx.discountOn)} (${pct(q.discountPercent)})</span>
         <span class="value">−${money(q.discountAmount)}</span>
       </div>`
           : ""
@@ -201,13 +198,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         parseFloat(q.taxAmount ?? "0") > 0
           ? `
       <div class="totals-row tax">
-        <span class="label">Tax (${q.taxPercent}%)</span>
+        <span class="label">${esc(tx.taxOn)}${parseFloat(q.taxPercent ?? "0") > 0 ? ` (${pct(q.taxPercent)})` : ""}</span>
         <span class="value">+${money(q.taxAmount)}</span>
       </div>`
           : ""
       }
       <div class="totals-row total">
-        <span class="label">Total</span>
+        <span class="label">${esc(tx.total)}</span>
         <span class="value">${money(q.totalAmount)}</span>
       </div>
     </div>
@@ -217,14 +214,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     q.notes
       ? `
   <div class="notes">
-    <div class="section-label">Notes</div>
+    <div class="section-label">${esc(tx.notes)}</div>
     <p style="margin-top:6px;color:#444;white-space:pre-wrap">${esc(q.notes)}</p>
   </div>`
       : ""
   }
 
   <div class="footer">
-    Generated by ${APP_CONFIG.name} &nbsp;·&nbsp; ${new Date().toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" })}
+    ${esc(seller.name)} &nbsp;·&nbsp; ${esc(tx.generated)} ${formatDocumentDate(new Date(), lang)}
   </div>
 
 </body>

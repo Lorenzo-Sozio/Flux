@@ -4,6 +4,7 @@
  */
 
 import { getAppUrl } from "@/lib/app-url";
+import { type DocumentLanguage, fill, INVOICE_TEXT } from "@/lib/document-language";
 import { getPlatformEmailConfig, sendEmail } from "@/lib/email-provider";
 
 // Resolved per call, not at import: `getAppUrl()` refuses to guess in production,
@@ -436,29 +437,38 @@ export async function sendTaskDueEmail(email: string, taskTitle: string, taskLin
 export async function sendInvoiceCopyEmail(data: {
   to: string;
   issuerName: string;
-  documentLabel: string;
+  documentType: "TD01" | "TD04";
   documentNumber: string;
   issueDate: string;
   total: string;
   dueDate: string | null;
   pdf: { filename: string; bytes: Uint8Array };
   replyTo?: string | null;
+  lang: DocumentLanguage;
 }) {
-  const [y, m, d] = data.issueDate.split("-");
-  const due = data.dueDate ? data.dueDate.split("-").reverse().join("/") : null;
+  const tx = INVOICE_TEXT[data.lang];
+  const day = (iso: string) => iso.split("-").reverse().join("/");
+  const label = data.documentType === "TD04" ? tx.creditNote : tx.invoice;
+  const body =
+    fill(tx.emailBody, {
+      label: esc(data.lang === "it" ? label.toLowerCase() : label),
+      number: `<strong>${esc(data.documentNumber)}</strong>`,
+      date: day(data.issueDate),
+      total: `<strong>${esc(data.total)}</strong>`,
+    }) + (data.dueDate ? fill(tx.emailDue, { date: esc(day(data.dueDate)) }) : "");
   const html = `
       <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111827">
-        <p>Gentile cliente,</p>
-        <p>in allegato la copia di cortesia della ${esc(data.documentLabel.toLowerCase())} n. <strong>${esc(data.documentNumber)}</strong> del ${d}/${m}/${y}, di importo <strong>${esc(data.total)}</strong>${due ? `, con scadenza il ${esc(due)}` : ""}.</p>
-        <p>Cordiali saluti,<br>${esc(data.issuerName)}</p>
+        <p>${esc(tx.emailGreeting)}</p>
+        <p>${body}.</p>
+        <p>${esc(tx.emailSignoff)}<br>${esc(data.issuerName)}</p>
         <p style="color:#6b7280;font-size:12px;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:12px">
-          Il PDF allegato è una copia di cortesia priva di valore fiscale. La fattura elettronica originale è quella trasmessa tramite il Sistema di Interscambio (SDI) ed è disponibile nell'area riservata del sito dell'Agenzia delle Entrate.
+          ${esc(tx.emailNotice)}
         </p>
       </div>`;
 
   return sendEmail({
     to: sanitizeHeader(data.to),
-    subject: sanitizeHeader(`${data.documentLabel} n. ${data.documentNumber} — ${data.issuerName}`),
+    subject: sanitizeHeader(`${label} ${tx.number} ${data.documentNumber} — ${data.issuerName}`),
     html,
     ...(data.replyTo ? { replyTo: sanitizeHeader(data.replyTo) } : {}),
     attachments: [{ filename: data.pdf.filename, content: data.pdf.bytes, contentType: "application/pdf" }],

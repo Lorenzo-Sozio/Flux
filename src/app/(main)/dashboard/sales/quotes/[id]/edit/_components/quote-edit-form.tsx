@@ -18,6 +18,7 @@ import { QuoteItemSchema } from "@/actions/quotes-validation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -88,7 +89,10 @@ export function QuoteEditForm({ quote, formData }: Props) {
   const router = useRouter();
   const t = useTranslations("quotes.form");
   const tc = useTranslations("common");
-  const { formatAmount } = useCurrency();
+  const { formatMoney } = useCurrency();
+  // Fixed when the quote was created, with its exchange rate: changing it here would
+  // relabel the figures without converting them.
+  const currency = quote.currency || "EUR";
   const [submitting, setSubmitting] = useState(false);
 
   const form = useForm<FormValues>({
@@ -210,7 +214,7 @@ export function QuoteEditForm({ quote, formData }: Props) {
           <div className="flex items-center gap-2">
             <div className="mr-2 hidden items-baseline gap-2 sm:flex">
               <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("total")}</span>
-              <span className="font-bold text-base tabular-nums">{formatAmount(totals.total)}</span>
+              <span className="font-bold text-base tabular-nums">{formatMoney(totals.total, currency)}</span>
             </div>
             <Button type="button" variant="ghost" onClick={() => router.push(`/dashboard/sales/quotes/${quote.id}`)}>
               {tc("cancel")}
@@ -376,7 +380,9 @@ export function QuoteEditForm({ quote, formData }: Props) {
                             )}
                           </div>
                           <div className="flex items-center gap-1">
-                            <span className="mr-1 font-semibold text-sm tabular-nums">{formatAmount(lineTotal)}</span>
+                            <span className="mr-1 font-semibold text-sm tabular-nums">
+                              {formatMoney(lineTotal, currency)}
+                            </span>
                             <Button
                               type="button"
                               variant="ghost"
@@ -511,7 +517,7 @@ export function QuoteEditForm({ quote, formData }: Props) {
                           />
 
                           <span className="hidden text-right font-semibold text-sm tabular-nums 2xl:block">
-                            {formatAmount(lineTotal)}
+                            {formatMoney(lineTotal, currency)}
                           </span>
 
                           <div className="hidden items-center justify-end 2xl:flex">
@@ -559,7 +565,11 @@ export function QuoteEditForm({ quote, formData }: Props) {
                 <CardDescription>{t("termsSubtitle")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs">{t("currency")}</Label>
+                    <CurrencySelect value={currency} onChange={() => undefined} disabled />
+                  </div>
                   <FormField
                     control={form.control}
                     name="expiresAt"
@@ -652,7 +662,7 @@ export function QuoteEditForm({ quote, formData }: Props) {
                 <CardContent className="space-y-2.5 text-sm">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">{t("subtotal")}</span>
-                    <span className="tabular-nums">{formatAmount(totals.subtotal)}</span>
+                    <span className="tabular-nums">{formatMoney(totals.subtotal, currency)}</span>
                   </div>
 
                   {totals.discountAmount > 0 && (
@@ -660,20 +670,20 @@ export function QuoteEditForm({ quote, formData }: Props) {
                       <span>
                         {t("discountAmount")} · {headerDiscount}%
                       </span>
-                      <span className="tabular-nums">−{formatAmount(totals.discountAmount)}</span>
+                      <span className="tabular-nums">−{formatMoney(totals.discountAmount, currency)}</span>
                     </div>
                   )}
 
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">{t("taxAmount")}</span>
-                    <span className="tabular-nums">{formatAmount(totals.taxAmount)}</span>
+                    <span className="tabular-nums">{formatMoney(totals.taxAmount, currency)}</span>
                   </div>
 
                   <Separator className="my-1" />
 
                   <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2.5">
                     <span className="font-semibold">{t("total")}</span>
-                    <span className="font-bold text-lg tabular-nums">{formatAmount(totals.total)}</span>
+                    <span className="font-bold text-lg tabular-nums">{formatMoney(totals.total, currency)}</span>
                   </div>
                 </CardContent>
                 <div className="px-6 pb-6">

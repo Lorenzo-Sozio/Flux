@@ -40,14 +40,17 @@ const STATE_TONE: Record<string, string> = {
 export function PaymentsCard({
   orderId,
   totalAmount,
+  currency,
   deliveredAt,
 }: {
   orderId: string;
   totalAmount: string | number | null;
+  /** The order's own currency: payments are recorded in it. */
+  currency: string;
   deliveredAt: Date | string | null;
 }) {
   const t = useTranslations("orders.payments");
-  const { formatAmount } = useCurrency();
+  const { formatMoney } = useCurrency();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -125,11 +128,11 @@ export function PaymentsCard({
         <div className="space-y-1.5 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">{t("paid")}</span>
-            <span className="tabular-nums">{formatAmount(summary.paid)}</span>
+            <span className="tabular-nums">{formatMoney(summary.paid, currency)}</span>
           </div>
           <div className="flex items-center justify-between font-medium">
             <span>{summary.outstanding < 0 ? t("credit") : t("outstanding")}</span>
-            <span className="tabular-nums">{formatAmount(Math.abs(summary.outstanding))}</span>
+            <span className="tabular-nums">{formatMoney(Math.abs(summary.outstanding), currency)}</span>
           </div>
         </div>
 
@@ -140,7 +143,7 @@ export function PaymentsCard({
               {payments.map((p) => (
                 <li key={p.id} className="flex items-center justify-between gap-2 text-xs">
                   <div className="min-w-0">
-                    <span className="tabular-nums">{formatAmount(Number(p.amount ?? 0))}</span>
+                    <span className="tabular-nums">{formatMoney(Number(p.amount ?? 0), currency)}</span>
                     <span className="ml-2 text-muted-foreground">
                       {new Date(p.paidAt).toLocaleDateString()}
                       {p.method ? ` · ${p.method}` : ""}

@@ -1,4 +1,5 @@
 import { isDay } from "@/lib/contract-terms";
+import { documentLanguage } from "@/lib/document-language";
 import { normaliseVat } from "@/lib/fiscal-ids";
 import { isValidSeries, NATURE_CODES } from "@/lib/invoice-rules";
 
@@ -155,6 +156,7 @@ export function customerSnapshot(c: {
   city: string | null;
   state: string | null;
   country: string | null;
+  language?: string | null;
 }) {
   return {
     name: c.name,
@@ -167,5 +169,7 @@ export function customerSnapshot(c: {
     city: c.city,
     province: c.state?.trim().toUpperCase() || null,
     country: c.country,
+    // Frozen with the rest, so the courtesy copy reprinted next year keeps its language.
+    language: documentLanguage(c),
   };
 }

@@ -39,6 +39,20 @@ interface CurrencyContextValue {
     eurAmount: number,
     opts?: { noDecimals?: boolean; minimumFractionDigits?: number; maximumFractionDigits?: number },
   ) => string;
+  /**
+   * An amount in the currency it was written in — a quote, an order, a contract —
+   * never converted, in the conventions of the interface language.
+   *
+   * ⚠️ `formatAmount` is for figures that are EUR by construction. Used on a
+   * document it multiplied the stored amount by the viewer's display rate and
+   * printed it in that currency: an Italian user whose switcher had once been set
+   * to dollars saw every euro quote as a different number with a $ in front.
+   */
+  formatMoney: (
+    amount: number | string | null | undefined,
+    currency: string,
+    opts?: { noDecimals?: boolean },
+  ) => string;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -126,9 +140,22 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
     [currency, rates],
   );
 
+  const formatMoney = useCallback(
+    (amount: number | string | null | undefined, code: string, opts?: { noDecimals?: boolean }): string => {
+      const value = typeof amount === "string" ? Number.parseFloat(amount) : (amount ?? 0);
+      return new Intl.NumberFormat(locale === "it" ? "it-IT" : "en-GB", {
+        style: "currency",
+        currency: code || "EUR",
+        useGrouping: "always",
+        ...(opts?.noDecimals ? { minimumFractionDigits: 0, maximumFractionDigits: 0 } : {}),
+      }).format(Number.isFinite(value) ? value : 0);
+    },
+    [locale],
+  );
+
   const value = useMemo<CurrencyContextValue>(
-    () => ({ currency, rates, loading, error, fetchedAt, setCurrency, formatAmount }),
-    [currency, rates, loading, error, fetchedAt, setCurrency, formatAmount],
+    () => ({ currency, rates, loading, error, fetchedAt, setCurrency, formatAmount, formatMoney }),
+    [currency, rates, loading, error, fetchedAt, setCurrency, formatAmount, formatMoney],
   );
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;

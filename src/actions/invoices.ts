@@ -7,6 +7,7 @@ import { and, asc, count, desc, eq, gte, ilike, or, type SQL, sql } from "drizzl
 
 import { companies, invoiceIssuers, invoiceItems, invoices, orderItems, orders, products } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
+import { documentLanguage, formatDocumentMoney } from "@/lib/document-language";
 import { sendInvoiceCopyEmail } from "@/lib/email";
 import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { customerGaps, type Gap, issuerGaps } from "@/lib/fiscal-ids";
@@ -535,20 +536,19 @@ export async function sendInvoiceCopy(id: string, to: string): Promise<{ ok: tru
 
   const pdf = await readInvoiceFile(db, invoice, "pdf");
   const issuer = (invoice.issuerSnapshot ?? {}) as { legalName?: string; email?: string };
+  // The language frozen with the customer at issue, so the email matches the PDF it carries.
+  const lang = documentLanguage(invoice.customerSnapshot as { language?: string | null; country?: string | null });
   const sent = await sendInvoiceCopyEmail({
     to: address,
     issuerName: issuer.legalName ?? "",
-    documentLabel: invoice.documentType === "TD04" ? "Nota di credito" : "Fattura",
+    documentType: invoice.documentType as "TD01" | "TD04",
     documentNumber: invoice.documentNumber,
     issueDate: invoice.issueDate,
-    total: new Intl.NumberFormat("it-IT", {
-      style: "currency",
-      currency: invoice.currency,
-      useGrouping: "always",
-    }).format(Number(invoice.total)),
+    total: formatDocumentMoney(invoice.total, invoice.currency, lang),
     dueDate: invoice.dueDate,
     pdf: { filename: pdf.name, bytes: pdf.bytes },
     replyTo: issuer.email,
+    lang,
   });
   if (!sent.success) return { ok: false, error: sent.error ?? "The email could not be sent." };
 

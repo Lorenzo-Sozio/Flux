@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/lib/document-language.ts",
+    "description": "⚠️⚠️ la lingua scelta sulla scheda cliente viene ignorata",
+    "find": "  if (isDocumentLanguage(customer?.language)) return customer.language;\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/document-language.ts",
+    "description": "⚠️ un cliente senza paese riceve i documenti in inglese",
+    "find": "  return !country || ITALY.has(country) ? \"it\" : \"en\";",
+    "replace": "  return country && ITALY.has(country) ? \"it\" : \"en\";"
+  },
+  {
+    "file": "src/lib/document-language.ts",
+    "description": "⚠️ un importo di quattro cifre in italiano perde il separatore delle migliaia",
+    "find": "    useGrouping: \"always\",\n  }).format(Number.isFinite(value) ? value : 0);",
+    "replace": "  }).format(Number.isFinite(value) ? value : 0);"
+  },
+  {
+    "file": "src/lib/document-language.ts",
+    "description": "⚠️ una data di calendario slitta al giorno prima",
+    "find": "new Date(`${value}T12:00:00Z`)",
+    "replace": "new Date(`${value}T00:00:00+14:00`)"
+  },
+  {
+    "file": "src/lib/document-language.ts",
+    "description": "⚠️⚠️ il PDF inglese dice «Preventivo»",
+    "find": "    documentTitle: \"Quote\",",
+    "replace": "    documentTitle: \"Preventivo\","
+  },
+  {
+    "file": "src/app/api/quotes/public/route.ts",
+    "description": "⚠️⚠️ la pagina pubblica riceve tutta la scheda aziendale",
+    "find": "      company: { columns: { name: true, country: true, language: true, vatNumber: true } },",
+    "replace": "      company: true,"
+  },
+  {
+    "file": "src/actions/quotes.ts",
+    "description": "⚠️⚠️ il link nell'email non apre il preventivo",
+    "find": "    const quoteViewUrl = appUrl(`/q/${quote.publicToken}`);",
+    "replace": "    const quoteViewUrl = appUrl(`/q/${quote.id}`);"
+  },
+  {
+    "file": "src/lib/invoice-draft.ts",
+    "description": "⚠️ la lingua non viene congelata con il cliente all'emissione",
+    "find": "    language: documentLanguage(c),\n",
+    "replace": ""
+  }
+]

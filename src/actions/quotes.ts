@@ -11,6 +11,7 @@ import { CreateQuoteSchema, UpdateQuoteSchema } from "@/actions/quotes-validatio
 import { companies, contacts, deals, products, quoteActivities, quoteItems, quotes, users } from "@/db/schema";
 import { appUrl } from "@/lib/app-url";
 import { ForbiddenError, requireCapability, requirePlanModule } from "@/lib/auth-guard";
+import { documentLanguage, fill, formatDocumentDate, formatDocumentMoney, QUOTE_TEXT } from "@/lib/document-language";
 import { computeDocument } from "@/lib/document-totals";
 import { sendEmail } from "@/lib/email-provider";
 import { getExchangeRates } from "@/lib/exchange-rates";
@@ -447,20 +448,34 @@ export async function sendQuoteEmailAction(quoteId: string, toEmail: string, sub
       throw new Error("Unauthorized");
     }
 
-    // Generate public view token for quote (simplified: use quoteId + timestamp)
-    const viewToken = crypto.createHash("sha256").update(`${quoteId}:${Date.now()}`).digest("hex");
+    // ⚠️ The link used a fresh hash of the id and the time, saved nowhere, so every
+    // customer received a "View quote" button that opened a not-found page. The
+    // public page looks quotes up by `publicToken`; that is the link.
+    const quoteViewUrl = appUrl(`/q/${quote.publicToken}`);
 
-    // Was `${process.env.NEXTAUTH_URL}/...`, which renders the literal string
-    // "undefined/quotes/..." when the variable is unset — a link the customer
-    // cannot open, delivered without any error (audit rilievo B-04).
-    const quoteViewUrl = appUrl(`/q/${viewToken}`);
+    // In the customer's language and the quote's currency, whoever sends it.
+    const lang = documentLanguage(quote.company);
+    const tx = QUOTE_TEXT[lang];
+    const escapeHtml = (v: string) =>
+      v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const summary = fill(tx.emailBody, {
+      number: escapeHtml(quote.quoteNumber),
+      total: escapeHtml(formatDocumentMoney(quote.totalAmount, quote.currency, lang)),
+    });
+    const validity = quote.expiresAt
+      ? ` ${fill(tx.emailValidUntil, { date: escapeHtml(formatDocumentDate(quote.expiresAt, lang)) })}`
+      : "";
 
-    // Build HTML email
+    // The message is what the salesperson typed: escaped, because it was pasted
+    // into HTML as it was, and a stray "<" broke the email.
     const html = `
-      <h2>Quote: ${quote.quoteNumber}</h2>
-      <p>${message}</p>
-      <p><strong>Total: ${quote.currency} ${parseFloat(quote.totalAmount).toFixed(2)}</strong></p>
-      <p><a href="${quoteViewUrl}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px;">View Quote</a></p>
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111827;line-height:1.5">
+        <p style="white-space:pre-wrap">${escapeHtml(message)}</p>
+        <div style="margin:20px 0;padding:14px 16px;border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb">
+          <p style="margin:0">${summary}${validity}</p>
+        </div>
+        <p><a href="${quoteViewUrl}" style="display:inline-block;padding:10px 20px;background-color:#111827;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600">${escapeHtml(tx.emailCta)}</a></p>
+      </div>
     `;
 
     // Send email

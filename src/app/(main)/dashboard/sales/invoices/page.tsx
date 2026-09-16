@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Plus } from "lucide-react";
-import { getTranslations } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
 import { getInvoices, getStampDutySummary } from "@/actions/invoices";
 import { ListToolbar } from "@/components/crm/list-toolbar";
@@ -29,9 +29,10 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
     getTranslations("invoices"),
     getActor(),
   ]);
-  const euro = (n: number) => new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" }).format(n);
+  const numberLocale = (await getLocale()) === "it" ? "it-IT" : "en-GB";
+  const euro = (n: number) => new Intl.NumberFormat(numberLocale, { style: "currency", currency: "EUR" }).format(n);
   const money = (value: string, currency: string) =>
-    new Intl.NumberFormat("it-IT", { style: "currency", currency }).format(Number(value));
+    new Intl.NumberFormat(numberLocale, { style: "currency", currency }).format(Number(value));
 
   return (
     <div className="space-y-6">

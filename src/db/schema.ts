@@ -192,6 +192,9 @@ export const companies = pgTable("company", {
   // invoice needs to reach this customer. Checked when issuing, not when saving.
   fiscalCode: text("fiscal_code"),
   pec: text("pec"),
+  // "it" | "en": the language of this customer's documents. Null reads it from the
+  // country — see src/lib/document-language.ts.
+  language: text("language"),
   tags: text("tags").array(),
   sourceLeadId: text("source_lead_id"), // FK set via migration → lead.id (set null)
   companyCategoryId: text("company_category_id").references(() => companyCategories.id, { onDelete: "set null" }),

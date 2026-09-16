@@ -14,6 +14,7 @@ import { createOrder, type getOrderFormData } from "@/actions/orders";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { CurrencySelect } from "@/components/ui/currency-select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -57,6 +58,7 @@ interface OrderFormValues {
   status: "draft" | "processing" | "completed" | "cancelled";
   orderDate: string;
   discountPercent: number;
+  currency: string;
   notes: string;
   items: LineValues[];
 }
@@ -106,7 +108,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
   // in both places or the two screens disagree about the same row.
   const tStatus = useTranslations("orders.statuses");
   const tc = useTranslations("common");
-  const { formatAmount } = useCurrency();
+  const { formatMoney } = useCurrency();
 
   const data = initialData;
   const [submitting, setSubmitting] = useState(false);
@@ -122,12 +124,14 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
       status: "draft",
       orderDate: new Date().toISOString().slice(0, 10),
       discountPercent: 0,
+      currency: "EUR",
       notes: "",
       items: [emptyLine()],
     },
   });
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
+  const currency = form.watch("currency") || "EUR";
 
   // The server page could not load the customers and products. Say so, as the
   // client-side load used to, rather than showing empty pickers with no reason.
@@ -196,6 +200,8 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
     if (!quote) return;
     if (quote.companyId) form.setValue("companyId", quote.companyId);
     if (quote.contactId) form.setValue("contactId", quote.contactId);
+    // An order from a quote is sold in the quote's currency.
+    if (quote.currency) form.setValue("currency", quote.currency);
   }
 
   function selectDeal(dealId: string) {
@@ -223,6 +229,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
         status: values.status,
         orderDate: values.orderDate || undefined,
         discountPercent: values.discountPercent,
+        currency: values.currency,
         notes: values.notes || undefined,
         items: usable.map((l) => ({
           productId: l.productId || undefined,
@@ -272,7 +279,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
           {/* The number the writer keeps glancing at, without scrolling back for it. */}
           <div className="mr-2 hidden items-baseline gap-2 sm:flex">
             <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("total")}</span>
-            <span className="font-bold text-base tabular-nums">{formatAmount(totals.total)}</span>
+            <span className="font-bold text-base tabular-nums">{formatMoney(totals.total, currency)}</span>
           </div>
           <Button type="button" variant="ghost" onClick={() => router.push("/dashboard/sales/orders")}>
             {tc("cancel")}
@@ -326,7 +333,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
           </CardContent>
         </Card>
 
-        {/* Four short answers, two by two, so this card ends level with the one beside it. */}
+        {/* Short answers, two by two; the currency takes a row of its own. */}
         <Card className="md:col-span-7">
           <CardHeader>
             <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
@@ -358,6 +365,11 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
               <div className="space-y-1.5">
                 <Label className="text-xs">{t("orderDate")}</Label>
                 <Input type="date" className="h-9" {...form.register("orderDate")} />
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-xs">{t("currency")}</Label>
+                <CurrencySelect value={currency} onChange={(v) => form.setValue("currency", v)} />
               </div>
 
               <div className="space-y-1.5">
@@ -482,7 +494,9 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
                       )}
                     </div>
                     <div className="flex items-center gap-1">
-                      <span className="mr-1 font-semibold text-sm tabular-nums">{formatAmount(lineTotal)}</span>
+                      <span className="mr-1 font-semibold text-sm tabular-nums">
+                        {formatMoney(lineTotal, currency)}
+                      </span>
                       {noteButton}
                       {removeButton}
                     </div>
@@ -568,7 +582,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
                     </div>
 
                     <span className="hidden text-right font-semibold text-sm tabular-nums xl:block">
-                      {formatAmount(lineTotal)}
+                      {formatMoney(lineTotal, currency)}
                     </span>
 
                     <div className="hidden items-center justify-end gap-0.5 xl:flex">
@@ -639,7 +653,7 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
           <CardContent className="space-y-2.5 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">{t("net")}</span>
-              <span className="tabular-nums">{formatAmount(totals.subtotal)}</span>
+              <span className="tabular-nums">{formatMoney(totals.subtotal, currency)}</span>
             </div>
 
             <div className="flex items-center justify-between gap-3">
@@ -663,20 +677,20 @@ export function NewOrderForm({ initialData }: { initialData: FormData | null }) 
             {totals.discountAmount > 0 && (
               <div className="flex items-center justify-between text-muted-foreground">
                 <span>{t("discountAmount")}</span>
-                <span className="tabular-nums">−{formatAmount(totals.discountAmount)}</span>
+                <span className="tabular-nums">−{formatMoney(totals.discountAmount, currency)}</span>
               </div>
             )}
 
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">{t("taxAmount")}</span>
-              <span className="tabular-nums">{formatAmount(totals.taxAmount)}</span>
+              <span className="tabular-nums">{formatMoney(totals.taxAmount, currency)}</span>
             </div>
 
             <Separator className="my-1" />
 
             <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2.5">
               <span className="font-semibold">{t("total")}</span>
-              <span className="font-bold text-lg tabular-nums">{formatAmount(totals.total)}</span>
+              <span className="font-bold text-lg tabular-nums">{formatMoney(totals.total, currency)}</span>
             </div>
           </CardContent>
         </Card>

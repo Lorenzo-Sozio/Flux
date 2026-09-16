@@ -33,6 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useCurrency } from "@/hooks/use-currency";
 import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { PAYMENT_METHODS } from "@/lib/invoice-draft";
 import { draftProblems } from "@/lib/invoice-rules";
@@ -48,6 +49,7 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
   const t = useTranslations("invoices");
   const tI = useTranslations("invoicing");
   const router = useRouter();
+  const { formatMoney } = useCurrency();
   const { invoice } = data;
   const isDraft = invoice.status === "draft";
   const editable = isDraft && canWrite;
@@ -101,8 +103,7 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
   const liveDraftProblems = isDraft
     ? draftProblems(draftLines, num(discount), { mode: stampMode, note: stampNote })
     : [];
-  const money = (n: number) =>
-    new Intl.NumberFormat("it-IT", { style: "currency", currency: invoice.currency }).format(n);
+  const money = (n: number) => formatMoney(n, invoice.currency);
 
   const touch =
     <T,>(setter: (v: T) => void) =>

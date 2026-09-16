@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import { format } from "date-fns";
 import { Building2, Calendar, Check, Clock, User, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  type DocumentLanguage,
+  formatDocumentDate,
+  formatDocumentMoney,
+  QUOTE_TEXT,
+  quoteStatusText,
+} from "@/lib/document-language";
 
 // Mirror the type from the API response
 interface QuoteItem {
@@ -45,6 +51,9 @@ interface PublicQuote {
   company: { name: string } | null;
   contact: { firstName: string; lastName: string } | null;
   owner: { name: string | null; email: string } | null;
+  /** The customer's language, decided by the API from their record. */
+  language: DocumentLanguage;
+  sellerName: string;
 }
 
 interface Props {
@@ -52,21 +61,14 @@ interface Props {
   token: string;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
-  draft: { label: "Draft", className: "border-slate-300 text-slate-600" },
-  sent: { label: "Sent", className: "border-blue-300 text-blue-600 bg-blue-50" },
-  viewed: { label: "Viewed", className: "border-violet-300 text-violet-600 bg-violet-50" },
-  accepted: { label: "Accepted", className: "border-green-400 text-green-700 bg-green-50" },
-  declined: { label: "Declined", className: "border-red-300 text-red-600 bg-red-50" },
-  expired: { label: "Expired", className: "border-amber-300 text-amber-600 bg-amber-50" },
+const STATUS_STYLE: Record<string, string> = {
+  draft: "border-slate-300 text-slate-600",
+  sent: "border-blue-300 text-blue-600 bg-blue-50",
+  viewed: "border-violet-300 text-violet-600 bg-violet-50",
+  accepted: "border-green-400 text-green-700 bg-green-50",
+  declined: "border-red-300 text-red-600 bg-red-50",
+  expired: "border-amber-300 text-amber-600 bg-amber-50",
 };
-
-function fmt(amount: string | null, currency: string) {
-  return `${currency} ${parseFloat(amount ?? "0").toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-}
 
 export function PublicQuoteView({ quote, token }: Props) {
   const [status, setStatus] = useState(quote.status);
@@ -75,7 +77,12 @@ export function PublicQuoteView({ quote, token }: Props) {
   const [showDeclineForm, setShowDeclineForm] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const statusCfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.sent;
+  // The customer's language, not the browser's: the same quote reads the same for
+  // everyone it is forwarded to.
+  const lang = quote.language ?? "it";
+  const tx = QUOTE_TEXT[lang];
+  const fmt = (amount: string | null) => formatDocumentMoney(amount, quote.currency, lang);
+  const statusClass = STATUS_STYLE[status] ?? STATUS_STYLE.sent;
   const contactName = quote.contact ? `${quote.contact.firstName} ${quote.contact.lastName}`.trim() : null;
   const canAct = ["sent", "viewed"].includes(status);
 
@@ -89,14 +96,22 @@ export function PublicQuoteView({ quote, token }: Props) {
         body: JSON.stringify({ token, action, reason: declineReason || undefined }),
       });
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error ?? "Something went wrong");
+        const data = (await res.json().catch(() => ({}))) as { code?: string };
+        setError(
+          data.code === "expired"
+            ? tx.expired
+            : data.code === "not_actionable"
+              ? tx.notActionable
+              : res.status === 404
+                ? tx.notFound
+                : tx.somethingWrong,
+        );
         return;
       }
       setStatus(action);
       setShowDeclineForm(false);
     } catch {
-      setError("Network error. Please try again.");
+      setError(tx.networkError);
     } finally {
       setLoading(false);
     }
@@ -107,8 +122,8 @@ export function PublicQuoteView({ quote, token }: Props) {
       <div className="mx-auto max-w-3xl space-y-6">
         {/* Branding header */}
         <div className="text-center space-y-1">
-          <p className="text-sm text-muted-foreground">You have received a quote from</p>
-          {quote.owner && <p className="font-semibold text-lg">{quote.owner.name ?? quote.owner.email}</p>}
+          <p className="text-sm text-muted-foreground">{tx.receivedFrom}</p>
+          <p className="font-semibold text-lg">{quote.sellerName || quote.owner?.name || quote.owner?.email}</p>
         </div>
 
         {/* Main quote card */}
@@ -118,19 +133,19 @@ export function PublicQuoteView({ quote, token }: Props) {
               <div className="space-y-1">
                 <div className="flex items-center gap-3">
                   <span className="text-xl font-bold font-mono tracking-tight">{quote.quoteNumber}</span>
-                  <Badge variant="outline" className={`text-xs font-medium ${statusCfg.className}`}>
-                    {statusCfg.label}
+                  <Badge variant="outline" className={`text-xs font-medium ${statusClass}`}>
+                    {quoteStatusText(status, lang)}
                   </Badge>
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                   <span className="flex items-center gap-1.5">
                     <Calendar className="h-3.5 w-3.5" />
-                    Issued {format(new Date(quote.issuedAt), "MMM d, yyyy")}
+                    {tx.issued} {formatDocumentDate(quote.issuedAt, lang)}
                   </span>
                   {quote.expiresAt && (
                     <span className="flex items-center gap-1.5">
                       <Clock className="h-3.5 w-3.5" />
-                      Expires {format(new Date(quote.expiresAt), "MMM d, yyyy")}
+                      {tx.expires} {formatDocumentDate(quote.expiresAt, lang)}
                     </span>
                   )}
                   {quote.company && (
@@ -158,10 +173,10 @@ export function PublicQuoteView({ quote, token }: Props) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-muted-foreground text-xs uppercase tracking-wide">
-                    <th className="text-left py-2 font-medium">Description</th>
-                    <th className="text-right py-2 font-medium">Qty</th>
-                    <th className="text-right py-2 font-medium">Unit Price</th>
-                    <th className="text-right py-2 font-medium">Total</th>
+                    <th className="text-left py-2 font-medium">{tx.description}</th>
+                    <th className="text-right py-2 font-medium">{tx.quantity}</th>
+                    <th className="text-right py-2 font-medium">{tx.unitPrice}</th>
+                    <th className="text-right py-2 font-medium">{tx.lineTotal}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -174,10 +189,8 @@ export function PublicQuoteView({ quote, token }: Props) {
                         )}
                       </td>
                       <td className="py-3 text-right tabular-nums">{item.quantity}</td>
-                      <td className="py-3 text-right tabular-nums">{fmt(item.unitPrice, quote.currency)}</td>
-                      <td className="py-3 text-right font-semibold tabular-nums">
-                        {fmt(item.totalPrice, quote.currency)}
-                      </td>
+                      <td className="py-3 text-right tabular-nums">{fmt(item.unitPrice)}</td>
+                      <td className="py-3 text-right font-semibold tabular-nums">{fmt(item.totalPrice)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -191,25 +204,25 @@ export function PublicQuoteView({ quote, token }: Props) {
           <CardContent className="pt-4">
             <div className="ml-auto max-w-xs space-y-1.5">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal</span>
-                <span>{fmt(quote.subtotal, quote.currency)}</span>
+                <span className="text-muted-foreground">{tx.subtotal}</span>
+                <span>{fmt(quote.subtotal)}</span>
               </div>
               {parseFloat(quote.discountAmount ?? "0") > 0 && (
                 <div className="flex justify-between text-sm text-amber-600">
-                  <span>Discount</span>
-                  <span>−{fmt(quote.discountAmount, quote.currency)}</span>
+                  <span>{tx.discountOn}</span>
+                  <span>−{fmt(quote.discountAmount)}</span>
                 </div>
               )}
               {parseFloat(quote.taxAmount ?? "0") > 0 && (
                 <div className="flex justify-between text-sm text-muted-foreground">
-                  <span>Tax</span>
-                  <span>+{fmt(quote.taxAmount, quote.currency)}</span>
+                  <span>{tx.taxOn}</span>
+                  <span>+{fmt(quote.taxAmount)}</span>
                 </div>
               )}
               <Separator />
               <div className="flex justify-between font-bold text-base">
-                <span>Total</span>
-                <span>{fmt(quote.totalAmount, quote.currency)}</span>
+                <span>{tx.total}</span>
+                <span>{fmt(quote.totalAmount)}</span>
               </div>
             </div>
           </CardContent>
@@ -219,7 +232,7 @@ export function PublicQuoteView({ quote, token }: Props) {
             <>
               <Separator />
               <CardContent className="pt-4">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Notes</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">{tx.notes}</p>
                 <p className="text-sm whitespace-pre-wrap">{quote.notes}</p>
               </CardContent>
             </>
@@ -232,9 +245,7 @@ export function PublicQuoteView({ quote, token }: Props) {
             <CardContent className="pt-6 pb-6 space-y-4">
               {!showDeclineForm ? (
                 <>
-                  <p className="text-sm text-center text-muted-foreground">
-                    Please review the quote above and accept or decline it.
-                  </p>
+                  <p className="text-sm text-center text-muted-foreground">{tx.reviewPrompt}</p>
                   <div className="flex gap-3 justify-center">
                     <Button
                       className="min-w-28 bg-green-600 hover:bg-green-700"
@@ -242,7 +253,7 @@ export function PublicQuoteView({ quote, token }: Props) {
                       onClick={() => handleAction("accepted")}
                     >
                       <Check className="h-4 w-4 mr-2" />
-                      Accept Quote
+                      {tx.accept}
                     </Button>
                     <Button
                       variant="outline"
@@ -251,25 +262,25 @@ export function PublicQuoteView({ quote, token }: Props) {
                       onClick={() => setShowDeclineForm(true)}
                     >
                       <X className="h-4 w-4 mr-2" />
-                      Decline
+                      {tx.decline}
                     </Button>
                   </div>
                 </>
               ) : (
                 <>
-                  <p className="text-sm font-medium">Reason for declining (optional)</p>
+                  <p className="text-sm font-medium">{tx.declineReason}</p>
                   <Textarea
-                    placeholder="Let us know why you're declining this quote…"
+                    placeholder={tx.declinePlaceholder}
                     value={declineReason}
                     onChange={(e) => setDeclineReason(e.target.value)}
                     rows={3}
                   />
                   <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => setShowDeclineForm(false)} disabled={loading}>
-                      Back
+                      {tx.back}
                     </Button>
                     <Button size="sm" variant="destructive" disabled={loading} onClick={() => handleAction("declined")}>
-                      Confirm Decline
+                      {tx.confirmDecline}
                     </Button>
                   </div>
                 </>
@@ -288,8 +299,8 @@ export function PublicQuoteView({ quote, token }: Props) {
                   <Check className="h-6 w-6 text-green-600" />
                 </span>
               </div>
-              <p className="font-semibold text-green-700 dark:text-green-400">Quote Accepted</p>
-              <p className="text-sm text-muted-foreground">Thank you! We'll be in touch shortly to proceed.</p>
+              <p className="font-semibold text-green-700 dark:text-green-400">{tx.acceptedTitle}</p>
+              <p className="text-sm text-muted-foreground">{tx.acceptedBody}</p>
             </CardContent>
           </Card>
         )}
@@ -302,18 +313,15 @@ export function PublicQuoteView({ quote, token }: Props) {
                   <X className="h-6 w-6 text-red-600" />
                 </span>
               </div>
-              <p className="font-semibold text-red-600 dark:text-red-400">Quote Declined</p>
-              <p className="text-sm text-muted-foreground">
-                We've recorded your response. Feel free to reach out if you'd like to discuss.
-              </p>
+              <p className="font-semibold text-red-600 dark:text-red-400">{tx.declinedTitle}</p>
+              <p className="text-sm text-muted-foreground">{tx.declinedBody}</p>
             </CardContent>
           </Card>
         )}
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground">
-          Powered by Flux CRM · This quote was sent to you directly by{" "}
-          {quote.owner?.name ?? quote.owner?.email ?? "the sender"}
+          {tx.sentBy.replace("{name}", quote.sellerName || quote.owner?.name || quote.owner?.email || "")}
         </p>
       </div>
     </div>

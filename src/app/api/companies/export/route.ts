@@ -43,6 +43,7 @@ export async function GET() {
       leadScore: companies.leadScore,
       vatNumber: companies.vatNumber,
       sdiCode: companies.sdiCode,
+      language: companies.language,
       tags: companies.tags,
       createdAt: companies.createdAt,
     })

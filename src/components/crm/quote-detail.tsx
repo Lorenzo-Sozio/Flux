@@ -47,6 +47,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
+import { type DocumentLanguage, fill, QUOTE_TEXT } from "@/lib/document-language";
 import { can } from "@/lib/permissions";
 import { whatToChase } from "@/lib/quote-followup";
 import { quoteStatusConfig } from "@/lib/quote-status";
@@ -61,6 +62,10 @@ interface QuoteDetailProps {
   onStatusChange?: (newStatus: string) => void;
   /** The **workspace** role. Never the platform one: see the two scales in CLAUDE.md. */
   tenantRole?: string | null;
+  /** The language emails to this customer are drafted in. */
+  customerLanguage?: DocumentLanguage;
+  /** Follow-up subjects and bodies in that language, with `{quoteNumber}` and `{days}` to fill. */
+  customerDrafts?: Record<string, { subject: string; body: string }>;
 }
 
 const ACTIVITY_LABELS: Record<string, string> = {
@@ -78,10 +83,18 @@ const ACTIVITY_LABELS: Record<string, string> = {
   rejected: "Preventivo rifiutato",
 };
 
-export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, tenantRole }: QuoteDetailProps) {
+export function QuoteDetail({
+  quote,
+  autoOpenSend = false,
+  onStatusChange,
+  tenantRole,
+  customerLanguage = "it",
+  customerDrafts,
+}: QuoteDetailProps) {
   const router = useRouter();
-  const { formatAmount } = useCurrency();
-  const fmt = (amount: string | null) => formatAmount(parseFloat(amount ?? "0"));
+  const { formatMoney } = useCurrency();
+  // In the quote's own currency: the figure the customer was offered, not a conversion.
+  const fmt = (amount: string | null) => formatMoney(amount, quote.currency);
   const [isLoading, setIsLoading] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
@@ -656,6 +669,9 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, tenan
         open={showEmailDialog}
         onOpenChange={setShowEmailDialog}
         quoteId={quote.id}
+        defaultTo={quote.contact?.email ?? quote.company?.mainEmail ?? ""}
+        defaultSubject={fill(QUOTE_TEXT[customerLanguage].emailSubject, { number: quote.quoteNumber })}
+        defaultMessage={QUOTE_TEXT[customerLanguage].emailDefaultMessage}
         onSuccess={() => {
           setShowEmailDialog(false);
           toast.success("Quote sent successfully");
@@ -670,8 +686,16 @@ export function QuoteDetail({ quote, autoOpenSend = false, onStatusChange, tenan
           onOpenChange={setShowFollowUpDialog}
           quoteId={quote.id}
           defaultTo={quote.contact?.email ?? ""}
-          defaultSubject={tf(`${followUpKey}Subject`, followUpVars)}
-          defaultMessage={tf(`${followUpKey}Body`, followUpVars)}
+          defaultSubject={
+            customerDrafts?.[followUpKey]
+              ? fill(customerDrafts[followUpKey].subject, followUpVars)
+              : tf(`${followUpKey}Subject`, followUpVars)
+          }
+          defaultMessage={
+            customerDrafts?.[followUpKey]
+              ? fill(customerDrafts[followUpKey].body, followUpVars)
+              : tf(`${followUpKey}Body`, followUpVars)
+          }
           title={tf("dialogTitle")}
           descriptionText={tf("dialogDescription")}
           submitLabel={tf("submitLabel")}

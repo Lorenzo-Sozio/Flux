@@ -1372,6 +1372,12 @@ export const openApiSpec = {
                   mainEmail: { type: "string", format: "email", example: "info@acme.it" },
                   vatNumber: { type: "string", example: "IT02345678901" },
                   sdiCode: { type: "string", example: "XXXXXXX" },
+                  language: {
+                    type: "string",
+                    enum: ["it", "en"],
+                    nullable: true,
+                    description: "Language of the customer's documents; null reads it from the country.",
+                  },
                   tags: { type: "array", items: { type: "string" } },
                   onDuplicate: { type: "string", enum: ["skip", "update", "error"], default: "skip" },
                 },
