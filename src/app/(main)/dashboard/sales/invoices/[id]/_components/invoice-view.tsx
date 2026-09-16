@@ -40,6 +40,7 @@ import { assessStampDuty, type StampMode, withStampRecharge } from "@/lib/stamp-
 
 import { asDraftLines, type EditableLine, num } from "../../_components/invoice-lines";
 import { InvoiceLinesTable, InvoiceTotals } from "../../_components/invoice-parts";
+import { IssuedInvoiceFiles } from "./issued-invoice-files";
 
 type Data = NonNullable<Awaited<ReturnType<typeof getInvoice>>>;
 
@@ -207,11 +208,14 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
           </Badge>
         </div>
         {!isDraft && (
-          <Button asChild variant="outline">
-            <a href={`/api/invoices/${invoice.id}/xml`} download>
-              {t("downloadXml")}
-            </a>
-          </Button>
+          <IssuedInvoiceFiles
+            invoiceId={invoice.id}
+            archivedAt={invoice.archivedAt as unknown as string | null}
+            emailedAt={invoice.emailedAt as unknown as string | null}
+            emailedTo={invoice.emailedTo}
+            customerEmail={data.customerEmail}
+            canWrite={canWrite}
+          />
         )}
         {isDraft && (
           <div className="flex flex-wrap gap-2">

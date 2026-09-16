@@ -3904,7 +3904,6 @@
     "f24Code": "F24 tax code",
     "payBy": "Pay by",
     "deferred": "deferred",
-    "downloadXml": "Download XML",
     "newInvoice": "New invoice",
     "product": "Product",
     "offCatalogue": "Off catalogue",
@@ -3944,6 +3943,25 @@
     },
     "searchPlaceholder": "Search by number or customer…",
     "allInvoices": "All",
-    "noMatches": "No invoice matches the search."
+    "noMatches": "No invoice matches the search.",
+    "files": {
+      "downloadPdf": "Courtesy PDF",
+      "downloadXml": "FatturaPA XML",
+      "send": "Send to customer",
+      "sendTitle": "Send the courtesy copy",
+      "sendDescription": "The customer receives the PDF as an attachment, from the sender set in Settings › Email. The message says the copy has no fiscal value.",
+      "recipient": "Recipient",
+      "recipientPlaceholder": "accounts@customer.com",
+      "noCustomerEmail": "The company has no main email: type the address to send it to.",
+      "sendButton": "Send",
+      "cancel": "Cancel",
+      "sent": "Courtesy copy sent to {to}.",
+      "archivedOn": "XML and PDF archived on {when}",
+      "notArchived": "Files not archived yet.",
+      "archiveNow": "Archive now",
+      "archivedToast": "XML and PDF archived.",
+      "archiveFailed": "Archiving failed.",
+      "emailedOn": "Sent on {when} to {to}"
+    }
   }
 }

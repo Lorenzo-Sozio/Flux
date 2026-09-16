@@ -422,3 +422,45 @@ export async function sendTaskDueEmail(email: string, taskTitle: string, taskLin
       </div>`,
   });
 }
+
+// ─── Invoice courtesy copy ────────────────────────────────────────────────────
+
+/**
+ * The courtesy copy of an issued invoice, as a PDF attachment.
+ *
+ * ⚠️ Sent through the workspace's own email settings, from the workspace's own
+ * address: the customer is receiving an invoice from their supplier, not from Flux.
+ * The body repeats that the PDF has no fiscal value, because the attachment is the
+ * part that gets forwarded to an accountant on its own.
+ */
+export async function sendInvoiceCopyEmail(data: {
+  to: string;
+  issuerName: string;
+  documentLabel: string;
+  documentNumber: string;
+  issueDate: string;
+  total: string;
+  dueDate: string | null;
+  pdf: { filename: string; bytes: Uint8Array };
+  replyTo?: string | null;
+}) {
+  const [y, m, d] = data.issueDate.split("-");
+  const due = data.dueDate ? data.dueDate.split("-").reverse().join("/") : null;
+  const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111827">
+        <p>Gentile cliente,</p>
+        <p>in allegato la copia di cortesia della ${esc(data.documentLabel.toLowerCase())} n. <strong>${esc(data.documentNumber)}</strong> del ${d}/${m}/${y}, di importo <strong>${esc(data.total)}</strong>${due ? `, con scadenza il ${esc(due)}` : ""}.</p>
+        <p>Cordiali saluti,<br>${esc(data.issuerName)}</p>
+        <p style="color:#6b7280;font-size:12px;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:12px">
+          Il PDF allegato è una copia di cortesia priva di valore fiscale. La fattura elettronica originale è quella trasmessa tramite il Sistema di Interscambio (SDI) ed è disponibile nell'area riservata del sito dell'Agenzia delle Entrate.
+        </p>
+      </div>`;
+
+  return sendEmail({
+    to: sanitizeHeader(data.to),
+    subject: sanitizeHeader(`${data.documentLabel} n. ${data.documentNumber} — ${data.issuerName}`),
+    html,
+    ...(data.replyTo ? { replyTo: sanitizeHeader(data.replyTo) } : {}),
+    attachments: [{ filename: data.pdf.filename, content: data.pdf.bytes, contentType: "application/pdf" }],
+  });
+}

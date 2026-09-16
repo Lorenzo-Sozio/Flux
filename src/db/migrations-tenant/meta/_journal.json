@@ -176,6 +176,13 @@
       "when": 1789600000000,
       "tag": "0024_two_euros_decided_by_rule",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1789700000000,
+      "tag": "0025_kept_as_it_was_sent",
+      "breakpoints": true
     }
   ]
 }

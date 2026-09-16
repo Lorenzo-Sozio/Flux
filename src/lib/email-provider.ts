@@ -26,7 +26,8 @@ export interface EmailConfig {
 
 export interface EmailAttachment {
   filename: string;
-  content: string; // UTF-8 text content
+  /** Text is sent as UTF-8; bytes (a PDF) as they are. */
+  content: string | Uint8Array;
   contentType: string; // e.g. 'text/calendar; method=REQUEST'
 }
 
@@ -188,7 +189,7 @@ async function sendViaResend(options: SendOptions, config: EmailConfig): Promise
 
     const resendAttachments = options.attachments?.map((a) => ({
       filename: a.filename,
-      content: Buffer.from(a.content, "utf-8"),
+      content: typeof a.content === "string" ? Buffer.from(a.content, "utf-8") : Buffer.from(a.content),
     }));
 
     const { data, error } = await resend.emails.send({
@@ -227,7 +228,7 @@ async function sendViaSMTP(options: SendOptions, config: EmailConfig): Promise<S
     const from = options.fromOverride ?? `"${config.fromName}" <${config.fromEmail}>`;
     const smtpAttachments = options.attachments?.map((a) => ({
       filename: a.filename,
-      content: a.content,
+      content: typeof a.content === "string" ? a.content : Buffer.from(a.content),
       contentType: a.contentType,
     }));
 

@@ -557,6 +557,31 @@ block is part of the schema — reordering is a rejection.
 ⚠️ The file is built from what the invoice froze at issue, never from the records
 as they are now: `/api/invoices/{id}/xml` returns the same bytes next year.
 
+#### The courtesy PDF and the archive
+
+[src/lib/invoice-archive.ts](src/lib/invoice-archive.ts) keeps both files of an
+issued invoice in object storage: the XML, and the PDF from
+[src/components/pdf/invoice-pdf.tsx](src/components/pdf/invoice-pdf.tsx). Migration
+`0025_kept_as_it_was_sent` adds the keys, their SHA-256 and when a copy was emailed.
+
+⚠️⚠️ **Written once, and the write decides.** Each archiving request uploads under
+fresh random keys, then records them with an update that applies only while
+`xml_key IS NULL`; the loser deletes its own objects. Nothing is overwritten.
+
+⚠️ **Archiving never fails an issue.** It runs in `after()` once the number is
+assigned; a failure is logged, the download routes build the file from the
+snapshots and archive it then, and the invoice page offers "Archive now".
+
+⚠️ An archived object whose bytes no longer match the stored hash is **not
+served**: the file is rebuilt from the snapshots and the mismatch logged.
+
+⚠️ The PDF says on every page that it has no fiscal value. It is not the invoice,
+and this archive is not *conservazione sostitutiva*.
+
+`src/lib/invoice-archive.test.ts` runs on PGlite with an in-memory store;
+`scripts/mutations/invoice-archive.json` breaks the conditional record, the
+hash check and the draft refusal.
+
 ### Mobile and the installable app (PWA)
 
 ```bash

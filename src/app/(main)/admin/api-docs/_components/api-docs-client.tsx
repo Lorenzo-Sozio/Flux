@@ -511,6 +511,47 @@ const GROUPS: ApiGroup[] = [
           },
         ],
       },
+      {
+        id: "invoice-pdf",
+        method: "GET",
+        path: "/api/invoices/{id}/pdf",
+        summary: "Scarica la copia di cortesia in PDF",
+        description:
+          "Restituisce il PDF leggibile della fattura o nota di credito emessa, costruito dagli stessi dati congelati dell'XML. È una copia di cortesia priva di valore fiscale, come riportato a piè di pagina: l'originale è il tracciato trasmesso tramite SDI. Il file archiviato all'emissione viene servito se integro; altrimenti è ricostruito e archiviato.",
+        auth: "session",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            required: true,
+            type: "string",
+            description: "ID della fattura.",
+            example: "8f1c2b7e-4a3d-4f16-9d21-0b7e5c9a1234",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "File PDF (application/pdf), allegato con nome Fattura-{numero}.pdf",
+            example: "%PDF-1.3 …",
+          },
+          {
+            status: 401,
+            description: "Non autenticato",
+            example: JSON.stringify({ error: "Unauthorized" }, null, 2),
+          },
+          {
+            status: 404,
+            description: "Fattura inesistente",
+            example: "Not found",
+          },
+          {
+            status: 409,
+            description: "La fattura è ancora una bozza",
+            example: "A draft has no PDF: issue it first.",
+          },
+        ],
+      },
     ],
   },
   {

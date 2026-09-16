@@ -454,4 +454,18 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nALTER TABLE "invoice_issuer" ADD COLUMN IF NOT EXISTS "recharge_stamp_duty" boolean DEFAULT false NOT NULL;\n',
     ],
   },
+  {
+    tag: "0025_kept_as_it_was_sent",
+    folderMillis: 1789700000000,
+    hash: "d4eb63f51487f62d5f2a20b1ce168eec6ca86ce9b2210e377353415013622614",
+    sql: [
+      '-- Where an issued invoice\'s files are kept, and what they hashed to when written,\n-- plus the last time a courtesy copy was emailed and to whom.\n--\n-- Additive and re-runnable, as every tenant migration has to be.\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "xml_key" text;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "xml_sha256" text;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "pdf_key" text;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "pdf_sha256" text;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "archived_at" timestamp;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "emailed_at" timestamp;\n',
+      '\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "emailed_to" text;\n',
+    ],
+  },
 ];

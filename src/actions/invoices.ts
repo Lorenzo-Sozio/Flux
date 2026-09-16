@@ -1,13 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 
 import { and, asc, count, desc, eq, gte, ilike, or, type SQL, sql } from "drizzle-orm";
 
 import { companies, invoiceIssuers, invoiceItems, invoices, orderItems, orders, products } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
+import { sendInvoiceCopyEmail } from "@/lib/email";
 import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { customerGaps, type Gap, issuerGaps } from "@/lib/fiscal-ids";
+import { archiveInvoice, readInvoiceFile } from "@/lib/invoice-archive";
 import { cleanDraft, customerSnapshot, type DraftInput, italianToday, linesFromOrder } from "@/lib/invoice-draft";
 import { issueInvoice } from "@/lib/invoice-issue";
 import { type DraftLine, type DraftProblem, draftProblems, invoiceScope } from "@/lib/invoice-rules";
@@ -184,6 +187,7 @@ export async function getInvoice(id: string) {
     invoice,
     items,
     companyName: company?.name ?? null,
+    customerEmail: company?.mainEmail ?? null,
     blockers,
     stamp: final.stamp,
     rechargeStamp: recharge,
@@ -476,9 +480,86 @@ export async function issueInvoiceAction(
   });
   if (!result) return { ok: false, error: "This invoice was issued or changed in the meantime. Reload it." };
 
+  // The files are kept after the response: the number is already assigned, and a
+  // failure here is retried by the next download rather than failing the issue.
+  after(() =>
+    archiveInvoice(db, id).catch((err) => console.error(`[invoice-archive] invoice ${id} not archived`, err)),
+  );
+
   revalidatePath(LIST);
   revalidatePath(`${LIST}/${id}`);
   return { ok: true, documentNumber: result.documentNumber };
+}
+
+// ─── Files and the courtesy copy ──────────────────────────────────────────────
+
+/** Archives an issued invoice's XML and PDF now, for one whose archive failed after issuing. */
+export async function archiveInvoiceAction(id: string): Promise<{ ok: boolean; error?: string }> {
+  await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  try {
+    const outcome = await archiveInvoice(db, id);
+    revalidatePath(`${LIST}/${id}`);
+    if (outcome === "archived" || outcome === "already" || outcome === "lost_race") return { ok: true };
+    return {
+      ok: false,
+      error: outcome === "missing" ? "This invoice no longer exists." : "Only an issued invoice is archived.",
+    };
+  } catch (err) {
+    console.error(`[invoice-archive] invoice ${id} not archived`, err);
+    return { ok: false, error: err instanceof Error ? err.message : "The files could not be stored." };
+  }
+}
+
+const EMAIL = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
+
+/**
+ * Emails the courtesy PDF to the customer, and records when and to whom.
+ *
+ * ⚠️ Only an issued invoice: a draft has no number, and a PDF of one would be a
+ * document the customer could mistake for the invoice.
+ */
+export async function sendInvoiceCopy(id: string, to: string): Promise<{ ok: true } | { ok: false; error: string }> {
+  await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const address = to.trim();
+  if (!EMAIL.test(address)) return { ok: false, error: "The email address is not valid." };
+
+  const db = await getDb();
+  const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
+  if (!invoice) return { ok: false, error: "This invoice no longer exists." };
+  if (invoice.status !== "issued" || !invoice.documentNumber || !invoice.issueDate) {
+    return { ok: false, error: "Only an issued invoice can be sent." };
+  }
+
+  const pdf = await readInvoiceFile(db, invoice, "pdf");
+  const issuer = (invoice.issuerSnapshot ?? {}) as { legalName?: string; email?: string };
+  const sent = await sendInvoiceCopyEmail({
+    to: address,
+    issuerName: issuer.legalName ?? "",
+    documentLabel: invoice.documentType === "TD04" ? "Nota di credito" : "Fattura",
+    documentNumber: invoice.documentNumber,
+    issueDate: invoice.issueDate,
+    total: new Intl.NumberFormat("it-IT", {
+      style: "currency",
+      currency: invoice.currency,
+      useGrouping: "always",
+    }).format(Number(invoice.total)),
+    dueDate: invoice.dueDate,
+    pdf: { filename: pdf.name, bytes: pdf.bytes },
+    replyTo: issuer.email,
+  });
+  if (!sent.success) return { ok: false, error: sent.error ?? "The email could not be sent." };
+
+  await db.update(invoices).set({ emailedAt: new Date(), emailedTo: address }).where(eq(invoices.id, id));
+  if (!pdf.archived) {
+    after(() =>
+      archiveInvoice(db, id).catch((err) => console.error(`[invoice-archive] invoice ${id} not archived`, err)),
+    );
+  }
+  revalidatePath(`${LIST}/${id}`);
+  return { ok: true };
 }
 
 /** The value the upsert tried to insert, for the columns it updates on conflict. */

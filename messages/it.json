@@ -3904,7 +3904,6 @@
     "f24Code": "Codice tributo F24",
     "payBy": "Da versare entro",
     "deferred": "rinviato",
-    "downloadXml": "Scarica XML",
     "newInvoice": "Nuova fattura",
     "product": "Prodotto",
     "offCatalogue": "Fuori catalogo",
@@ -3944,6 +3943,25 @@
     },
     "searchPlaceholder": "Cerca per numero o cliente…",
     "allInvoices": "Tutte",
-    "noMatches": "Nessuna fattura corrisponde alla ricerca."
+    "noMatches": "Nessuna fattura corrisponde alla ricerca.",
+    "files": {
+      "downloadPdf": "PDF di cortesia",
+      "downloadXml": "XML FatturaPA",
+      "send": "Invia al cliente",
+      "sendTitle": "Invia la copia di cortesia",
+      "sendDescription": "Il cliente riceve il PDF in allegato, dal mittente configurato in Impostazioni › Email. Il messaggio ricorda che la copia non ha valore fiscale.",
+      "recipient": "Destinatario",
+      "recipientPlaceholder": "amministrazione@cliente.it",
+      "noCustomerEmail": "L'azienda non ha un'email principale: scrivi l'indirizzo a cui mandarla.",
+      "sendButton": "Invia",
+      "cancel": "Annulla",
+      "sent": "Copia di cortesia inviata a {to}.",
+      "archivedOn": "XML e PDF archiviati il {when}",
+      "notArchived": "File non ancora archiviati.",
+      "archiveNow": "Archivia ora",
+      "archivedToast": "XML e PDF archiviati.",
+      "archiveFailed": "Archiviazione non riuscita.",
+      "emailedOn": "Inviata il {when} a {to}"
+    }
   }
 }

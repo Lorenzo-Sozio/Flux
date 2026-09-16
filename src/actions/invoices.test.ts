@@ -26,6 +26,8 @@ describe("who may do what", () => {
     ["saveInvoiceDraft", "invoice:write"],
     ["deleteInvoiceDraft", "invoice:write"],
     ["issueInvoiceAction", "invoice:issue"],
+    ["archiveInvoiceAction", "invoice:write"],
+    ["sendInvoiceCopy", "invoice:write"],
   ]) {
     it(`⚠️⚠️ ${name} requires ${capability} before touching the database`, () => {
       const b = body(name);
@@ -86,5 +88,28 @@ describe("issuing", () => {
 
   it("⚠️ dates the invoice in Italian time, not UTC", () => {
     expect(body("issueInvoiceAction")).toContain("const issueDate = italianToday();");
+  });
+});
+
+describe("files and the courtesy copy", () => {
+  it("⚠️⚠️ archives after issuing, never before and never in the way of the response", () => {
+    const b = body("issueInvoiceAction");
+    const archive = b.indexOf("after(() =>\n    archiveInvoice(db, id)");
+    expect(archive, "the invoice is not archived after issuing").toBeGreaterThan(-1);
+    expect(archive).toBeGreaterThan(b.indexOf("if (!result) return"));
+    expect(b).not.toContain("await archiveInvoice(");
+  });
+
+  it("⚠️⚠️ sends a courtesy copy only of an issued invoice, to a checked address", () => {
+    const b = body("sendInvoiceCopy");
+    const refuse = b.indexOf('if (invoice.status !== "issued" || !invoice.documentNumber || !invoice.issueDate) {');
+    expect(refuse, "a draft could be sent").toBeGreaterThan(-1);
+    expect(refuse).toBeLessThan(b.indexOf("await sendInvoiceCopyEmail("));
+    expect(b.indexOf("if (!EMAIL.test(address))")).toBeLessThan(b.indexOf("getDb()"));
+  });
+
+  it("⚠️ records the sending only once the email went", () => {
+    const b = body("sendInvoiceCopy");
+    expect(b.indexOf("if (!sent.success) return")).toBeLessThan(b.indexOf("emailedAt: new Date()"));
   });
 });

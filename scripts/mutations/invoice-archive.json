@@ -1,0 +1,50 @@
+[
+  {
+    "file": "src/lib/invoice-archive.ts",
+    "description": "⚠️⚠️ la registrazione non è condizionata: due archiviazioni in parallelo sovrascrivono i file della prima",
+    "find": "    .where(and(eq(invoices.id, id), eq(invoices.status, \"issued\"), isNull(invoices.xmlKey)))",
+    "replace": "    .where(and(eq(invoices.id, id), eq(invoices.status, \"issued\")))"
+  },
+  {
+    "file": "src/lib/invoice-archive.ts",
+    "description": "⚠️ chi perde la corsa lascia i propri file nel bucket",
+    "find": "    await Promise.all([store.delete(xmlKey), store.delete(pdfKey)]).catch(() => undefined);\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/invoice-archive.ts",
+    "description": "⚠️⚠️ un file alterato nello storage viene servito come originale",
+    "find": "      if (bytes && contentHash(bytes) === expected) {",
+    "replace": "      if (bytes) {"
+  },
+  {
+    "file": "src/lib/invoice-archive.ts",
+    "description": "⚠️ una fattura già archiviata viene archiviata di nuovo",
+    "find": "  if (invoice.xmlKey && invoice.pdfKey) return \"already\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/invoice-archive.ts",
+    "description": "⚠️ una bozza viene archiviata",
+    "find": "  if (invoice.status !== \"issued\") return \"not_issued\";",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/invoice-archive.ts",
+    "description": "⚠️ la chiave d'archivio accetta percorsi arbitrari",
+    "find": "  return new RegExp(`^invoices/\\\\d{6}/[0-9a-f-]{36}\\\\.${kind}$`).test(key);",
+    "replace": "  return key.startsWith(\"invoices/\");"
+  },
+  {
+    "file": "src/actions/invoices.ts",
+    "description": "⚠️⚠️ si può inviare come copia di cortesia una bozza senza numero",
+    "find": "  if (invoice.status !== \"issued\" || !invoice.documentNumber || !invoice.issueDate) {\n    return { ok: false, error: \"Only an issued invoice can be sent.\" };\n  }\n",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/invoices.ts",
+    "description": "⚠️ dopo l'emissione i file non vengono archiviati",
+    "find": "  after(() =>\n    archiveInvoice(db, id).catch((err) => console.error(`[invoice-archive] invoice ${id} not archived`, err)),\n  );\n\n  revalidatePath(LIST);",
+    "replace": "  revalidatePath(LIST);"
+  }
+]

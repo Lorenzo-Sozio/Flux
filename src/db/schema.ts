@@ -952,6 +952,15 @@ export const invoices = pgTable(
     // The lines exactly as checked when issuing. An issued invoice is read from here,
     // never from invoice_item, which a save racing the issue could still touch.
     linesSnapshot: jsonb("lines_snapshot"),
+    // The files as issued, in object storage: written once after issuing, then served
+    // from here. The hash is of the bytes written, so a changed object is noticed.
+    xmlKey: text("xml_key"),
+    xmlSha256: text("xml_sha256"),
+    pdfKey: text("pdf_key"),
+    pdfSha256: text("pdf_sha256"),
+    archivedAt: timestamp("archived_at", { mode: "date" }),
+    emailedAt: timestamp("emailed_at", { mode: "date" }),
+    emailedTo: text("emailed_to"),
     createdBy: text("created_by"),
     issuedBy: text("issued_by"),
     issuedAt: timestamp("issued_at", { mode: "date" }),
