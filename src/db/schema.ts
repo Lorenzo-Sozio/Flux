@@ -947,6 +947,9 @@ export const invoices = pgTable(
     stampDutyMode: text("stamp_duty_mode").default("auto").notNull(), // auto | force_on | force_off
     stampDutyNote: text("stamp_duty_note"),
     total: numeric("total", { precision: 12, scale: 2 }).default("0").notNull(),
+    // On an issued invoice: what its issued credit notes have given back. Advanced only by
+    // the statement that issues a credit note, and never past `total`.
+    creditedAmount: numeric("credited_amount", { precision: 12, scale: 2 }).default("0").notNull(),
     paymentMethod: text("payment_method").default("MP05").notNull(),
     notes: text("notes"),
     revision: integer("revision").default(1).notNull(),
@@ -977,6 +980,7 @@ export const invoices = pgTable(
       .where(sql`number IS NOT NULL`),
     index("invoice_order_idx").on(t.orderId),
     index("invoice_company_idx").on(t.companyId),
+    index("invoice_original_idx").on(t.originalInvoiceId),
   ],
 );
 

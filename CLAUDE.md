@@ -557,6 +557,19 @@ block is part of the schema — reordering is a rejection.
 ⚠️ The file is built from what the invoice froze at issue, never from the records
 as they are now: `/api/invoices/{id}/xml` returns the same bytes next year.
 
+#### Credit notes (TD04)
+
+⚠️⚠️ **What is left to credit is decided by the issuing statement.** `credit` in
+[src/lib/invoice-issue.ts](src/lib/invoice-issue.ts) advances the original invoice's
+`credited_amount` only while `total - credited_amount` covers the note, and `next`
+numbers the note only if `credit` did. The condition sits on the row being
+updated, which Postgres re-checks after waiting for a concurrent writer; a check
+in a separate query, or a subquery in the same statement, reads the old figure
+and lets two notes take the same remainder. Migration `0027_what_was_given_back`.
+
+⚠️ A credit note never recharges stamp duty (`rechargesFor`): the recharge line
+would hand the €2 back to the customer.
+
 #### The courtesy PDF and the archive
 
 [src/lib/invoice-archive.ts](src/lib/invoice-archive.ts) keeps both files of an

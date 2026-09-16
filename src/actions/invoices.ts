@@ -82,6 +82,43 @@ function finalLines(lines: DraftLine[], discountPercent: number, mode: string, r
   return { stamp, lines: withStampRecharge(withDescription, stamp.applied, recharge) as DraftLine[] };
 }
 
+/**
+ * What is left to credit on an issued invoice: its total less what issued credit
+ * notes have already given back. Null when the original is missing or not an
+ * issued invoice.
+ *
+ * ⚠️ For the screen and for a readable refusal only. The limit that holds is the
+ * one inside the issuing statement, which cannot be raced.
+ */
+async function creditRoom(db: Db, originalId: string | null) {
+  if (!originalId) return null;
+  const [original] = await db
+    .select({
+      id: invoices.id,
+      documentNumber: invoices.documentNumber,
+      issueDate: invoices.issueDate,
+      status: invoices.status,
+      documentType: invoices.documentType,
+      total: invoices.total,
+      creditedAmount: invoices.creditedAmount,
+      currency: invoices.currency,
+    })
+    .from(invoices)
+    .where(eq(invoices.id, originalId));
+  if (!original || original.status !== "issued" || original.documentType !== "TD01") return null;
+  const residual = Math.round((Number(original.total) - Number(original.creditedAmount)) * 100) / 100;
+  return { ...original, residual };
+}
+
+/**
+ * ⚠️ A credit note never recharges stamp duty. The recharge line on an invoice asks
+ * the customer for the €2; on a credit note the same line would give it back, and
+ * the duty already paid on the invoice is not refunded to anyone.
+ */
+async function rechargesFor(db: Db, documentType: string): Promise<boolean> {
+  return documentType === "TD04" ? false : issuerRecharges(db);
+}
+
 async function issuerRecharges(db: Db): Promise<boolean> {
   const [row] = await tolerateUnmigrated(
     "invoice_issuer.recharge_stamp_duty",
@@ -144,6 +181,7 @@ export async function getInvoices(params: ListParams, status = "all") {
             documentNumber: invoices.documentNumber,
             issueDate: invoices.issueDate,
             total: invoices.total,
+            creditedAmount: invoices.creditedAmount,
             currency: invoices.currency,
             companyName: companies.name,
             createdAt: invoices.createdAt,
@@ -177,15 +215,46 @@ export async function getInvoice(id: string) {
   ]);
   const lines = toDraftLines(items);
   const discount = Number(invoice.discountPercent);
-  const recharge = Boolean(issuer?.rechargeStampDuty);
+  const isCredit = invoice.documentType === "TD04";
+  const recharge = isCredit ? false : Boolean(issuer?.rechargeStampDuty);
   const final = finalLines(lines, discount, invoice.stampDutyMode, recharge);
+  const [original, creditNotes] = await Promise.all([
+    isCredit ? creditRoom(db, invoice.originalInvoiceId) : Promise.resolve(null),
+    isCredit
+      ? Promise.resolve([])
+      : db
+          .select({
+            id: invoices.id,
+            status: invoices.status,
+            documentNumber: invoices.documentNumber,
+            issueDate: invoices.issueDate,
+            total: invoices.total,
+          })
+          .from(invoices)
+          .where(and(eq(invoices.originalInvoiceId, id), eq(invoices.documentType, "TD04")))
+          .orderBy(asc(invoices.createdAt)),
+  ]);
+  const draftChecks = draftProblems(lines, discount, { mode: invoice.stampDutyMode, note: invoice.stampDutyNote });
+  if (isCredit && invoice.status === "draft") {
+    if (!original) draftChecks.push({ kind: "credit_without_original" });
+    else if (
+      invoiceTotals(
+        final.lines.map((l) => ({ ...l, description: l.description ?? "" })),
+        discount,
+      ).total > original.residual
+    ) {
+      draftChecks.push({ kind: "credit_exceeds_residual" });
+    }
+  }
   const blockers: IssueBlockers = {
     issuer: issuerGaps(issuer ?? {}),
     customer: company ? customerGaps({ ...company, province: company.state }) : [{ field: "name", problem: "missing" }],
-    draft: draftProblems(lines, discount, { mode: invoice.stampDutyMode, note: invoice.stampDutyNote }),
+    draft: draftChecks,
   };
   return {
     invoice,
+    original,
+    creditNotes,
     items,
     companyName: company?.name ?? null,
     customerEmail: company?.mainEmail ?? null,
@@ -369,6 +438,78 @@ export async function createInvoice(
 }
 
 /**
+ * A draft credit note for an issued invoice, with the invoice's lines.
+ *
+ * "full" copies every line as it was issued, so the note gives back the whole
+ * invoice; "partial" copies them too, to be reduced or removed on the draft page.
+ * Either way what is issued is checked against what is left to credit.
+ *
+ * ⚠️ The stamp recharge line is not copied: see `rechargesFor`. The customer is the
+ * company as it is now, checked like any invoice's; the series is the invoice's,
+ * so the note continues the same numbering unless it is changed on the draft.
+ */
+export async function createCreditNote(
+  invoiceId: string,
+  mode: "full" | "partial",
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const actor = await requireCapability("invoice:write");
+  await requirePlanModule("sales");
+  const db = await getDb();
+
+  const room = await creditRoom(db, invoiceId);
+  if (!room) return { ok: false, error: "Only an issued invoice can be credited." };
+  if (room.residual <= 0) return { ok: false, error: "This invoice has already been credited in full." };
+  const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
+
+  const frozen = (
+    (invoice.linesSnapshot ?? []) as (DraftLine & { isStampRecharge?: boolean; productId?: string | null })[]
+  )
+    .filter((l) => !l.isStampRecharge)
+    .map((l) => ({
+      productId: l.productId ?? null,
+      description: l.description ?? "",
+      quantity: Number(l.quantity),
+      unitPrice: Number(l.unitPrice),
+      discountPercent: Number(l.discountPercent ?? 0),
+      taxPercent: Number(l.taxPercent),
+      nature: l.nature ?? null,
+    }));
+  if (frozen.length === 0) return { ok: false, error: "The invoice has no lines to credit." };
+
+  const discount = Number(invoice.discountPercent);
+  const final = finalLines(frozen, discount, invoice.stampDutyMode, false);
+  const totals = totalsOf(final.lines, discount);
+  const [row] = await db
+    .insert(invoices)
+    .values({
+      documentType: "TD04",
+      originalInvoiceId: invoice.id,
+      orderId: invoice.orderId,
+      companyId: invoice.companyId,
+      currency: invoice.currency,
+      series: invoice.series,
+      discountPercent: invoice.discountPercent,
+      stampDuty: final.stamp.applied,
+      stampDutyMode: invoice.stampDutyMode,
+      stampDutyNote: invoice.stampDutyNote,
+      paymentMethod: invoice.paymentMethod,
+      notes:
+        mode === "full" ? `Storno totale della fattura n. ${invoice.documentNumber} del ${invoice.issueDate}` : null,
+      subtotal: String(totals.subtotal),
+      discountAmount: String(totals.discountAmount),
+      taxableAmount: String(totals.taxableAmount),
+      taxAmount: String(totals.taxAmount),
+      total: String(totals.total),
+      createdBy: actor.userId,
+    })
+    .returning({ id: invoices.id });
+  await writeLines(db, row.id, frozen);
+  revalidatePath(LIST);
+  revalidatePath(`${LIST}/${invoice.id}`);
+  return { ok: true, id: row.id };
+}
+
+/**
  * Saves a draft at the revision the editor loaded.
  *
  * ⚠️ The revision is bumped first and conditionally: an edit that arrives after the
@@ -386,7 +527,13 @@ export async function saveInvoiceDraft(
   const { lines, ...header } = cleaned.value;
   const db = await getDb();
 
-  const final = finalLines(lines, header.discountPercent, header.stampDutyMode, await issuerRecharges(db));
+  const [current] = await db.select({ documentType: invoices.documentType }).from(invoices).where(eq(invoices.id, id));
+  const final = finalLines(
+    lines,
+    header.discountPercent,
+    header.stampDutyMode,
+    await rechargesFor(db, current?.documentType ?? "TD01"),
+  );
   const totals = totalsOf(final.lines, header.discountPercent);
   const [bumped] = await db
     .update(invoices)
@@ -450,11 +597,20 @@ export async function issueInvoiceAction(
   ]);
   const lines = toDraftLines(items);
   const discount = Number(invoice.discountPercent);
+  const isCredit = invoice.documentType === "TD04";
   const blockers: IssueBlockers = {
     issuer: issuerGaps(issuer ?? {}),
     customer: company ? customerGaps({ ...company, province: company.state }) : [{ field: "name", problem: "missing" }],
     draft: draftProblems(lines, discount, { mode: invoice.stampDutyMode, note: invoice.stampDutyNote }),
   };
+  // Decided again here, from the lines being frozen, rather than trusted from the
+  // draft row: the stamp and its recharge line are part of what is issued.
+  const recharge = isCredit ? false : Boolean(issuer?.rechargeStampDuty);
+  const final = finalLines(lines, discount, invoice.stampDutyMode, recharge);
+  const totals = totalsOf(final.lines, discount);
+  const room = isCredit ? await creditRoom(db, invoice.originalInvoiceId) : null;
+  if (isCredit && !room) blockers.draft.push({ kind: "credit_without_original" });
+  if (room && totals.total > room.residual) blockers.draft.push({ kind: "credit_exceeds_residual" });
   if (blockers.issuer.length || blockers.customer.length || blockers.draft.length) {
     return { ok: false, error: "This invoice cannot be issued yet.", blockers };
   }
@@ -462,9 +618,6 @@ export async function issueInvoiceAction(
   const issueDate = italianToday();
   const fiscalYear = Number(issueDate.slice(0, 4));
   const { id: _id, updatedAt: _u, updatedBy: _b, ...issuerFields } = issuer;
-  // Decided again here, from the lines being frozen, rather than trusted from the
-  // draft row: the stamp and its recharge line are part of what is issued.
-  const final = finalLines(lines, discount, invoice.stampDutyMode, Boolean(issuer.rechargeStampDuty));
   const result = await issueInvoice(db, {
     invoiceId: id,
     revision,
@@ -477,9 +630,19 @@ export async function issueInvoiceAction(
     customerSnapshot: customerSnapshot(company),
     linesSnapshot: final.lines,
     stampDuty: final.stamp.applied,
-    totals: totalsOf(final.lines, discount),
+    totals,
+    // The statement takes the amount from the original, within what is left, or issues nothing.
+    creditOf: isCredit ? invoice.originalInvoiceId : null,
   });
-  if (!result) return { ok: false, error: "This invoice was issued or changed in the meantime. Reload it." };
+  if (!result) {
+    return {
+      ok: false,
+      error: isCredit
+        ? "This credit note was not issued: it was changed, already issued, or more than what is left on the invoice was credited in the meantime. Reload it."
+        : "This invoice was issued or changed in the meantime. Reload it.",
+    };
+  }
+  if (room) revalidatePath(`${LIST}/${room.id}`);
 
   // The files are kept after the response: the number is already assigned, and a
   // failure here is retried by the next download rather than failing the issue.

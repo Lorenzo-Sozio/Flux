@@ -476,4 +476,13 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '-- The language a customer\'s documents are written in: quotes, their print view,\n-- public page and email, and the courtesy copy of an invoice. Null means "from the\n-- country", so existing customers need no backfill.\n--\n-- Additive and re-runnable, as every tenant migration has to be.\nALTER TABLE "company" ADD COLUMN IF NOT EXISTS "language" text;\n',
     ],
   },
+  {
+    tag: "0027_what_was_given_back",
+    folderMillis: 1789900000000,
+    hash: "0f1ce0ea233633d0cd3055c6e147b200e9a1abf81ea5b31d2f6f4d7442457d00",
+    sql: [
+      '-- How much of an issued invoice its issued credit notes have taken back. Advanced in\n-- the same statement that issues a credit note, and only while it stays within the\n-- invoice total, so two credit notes issued together cannot give back more than was\n-- invoiced.\n--\n-- Additive and re-runnable, as every tenant migration has to be.\nALTER TABLE "invoice" ADD COLUMN IF NOT EXISTS "credited_amount" numeric(12, 2) DEFAULT \'0\' NOT NULL;\n',
+      '\nCREATE INDEX IF NOT EXISTS "invoice_original_idx" ON "invoice" USING btree ("original_invoice_id");\n',
+    ],
+  },
 ];

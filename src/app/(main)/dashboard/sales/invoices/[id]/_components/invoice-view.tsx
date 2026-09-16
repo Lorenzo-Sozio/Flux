@@ -41,6 +41,7 @@ import { assessStampDuty, type StampMode, withStampRecharge } from "@/lib/stamp-
 
 import { asDraftLines, type EditableLine, num } from "../../_components/invoice-lines";
 import { InvoiceLinesTable, InvoiceTotals } from "../../_components/invoice-parts";
+import { CreditNoteButton, CreditNotesCard } from "./credit-notes";
 import { IssuedInvoiceFiles } from "./issued-invoice-files";
 
 type Data = NonNullable<Awaited<ReturnType<typeof getInvoice>>>;
@@ -100,9 +101,16 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
     : draftLines;
   const totals = invoiceTotals(totalledLines, num(discount));
   // The draft checks run on the screen as typed, so the list of what is missing moves with the edit.
+  const isCredit = invoice.documentType === "TD04";
   const liveDraftProblems = isDraft
     ? draftProblems(draftLines, num(discount), { mode: stampMode, note: stampNote })
     : [];
+  // A credit note cannot give back more than is left on its invoice; the issuing
+  // statement enforces it, this says so while the lines are being edited.
+  if (isDraft && isCredit) {
+    if (!data.original) liveDraftProblems.push({ kind: "credit_without_original" });
+    else if (totals.total > data.original.residual) liveDraftProblems.push({ kind: "credit_exceeds_residual" });
+  }
   const money = (n: number) => formatMoney(n, invoice.currency);
 
   const touch =
@@ -198,16 +206,36 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
             {t(`types.${invoice.documentType as "TD01" | "TD04"}`)}
           </p>
           <h1 className="font-bold text-2xl tracking-tight">
-            {invoice.documentNumber ? t("numberTitle", { number: invoice.documentNumber }) : t("draftTitle")}
+            {invoice.documentNumber
+              ? t(isCredit ? "credit.noteNumber" : "numberTitle", { number: invoice.documentNumber })
+              : t(isCredit ? "credit.draftNote" : "draftTitle")}
           </h1>
           <p className="text-muted-foreground text-sm">
             {(isDraft ? data.companyName : customer?.name) ?? "—"}
             {invoice.issueDate ? ` · ${invoice.issueDate}` : ""}
           </p>
+          {isCredit && data.original && (
+            <p className="text-sm">
+              {t("credit.creditsInvoice")}{" "}
+              <Link href={`/dashboard/sales/invoices/${data.original.id}`} className="font-medium underline">
+                {t("numberTitle", { number: data.original.documentNumber ?? "" })}
+              </Link>
+              {data.original.issueDate ? ` · ${data.original.issueDate}` : ""}
+              {isDraft && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  · {t("credit.residualLeft", { amount: money(data.original.residual) })}
+                </span>
+              )}
+            </p>
+          )}
           <Badge className="mt-2" variant={isDraft ? "outline" : "secondary"}>
             {t(`statuses.${invoice.status as "draft" | "issued"}`)}
           </Badge>
         </div>
+        {!isDraft && !isCredit && canWrite && (
+          <CreditNoteButton invoiceId={invoice.id} residual={Number(invoice.total) - Number(invoice.creditedAmount)} />
+        )}
         {!isDraft && (
           <IssuedInvoiceFiles
             invoiceId={invoice.id}
@@ -238,6 +266,15 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
           </div>
         )}
       </div>
+
+      {!isCredit && (
+        <CreditNotesCard
+          currency={invoice.currency}
+          total={Number(invoice.total)}
+          credited={Number(invoice.creditedAmount)}
+          notes={data.creditNotes}
+        />
+      )}
 
       {isDraft && allProblems.length > 0 && (
         <Card className="border-amber-300 dark:border-amber-800">

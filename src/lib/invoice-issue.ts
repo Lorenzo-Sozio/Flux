@@ -20,6 +20,15 @@ import { sql } from "drizzle-orm";
  *
  * A single statement is atomic on the Neon HTTP driver, which holds no transaction
  * across statements.
+ *
+ * ⚠️⚠️ **A credit note takes its amount back in the same statement.** `credit`
+ * advances the original invoice's `credited_amount` only while what is left covers
+ * this note, and `next` numbers the note only when `credit` did. Two credit notes
+ * issued together on one invoice queue on the original's row; the second re-reads
+ * it after the first commits (the condition is on the row being updated, which
+ * Postgres re-checks), finds too little left, and takes neither an amount nor a
+ * number. A check made in a separate query first, or even in a subquery here,
+ * would read the old figure and let both through.
  */
 
 // biome-ignore lint/suspicious/noExplicitAny: the tenant db handle is built per request
@@ -38,6 +47,8 @@ export interface IssueInput {
   customerSnapshot: unknown;
   /** The lines the totals were computed from, stamp recharge line included. */
   linesSnapshot: unknown;
+  /** For a credit note, the issued invoice it gives back from; null for an invoice. */
+  creditOf?: string | null;
   stampDuty: boolean;
   totals: {
     subtotal: number;
@@ -56,9 +67,18 @@ export function issueStatement(input: IssueInput) {
       WHERE id = ${input.invoiceId} AND status = 'draft' AND revision = ${input.revision}
       FOR UPDATE
     ),
+    credit AS (
+      UPDATE invoice SET credited_amount = credited_amount + ${money(input.totals.total)}::numeric, updated_at = now()
+      WHERE id = ${input.creditOf ?? null}::text
+        AND status = 'issued' AND document_type = 'TD01'
+        AND total - credited_amount >= ${money(input.totals.total)}::numeric
+        AND EXISTS (SELECT 1 FROM target)
+      RETURNING id
+    ),
     next AS (
       INSERT INTO document_counter (scope, last_value, updated_at)
       SELECT ${input.scope}, 1, now() FROM target
+      WHERE ${input.creditOf ?? null}::text IS NULL OR EXISTS (SELECT 1 FROM credit)
       ON CONFLICT (scope) DO UPDATE SET last_value = document_counter.last_value + 1, updated_at = now()
       RETURNING last_value
     )

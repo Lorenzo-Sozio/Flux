@@ -109,6 +109,13 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Pro
                       <Badge variant={r.status === "draft" ? "outline" : "secondary"}>
                         {t(`statuses.${r.status as "draft" | "issued"}`)}
                       </Badge>
+                      {Number(r.creditedAmount) > 0 && (
+                        <Badge variant="outline" className="ml-1">
+                          {Number(r.creditedAmount) >= Number(r.total)
+                            ? t("credit.fullyCredited")
+                            : t("credit.partlyCredited")}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{money(r.total, r.currency)}</TableCell>
                   </TableRow>

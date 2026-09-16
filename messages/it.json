@@ -3855,7 +3855,9 @@
       "nature_with_vat": "riga {line}: Natura su una riga con IVA",
       "unknown_nature": "riga {line}: codice Natura non valido",
       "not_positive": "un totale maggiore di zero",
-      "stamp_override_without_reason": "bollo: scrivi il motivo della scelta manuale"
+      "stamp_override_without_reason": "bollo: scrivi il motivo della scelta manuale",
+      "credit_exceeds_residual": "la nota di credito supera il residuo stornabile della fattura",
+      "credit_without_original": "la fattura da stornare non è più emessa o non esiste"
     },
     "lines": "Righe",
     "description": "Descrizione",
@@ -3967,6 +3969,28 @@
       "archivedToast": "XML e PDF archiviati.",
       "archiveFailed": "Archiviazione non riuscita.",
       "emailedOn": "Inviata il {when} a {to}"
+    },
+    "credit": {
+      "button": "Nota di credito",
+      "title": "Crea una nota di credito",
+      "description": "Nasce come bozza con le righe della fattura. La numerazione continua quella del sezionale, e all'emissione l'importo viene scalato dal residuo della fattura.",
+      "fullTitle": "Storno totale",
+      "fullHint": "Tutte le righe come sono state fatturate. Si emette così com'è.",
+      "partialTitle": "Storno parziale",
+      "partialHint": "Parte dalle stesse righe: riduci quantità o prezzi, o togli le righe che non vanno stornate.",
+      "create": "Crea bozza",
+      "cancel": "Annulla",
+      "cardTitle": "Note di credito",
+      "fullyCredited": "Stornata",
+      "partlyCredited": "Stornata in parte",
+      "invoiced": "Fatturato",
+      "credited": "Stornato",
+      "residual": "Residuo",
+      "draftNote": "Bozza di nota di credito",
+      "draftsDontCount": "Le bozze non contano finché non vengono emesse.",
+      "creditsInvoice": "Storna la",
+      "residualLeft": "residuo stornabile {amount}",
+      "noteNumber": "Nota di credito n. {number}"
     }
   }
 }

@@ -27,6 +27,7 @@ describe("who may do what", () => {
     ["deleteInvoiceDraft", "invoice:write"],
     ["issueInvoiceAction", "invoice:issue"],
     ["archiveInvoiceAction", "invoice:write"],
+    ["createCreditNote", "invoice:write"],
     ["sendInvoiceCopy", "invoice:write"],
   ]) {
     it(`⚠️⚠️ ${name} requires ${capability} before touching the database`, () => {
@@ -71,13 +72,11 @@ describe("issuing", () => {
 
   it("⚠️⚠️ decides the stamp again from the lines being frozen, and freezes the recharge line with them", () => {
     const b = body("issueInvoiceAction");
-    const decide = b.indexOf(
-      "const final = finalLines(lines, discount, invoice.stampDutyMode, Boolean(issuer.rechargeStampDuty));",
-    );
+    const decide = b.indexOf("const final = finalLines(lines, discount, invoice.stampDutyMode, recharge);");
     expect(decide, "the stamp is taken from the draft row instead").toBeGreaterThan(-1);
     expect(decide).toBeLessThan(b.indexOf("await issueInvoice("));
     expect(b).toContain("stampDuty: final.stamp.applied,");
-    expect(b).toContain("totals: totalsOf(final.lines, discount),");
+    expect(b).toContain("const totals = totalsOf(final.lines, discount);");
   });
 
   it("⚠️ refuses a stamp override without a reason", () => {
@@ -96,7 +95,9 @@ describe("files and the courtesy copy", () => {
     const b = body("issueInvoiceAction");
     const archive = b.indexOf("after(() =>\n    archiveInvoice(db, id)");
     expect(archive, "the invoice is not archived after issuing").toBeGreaterThan(-1);
-    expect(archive).toBeGreaterThan(b.indexOf("if (!result) return"));
+    const refused = b.indexOf("if (!result) {");
+    expect(refused, "the refusal branch moved: re-read this test").toBeGreaterThan(-1);
+    expect(archive).toBeGreaterThan(refused);
     expect(b).not.toContain("await archiveInvoice(");
   });
 
@@ -111,5 +112,31 @@ describe("files and the courtesy copy", () => {
   it("⚠️ records the sending only once the email went", () => {
     const b = body("sendInvoiceCopy");
     expect(b.indexOf("if (!sent.success) return")).toBeLessThan(b.indexOf("emailedAt: new Date()"));
+  });
+});
+
+describe("credit notes", () => {
+  it("⚠️⚠️ issues a credit note through the statement that takes its amount from the invoice", () => {
+    const b = body("issueInvoiceAction");
+    expect(b).toContain("creditOf: isCredit ? invoice.originalInvoiceId : null,");
+  });
+
+  it("⚠️⚠️ never recharges stamp duty on a credit note, wherever its lines are totalled", () => {
+    expect(body("issueInvoiceAction")).toContain(
+      "const recharge = isCredit ? false : Boolean(issuer?.rechargeStampDuty);",
+    );
+    expect(body("getInvoice")).toContain("const recharge = isCredit ? false : Boolean(issuer?.rechargeStampDuty);");
+    expect(body("saveInvoiceDraft")).toContain('await rechargesFor(db, current?.documentType ?? "TD01"),');
+    expect(body("createCreditNote")).toContain(
+      "const final = finalLines(frozen, discount, invoice.stampDutyMode, false);",
+    );
+  });
+
+  it("⚠️ copies the invoice's issued lines without the stamp recharge, and only from an issued invoice", () => {
+    const b = body("createCreditNote");
+    expect(b).toContain(".filter((l) => !l.isStampRecharge)");
+    expect(
+      b.indexOf('if (!room) return { ok: false, error: "Only an issued invoice can be credited." };'),
+    ).toBeLessThan(b.indexOf(".insert(invoices)"));
   });
 });

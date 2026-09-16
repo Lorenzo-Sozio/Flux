@@ -104,13 +104,49 @@
   {
     "file": "src/actions/invoices.ts",
     "description": "⚠️⚠️ all'emissione il bollo si prende dalla bozza invece che dalle righe congelate",
-    "find": "    stampDuty: final.stamp.applied,\n    totals: totalsOf(final.lines, discount),",
-    "replace": "    stampDuty: invoice.stampDuty,\n    totals: totalsOf(final.lines, discount),"
+    "find": "    stampDuty: final.stamp.applied,\n    totals,\n",
+    "replace": "    stampDuty: invoice.stampDuty,\n    totals,\n"
   },
   {
     "file": "src/lib/invoice-rules.ts",
     "description": "⚠️ si emette una fattura con il bollo forzato senza motivo",
     "find": "  if (stamp.mode !== \"auto\" && (stamp.note ?? \"\").trim().length < 5) {",
     "replace": "  if (false) {"
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ una nota di credito storna più del totale della fattura",
+    "find": "        AND total - credited_amount >= ${money(input.totals.total)}::numeric\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️⚠️ una nota di credito rifiutata consuma comunque un numero",
+    "find": "      WHERE ${input.creditOf ?? null}::text IS NULL OR EXISTS (SELECT 1 FROM credit)\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️ lo storno si registra anche se la bozza non viene emessa",
+    "find": "        AND EXISTS (SELECT 1 FROM target)\n",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/invoice-issue.ts",
+    "description": "⚠️ si storna una fattura ancora in bozza o un'altra nota di credito",
+    "find": "        AND status = 'issued' AND document_type = 'TD01'\n",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/invoices.ts",
+    "description": "⚠️⚠️ la nota di credito si emette senza scalare la fattura originale",
+    "find": "    creditOf: isCredit ? invoice.originalInvoiceId : null,\n",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/invoices.ts",
+    "description": "⚠️ la nota di credito riaddebita il bollo, cioè lo restituisce al cliente",
+    "find": "  const recharge = isCredit ? false : Boolean(issuer?.rechargeStampDuty);\n  const final = finalLines(lines, discount, invoice.stampDutyMode, recharge);\n  const totals = totalsOf(final.lines, discount);",
+    "replace": "  const recharge = Boolean(issuer?.rechargeStampDuty);\n  const final = finalLines(lines, discount, invoice.stampDutyMode, recharge);\n  const totals = totalsOf(final.lines, discount);"
   }
 ]

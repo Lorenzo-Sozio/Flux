@@ -3855,7 +3855,9 @@
       "nature_with_vat": "line {line}: Natura code on a taxed line",
       "unknown_nature": "line {line}: unknown Natura code",
       "not_positive": "a total above zero",
-      "stamp_override_without_reason": "stamp duty: write the reason for the manual choice"
+      "stamp_override_without_reason": "stamp duty: write the reason for the manual choice",
+      "credit_exceeds_residual": "the credit note exceeds what is left to credit on the invoice",
+      "credit_without_original": "the invoice to credit is missing or no longer issued"
     },
     "lines": "Lines",
     "description": "Description",
@@ -3967,6 +3969,28 @@
       "archivedToast": "XML and PDF archived.",
       "archiveFailed": "Archiving failed.",
       "emailedOn": "Sent on {when} to {to}"
+    },
+    "credit": {
+      "button": "Credit note",
+      "title": "Create a credit note",
+      "description": "It starts as a draft with the invoice's lines. Numbering continues the series, and on issue its amount comes off what is left on the invoice.",
+      "fullTitle": "Full credit",
+      "fullHint": "Every line as invoiced. Issue it as it is.",
+      "partialTitle": "Partial credit",
+      "partialHint": "Starts from the same lines: lower quantities or prices, or remove the lines that are not credited.",
+      "create": "Create draft",
+      "cancel": "Cancel",
+      "cardTitle": "Credit notes",
+      "fullyCredited": "Credited",
+      "partlyCredited": "Partly credited",
+      "invoiced": "Invoiced",
+      "credited": "Credited",
+      "residual": "Left",
+      "draftNote": "Draft credit note",
+      "draftsDontCount": "Drafts do not count until they are issued.",
+      "creditsInvoice": "Credits",
+      "residualLeft": "{amount} left to credit",
+      "noteNumber": "Credit note no. {number}"
     }
   }
 }

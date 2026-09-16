@@ -47,7 +47,9 @@ export type DraftProblem =
   | { kind: "nature_with_vat"; line: number }
   | { kind: "unknown_nature"; line: number }
   | { kind: "not_positive" }
-  | { kind: "stamp_override_without_reason" };
+  | { kind: "stamp_override_without_reason" }
+  | { kind: "credit_exceeds_residual" }
+  | { kind: "credit_without_original" };
 
 /** What stops this draft being issued, line by line (1-based). Empty means it can go. */
 export function draftProblems(
