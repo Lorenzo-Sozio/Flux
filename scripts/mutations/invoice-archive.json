@@ -38,7 +38,7 @@
   {
     "file": "src/actions/invoices.ts",
     "description": "⚠️⚠️ si può inviare come copia di cortesia una bozza senza numero",
-    "find": "  if (invoice.status !== \"issued\" || !invoice.documentNumber || !invoice.issueDate) {\n    return { ok: false, error: \"Only an issued invoice can be sent.\" };\n  }\n",
+    "find": "  if (invoice.status !== \"issued\" || !invoice.documentNumber || !invoice.issueDate) {\n    return { ok: false, error: (await serverT(\"serverErrors.invoices\"))(\"sendOnlyIssued\") };\n  }\n",
     "replace": ""
   },
   {

@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
-
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 
 type Stage = {
   label: string;
@@ -18,6 +16,7 @@ type ConversionRate = {
 
 export function FunnelChart({ stages, conversionRates }: { stages: Stage[]; conversionRates: ConversionRate[] }) {
   const t = useTranslations("analytics.funnel");
+  const format = useFormatter();
   const maxCount = Math.max(...stages.map((s) => s.count), 1);
 
   return (
@@ -46,35 +45,12 @@ export function FunnelChart({ stages, conversionRates }: { stages: Stage[]; conv
                 <span className="text-sm font-semibold text-white drop-shadow">{stage.label}</span>
               </div>
               <div className="absolute inset-y-0 right-4 flex items-center">
-                <span className="font-bold tabular-nums text-sm">{stage.count.toLocaleString()}</span>
+                <span className="font-bold tabular-nums text-sm">{format.number(stage.count)}</span>
               </div>
             </div>
           </div>
         );
       })}
-    </div>
-  );
-}
-
-export function PeriodSelector({ current, base }: { current: number; base: string }) {
-  const t = useTranslations("analytics.funnel");
-  const options = [{ value: 30 }, { value: 90 }, { value: 180 }, { value: 365 }];
-
-  return (
-    <div className="flex gap-1 rounded-lg border p-1">
-      {options.map((opt) => (
-        <Link
-          key={opt.value}
-          href={`${base}?period=${opt.value}`}
-          className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-            current === opt.value
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
-          }`}
-        >
-          {t("daysLabel", { count: opt.value })}
-        </Link>
-      ))}
     </div>
   );
 }

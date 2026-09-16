@@ -15,7 +15,7 @@ import {
   Settings2,
   TrendingUp,
 } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 
 import { getLossReasons, updateDealStage } from "@/actions/pipeline";
 import { DealModal } from "@/components/crm/deal-modal";
@@ -29,6 +29,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useCurrency } from "@/hooks/use-currency";
 import { cn } from "@/lib/utils";
 
 type Deal = {
@@ -77,6 +78,8 @@ export function PipelineBoard({
   canManageStages?: boolean;
 }) {
   const t = useTranslations("pipeline");
+  const format = useFormatter();
+  const { formatAmount, formatMoney } = useCurrency();
   const [isMounted, setIsMounted] = useState(false);
   const [deals, setDeals] = useState(initialDeals);
   const [pendingLoss, setPendingLoss] = useState<{ dealId: string; dealName: string; stageId: string } | null>(null);
@@ -137,7 +140,7 @@ export function PipelineBoard({
     // ⚠️ The height has to clear the bottom bar as well as the header, or the
     // last card in every column sits behind the tabs and the board's own
     // scrollbar is unreachable.
-    <div className="flex h-[calc(100dvh-120px-var(--mobile-nav-height)-var(--safe-bottom))] w-full flex-col overflow-hidden md:h-[calc(100dvh-120px)]">
+    <div className="flex h-[calc(100dvh-260px-var(--mobile-nav-height)-var(--safe-bottom))] min-h-[420px] w-full flex-col overflow-hidden md:h-[calc(100dvh-230px)]">
       <LostDealDialog
         open={pendingLoss !== null}
         dealName={pendingLoss?.dealName ?? ""}
@@ -261,12 +264,7 @@ export function PipelineBoard({
                     <CoinsIcon className="h-3 w-3" />
                     {/* A bare number with no currency symbol: money that does not say
                         what it is. Amounts are stored in EUR. */}
-                    {totalAmount.toLocaleString(undefined, {
-                      style: "currency",
-                      currency: "EUR",
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}
+                    {formatAmount(totalAmount)}
                   </p>
                 </div>
 
@@ -345,7 +343,7 @@ export function PipelineBoard({
                                 <CardContent className="flex flex-col gap-1.5 p-3 pt-0">
                                   <div className="mt-1 flex items-center justify-between">
                                     <p className="font-bold text-[11px] text-foreground/80">
-                                      {deal.currency} {Number(deal.amount || 0).toLocaleString()}
+                                      {formatMoney(deal.amount ?? 0, deal.currency)}
                                     </p>
                                     {(deal.probability ?? 0) > 0 && (
                                       <span className="font-medium text-[9px] text-muted-foreground">
@@ -363,7 +361,7 @@ export function PipelineBoard({
                                             : ""
                                         }
                                       >
-                                        {new Date(deal.expectedCloseDate).toLocaleDateString(undefined, {
+                                        {format.dateTime(new Date(deal.expectedCloseDate), {
                                           month: "short",
                                           day: "numeric",
                                         })}

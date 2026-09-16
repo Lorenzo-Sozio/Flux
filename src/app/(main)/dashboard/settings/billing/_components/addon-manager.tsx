@@ -28,6 +28,9 @@ interface AddonManagerProps {
 
 export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
   const t = useTranslations("settings.billing");
+  // ADDON_CONFIGS carries English; addons.catalogue.<type> carries the reader's language.
+  const addonText = (type: string, part: "name" | "description", fallback: string | undefined) =>
+    t.has(`addons.catalogue.${type}.${part}`) ? t(`addons.catalogue.${type}.${part}`) : fallback;
   const [removing, setRemoving] = useState<string | null>(null);
 
   const activeAddons = addons.filter((a) => a.status === "active");
@@ -64,14 +67,16 @@ export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
               <div key={addon.id} className="flex items-center justify-between rounded-md border px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">
-                    {cfg?.displayName ?? addon.addonType}
+                    {addonText(addon.addonType, "name", cfg?.displayName ?? addon.addonType)}
                     {addon.quantity > 1 && (
                       <Badge variant="secondary" className="ml-2 text-xs">
                         ×{addon.quantity}
                       </Badge>
                     )}
                   </p>
-                  <p className="text-xs text-muted-foreground">{cfg?.description}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {addonText(addon.addonType, "description", cfg?.description)}
+                  </p>
                 </div>
                 <Button
                   variant="ghost"
@@ -98,8 +103,8 @@ export function AddonManager({ addons, onAddonAdded }: AddonManagerProps) {
             return (
               <div key={type} className="flex items-center justify-between rounded-md border px-4 py-3">
                 <div>
-                  <p className="text-sm font-medium">{cfg.displayName}</p>
-                  <p className="text-xs text-muted-foreground">{cfg.description}</p>
+                  <p className="text-sm font-medium">{addonText(type, "name", cfg.displayName)}</p>
+                  <p className="text-xs text-muted-foreground">{addonText(type, "description", cfg.description)}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {t("addons.pricePerMonth", { price: (cfg.priceMonthly / 100).toFixed(0) })}
                   </p>

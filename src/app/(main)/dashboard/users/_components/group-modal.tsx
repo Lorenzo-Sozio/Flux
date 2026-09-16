@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { useMessageText } from "@/hooks/use-message-text";
 
 const PRESET_COLORS = [
   "#6366f1",
@@ -65,6 +66,7 @@ interface Props {
 export function GroupModal({ group, children, onSaved }: Props) {
   const t = useTranslations("users.groupModal");
   const tCommon = useTranslations("common");
+  const say = useMessageText();
   const groupSchema = useMemo(() => makeGroupSchema(t("nameRequired")), [t]);
   const [open, setOpen] = useState(false);
   const [users, setUsers] = useState<UserOption[]>([]);
@@ -115,7 +117,7 @@ export function GroupModal({ group, children, onSaved }: Props) {
         : await createUserGroup(data as UserGroupFormData);
 
       if (!result.success) {
-        toast.error(result.error ?? t("saveFailed"));
+        toast.error(say(result.error, t("saveFailed")));
         return;
       }
 

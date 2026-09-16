@@ -54,7 +54,7 @@ export default async function AssistantActivityPage() {
   const etichetta = (chiave: string) => (t.has(`entities.${chiave}`) ? t(`entities.${chiave}`) : chiave);
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
       <div>
         <h1 className="font-semibold text-2xl tracking-tight">{t("title")}</h1>
         <p className="mt-1 text-muted-foreground text-sm">{t("subtitle", { month: mese })}</p>

@@ -5,6 +5,7 @@ import Papa from "papaparse";
 
 import { auth } from "@/auth";
 import { companies } from "@/db/schema";
+import { serverT } from "@/lib/i18n-server";
 import { getDb } from "@/lib/tenant-context";
 
 const importLimits = new Map<string, { count: number; resetAt: number }>();
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest) {
   const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: (await serverT())("generic.unauthenticated") }, { status: 401 });
   }
 
   // Rate limiting: max 3 imports per 10 min
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
   const now = Date.now();
   const rl = importLimits.get(key);
   if (rl && now < rl.resetAt && rl.count >= 3) {
-    return NextResponse.json({ error: "Too many imports. Try again later." }, { status: 429 });
+    return NextResponse.json({ error: (await serverT("serverErrors.imports"))("tooMany") }, { status: 429 });
   }
   if (!rl || now > rl.resetAt) {
     importLimits.set(key, { count: 1, resetAt: now + 10 * 60 * 1000 });
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
-  if (!file) return NextResponse.json({ error: "No file provided." }, { status: 400 });
+  if (!file) return NextResponse.json({ error: (await serverT("serverErrors.imports"))("noFile") }, { status: 400 });
 
   const text = await file.text();
   const { data, errors } = Papa.parse<Record<string, string>>(text, {
@@ -40,7 +41,10 @@ export async function POST(req: NextRequest) {
   });
 
   if (errors.length > 0) {
-    return NextResponse.json({ error: "CSV parse error", details: errors }, { status: 400 });
+    return NextResponse.json(
+      { error: (await serverT("serverErrors.imports"))("csvParse"), details: errors },
+      { status: 400 },
+    );
   }
 
   let created = 0;

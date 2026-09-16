@@ -6,6 +6,7 @@ import { and, asc, eq, ne, sql } from "drizzle-orm";
 
 import { territories } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
+import { serverT } from "@/lib/i18n-server";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
 import { cleanTerritory, type TerritoryInput } from "@/lib/territory";
@@ -46,14 +47,17 @@ async function nameInUse(name: string, exceptId?: string): Promise<boolean> {
   return Boolean(row);
 }
 
-const TAKEN = "Another territory already has this name.";
+/** The refusal for a name another territory already has, in the reader's language. */
+async function taken(): Promise<{ ok: false; error: string }> {
+  return { ok: false, error: (await serverT("serverErrors.territories"))("nameTaken") };
+}
 
 export async function createTerritory(input: TerritoryInput): Promise<TerritoryResult> {
   const actor = await requireCapability("territory:manage");
   const cleaned = cleanTerritory(input);
   if (!cleaned.ok) return cleaned;
   // "Nord" and "nord" in one list are two territories nobody can tell apart.
-  if (await nameInUse(cleaned.value.name)) return { ok: false, error: TAKEN };
+  if (await nameInUse(cleaned.value.name)) return taken();
 
   const db = await getDb();
   try {
@@ -64,7 +68,7 @@ export async function createTerritory(input: TerritoryInput): Promise<TerritoryR
     revalidatePath(PAGE);
     return { ok: true, territory };
   } catch (err) {
-    if (isNameTaken(err)) return { ok: false, error: TAKEN };
+    if (isNameTaken(err)) return taken();
     throw err;
   }
 }
@@ -73,7 +77,7 @@ export async function updateTerritory(id: string, input: TerritoryInput): Promis
   await requireCapability("territory:manage");
   const cleaned = cleanTerritory(input);
   if (!cleaned.ok) return cleaned;
-  if (await nameInUse(cleaned.value.name, id)) return { ok: false, error: TAKEN };
+  if (await nameInUse(cleaned.value.name, id)) return taken();
 
   const db = await getDb();
   try {
@@ -82,11 +86,11 @@ export async function updateTerritory(id: string, input: TerritoryInput): Promis
       .set({ ...cleaned.value, updatedAt: new Date() })
       .where(eq(territories.id, id))
       .returning();
-    if (!territory) return { ok: false, error: "This territory no longer exists." };
+    if (!territory) return { ok: false, error: (await serverT("serverErrors.territories"))("notFound") };
     revalidatePath(PAGE);
     return { ok: true, territory };
   } catch (err) {
-    if (isNameTaken(err)) return { ok: false, error: TAKEN };
+    if (isNameTaken(err)) return taken();
     throw err;
   }
 }

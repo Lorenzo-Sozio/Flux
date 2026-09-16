@@ -68,13 +68,13 @@
   {
     "file": "src/lib/contract-terms.ts",
     "description": "⚠️⚠️ si salva un rinnovo automatico senza scadenza",
-    "find": "    if (endDate === null) return { ok: false, error: \"A contract that renews itself needs an end date.\" };",
+    "find": "    if (endDate === null) return refuse(\"validation.contracts.autoRenewNeedsEnd\");",
     "replace": ""
   },
   {
     "file": "src/lib/contract-terms.ts",
     "description": "⚠️ si salva una scadenza precedente all'inizio",
-    "find": "    if (endDate < input.startDate) return { ok: false, error: \"The end date is before the start date.\" };",
+    "find": "    if (endDate < input.startDate) return refuse(\"validation.contracts.endBeforeStart\");",
     "replace": ""
   },
   {

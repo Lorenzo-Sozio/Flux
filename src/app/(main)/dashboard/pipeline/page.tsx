@@ -1,10 +1,16 @@
 import { getCompaniesForSelect, getContactsForSelect } from "@/actions/crm";
 import { getPipelineData } from "@/actions/pipeline";
 import { hasCapability } from "@/lib/auth-guard";
+import { parsePipelineFilters } from "@/lib/pipeline-filters";
 
 import { PipelineBoard } from "./components/pipeline-board";
 
-export default async function PipelinePage() {
+export default async function PipelinePage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const filters = parsePipelineFilters(await searchParams);
   // Workspace role, not the platform staff field (audit rilievo U-02).
   const [canEdit, canManageStages] = await Promise.all([
     hasCapability("record:write"),
@@ -15,7 +21,7 @@ export default async function PipelinePage() {
   // used to load the full contact and company tables on each visit to the board
   // (audit rilievo B-08).
   const [data, companies, contacts] = await Promise.all([
-    getPipelineData(),
+    getPipelineData(filters),
     getCompaniesForSelect(),
     getContactsForSelect(),
   ]);

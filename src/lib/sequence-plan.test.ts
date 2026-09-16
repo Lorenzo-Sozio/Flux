@@ -96,7 +96,11 @@ describe("saving a sequence", () => {
       ...input,
       steps: [{ delayDays: 0, subject: "Ciao {{nome_cliente}}", body: "<p>x</p>" }],
     });
-    expect(r).toEqual({ ok: false, error: "Step 1 uses unknown placeholders: nome_cliente" });
+    expect(r).toEqual({
+      ok: false,
+      error: "validation.sequences.stepUnknownPlaceholders",
+      params: { step: 1, names: "nome_cliente" },
+    });
   });
 
   it("accepts the placeholders the catalogue knows", () => {

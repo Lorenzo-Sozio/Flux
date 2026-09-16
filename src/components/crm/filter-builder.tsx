@@ -94,7 +94,13 @@ function useFilterTranslations() {
     return ops?.[type]?.[op] ?? fallback;
   };
 
-  return { t, getFieldLabel, getOpLabel };
+  /** An enum option in the reader's language; the stored value when there is no translation. */
+  const getOptionLabel = (value: string): string => {
+    const options = fb?.optionValues as Record<string, string> | undefined;
+    return options?.[value] ?? value;
+  };
+
+  return { t, getFieldLabel, getOpLabel, getOptionLabel };
 }
 
 // ─── Lookup multi-select (FK fields with many options) ───────────────────────
@@ -191,7 +197,7 @@ function ValueInput({
   value: FilterValue;
   onChange: (v: FilterValue) => void;
 }) {
-  const { t } = useFilterTranslations();
+  const { t, getOptionLabel } = useFilterTranslations();
 
   if (NO_VALUE_OPERATORS.includes(operator)) {
     return <span className="self-center px-1 text-muted-foreground text-sm italic">—</span>;
@@ -306,7 +312,7 @@ function ValueInput({
               onChange(next);
             }}
           >
-            {opt}
+            {getOptionLabel(opt)}
           </Badge>
         ))}
       </div>

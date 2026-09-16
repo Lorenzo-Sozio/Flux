@@ -2,20 +2,20 @@ import { z } from "zod";
 
 export const QuoteItemSchema = z.object({
   productId: z.string().optional(),
-  description: z.string().min(1, "Description is required"),
-  quantity: z.coerce.number().int().positive("Quantity must be a positive integer"),
-  unitPrice: z.coerce.number().min(0, "Unit price cannot be negative"),
+  description: z.string().min(1, "validation.quotes.descriptionRequired"),
+  quantity: z.coerce.number().int().positive("validation.quotes.quantityPositive"),
+  unitPrice: z.coerce.number().min(0, "validation.quotes.unitPriceNegative"),
   discountPercent: z.coerce.number().min(0).max(100).default(0),
   taxPercent: z.coerce.number().min(0).max(100).default(0),
 });
 
 export const CreateQuoteSchema = z.object({
-  dealId: z.string().min(1, "Deal is required"),
-  companyId: z.string().min(1, "Company is required"),
+  dealId: z.string().min(1, "validation.quotes.dealRequired"),
+  companyId: z.string().min(1, "validation.quotes.companyRequired"),
   contactId: z.string().optional(),
   expiresAt: z.string().optional(),
   currency: z.string().default("EUR"),
-  items: z.array(QuoteItemSchema).min(1, "At least one item is required"),
+  items: z.array(QuoteItemSchema).min(1, "validation.quotes.itemsRequired"),
   notes: z.string().optional(),
   discountPercent: z.coerce.number().min(0).max(100).default(0),
   taxPercent: z.coerce.number().min(0).max(100).default(0),

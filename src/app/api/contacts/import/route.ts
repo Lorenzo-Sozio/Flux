@@ -5,6 +5,7 @@ import Papa from "papaparse";
 
 import { auth } from "@/auth";
 import { companies, contacts } from "@/db/schema";
+import { serverT } from "@/lib/i18n-server";
 import { checkRateLimit } from "@/lib/rate-limiter";
 import { getDb } from "@/lib/tenant-context";
 
@@ -14,20 +15,20 @@ export async function POST(req: NextRequest) {
   const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: (await serverT())("generic.unauthenticated") }, { status: 401 });
   }
 
   // Distributed rate limit: max 3 imports per 10 minutes per user, backed by platform DB.
   const allowed = await checkRateLimit(`import_contacts:${session.user.id}`, 3, 10 * 60_000);
   if (!allowed) {
-    return NextResponse.json({ error: "Too many imports. Try again in 10 minutes." }, { status: 429 });
+    return NextResponse.json({ error: (await serverT("serverErrors.imports"))("tooMany") }, { status: 429 });
   }
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
 
   if (!file) {
-    return NextResponse.json({ error: "No file provided." }, { status: 400 });
+    return NextResponse.json({ error: (await serverT("serverErrors.imports"))("noFile") }, { status: 400 });
   }
 
   const text = await file.text();
@@ -37,12 +38,15 @@ export async function POST(req: NextRequest) {
   });
 
   if (errors.length > 0) {
-    return NextResponse.json({ error: "CSV parse error", details: errors }, { status: 400 });
+    return NextResponse.json(
+      { error: (await serverT("serverErrors.imports"))("csvParse"), details: errors },
+      { status: 400 },
+    );
   }
 
   if (data.length > MAX_IMPORT_ROWS) {
     return NextResponse.json(
-      { error: `Import exceeds the maximum of ${MAX_IMPORT_ROWS} rows. Split the file and re-upload.` },
+      { error: (await serverT("serverErrors.imports"))("tooManyRows", { max: MAX_IMPORT_ROWS }) },
       { status: 400 },
     );
   }

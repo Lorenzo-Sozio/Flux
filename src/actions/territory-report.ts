@@ -2,6 +2,7 @@
 
 import { getTerritories } from "@/actions/territories";
 import { requireCapability } from "@/lib/auth-guard";
+import { PERIOD_OPTIONS } from "@/lib/pipeline-filters";
 import { getDb } from "@/lib/tenant-context";
 import { placeOfDeal, rollUp, type TerritoryRow } from "@/lib/territory-report";
 import { dealsByPlace, leadsByPlace } from "@/lib/territory-report-queries";
@@ -13,21 +14,21 @@ export interface TerritoryReport {
 }
 
 /**
- * Leads and pipeline by territory, over the last `days` days.
+ * Leads and pipeline by territory, over the last `days` days, for some agents or all.
  *
  * Three statements whatever the size of the workspace: the territories, leads by
  * address, deals by address. See src/lib/territory-report.ts for the roll-up.
  */
-export async function getTerritoryReport(days = 90): Promise<TerritoryReport> {
+export async function getTerritoryReport(days = 90, owners: string[] = []): Promise<TerritoryReport> {
   await requireCapability("report:read");
-  const period = [30, 90, 365].includes(days) ? days : 90;
+  const period = (PERIOD_OPTIONS as readonly number[]).includes(days) ? days : 90;
   const since = new Date(Date.now() - period * 86_400_000);
   const db = await getDb();
 
   const [rules, leadRows, dealRows] = await Promise.all([
     getTerritories(),
-    leadsByPlace(db, since),
-    dealsByPlace(db, since),
+    leadsByPlace(db, since, owners),
+    dealsByPlace(db, since, owners),
   ]);
 
   const rows = rollUp(

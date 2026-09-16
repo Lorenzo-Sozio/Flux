@@ -6,7 +6,7 @@ export const TICKET_TYPE_VALUES = ["support", "bug", "complaint", "info_request"
 export const TICKET_STATUS_VALUES = ["new", "open", "in_progress", "waiting", "on_hold", "resolved", "closed"] as const;
 
 export const CreateTicketSchema = z.object({
-  subject: z.string().min(1, "Subject required"),
+  subject: z.string().min(1, "validation.support.subjectRequired"),
   description: z.string().optional(),
   channel: z.enum(["email", "chat", "phone", "social"]),
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
@@ -65,9 +65,9 @@ export const AddMessageSchema = z.object({
 // ── Macro schemas ────────────────────────────────────────────────────────────
 
 export const CreateMacroSchema = z.object({
-  name: z.string().min(1, "Name required"),
+  name: z.string().min(1, "validation.support.nameRequired"),
   description: z.string().optional(),
-  body: z.string().min(1, "Body required"),
+  body: z.string().min(1, "validation.support.bodyRequired"),
   isPublic: z.boolean().default(true),
 });
 

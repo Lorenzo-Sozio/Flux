@@ -19,6 +19,7 @@ import {
 } from "@/db/schema";
 import { requireAdminAccess, requireCapability, requirePlanModule, requireWriteAccess } from "@/lib/auth-guard";
 import { AUTOMATION_RECIPES, findRecipe, isPreviewable } from "@/lib/automation-recipes";
+import { serverT } from "@/lib/i18n-server";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Read ─────────────────────────────────────────────────────────────────────
@@ -107,7 +108,7 @@ export async function createAutomationRule(data: AutomationRuleFormData) {
   // Server-side Zod validation (also validates nested JSON structures)
   const parsed = AutomationRuleFormSchema.safeParse(data);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0]?.message ?? "Invalid rule data" };
+    return { success: false, error: parsed.error.errors[0]?.message ?? (await serverT())("automation.invalidRule") };
   }
 
   const { name, description, isActive, targetEntity, triggerOn, conditionLogic, conditions, actions } = parsed.data;
@@ -137,7 +138,7 @@ export async function updateAutomationRule(id: string, data: AutomationRuleFormD
 
   const parsed = AutomationRuleFormSchema.safeParse(data);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0]?.message ?? "Invalid rule data" };
+    return { success: false, error: parsed.error.errors[0]?.message ?? (await serverT())("automation.invalidRule") };
   }
 
   const { name, description, isActive, targetEntity, triggerOn, conditionLogic, conditions, actions } = parsed.data;
@@ -265,7 +266,7 @@ export async function getRecipeMatchCounts(): Promise<{
  */
 export async function installAutomationRecipe(recipeId: string) {
   const recipe = findRecipe(recipeId);
-  if (!recipe) return { success: false, error: "No such recipe" };
+  if (!recipe) return { success: false, error: (await serverT())("automation.noSuchRecipe") };
 
   await requireWriteAccess();
   const db = await getDb();

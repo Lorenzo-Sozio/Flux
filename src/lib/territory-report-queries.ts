@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 
 import { companies, contacts, deals, leads } from "@/db/schema";
+import { ownerCondition } from "@/lib/pipeline-filters";
 
 /**
  * The two statements behind the territory report.
@@ -18,7 +19,7 @@ import { companies, contacts, deals, leads } from "@/db/schema";
 // biome-ignore lint/suspicious/noExplicitAny: the tenant db handle is built per request
 type AnyDb = any;
 
-export function leadsByPlace(db: AnyDb, since: Date) {
+export function leadsByPlace(db: AnyDb, since: Date, owners: readonly string[] = []) {
   const from = since.toISOString();
   return db
     .select({
@@ -30,10 +31,11 @@ export function leadsByPlace(db: AnyDb, since: Date) {
       convertedLeads: sql<string>`count(*) filter (where ${leads.isConverted} = true and ${leads.convertedAt} >= ${from})`,
     })
     .from(leads)
+    .where(ownerCondition(leads.ownerId, owners))
     .groupBy(leads.country, leads.state, leads.zipCode);
 }
 
-export function dealsByPlace(db: AnyDb, since: Date) {
+export function dealsByPlace(db: AnyDb, since: Date, owners: readonly string[] = []) {
   const from = since.toISOString();
   return db
     .select({
@@ -52,5 +54,6 @@ export function dealsByPlace(db: AnyDb, since: Date) {
     .from(deals)
     .leftJoin(companies, eq(companies.id, deals.companyId))
     .leftJoin(contacts, eq(contacts.id, deals.contactId))
+    .where(ownerCondition(deals.ownerId, owners))
     .groupBy(companies.country, companies.state, companies.zipCode, contacts.country, contacts.state, contacts.zipCode);
 }

@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
-import { and, count, eq, gte, inArray } from "drizzle-orm";
+import { and, count, eq, gte, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { getFormatter, getTranslations } from "next-intl/server";
 
 import { dispatchWebhook } from "@/actions/webhooks";
 import { runAutomations } from "@/components/crm/automation/rule-engine";
@@ -23,9 +24,12 @@ import { requireAdminAccess, requireCapability, requirePlanLimit, requireWriteAc
 import { contactReach } from "@/lib/contact-reach";
 import { convertToEur, getExchangeRates } from "@/lib/exchange-rates";
 import { notify } from "@/lib/notify";
+import { type DealStatusFilter, ownerCondition, periodStart } from "@/lib/pipeline-filters";
 import { getDb } from "@/lib/tenant-context";
 
-export async function getPipelineData() {
+export async function getPipelineData(
+  filters: { owners?: string[]; status?: DealStatusFilter | null; q?: string } = {},
+) {
   await requireCapability("record:read");
   const db = await getDb();
   let stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
@@ -41,7 +45,13 @@ export async function getPipelineData() {
     stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
   }
 
-  const allDeals = await db.select().from(deals);
+  const where: (SQL | undefined)[] = [ownerCondition(deals.ownerId, filters.owners ?? [])];
+  if (filters.status) where.push(eq(deals.status, filters.status));
+  if (filters.q) where.push(ilike(deals.name, `%${filters.q.replace(/[\\%_]/g, "\\$&")}%`));
+  const allDeals = await db
+    .select()
+    .from(deals)
+    .where(and(...where));
 
   return { stages, deals: allDeals };
 }
@@ -344,11 +354,22 @@ export async function getDealById(dealId: string) {
 }
 
 // ─── Pipeline Report ──────────────────────────────────────────────────────────
-export async function getPipelineReport() {
+export async function getPipelineReport(filters: { owners?: string[]; period?: number } = {}) {
   await requireCapability("report:read");
   const db = await getDb();
   const stages = await db.select().from(pipelineStages).orderBy(pipelineStages.order);
-  const allDeals = await db.select().from(deals);
+  // Open pipeline is what is on the table now, whatever its age; the period applies
+  // to what closed, on the day it closed.
+  const since = filters.period ? periodStart(filters.period) : null;
+  const allDeals = await db
+    .select()
+    .from(deals)
+    .where(
+      and(
+        ownerCondition(deals.ownerId, filters.owners ?? []),
+        since ? or(eq(deals.status, "open"), gte(deals.closedAt, since)) : undefined,
+      ),
+    );
   const now = Date.now();
 
   const stageReport = stages.map((stage) => {
@@ -514,9 +535,11 @@ async function refreshDealHealthScore(dealId: string) {
 
 // ── Forecast ──────────────────────────────────────────────────────────────────
 
-export async function getForecastData() {
+export async function getForecastData(filters: { owners?: string[] } = {}) {
   await requireCapability("report:read");
   const db = await getDb();
+  const [format, tFilters] = await Promise.all([getFormatter(), getTranslations("pipeline.filters")]);
+  const owners = filters.owners ?? [];
   const openDeals = await db
     .select({
       id: deals.id,
@@ -533,7 +556,7 @@ export async function getForecastData() {
     .from(deals)
     .leftJoin(users, eq(deals.ownerId, users.id))
     .leftJoin(pipelineStages, eq(deals.stageId, pipelineStages.id))
-    .where(eq(deals.status, "open"));
+    .where(and(eq(deals.status, "open"), ownerCondition(deals.ownerId, owners)));
 
   // Build monthly buckets for the next 6 months
   const now = new Date();
@@ -554,7 +577,7 @@ export async function getForecastData() {
     const period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     periodKeys.push(period);
     months.push({
-      label: d.toLocaleDateString(undefined, { month: "short", year: "numeric" }),
+      label: format.dateTime(d, { month: "short", year: "numeric" }),
       year: d.getFullYear(),
       month: d.getMonth(),
       period,
@@ -569,7 +592,9 @@ export async function getForecastData() {
   const targetRows = await db
     .select({ period: salesTargets.period, targetAmount: salesTargets.targetAmount })
     .from(salesTargets)
-    .where(inArray(salesTargets.period, periodKeys));
+    // A target belongs to a person, so filtered to agents it is their targets only;
+    // "nobody" has none.
+    .where(and(inArray(salesTargets.period, periodKeys), ownerCondition(salesTargets.userId, owners)));
 
   for (const tr of targetRows) {
     const bucket = months.find((m) => m.period === tr.period);
@@ -631,7 +656,7 @@ export async function getForecastData() {
         existing.weighted += weighted;
         existing.dealCount += 1;
       } else {
-        ownerMap.set(deal.ownerId, { name: deal.ownerName ?? "Unassigned", weighted, dealCount: 1 });
+        ownerMap.set(deal.ownerId, { name: deal.ownerName ?? tFilters("unnamed"), weighted, dealCount: 1 });
       }
     }
   }
@@ -762,10 +787,11 @@ export async function loseDeal(dealId: string, loss: LossDetails) {
  * what every sales meeting asks first. All three carry value, not just counts,
  * because ten small losses and one large one are different problems.
  */
-export async function getWinLossAnalysis(sinceDays = 365) {
+export async function getWinLossAnalysis(sinceDays = 365, owners: string[] = []) {
   await requireCapability("report:read");
   const db = await getDb();
-  const since = new Date(Date.now() - sinceDays * 86_400_000);
+  const since = periodStart(sinceDays);
+  const t = await getTranslations("pipeline.winLoss");
 
   const closed = await db
     .select({
@@ -778,7 +804,9 @@ export async function getWinLossAnalysis(sinceDays = 365) {
       lostAtStageId: deals.lostAtStageId,
     })
     .from(deals)
-    .where(and(inArray(deals.status, ["won", "lost"]), gte(deals.closedAt, since)));
+    .where(
+      and(inArray(deals.status, ["won", "lost"]), gte(deals.closedAt, since), ownerCondition(deals.ownerId, owners)),
+    );
 
   const [reasons, stages] = await Promise.all([
     db.select().from(dealLossReasons),
@@ -812,8 +840,12 @@ export async function getWinLossAnalysis(sinceDays = 365) {
     // Of everything that actually closed. Open deals are not a loss yet, and
     // counting them as one is how a win rate quietly becomes meaningless.
     winRate: closed.length ? Math.round((won.length / closed.length) * 100) : 0,
-    byReason: groupLosses((d) => (d.lossReasonId ? (reasonName.get(d.lossReasonId) ?? "Unknown") : "Not recorded")),
-    byStage: groupLosses((d) => (d.lostAtStageId ? (stageName.get(d.lostAtStageId) ?? "Unknown") : "Not recorded")),
-    byCompetitor: groupLosses((d) => d.lostCompetitor?.trim() || "None named"),
+    byReason: groupLosses((d) =>
+      d.lossReasonId ? (reasonName.get(d.lossReasonId) ?? t("unknown")) : t("notRecorded"),
+    ),
+    byStage: groupLosses((d) =>
+      d.lostAtStageId ? (stageName.get(d.lostAtStageId) ?? t("unknown")) : t("notRecorded"),
+    ),
+    byCompetitor: groupLosses((d) => d.lostCompetitor?.trim() || t("noneNamed")),
   };
 }

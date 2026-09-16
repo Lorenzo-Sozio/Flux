@@ -29,6 +29,7 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
+import { useMessageText } from "@/hooks/use-message-text";
 import { addDays } from "@/lib/contract-terms";
 import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { customerGaps } from "@/lib/fiscal-ids";
@@ -70,6 +71,7 @@ export function NewInvoiceForm({
   canIssue: boolean;
 }) {
   const t = useTranslations("invoices");
+  const say = useMessageText();
   const tn = useTranslations("invoices.new");
   const tI = useTranslations("invoicing");
   const router = useRouter();
@@ -177,7 +179,7 @@ export function NewInvoiceForm({
           },
         });
       } else {
-        toast.error(result.error);
+        toast.error(say(result));
       }
       return null;
     }

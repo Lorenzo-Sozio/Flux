@@ -254,7 +254,7 @@ export default async function CRMPage() {
               <TrendingUpIcon className="h-4 w-4 text-blue-500" />
             </CardHeader>
             <CardContent>
-              <div className="font-bold text-2xl">€{stats.totalDealValue.toLocaleString()}</div>
+              <div className="font-bold text-2xl">€{stats.totalDealValue.toLocaleString(locale)}</div>
               <p className="mt-1 text-muted-foreground text-xs">{t("pipelineValueDesc")}</p>
             </CardContent>
           </Card>
@@ -313,7 +313,7 @@ export default async function CRMPage() {
               <FileTextIcon className="h-4 w-4 text-violet-500" />
             </CardHeader>
             <CardContent>
-              <div className="font-bold text-2xl">€{stats.quotesPipelineValue.toLocaleString()}</div>
+              <div className="font-bold text-2xl">€{stats.quotesPipelineValue.toLocaleString(locale)}</div>
               <div className="mt-1 flex gap-2">
                 <span className="text-[10px] text-muted-foreground uppercase">
                   {t("openQuotesCount", { count: stats.quotesOpenCount })}
@@ -387,7 +387,7 @@ export default async function CRMPage() {
         <MonthTargetCard
           myTarget={myTarget}
           wonThisMonth={wonThisMonth}
-          monthLabel={now.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+          monthLabel={now.toLocaleDateString(locale, { month: "long", year: "numeric" })}
         />
       )}
 
@@ -437,7 +437,7 @@ export default async function CRMPage() {
                       </div>
                     </div>
                     <div className="ml-4 shrink-0 text-right">
-                      <p className="font-semibold text-sm">€{deal.amount.toLocaleString()}</p>
+                      <p className="font-semibold text-sm">€{deal.amount.toLocaleString(locale)}</p>
                       {deal.probability != null && (
                         <p className="text-[11px] text-muted-foreground">
                           {t("probPercent", { prob: deal.probability })}
@@ -532,7 +532,7 @@ export default async function CRMPage() {
                     </Badge>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs">
-                    {new Date(lead.createdAt).toLocaleDateString()}
+                    {new Date(lead.createdAt).toLocaleDateString(locale)}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" asChild>

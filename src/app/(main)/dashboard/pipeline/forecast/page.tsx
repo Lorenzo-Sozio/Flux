@@ -2,12 +2,18 @@ import { getTranslations } from "next-intl/server";
 
 import { getForecastData } from "@/actions/pipeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { parsePipelineFilters } from "@/lib/pipeline-filters";
 
 import { ForecastBarChart, OwnerPieChart } from "./_components/forecast-charts";
 import { ForecastKPI, ForecastOwnerTable } from "./_components/forecast-kpi";
 
-export default async function ForecastPage() {
-  const [data, t] = await Promise.all([getForecastData(), getTranslations("pipeline.forecast")]);
+export default async function ForecastPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { owners } = parsePipelineFilters(await searchParams);
+  const [data, t] = await Promise.all([getForecastData({ owners }), getTranslations("pipeline.forecast")]);
 
   return (
     <div className="space-y-6">

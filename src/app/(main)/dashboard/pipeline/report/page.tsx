@@ -1,34 +1,33 @@
-import Link from "next/link";
-
-import { ArrowLeft, Clock, DollarSign, Target, TrendingUp } from "lucide-react";
+import { Clock, DollarSign, Target, TrendingUp } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { getPipelineReport } from "@/actions/pipeline";
+import { Money } from "@/components/crm/money";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { parsePipelineFilters, pipelineView } from "@/lib/pipeline-filters";
 
 import { PipelineReportCharts } from "./_components/pipeline-report-charts";
 
-export default async function PipelineReportPage() {
-  const report = await getPipelineReport();
-  const t = await getTranslations("pipeline");
+export default async function PipelineReportPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { owners, period } = parsePipelineFilters(await searchParams, {
+    period: pipelineView("report").defaultPeriod,
+  });
+  const [report, t] = await Promise.all([getPipelineReport({ owners, period }), getTranslations("pipeline")]);
 
-  const fmt = (n: number) =>
-    new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(n);
+  // Amounts are stored in EUR and shown in the workspace currency, like the
+  // sibling pages; this one used to format euro in the server's own locale.
+  const fmt = (n: number) => <Money value={n} />;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/dashboard/pipeline">
-            <ArrowLeft className="mr-2 h-4 w-4" /> {t("backToPipeline")}
-          </Link>
-        </Button>
-        <div>
-          <h1 className="font-bold text-2xl tracking-tight">{t("report")}</h1>
-          <p className="text-muted-foreground text-sm">{t("reportSubtitle")}</p>
-        </div>
+      <div>
+        <h1 className="font-bold text-2xl tracking-tight">{t("report")}</h1>
+        <p className="text-muted-foreground text-sm">{t("reportSubtitlePeriod", { days: period })}</p>
       </div>
 
       {/* KPI Cards */}
@@ -118,7 +117,7 @@ export default async function PipelineReportPage() {
                     <td className="py-3 text-right">
                       <div className="flex items-center justify-end gap-1 text-muted-foreground">
                         <Clock className="h-3 w-3" />
-                        {stage.avgDaysInStage}d
+                        {t("filters.daysShort", { days: stage.avgDaysInStage })}
                       </div>
                     </td>
                   </tr>

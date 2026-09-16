@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { useMessageText } from "@/hooks/use-message-text";
 import { MAX_STEPS } from "@/lib/sequence-plan";
 
 interface Step {
@@ -44,6 +45,7 @@ const newKey = () => Math.random().toString(36).slice(2);
 
 export function SequenceEditor({ sequence, steps: initialSteps, templates, canManage }: Props) {
   const t = useTranslations("sequences");
+  const say = useMessageText();
   const router = useRouter();
   const [name, setName] = useState(sequence?.name ?? "");
   const [description, setDescription] = useState(sequence?.description ?? "");
@@ -77,7 +79,7 @@ export function SequenceEditor({ sequence, steps: initialSteps, templates, canMa
         steps: steps.map(({ delayDays, subject, body }) => ({ delayDays: Number(delayDays), subject, body })),
       });
       if (!result.ok) {
-        toast.error(result.error);
+        toast.error(say(result));
         return;
       }
       toast.success(t("saved"));

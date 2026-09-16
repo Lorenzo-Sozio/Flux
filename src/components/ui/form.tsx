@@ -6,6 +6,7 @@ import { Controller, ControllerProps, FieldPath, FieldValues, FormProvider, useF
 
 import { cn } from "@/lib/utils"
 import { Label } from "@/components/ui/label"
+import { useMessageText } from "@/hooks/use-message-text"
 
 const Form = FormProvider
 
@@ -137,7 +138,10 @@ const FormMessage = React.forwardRef<
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => {
   const { error, formMessageId } = useFormField()
-  const body = error ? String(error?.message) : null
+  const say = useMessageText()
+  // A schema message may be a `validation.*` key; it is translated here, where the
+  // reader's language is known.
+  const body = error ? say(String(error?.message)) : null
 
   if (!body) {
     return null

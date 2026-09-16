@@ -14,7 +14,7 @@ import {
   TrendingUpIcon,
   UserIcon,
 } from "lucide-react";
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 
 import { createActivity, getActivitiesByDeal } from "@/actions/activities";
 import { getCompaniesForSelect, getContactsForSelect } from "@/actions/crm";
@@ -97,6 +97,8 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
     getTranslations("pipeline"),
     getTranslations("entityDetail"),
   ]);
+  const [format, tStatus] = await Promise.all([getFormatter(), getTranslations("entities.statuses")]);
+  const statusLabel = (s: string) => (tStatus.has(s as never) ? tStatus(s as never) : s);
 
   if (!row) return notFound();
 
@@ -237,7 +239,7 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                 <span className="text-muted-foreground">{t("fieldExpectedClose")}</span>
                 <span className="font-medium">
                   {deal.expectedCloseDate
-                    ? new Date(deal.expectedCloseDate).toLocaleDateString(undefined, {
+                    ? format.dateTime(new Date(deal.expectedCloseDate), {
                         day: "2-digit",
                         month: "short",
                         year: "numeric",
@@ -296,12 +298,12 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                     <div className="flex cursor-pointer items-center justify-between rounded-md border p-3 transition-colors hover:bg-accent">
                       <div>
                         <p className="font-medium text-sm">{quote.quoteNumber}</p>
-                        <p className="text-muted-foreground text-xs">{new Date(quote.issuedAt).toLocaleDateString()}</p>
+                        <p className="text-muted-foreground text-xs">{format.dateTime(new Date(quote.issuedAt))}</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Badge variant="outline">{quote.status}</Badge>
+                        <Badge variant="outline">{statusLabel(quote.status)}</Badge>
                         <span className="font-semibold text-sm">
-                          {quote.currency} {parseFloat(quote.totalAmount).toFixed(2)}
+                          {format.number(Number(quote.totalAmount), { style: "currency", currency: quote.currency })}
                         </span>
                       </div>
                     </div>
@@ -327,11 +329,9 @@ export default async function DealDetailPage({ params }: { params: Promise<{ id:
                     <div className="flex cursor-pointer items-center justify-between rounded-md border p-3 transition-colors hover:bg-accent">
                       <div>
                         <p className="font-medium text-sm">{order.orderNumber}</p>
-                        <p className="text-muted-foreground text-xs">
-                          {new Date(order.orderDate).toLocaleDateString()}
-                        </p>
+                        <p className="text-muted-foreground text-xs">{format.dateTime(new Date(order.orderDate))}</p>
                       </div>
-                      <Badge variant="outline">{order.status}</Badge>
+                      <Badge variant="outline">{statusLabel(order.status)}</Badge>
                     </div>
                   </Link>
                 ))}

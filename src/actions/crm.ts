@@ -32,7 +32,6 @@ import {
   tickets,
   users,
 } from "@/db/schema";
-import { guarded } from "@/lib/action-error";
 import { requireCapability, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
 import { isSameCompanyName, normalizeCompanyName } from "@/lib/company-name";
 import {
@@ -43,6 +42,7 @@ import {
   LEAD_FIELDS,
 } from "@/lib/filter-engine";
 import { decodeFilter } from "@/lib/filter-types";
+import { guardedT } from "@/lib/i18n-server";
 import { computeLeadScore } from "@/lib/lead-score";
 import { COMPANY_CHILDREN, CONTACT_CHILDREN, childColumn, LEAD_CHILDREN, type MergeChild } from "@/lib/merge-children";
 import { notify } from "@/lib/notify";
@@ -172,7 +172,7 @@ export async function getContacts(encodedFilter?: string | null) {
 }
 
 export async function createLead(data: unknown) {
-  return guarded(async () => {
+  return guardedT(async () => {
     await requireWriteAccess();
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
@@ -209,7 +209,7 @@ export async function createLead(data: unknown) {
 }
 
 export async function updateLead(id: string, data: unknown) {
-  return guarded(async () => {
+  return guardedT(async () => {
     await requireWriteAccess();
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
@@ -448,7 +448,7 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
 }
 
 export async function createContact(data: unknown) {
-  return guarded(async () => {
+  return guardedT(async () => {
     await requireWriteAccess();
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
@@ -485,7 +485,7 @@ export async function createContact(data: unknown) {
 }
 
 export async function updateContact(id: string, data: unknown) {
-  return guarded(async () => {
+  return guardedT(async () => {
     await requireWriteAccess();
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
@@ -569,7 +569,7 @@ export async function getCompanies(encodedFilter?: string | null) {
 }
 
 export async function createCompany(data: unknown) {
-  return guarded(async () => {
+  return guardedT(async () => {
     await requireWriteAccess();
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message
@@ -596,7 +596,7 @@ export async function createCompany(data: unknown) {
 }
 
 export async function updateCompany(id: string, data: unknown) {
-  return guarded(async () => {
+  return guardedT(async () => {
     await requireWriteAccess();
     const db = await getDb();
     // Validated with the same schema the form uses, so a bad value is a message

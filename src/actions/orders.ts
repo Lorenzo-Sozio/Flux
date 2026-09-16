@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 
 import { and, asc, count, desc, eq, ilike, inArray, ne, or, type SQL, sql } from "drizzle-orm";
+import { getTranslations } from "next-intl/server";
 import { z } from "zod";
 
 import { dispatchWebhook } from "@/actions/webhooks";
@@ -228,7 +229,7 @@ const orderItemSchema = z
   .refine((line) => Boolean(line.productId?.trim() || line.description?.trim()), {
     // Without this a line is a price attached to nothing, and the person preparing
     // the order has no way of knowing what it was for.
-    message: "Pick a product or describe what the line is for",
+    message: "validation.orders.lineNeedsProductOrDescription",
     path: ["description"],
   });
 
@@ -242,7 +243,7 @@ const createSchema = z.object({
   currency: z.string().default("EUR"),
   discountPercent: z.coerce.number().min(0).max(100).default(0),
   notes: z.string().max(2000).optional(),
-  items: z.array(orderItemSchema).min(1, "At least one item is required"),
+  items: z.array(orderItemSchema).min(1, "validation.orders.itemsRequired"),
 });
 
 export async function createOrder(data: z.input<typeof createSchema>) {
@@ -488,9 +489,10 @@ export async function deleteOrder(id: string) {
   const db = await getDb();
 
   const [order] = await db.select({ status: orders.status }).from(orders).where(eq(orders.id, id));
-  if (!order) throw new Error("Order not found");
+  const t = await getTranslations("validation.orders");
+  if (!order) throw new Error(t("notFound"));
   if (order.status !== "draft" && order.status !== "cancelled") {
-    throw new Error("Only draft or cancelled orders can be deleted. Cancel it instead.");
+    throw new Error(t("onlyDraftDeletable"));
   }
 
   await db.delete(orders).where(eq(orders.id, id));
@@ -515,7 +517,8 @@ export async function convertQuoteToOrderAction(quoteId: string) {
   const db = await getDb();
 
   const [quote] = await db.select().from(quotes).where(eq(quotes.id, quoteId));
-  if (!quote) throw new Error("Quote not found.");
+  const t = await getTranslations("validation.orders");
+  if (!quote) throw new Error(t("quoteNotFound"));
 
   if (quote.status === "converted") {
     const [existing] = await db
@@ -525,15 +528,15 @@ export async function convertQuoteToOrderAction(quoteId: string) {
     // Not an error worth stopping on: the person clicked twice, or someone else
     // got there first. Send them to the order that already exists.
     if (existing) return { success: true, orderId: existing.id, orderNumber: existing.orderNumber };
-    throw new Error("This quote is already marked as converted.");
+    throw new Error(t("quoteAlreadyConverted"));
   }
 
   if (quote.status !== "accepted") {
-    throw new Error("Only an accepted quote becomes an order. Record the customer's answer first.");
+    throw new Error(t("quoteNotAccepted"));
   }
 
   const lines = await db.select().from(quoteItems).where(eq(quoteItems.quoteId, quoteId));
-  if (lines.length === 0) throw new Error("This quote has no lines to order.");
+  if (lines.length === 0) throw new Error(t("quoteHasNoLines"));
 
   const orderId = crypto.randomUUID();
   const now = new Date();
@@ -787,11 +790,12 @@ export async function recordOrderPayment(
 ) {
   const actor = await requireCapability("order:write");
   await requirePlanModule("sales");
-  if (!isRecordablePayment(data.amount)) throw new Error("A payment has to be a positive amount.");
+  const t = await getTranslations("validation.orders");
+  if (!isRecordablePayment(data.amount)) throw new Error(t("paymentPositive"));
 
   const db = await getDb();
   const [order] = await db.select({ id: orders.id }).from(orders).where(eq(orders.id, orderId));
-  if (!order) throw new Error("Order not found");
+  if (!order) throw new Error(t("notFound"));
 
   await db.insert(orderPayments).values({
     orderId,

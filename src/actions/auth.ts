@@ -11,6 +11,7 @@ import { notifications, passwordResetTokens, tenantMembers, tenants, userInvitat
 import { appUrl } from "@/lib/app-url";
 import { requireActor, requireCapability } from "@/lib/auth-guard";
 import { sendInvitationEmail, sendPasswordResetEmail } from "@/lib/email";
+import { serverT } from "@/lib/i18n-server";
 import { assignableRoles, normalizeTenantRole, outranks } from "@/lib/permissions";
 import { getCurrentTenantId, getDb } from "@/lib/tenant-context";
 import { decryptDbUrl } from "@/lib/tenant-db";
@@ -28,6 +29,17 @@ async function requireUserAdminContext() {
   const tenantId = await getCurrentTenantId();
   if (!tenantId) throw new Error("No active workspace.");
   return { actor, tenantId };
+}
+
+/**
+ * A refusal in the reader's language, keyed under `serverErrors.auth`.
+ *
+ * Returns the text rather than the `{ error }` object: TypeScript only widens a
+ * union of object *literals*, so `return { error: await authError(…) }` keeps
+ * `result.error` readable on the success branch for the forms that check it.
+ */
+async function authError(key: string): Promise<string> {
+  return (await serverT("serverErrors.auth"))(key);
 }
 
 /** The membership row for a user in a workspace, or undefined when not a member. */
@@ -51,13 +63,13 @@ export async function validateTenantSwitchAction(tenantId: string): Promise<{
   error?: string;
 }> {
   const session = await auth();
-  if (!session?.user?.id) return { ok: false, error: "Not authenticated." };
+  if (!session?.user?.id) return { ok: false, error: await authError("notAuthenticated") };
 
   const membership = await platformDb.query.tenantMembers.findFirst({
     where: and(eq(tenantMembers.userId, session.user.id), eq(tenantMembers.tenantId, tenantId)),
   });
 
-  if (!membership) return { ok: false, error: "You are not a member of this workspace." };
+  if (!membership) return { ok: false, error: await authError("notMemberOfWorkspace") };
 
   const [tenant] = await platformDb.select({ name: tenants.name }).from(tenants).where(eq(tenants.id, tenantId));
 
@@ -92,13 +104,13 @@ export async function registerAction(data: { name?: string; email: string; passw
   const email = data.email.trim().toLowerCase();
 
   if (password.length < 8) {
-    return { error: "Password must be at least 8 characters." };
+    return { error: await authError("passwordTooShort") };
   }
 
   const [existing] = await platformDb.select({ id: users.id }).from(users).where(eq(users.email, email));
 
   if (existing) {
-    return { error: "An account with this email already exists." };
+    return { error: await authError("emailTaken") };
   }
 
   const hashedPassword = await bcrypt.hash(password, 12);
@@ -149,7 +161,7 @@ export async function forgotPasswordAction(rawEmail: string) {
   // Report a delivery failure rather than always claiming the mail was sent. The
   // address is not echoed back, so this still reveals nothing about the account.
   if (sent && sent.success === false) {
-    return { error: "We could not send the email right now. Please try again in a few minutes." };
+    return { error: await authError("emailSendFailed") };
   }
 
   return { success: true };
@@ -164,7 +176,7 @@ export async function resetPasswordAction(data: { email: string; token: string; 
   const email = data.email.trim().toLowerCase();
 
   if (password.length < 8) {
-    return { error: "Password must be at least 8 characters." };
+    return { error: await authError("passwordTooShort") };
   }
 
   const [resetToken] = await platformDb
@@ -179,7 +191,7 @@ export async function resetPasswordAction(data: { email: string; token: string; 
     );
 
   if (!resetToken) {
-    return { error: "Invalid or expired reset link. Please request a new one." };
+    return { error: await authError("resetLinkInvalid") };
   }
 
   const hashedPassword = await bcrypt.hash(password, 12);
@@ -210,11 +222,11 @@ export async function inviteUserAction(data: { email: string; role: string }) {
   const { actor, tenantId } = await requireUserAdminContext();
 
   const email = data.email.trim().toLowerCase();
-  if (!email.includes("@")) return { error: "Enter a valid email address." };
+  if (!email.includes("@")) return { error: await authError("emailInvalid") };
 
   const tenantRole = normalizeTenantRole(data.role);
   if (!assignableRoles(actor).includes(tenantRole)) {
-    return { error: "You cannot grant a role higher than your own." };
+    return { error: await authError("roleTooHigh") };
   }
 
   const [inviter] = await platformDb
@@ -229,7 +241,7 @@ export async function inviteUserAction(data: { email: string; role: string }) {
   // workspace — that is an invitation, not a conflict.
   if (existing) {
     const membership = await findMembership(tenantId, existing.id);
-    if (membership) return { error: "This person is already a member of this workspace." };
+    if (membership) return { error: await authError("alreadyMember") };
   }
 
   // Revoke this workspace's pending invitations for the same address
@@ -259,7 +271,7 @@ export async function inviteUserAction(data: { email: string; role: string }) {
     // Invitation is saved in DB — share the link manually if email failed
     return {
       success: false,
-      emailError: emailResult.error ?? "Unknown email error",
+      emailError: emailResult.error ?? (await authError("emailUnknownError")),
       inviteUrl: emailResult.inviteUrl,
     };
   }
@@ -277,11 +289,11 @@ export async function acceptInvitationAction(data: { token: string; name: string
     .where(and(eq(userInvitations.token, token), gt(userInvitations.expiresAt, new Date())));
 
   if (!invitation) {
-    return { error: "Invalid or expired invitation." };
+    return { error: await authError("invitationInvalid") };
   }
 
   if (invitation.acceptedAt) {
-    return { error: "This invitation has already been used." };
+    return { error: await authError("invitationUsed") };
   }
 
   // Reuse existing platform account if one already exists for this email
@@ -293,7 +305,7 @@ export async function acceptInvitationAction(data: { token: string; name: string
     userId = existingUser.id;
   } else {
     if (password.length < 8) {
-      return { error: "Password must be at least 8 characters." };
+      return { error: await authError("passwordTooShort") };
     }
     const hashedPassword = await bcrypt.hash(password, 12);
     userId = crypto.randomUUID();
@@ -355,19 +367,19 @@ export async function updateUserRoleAction(userId: string, role: string) {
 
   const nextRole = normalizeTenantRole(role);
   if (!assignableRoles(actor).includes(nextRole)) {
-    return { error: "You cannot grant a role higher than your own." };
+    return { error: await authError("roleTooHigh") };
   }
 
   if (userId === actor.userId) {
-    return { error: "You cannot change your own role. Ask another admin." };
+    return { error: await authError("ownRole") };
   }
 
   const membership = await findMembership(tenantId, userId);
-  if (!membership) return { error: "That user is not a member of this workspace." };
+  if (!membership) return { error: await authError("userNotMember") };
 
   // An admin must not be able to demote or take over an owner.
   if (!actor.isPlatformStaff && !outranks(actor.tenantRole, membership.role) && actor.tenantRole !== "owner") {
-    return { error: "You cannot change the role of someone at or above your own level." };
+    return { error: await authError("roleAtOrAbove") };
   }
 
   // A workspace must never be left without an owner.
@@ -376,7 +388,7 @@ export async function updateUserRoleAction(userId: string, role: string) {
       .select({ id: tenantMembers.id })
       .from(tenantMembers)
       .where(and(eq(tenantMembers.tenantId, tenantId), eq(tenantMembers.role, "owner")));
-    if (owners.length <= 1) return { error: "A workspace must keep at least one owner." };
+    if (owners.length <= 1) return { error: await authError("lastOwner") };
   }
 
   await platformDb.update(tenantMembers).set({ role: nextRole }).where(eq(tenantMembers.id, membership.id));
@@ -402,14 +414,14 @@ export async function deleteUserAction(userId: string) {
   const { actor, tenantId } = await requireUserAdminContext();
 
   if (userId === actor.userId) {
-    return { error: "You cannot remove yourself from the workspace." };
+    return { error: await authError("removeSelf") };
   }
 
   const membership = await findMembership(tenantId, userId);
-  if (!membership) return { error: "That user is not a member of this workspace." };
+  if (!membership) return { error: await authError("userNotMember") };
 
   if (membership.role === "owner" && !actor.isPlatformStaff && actor.tenantRole !== "owner") {
-    return { error: "Only an owner can remove another owner." };
+    return { error: await authError("removeOwner") };
   }
 
   if (membership.role === "owner") {
@@ -417,7 +429,7 @@ export async function deleteUserAction(userId: string) {
       .select({ id: tenantMembers.id })
       .from(tenantMembers)
       .where(and(eq(tenantMembers.tenantId, tenantId), eq(tenantMembers.role, "owner")));
-    if (owners.length <= 1) return { error: "A workspace must keep at least one owner." };
+    if (owners.length <= 1) return { error: await authError("lastOwner") };
   }
 
   await platformDb.delete(tenantMembers).where(eq(tenantMembers.id, membership.id));
@@ -524,20 +536,20 @@ export async function markAllNotificationsReadAction() {
 // the new hash into the tenant copy changed nothing while reporting success.
 export async function changePasswordAction(data: { currentPassword: string; newPassword: string }) {
   const session = await auth();
-  if (!session?.user?.id) return { error: "Not authenticated." };
+  if (!session?.user?.id) return { error: await authError("notAuthenticated") };
 
   const [user] = await platformDb
     .select({ id: users.id, password: users.password })
     .from(users)
     .where(eq(users.id, session.user.id));
 
-  if (!user) return { error: "User not found." };
-  if (!user.password) return { error: "This account uses social login — password change is not available." };
+  if (!user) return { error: await authError("userNotFound") };
+  if (!user.password) return { error: await authError("socialLogin") };
 
   const valid = await bcrypt.compare(data.currentPassword, user.password);
-  if (!valid) return { error: "Current password is incorrect." };
+  if (!valid) return { error: await authError("currentPasswordWrong") };
 
-  if (data.newPassword.length < 8) return { error: "New password must be at least 8 characters." };
+  if (data.newPassword.length < 8) return { error: await authError("newPasswordTooShort") };
 
   const hashed = await bcrypt.hash(data.newPassword, 12);
   await platformDb.update(users).set({ password: hashed }).where(eq(users.id, user.id));
@@ -552,14 +564,14 @@ export async function adminSendPasswordResetAction(targetUserId: string) {
   const { tenantId } = await requireUserAdminContext();
 
   const membership = await findMembership(tenantId, targetUserId);
-  if (!membership) return { error: "That user is not a member of this workspace." };
+  if (!membership) return { error: await authError("userNotMember") };
 
   const [user] = await platformDb
     .select({ id: users.id, email: users.email })
     .from(users)
     .where(eq(users.id, targetUserId));
 
-  if (!user?.email) return { error: "User not found." };
+  if (!user?.email) return { error: await authError("userNotFound") };
 
   // Reuse the existing forgot-password flow
   await platformDb.delete(passwordResetTokens).where(eq(passwordResetTokens.identifier, user.email));

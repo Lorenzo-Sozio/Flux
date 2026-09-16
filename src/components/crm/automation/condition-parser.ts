@@ -21,8 +21,23 @@ export interface ValidationResult {
   tree?: ParsedCondition;
 }
 
+/**
+ * What went wrong, as a stable code the editor translates
+ * (automation.expressionEditor.errors.<code>, with `params` as its arguments).
+ * `message` is the English for logs, where there is no reader's language.
+ */
+export type ValidationErrorCode =
+  | "unmatchedClose"
+  | "unclosedOpen"
+  | "invalidReference"
+  | "missingClose"
+  | "unknownToken"
+  | "unexpectedToken";
+
 export interface ValidationError {
   type: "syntax" | "logic" | "reference";
+  code: ValidationErrorCode;
+  params?: Record<string, string | number>;
   message: string;
   position?: number;
   severity: "error" | "warning";
@@ -54,7 +69,8 @@ export function validateParentheses(expr: string): ValidationError[] {
       if (depth < 0) {
         errors.push({
           type: "syntax",
-          message: "Parentesi chiusa non corrispondente",
+          code: "unmatchedClose",
+          message: "Closing parenthesis without a matching opening one",
           position: i,
           severity: "error",
         });
@@ -66,7 +82,9 @@ export function validateParentheses(expr: string): ValidationError[] {
   if (depth > 0) {
     errors.push({
       type: "syntax",
-      message: `${depth} parentesi aperta non chiusa`,
+      code: "unclosedOpen",
+      params: { count: depth },
+      message: `${depth} opening parenthesis not closed`,
       severity: "error",
     });
   }
@@ -90,7 +108,9 @@ export function validateConditionReferences(expr: string, conditionCount: number
     if (index >= conditionCount) {
       errors.push({
         type: "reference",
-        message: `Riferimento a condizione C${index} non valido (hai solo ${conditionCount} condizioni)`,
+        code: "invalidReference",
+        params: { ref: `C${index}`, count: conditionCount },
+        message: `C${index} does not exist (there are only ${conditionCount} conditions)`,
         position: match.index,
         severity: "error",
       });
@@ -175,7 +195,8 @@ class ConditionParser {
       if (this.currentToken() !== ")") {
         this.errors.push({
           type: "syntax",
-          message: 'Parentesi non bilanciata - manca ")"',
+          code: "missingClose",
+          message: 'Unbalanced parentheses: ")" is missing',
           severity: "error",
         });
       } else {
@@ -203,7 +224,9 @@ class ConditionParser {
 
     this.errors.push({
       type: "syntax",
-      message: `Token non riconosciuto: "${token}". Usa C0, C1, ... per le condizioni.`,
+      code: "unknownToken",
+      params: { token },
+      message: `Unrecognised token "${token}". Use C0, C1, … for the conditions.`,
       severity: "error",
     });
     this.advance();
@@ -220,7 +243,9 @@ class ConditionParser {
     if (this.pos < this.tokens.length) {
       this.errors.push({
         type: "syntax",
-        message: `Token inatteso: "${this.currentToken()}"`,
+        code: "unexpectedToken",
+        params: { token: this.currentToken() },
+        message: `Unexpected token "${this.currentToken()}"`,
         severity: "error",
       });
     }
@@ -264,7 +289,7 @@ export function validateExpression(expr: string, conditionCount: number): Valida
 export function describeTree(tree: ParsedCondition, conditionLabels?: string[]): string {
   if (tree.type === "condition") {
     if (conditionLabels && tree.conditionId !== undefined) {
-      return conditionLabels[tree.conditionId] || `Condizione ${tree.conditionId}`;
+      return conditionLabels[tree.conditionId] || `C${tree.conditionId}`;
     }
     return tree.value || "";
   }
@@ -321,21 +346,18 @@ export function compileExpression(tree: ParsedCondition): (values: boolean[]) =>
 }
 
 /**
- * Helper: Crea etichette per le condizioni (es: "Status is 'open'")
+ * A condition as a sentence, e.g. `Stato è uguale a "open"`.
+ *
+ * The field and operator arrive already in the reader's language: this module is
+ * shared with the server-side engine and has none of its own.
  */
-export function createConditionLabel(field: string, operator: string, value?: string | number | boolean): string {
-  const operatorLabels: Record<string, string> = {
-    equals: "è",
-    not_equals: "non è",
-    greater_than: "è maggiore di",
-    less_than: "è minore di",
-    contains: "contiene",
-    is_empty: "è vuoto",
-  };
-
-  const op = operatorLabels[operator] || operator;
-  if (value !== undefined && value !== null) {
-    return `${field} ${op} "${value}"`;
+export function createConditionLabel(
+  fieldLabel: string,
+  operatorLabel: string,
+  value?: string | number | boolean,
+): string {
+  if (value !== undefined && value !== null && value !== "") {
+    return `${fieldLabel} ${operatorLabel} "${value}"`;
   }
-  return `${field} ${op}`;
+  return `${fieldLabel} ${operatorLabel}`;
 }

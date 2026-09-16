@@ -1,6 +1,7 @@
 import { isDay } from "@/lib/contract-terms";
 import { documentLanguage } from "@/lib/document-language";
 import { normaliseVat } from "@/lib/fiscal-ids";
+import { type Refusal, refuse } from "@/lib/i18n-message";
 import { isValidSeries, NATURE_CODES } from "@/lib/invoice-rules";
 
 /**
@@ -69,18 +70,18 @@ export function linesFromOrder(
 }
 
 /** An edited draft as it will be stored, or the reason it cannot be. */
-export function cleanDraft(input: DraftInput): { ok: true; value: DraftInput } | { ok: false; error: string } {
+export function cleanDraft(input: DraftInput): { ok: true; value: DraftInput } | Refusal {
   const series = input.series.trim().toUpperCase();
-  if (!isValidSeries(series)) return { ok: false, error: "The series is letters and digits, up to 10." };
+  if (!isValidSeries(series)) return refuse("validation.invoices.seriesInvalid");
   const dueDate = input.dueDate || null;
-  if (dueDate && !isDay(dueDate)) return { ok: false, error: "The due date is not a valid date." };
+  if (dueDate && !isDay(dueDate)) return refuse("validation.invoices.dueDateInvalid");
   const discountPercent = Number(input.discountPercent) || 0;
-  if (discountPercent < 0 || discountPercent > 100) return { ok: false, error: "The discount is between 0 and 100%." };
-  if (!Object.hasOwn(PAYMENT_METHODS, input.paymentMethod)) return { ok: false, error: "Unknown payment method." };
+  if (discountPercent < 0 || discountPercent > 100) return refuse("validation.invoices.discountRange");
+  if (!Object.hasOwn(PAYMENT_METHODS, input.paymentMethod)) return refuse("validation.invoices.paymentMethodUnknown");
   if (!["auto", "force_on", "force_off"].includes(input.stampDutyMode)) {
-    return { ok: false, error: "Unknown stamp duty setting." };
+    return refuse("validation.invoices.stampDutyModeUnknown");
   }
-  if (input.lines.length > 200) return { ok: false, error: "An invoice has at most 200 lines." };
+  if (input.lines.length > 200) return refuse("validation.invoices.tooManyLines", { max: 200 });
 
   const lines: DraftLineInput[] = [];
   for (const [i, l] of input.lines.entries()) {
@@ -90,13 +91,14 @@ export function cleanDraft(input: DraftInput): { ok: true; value: DraftInput } |
     const lineDiscount = Number(l.discountPercent ?? 0);
     const taxPercent = Number(l.taxPercent);
     if (!(Number.isFinite(quantity) && quantity >= 0 && quantity < 1e9))
-      return { ok: false, error: `Line ${n}: quantity.` };
+      return refuse("validation.invoices.lineQuantity", { line: n });
     if (!(Number.isFinite(unitPrice) && unitPrice >= 0 && unitPrice < 1e10))
-      return { ok: false, error: `Line ${n}: price.` };
-    if (!(lineDiscount >= 0 && lineDiscount <= 100)) return { ok: false, error: `Line ${n}: discount.` };
-    if (!(taxPercent >= 0 && taxPercent <= 100)) return { ok: false, error: `Line ${n}: VAT rate.` };
+      return refuse("validation.invoices.linePrice", { line: n });
+    if (!(lineDiscount >= 0 && lineDiscount <= 100)) return refuse("validation.invoices.lineDiscount", { line: n });
+    if (!(taxPercent >= 0 && taxPercent <= 100)) return refuse("validation.invoices.lineTaxRate", { line: n });
     const nature = l.nature?.trim() || null;
-    if (nature && !Object.hasOwn(NATURE_CODES, nature)) return { ok: false, error: `Line ${n}: unknown Natura code.` };
+    if (nature && !Object.hasOwn(NATURE_CODES, nature))
+      return refuse("validation.invoices.lineNatureUnknown", { line: n });
     lines.push({
       productId: l.productId || null,
       description: l.description.trim().slice(0, 1000),

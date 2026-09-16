@@ -20,7 +20,7 @@
   {
     "file": "src/lib/quote-events.ts",
     "description": "il recapito non viaggia con la risposta: chi riceve non sa di quale persona si tratti, perche' il nostro id da lui non significa niente",
-    "find": "  return { email: contact?.email ?? undefined, phone: contact?.phone ?? undefined };",
+    "find": "  return contactReach(db as Parameters<typeof contactReach>[0], quote.contactId);",
     "replace": "  return {};"
   }
 ]

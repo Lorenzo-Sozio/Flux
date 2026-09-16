@@ -18,7 +18,17 @@
       "leadsBySource": "Lead per Fonte",
       "back": "Pipeline",
       "daysLabel": "{count} giorni",
-      "conversionStep": "{rate}% di conversione ({from} → {to})"
+      "conversionStep": "{rate}% di conversione ({from} → {to})",
+      "stages": {
+        "leads": "Lead",
+        "converted": "Lead convertiti",
+        "contacts": "Contatti (da lead)",
+        "deals": "Trattative",
+        "quotesSent": "Preventivi inviati",
+        "won": "Vinte"
+      },
+      "daysShort": "{days} g",
+      "unknownSource": "Origine sconosciuta"
     }
   },
   "appointment": {
@@ -337,7 +347,41 @@
       "installFailed": "Non è stato possibile aggiungere la regola.",
       "onChange": "Scatta su un cambiamento, quindi non c'è ancora niente da contare",
       "matchesNow": "{count} record la soddisfano in questo momento",
-      "alreadyAdded": "Quella regola c'è già."
+      "alreadyAdded": "Quella regola c'è già.",
+      "items": {
+        "hot-lead-call": {
+          "summary": "Quando un lead arriva a 80 punti o più, metti in lista una chiamata per domani",
+          "why": "Un lead caldo che nessuno chiama entro un giorno è un lead che si sta raffreddando."
+        },
+        "big-deal-notify": {
+          "summary": "Quando compare una trattativa sopra 10.000, avvisa chi ne è responsabile",
+          "why": "Le trattative più grandi vanno conosciute il giorno in cui arrivano, non alla riunione di revisione."
+        },
+        "deal-won-followup": {
+          "summary": "Quando una trattativa è vinta, pianifica il ringraziamento e il passaggio di consegne",
+          "why": "Il momento in cui una trattativa si chiude è quello in cui il cliente è più disposto ad ascoltarti."
+        },
+        "urgent-ticket-notify": {
+          "summary": "Quando arriva un ticket urgente, avvisa qualcuno invece di aspettare lo SLA",
+          "why": "Lo SLA avvisa a metà della finestra. Urgente significa che la finestra era già breve."
+        },
+        "ticket-resolved-check": {
+          "summary": "Tre giorni dopo la risoluzione di un ticket, verifica che sia davvero risolto",
+          "why": "Un ticket risolto che si riapre è un cliente che ha dovuto chiedere due volte."
+        },
+        "order-completed-feedback": {
+          "summary": "Quando un ordine è completato, chiedi al cliente com'è andata",
+          "why": "Un parere chiesto il giorno stesso riceve risposta; chiesto un mese dopo, no."
+        },
+        "new-contact-welcome": {
+          "summary": "Ogni nuovo contatto riceve un'attività di primo contatto",
+          "why": "Un contatto aggiunto e mai sentito è una riga, non una relazione."
+        },
+        "large-order-notify": {
+          "summary": "Quando viene registrato un ordine sopra 5.000, avvisa il responsabile",
+          "why": "Gli ordini da controllare prima che vengano preparati sono quelli grandi."
+        }
+      }
     },
     "ruleBuilder": {
       "titleNew": "Nuova regola di automazione",
@@ -576,6 +620,17 @@
             "cancelled": "Annullato"
           }
         }
+      },
+      "validation": {
+        "dottedEventName": "Usa un nome puntato, ad esempio lead.escalate",
+        "routeNeedsCriteria": "Un percorso richiede almeno un territorio o un'origine.",
+        "choosePeople": "Scegli le persone tra cui distribuire i record.",
+        "duplicateRouteId": "Due percorsi hanno lo stesso identificativo.",
+        "scheduledTriggerFormat": "Un trigger pianificato deve avere la forma scheduled: seguita da un'espressione cron",
+        "nameRequired": "Il nome è obbligatorio",
+        "triggerRequired": "Seleziona almeno un evento di attivazione",
+        "conditionRequired": "Serve almeno una condizione",
+        "actionRequired": "Serve almeno un'azione"
       }
     },
     "expressionEditor": {
@@ -598,7 +653,15 @@
       "addParentheses": "Aggiungi ( )",
       "addOperator": "Aggiungi {operator}",
       "availableConditions": "Condizioni disponibili",
-      "treePreview": "Anteprima albero logico"
+      "treePreview": "Anteprima albero logico",
+      "errors": {
+        "unmatchedClose": "Parentesi chiusa senza una parentesi aperta corrispondente",
+        "unclosedOpen": "{count, plural, one {# parentesi aperta non chiusa} other {# parentesi aperte non chiuse}}",
+        "invalidReference": "{ref} non esiste: ci sono solo {count, plural, one {# condizione} other {# condizioni}}",
+        "missingClose": "Parentesi non bilanciate: manca \")\"",
+        "unknownToken": "Elemento non riconosciuto: \"{token}\". Usa C0, C1, … per le condizioni.",
+        "unexpectedToken": "Elemento inatteso: \"{token}\""
+      }
     }
   },
   "businessHours": {
@@ -1516,7 +1579,9 @@
       "employeeCount": "Dipendenti",
       "annualRevenue": "Fatturato Annuo",
       "companyCategoryId": "Categoria",
-      "companyTypeId": "Tipo di Attività"
+      "companyTypeId": "Tipo di Attività",
+      "leadTypeId": "Tipo di lead",
+      "leadCategoryId": "Categoria lead"
     },
     "cancel": "Annulla",
     "save": "Salva",
@@ -1530,6 +1595,35 @@
       "saveFailed": "Impossibile salvare il filtro.",
       "deleted": "Filtro eliminato.",
       "deleteFailed": "Impossibile eliminare il filtro."
+    },
+    "optionValues": {
+      "new": "Nuovo",
+      "contacting": "In contatto",
+      "engaged": "Coinvolto",
+      "qualified": "Qualificato",
+      "unqualified": "Non qualificato",
+      "converted": "Convertito",
+      "hot": "Caldo",
+      "warm": "Tiepido",
+      "cold": "Freddo",
+      "organic": "Organico",
+      "referral": "Referral",
+      "outbound": "Outbound",
+      "event": "Evento",
+      "website": "Sito web",
+      "social": "Social",
+      "other": "Altro",
+      "linkedin": "LinkedIn",
+      "cold_outreach": "Contatto a freddo",
+      "trade_show": "Fiera",
+      "advertisement": "Pubblicità",
+      "email_campaign": "Campagna email",
+      "active": "Attivo",
+      "inactive": "Inattivo",
+      "prospect": "Potenziale cliente",
+      "customer": "Cliente",
+      "partner": "Partner",
+      "vendor": "Fornitore"
     }
   },
   "finance": {
@@ -2142,7 +2236,15 @@
       "desktopPreview": "Anteprima desktop (600px)",
       "emailPreview": "Anteprima email",
       "emptyCanvas": "Clicca un blocco nel pannello a sinistra per aggiungerlo",
-      "duplicate": "Duplica"
+      "duplicate": "Duplica",
+      "defaults": {
+        "heading": "Il tuo titolo qui",
+        "text": "Scrivi qui il tuo messaggio. Usa il <strong>grassetto</strong> o il <em>corsivo</em> per mettere in evidenza i punti chiave.",
+        "button": "Clicca qui",
+        "leftColumn": "Contenuto della colonna sinistra",
+        "rightColumn": "Contenuto della colonna destra",
+        "footer": "© {year} Nome azienda. Tutti i diritti riservati."
+      }
     }
   },
   "minutes": {
@@ -2661,7 +2763,11 @@
       "whereDescription": "Presto vuol dire qualificazione, tardi vuol dire chiusura.",
       "whoTitle": "Chi l'ha vinta",
       "whoDescription": "Indicato solo dove qualcuno l'ha registrato.",
-      "nothingYet": "Ancora niente da mostrare."
+      "nothingYet": "Ancora niente da mostrare.",
+      "subtitlePeriod": "Tutto ciò che si è chiuso negli ultimi {days} giorni.",
+      "unknown": "Sconosciuto",
+      "notRecorded": "Non registrato",
+      "noneNamed": "Nessuno indicato"
     },
     "ordersFromDeal": "Ordini",
     "noOrdersFromDeal": "Ancora nessun ordine. Un preventivo accettato lo diventa.",
@@ -2690,7 +2796,44 @@
     },
     "healthScore": "Salute: {score}/100",
     "deleteTask": "Elimina attività",
-    "noData": "Nessun dato"
+    "noData": "Nessun dato",
+    "views": {
+      "board": "Trattative",
+      "forecast": "Previsioni",
+      "funnel": "Funnel",
+      "winLoss": "Vinte / Perse",
+      "targets": "Obiettivi",
+      "territories": "Territori",
+      "report": "Report"
+    },
+    "filters": {
+      "sections": "Sezioni della pipeline",
+      "agents": "Filtra per agente",
+      "allAgents": "Tutti gli agenti",
+      "agentsCount": "{count, plural, one {# agente} other {# agenti}}",
+      "searchAgents": "Cerca un agente…",
+      "selectAll": "Seleziona tutti",
+      "clearSelection": "Cancella selezione",
+      "unassigned": "Non assegnate",
+      "unassignedHint": "Trattative senza agente",
+      "formerMember": "Non più nel workspace",
+      "noAgents": "Nessun agente trovato.",
+      "selectedCount": "{count} di {total} selezionati",
+      "unnamed": "Senza nome",
+      "period": "Periodo",
+      "days": "{days} giorni",
+      "daysShort": "{days} g",
+      "status": "Stato",
+      "statusAll": "Tutti gli stati",
+      "statuses": {
+        "open": "Aperte",
+        "won": "Vinte",
+        "lost": "Perse"
+      },
+      "searchDeals": "Cerca trattativa…",
+      "reset": "Azzera filtri"
+    },
+    "reportSubtitlePeriod": "Pipeline aperta oggi; vinte e perse chiuse negli ultimi {days} giorni."
   },
   "placeholders": {
     "unknown": "Niente riempirà {list}. Arriverà al destinatario esattamente com'è scritto.",
@@ -2700,7 +2843,41 @@
     "hidePreview": "Nascondi anteprima",
     "subject": "Oggetto",
     "body": "Corpo",
-    "empty": "Vuoto"
+    "empty": "Vuoto",
+    "catalogue": {
+      "firstName": {
+        "label": "Nome",
+        "description": "Il nome del destinatario. Vuoto se il record non ne ha uno."
+      },
+      "lastName": {
+        "label": "Cognome",
+        "description": "Il cognome del destinatario."
+      },
+      "fullName": {
+        "label": "Nome completo",
+        "description": "Nome e cognome insieme, senza doppio spazio quando uno dei due manca."
+      },
+      "email": {
+        "label": "Indirizzo email",
+        "description": "L'indirizzo a cui va il messaggio."
+      },
+      "company": {
+        "label": "Azienda",
+        "description": "L'azienda indicata nel record del destinatario."
+      },
+      "jobTitle": {
+        "label": "Qualifica",
+        "description": "Il ruolo del destinatario, se il record lo riporta."
+      },
+      "phone": {
+        "label": "Telefono",
+        "description": "Il numero di telefono del destinatario."
+      },
+      "unsubscribe": {
+        "label": "Link di disiscrizione",
+        "description": "Dove il destinatario smette di ricevere i tuoi messaggi. Viene aggiunto in automatico se lo ometti."
+      }
+    }
   },
   "products": {
     "title": "Prodotti",
@@ -3097,6 +3274,152 @@
           "line": "Linea",
           "area": "Area",
           "pie": "Torta"
+        },
+        "groupColumn": "{field} ({bucket})",
+        "aggColumn": "{fn} {field}",
+        "bucketNames": {
+          "day": "giorno",
+          "week": "settimana",
+          "month": "mese",
+          "quarter": "trimestre",
+          "year": "anno"
+        },
+        "aggregations": {
+          "count": "Conteggio",
+          "sum": "Somma",
+          "avg": "Media",
+          "min": "Minimo",
+          "max": "Massimo"
+        },
+        "types": {
+          "text": "testo",
+          "number": "numero",
+          "date": "data",
+          "boolean": "sì/no",
+          "enum": "elenco"
+        }
+      },
+      "entities": {
+        "deals": "Trattative",
+        "contacts": "Contatti",
+        "companies": "Aziende",
+        "leads": "Lead",
+        "quotes": "Preventivi",
+        "activities": "Interazioni",
+        "tasks": "Attività"
+      },
+      "fields": {
+        "name": "Nome",
+        "amount": "Importo",
+        "currency": "Valuta",
+        "probability": "Probabilità (%)",
+        "status": "Stato",
+        "healthScore": "Indice di salute",
+        "expectedCloseDate": "Chiusura prevista",
+        "createdAt": "Data di creazione",
+        "firstName": "Nome",
+        "lastName": "Cognome",
+        "email": "Email",
+        "phone": "Telefono",
+        "jobTitle": "Qualifica",
+        "source": "Origine",
+        "leadScore": "Punteggio lead",
+        "marketingConsent": "Consenso marketing",
+        "country": "Paese",
+        "industry": "Settore",
+        "type": "Tipo",
+        "employeeCount": "Dipendenti",
+        "annualRevenue": "Fatturato annuo",
+        "companyName": "Azienda",
+        "rating": "Valutazione",
+        "isConverted": "Convertito",
+        "quoteNumber": "N. preventivo",
+        "totalAmount": "Importo totale",
+        "subtotal": "Imponibile",
+        "issuedAt": "Data di emissione",
+        "expiresAt": "Scadenza",
+        "content": "Contenuto",
+        "date": "Data",
+        "durationMinutes": "Durata (min)",
+        "title": "Titolo",
+        "priority": "Priorità",
+        "dueDate": "Data di scadenza",
+        "estimatedHours": "Ore stimate",
+        "actualHours": "Ore effettive",
+        "progressPct": "Avanzamento (%)"
+      },
+      "values": {
+        "deals": {
+          "status": {
+            "open": "Aperta",
+            "won": "Vinta",
+            "lost": "Persa"
+          }
+        },
+        "contacts": {
+          "status": {
+            "active": "Attivo",
+            "inactive": "Inattivo"
+          }
+        },
+        "companies": {
+          "type": {
+            "prospect": "Potenziale cliente",
+            "customer": "Cliente",
+            "partner": "Partner",
+            "vendor": "Fornitore"
+          },
+          "status": {
+            "active": "Attiva",
+            "inactive": "Inattiva"
+          }
+        },
+        "leads": {
+          "status": {
+            "new": "Nuovo",
+            "contacting": "In contatto",
+            "engaged": "Coinvolto",
+            "qualified": "Qualificato",
+            "unqualified": "Non qualificato"
+          },
+          "rating": {
+            "hot": "Caldo",
+            "warm": "Tiepido",
+            "cold": "Freddo"
+          }
+        },
+        "quotes": {
+          "status": {
+            "draft": "Bozza",
+            "pending_approval": "In attesa di approvazione",
+            "sent": "Inviato",
+            "viewed": "Visualizzato",
+            "accepted": "Accettato",
+            "declined": "Rifiutato",
+            "expired": "Scaduto"
+          }
+        },
+        "activities": {
+          "type": {
+            "note": "Nota",
+            "call": "Chiamata",
+            "meeting": "Riunione",
+            "email": "Email"
+          }
+        },
+        "tasks": {
+          "status": {
+            "todo": "Da fare",
+            "in_progress": "In corso",
+            "done": "Completata"
+          },
+          "priority": {
+            "low": "Bassa",
+            "normal": "Normale",
+            "high": "Alta",
+            "critical": "Critica",
+            "blocker": "Bloccante"
+          }
         }
       }
     },
@@ -3578,7 +3901,8 @@
       "monthCardTitle": "Obiettivo Mensile",
       "monthCardNoTarget": "Nessun obiettivo impostato",
       "monthCardOf": "di {amount}",
-      "monthCardPct": "dell'obiettivo"
+      "monthCardPct": "dell'obiettivo",
+      "removeTarget": "Rimuovi obiettivo"
     },
     "billing": {
       "title": "Fatturazione e Abbonamento",
@@ -3666,7 +3990,29 @@
         "addButton": "Aggiungi",
         "addViaPortal": "Per aggiungere questo modulo, utilizza il portale Gestisci Fatturazione in alto.",
         "availableTitle": "Componenti Aggiuntivi Disponibili",
-        "pricePerMonth": "€{price}/mese"
+        "pricePerMonth": "€{price}/mese",
+        "catalogue": {
+          "extra_users": {
+            "name": "Utenti aggiuntivi",
+            "description": "Posti utente oltre a quelli inclusi nel piano."
+          },
+          "helpdesk": {
+            "name": "Modulo Helpdesk",
+            "description": "Gestione avanzata dei ticket, automazione degli SLA e chat."
+          },
+          "advanced_reporting": {
+            "name": "Report avanzati",
+            "description": "Generatore di report personalizzati, esportazioni pianificate ed esportazioni per la BI."
+          },
+          "white_label": {
+            "name": "White label",
+            "description": "Dominio personalizzato, colori del marchio e marchio Flux nascosto."
+          },
+          "sandbox": {
+            "name": "Ambiente sandbox",
+            "description": "Ambiente di prova isolato, speculare al tuo spazio di lavoro di produzione."
+          }
+        }
       },
       "invoices": {
         "title": "Fatture",
@@ -4544,6 +4890,9 @@
     },
     "panel": {
       "storageNote": "*Le preferenze sono salvate nei cookie. Nel codice puoi scegliere tra cookie, localStorage o nessun salvataggio."
+    },
+    "presets": {
+      "default": "Predefinito"
     }
   },
   "handover": {
@@ -6077,5 +6426,270 @@
     },
     "entityIdPlaceholder": "ID {entity}…",
     "saveChanges": "Salva modifiche"
+  },
+  "serverErrors": {
+    "generic": {
+      "forbidden": "Non hai i permessi per eseguire questa operazione.",
+      "unauthenticated": "Devi accedere per continuare.",
+      "validation": "Alcuni campi richiedono attenzione.",
+      "unknown": "Si è verificato un errore da parte nostra. Riprova."
+    },
+    "capability": {
+      "readOnly": "Il tuo ruolo è di sola lettura. Chiedi a un amministratore dello spazio di lavoro i permessi di modifica.",
+      "quoteApprove": "Solo gli amministratori dello spazio di lavoro possono approvare i preventivi.",
+      "ticketDelete": "Solo gli amministratori dello spazio di lavoro possono eliminare i ticket.",
+      "slaManage": "Solo gli amministratori dello spazio di lavoro possono modificare le policy SLA.",
+      "settingsManage": "Solo gli amministratori dello spazio di lavoro possono modificare le impostazioni.",
+      "pipelineManage": "Solo gli amministratori dello spazio di lavoro possono modificare la pipeline.",
+      "customFieldManage": "Solo gli amministratori dello spazio di lavoro possono gestire i campi personalizzati.",
+      "webhookManage": "Solo gli amministratori dello spazio di lavoro possono gestire i webhook.",
+      "automationManage": "Solo gli amministratori dello spazio di lavoro possono gestire le regole di automazione.",
+      "userManage": "Solo gli amministratori dello spazio di lavoro possono gestire gli utenti.",
+      "groupManage": "Solo gli amministratori dello spazio di lavoro possono gestire i gruppi.",
+      "billingManage": "Solo il proprietario dello spazio di lavoro può modificare l'abbonamento.",
+      "reportManage": "Solo gli amministratori dello spazio di lavoro possono salvare o eliminare i report condivisi."
+    },
+    "plan": {
+      "suspended": "Il tuo account è sospeso. Contatta l'assistenza per riattivarlo.",
+      "inactive": "Il tuo abbonamento non è attivo. Aggiorna i dati di fatturazione.",
+      "subscriptionInactive": "Abbonamento non attivo. Aggiorna i dati di fatturazione.",
+      "moduleUnavailable": "Il tuo piano attuale non include il modulo {module}. Passa a un piano superiore per usarlo.",
+      "limitReached": "Hai raggiunto il limite del tuo piano attuale per {metric} ({limit}). Passa a un piano superiore per continuare.",
+      "modules": {
+        "crm": "CRM",
+        "sales": "Vendite",
+        "marketing": "Marketing",
+        "support": "Assistenza",
+        "automation": "Automazione",
+        "reporting": "Report",
+        "helpdesk": "Helpdesk"
+      },
+      "metrics": {
+        "maxUsers": "utenti",
+        "apiCallsPerMonth": "chiamate API al mese",
+        "storageGb": "spazio di archiviazione (GB)",
+        "automationRunsPerMonth": "esecuzioni di automazioni al mese",
+        "maxRecords": "record",
+        "maxWorkspaces": "spazi di lavoro",
+        "maxIntegrations": "integrazioni"
+      }
+    },
+    "auth": {
+      "notAuthenticated": "Accesso non effettuato.",
+      "notMemberOfWorkspace": "Non fai parte di questo spazio di lavoro.",
+      "passwordTooShort": "La password deve contenere almeno 8 caratteri.",
+      "newPasswordTooShort": "La nuova password deve contenere almeno 8 caratteri.",
+      "emailTaken": "Esiste già un account con questo indirizzo email.",
+      "emailSendFailed": "Al momento non è possibile inviare l'email. Riprova tra qualche minuto.",
+      "emailUnknownError": "Errore sconosciuto durante l'invio dell'email.",
+      "resetLinkInvalid": "Il link per reimpostare la password non è valido o è scaduto. Richiedine uno nuovo.",
+      "emailInvalid": "Inserisci un indirizzo email valido.",
+      "roleTooHigh": "Non puoi assegnare un ruolo superiore al tuo.",
+      "alreadyMember": "Questa persona fa già parte dello spazio di lavoro.",
+      "invitationInvalid": "L'invito non è valido o è scaduto.",
+      "invitationUsed": "Questo invito è già stato utilizzato.",
+      "ownRole": "Non puoi modificare il tuo ruolo. Chiedi a un altro amministratore.",
+      "userNotMember": "Questo utente non fa parte dello spazio di lavoro.",
+      "roleAtOrAbove": "Non puoi modificare il ruolo di chi ha un livello pari o superiore al tuo.",
+      "lastOwner": "Uno spazio di lavoro deve avere almeno un proprietario.",
+      "removeSelf": "Non puoi rimuovere te stesso dallo spazio di lavoro.",
+      "removeOwner": "Solo un proprietario può rimuovere un altro proprietario.",
+      "userNotFound": "Utente non trovato.",
+      "socialLogin": "Questo account usa l'accesso tramite social: non è possibile cambiare la password.",
+      "currentPasswordWrong": "La password attuale non è corretta."
+    },
+    "invoices": {
+      "chooseCustomer": "Scegli il cliente da fatturare.",
+      "orderHasDraft": "Per questo ordine esiste già una fattura in bozza.",
+      "creditOnlyIssued": "Solo una fattura emessa può essere stornata con una nota di credito.",
+      "creditedInFull": "Questa fattura è già stata stornata per intero.",
+      "noLinesToCredit": "La fattura non ha righe da stornare.",
+      "changedBySomeoneElse": "Questa fattura è stata emessa o modificata da qualcun altro. Ricarica la pagina.",
+      "notDraft": "Questa fattura non è più una bozza.",
+      "draftChanged": "La bozza è cambiata da quando l'hai aperta. Ricarica la pagina.",
+      "cannotIssueYet": "Questa fattura non può ancora essere emessa.",
+      "creditNoteNotIssued": "La nota di credito non è stata emessa: nel frattempo è stata modificata, è già stata emessa oppure sulla fattura è stato stornato più di quanto restava. Ricarica la pagina.",
+      "changedInTheMeantime": "Nel frattempo questa fattura è stata emessa o modificata. Ricarica la pagina.",
+      "notFound": "Questa fattura non esiste più.",
+      "archiveOnlyIssued": "Si archiviano solo le fatture emesse.",
+      "archiveFailed": "Non è stato possibile archiviare i file.",
+      "emailInvalid": "L'indirizzo email non è valido.",
+      "sendOnlyIssued": "Si possono inviare solo le fatture emesse.",
+      "emailNotSent": "Non è stato possibile inviare l'email."
+    },
+    "contracts": {
+      "notFound": "Questo contratto non esiste più."
+    },
+    "sequences": {
+      "notFound": "Questa sequenza non esiste più.",
+      "refusals": {
+        "sequenceUnavailable": "Questa sequenza è in pausa, eliminata o riservata a un altro tipo di record.",
+        "noSteps": "Questa sequenza non ha passaggi.",
+        "alreadyEnrolled": "Già iscritto a questa sequenza.",
+        "unsubscribed": "Questo indirizzo ha annullato l'iscrizione.",
+        "bounced": "Le email a questo indirizzo vengono respinte.",
+        "missingEmail": "Questo record non ha un indirizzo email.",
+        "converted": "Questo lead è già stato convertito.",
+        "recordDeleted": "Questo record non esiste più.",
+        "unknown": "Non è stato possibile iscrivere il record."
+      }
+    },
+    "territories": {
+      "nameTaken": "Esiste già un territorio con questo nome.",
+      "notFound": "Questo territorio non esiste più."
+    },
+    "automation": {
+      "noSuchRecipe": "Modello di automazione non trovato.",
+      "invalidRule": "I dati della regola non sono validi."
+    },
+    "emailSettings": {
+      "noStoredConfig": "Non c'è una configurazione salvata da provare.",
+      "passwordRequiredForNewServer": "Hai cambiato server: prima di provarlo devi inserire la sua password. Quella salvata appartiene al server precedente.",
+      "noTestRecipient": "Nessun indirizzo a cui inviare l'email di prova."
+    },
+    "push": {
+      "invalidSubscription": "Sottoscrizione non valida.",
+      "testBody": "Le notifiche funzionano su questo dispositivo."
+    },
+    "documents": {
+      "invalidRequest": "Richiesta non valida.",
+      "noFile": "Nessun file selezionato.",
+      "emptyFile": "Il file è vuoto.",
+      "tooLarge": "Il file è troppo grande (massimo 10 MB).",
+      "invalidEntityType": "Tipo di record non valido.",
+      "invalidEntityId": "Identificativo del record non valido.",
+      "invalidDocumentId": "Identificativo del documento non valido.",
+      "notFound": "Documento non trovato.",
+      "notOwner": "Solo chi ha caricato il documento può eliminarlo.",
+      "typeNotAllowed": "Il tipo di file \"{type}\" non è consentito.",
+      "extensionMismatch": "L'estensione \"{extension}\" non corrisponde al tipo di file dichiarato.",
+      "contentMismatch": "Il contenuto del file non corrisponde al tipo dichiarato.",
+      "uploadFailed": "Caricamento non riuscito. Riprova.",
+      "saveFailed": "Non è stato possibile salvare il documento."
+    },
+    "imports": {
+      "tooMany": "Troppe importazioni. Riprova tra 10 minuti.",
+      "noFile": "Nessun file selezionato.",
+      "csvParse": "Impossibile leggere il file CSV.",
+      "tooManyRows": "L'importazione supera il massimo di {max, number} righe. Dividi il file e caricalo di nuovo."
+    },
+    "unauthorized": {
+      "onlyRoleCan": "Solo il ruolo {role} può {what}.",
+      "needsRole": "Serve il ruolo {role}.",
+      "yourRole": "Il tuo ruolo in questo spazio di lavoro è {role}.",
+      "howToChange": "Un amministratore dello spazio di lavoro può cambiare il tuo ruolo da Amministrazione → Utenti.",
+      "roles": {
+        "viewer": "Visualizzatore",
+        "editor": "Editor",
+        "admin": "Amministratore",
+        "owner": "Proprietario"
+      },
+      "what": {
+        "manageUsers": "gestire le persone di questo spazio di lavoro",
+        "openSettings": "aprire le impostazioni dello spazio di lavoro",
+        "changeSettings": "modificare le impostazioni dello spazio di lavoro",
+        "seeSubscription": "vedere l'abbonamento",
+        "changeSubscription": "modificare l'abbonamento",
+        "manageWebhooks": "gestire i webhook",
+        "manageCustomFields": "gestire i campi personalizzati",
+        "changePipeline": "modificare la pipeline",
+        "changeSla": "modificare le policy SLA",
+        "openReports": "aprire i report",
+        "saveReports": "salvare report condivisi",
+        "manageAutomation": "gestire le regole di automazione",
+        "manageMacros": "gestire le macro di risposta",
+        "makeChanges": "apportare modifiche"
+      }
+    }
+  },
+  "validation": {
+    "contracts": {
+      "titleRequired": "Serve un titolo",
+      "companyRequired": "Scegli l'azienda",
+      "amountNegative": "L'importo non può essere negativo",
+      "startDateRequired": "Serve una data di inizio",
+      "endBeforeStart": "La fine non può precedere l'inizio",
+      "autoRenewNeedsEnd": "Il rinnovo automatico richiede una data di fine",
+      "renewalTermRequired": "Indica la durata del rinnovo",
+      "statusUnknown": "Stato non riconosciuto.",
+      "billingPeriodUnknown": "Periodicità di fatturazione non riconosciuta.",
+      "startDateInvalid": "La data di inizio non è una data valida.",
+      "endDateInvalid": "La data di fine non è una data valida.",
+      "noticeRange": "Il preavviso deve essere compreso tra 0 e 365 giorni.",
+      "renewalTermRange": "La durata del rinnovo deve essere compresa tra 1 e 120 mesi."
+    },
+    "crm": {
+      "firstNameRequired": "Il nome è obbligatorio.",
+      "lastNameRequired": "Il cognome è obbligatorio.",
+      "companyNameRequired": "Il nome dell'azienda è obbligatorio.",
+      "emailInvalid": "Inserisci un indirizzo email valido.",
+      "urlInvalid": "Inserisci un indirizzo completo, che inizi con http:// o https://"
+    },
+    "quotes": {
+      "descriptionRequired": "La descrizione è obbligatoria.",
+      "quantityPositive": "La quantità deve essere un numero intero positivo.",
+      "unitPriceNegative": "Il prezzo unitario non può essere negativo.",
+      "dealRequired": "La trattativa è obbligatoria.",
+      "companyRequired": "L'azienda è obbligatoria.",
+      "itemsRequired": "Serve almeno una riga."
+    },
+    "orders": {
+      "lineNeedsProductOrDescription": "Scegli un prodotto o descrivi a cosa si riferisce la riga.",
+      "itemsRequired": "Serve almeno una riga.",
+      "notFound": "Ordine non trovato.",
+      "onlyDraftDeletable": "Si possono eliminare solo gli ordini in bozza o annullati. Annullalo invece di eliminarlo.",
+      "quoteNotFound": "Preventivo non trovato.",
+      "quoteAlreadyConverted": "Questo preventivo risulta già convertito.",
+      "quoteNotAccepted": "Solo un preventivo accettato diventa un ordine. Registra prima la risposta del cliente.",
+      "quoteHasNoLines": "Questo preventivo non ha righe da ordinare.",
+      "paymentPositive": "Un pagamento deve avere un importo positivo."
+    },
+    "products": {
+      "nameRequired": "Il nome è obbligatorio.",
+      "priceNegative": "Il prezzo non può essere negativo."
+    },
+    "sla": {
+      "nameRequired": "Il nome è obbligatorio.",
+      "positiveInteger": "Deve essere un numero intero positivo."
+    },
+    "support": {
+      "subjectRequired": "L'oggetto è obbligatorio.",
+      "nameRequired": "Il nome è obbligatorio.",
+      "bodyRequired": "Il testo è obbligatorio."
+    },
+    "userGroups": {
+      "nameRequired": "Il nome è obbligatorio.",
+      "colorInvalid": "Colore non valido.",
+      "invalidData": "Dati non validi."
+    },
+    "invoices": {
+      "seriesInvalid": "Il sezionale è composto da lettere e cifre, al massimo 10.",
+      "dueDateInvalid": "La data di scadenza non è una data valida.",
+      "discountRange": "Lo sconto deve essere compreso tra 0 e 100%.",
+      "paymentMethodUnknown": "Modalità di pagamento non riconosciuta.",
+      "stampDutyModeUnknown": "Impostazione dell'imposta di bollo non riconosciuta.",
+      "tooManyLines": "Una fattura ha al massimo {max} righe.",
+      "lineQuantity": "Riga {line}: quantità non valida.",
+      "linePrice": "Riga {line}: prezzo non valido.",
+      "lineDiscount": "Riga {line}: sconto non valido.",
+      "lineTaxRate": "Riga {line}: aliquota IVA non valida.",
+      "lineNatureUnknown": "Riga {line}: codice Natura non riconosciuto."
+    },
+    "sequences": {
+      "nameRequired": "Una sequenza ha bisogno di un nome.",
+      "entityUnknown": "Una sequenza è per i lead o per i contatti.",
+      "stepsRequired": "Una sequenza ha bisogno di almeno un passo.",
+      "tooManySteps": "Una sequenza ha al massimo {max} passi.",
+      "stepDelayRange": "Passo {step}: l'attesa deve essere tra 0 e 365 giorni.",
+      "stepSubjectRequired": "Il passo {step} ha bisogno di un oggetto.",
+      "stepBodyRequired": "Il passo {step} non ha testo.",
+      "stepBodyTooLong": "Il passo {step} è troppo lungo.",
+      "stepUnknownPlaceholders": "Il passo {step} usa segnaposto sconosciuti: {names}"
+    },
+    "territories": {
+      "nameRequired": "Un territorio ha bisogno di un nome.",
+      "countryUnknown": "Codice paese non valido: {codes}",
+      "criteriaRequired": "Scegli almeno un paese, una provincia o regione, o un prefisso di codice postale."
+    }
   }
 }

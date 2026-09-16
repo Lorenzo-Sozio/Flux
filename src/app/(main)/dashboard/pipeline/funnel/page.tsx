@@ -1,16 +1,32 @@
 import { Clock, Percent, TrendingUp, Users } from "lucide-react";
-import { getTranslations } from "next-intl/server";
+import { getFormatter, getTranslations } from "next-intl/server";
 
 import { getFunnelData } from "@/actions/analytics";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { parsePipelineFilters, pipelineView } from "@/lib/pipeline-filters";
 
-import { FunnelChart, PeriodSelector } from "./_components/funnel-chart";
+import { FunnelChart } from "./_components/funnel-chart";
 
-export default async function FunnelPage({ searchParams }: { searchParams: Promise<{ period?: string }> }) {
-  const { period } = await searchParams;
-  const periodDays = Number(period ?? 90);
-  const data = await getFunnelData(Number.isFinite(periodDays) && periodDays > 0 ? periodDays : 90);
-  const t = await getTranslations("analytics.funnel");
+export default async function FunnelPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const { owners, period } = parsePipelineFilters(await searchParams, {
+    period: pipelineView("funnel").defaultPeriod,
+  });
+  const [data, t, format] = await Promise.all([
+    getFunnelData(period, owners),
+    getTranslations("analytics.funnel"),
+    getFormatter(),
+  ]);
+  const stageName = (key: string) => t(`stages.${key}` as never);
+  const stages = data.stages.map((s) => ({ label: stageName(s.key), count: s.count, fill: s.fill }));
+  const conversionRates = data.conversionRates.map((cr) => ({
+    from: stageName(cr.from),
+    to: stageName(cr.to),
+    rate: cr.rate,
+  }));
 
   const overallRate =
     data.totals.totalLeads > 0 ? Number(((data.totals.totalWon / data.totals.totalLeads) * 100).toFixed(2)) : 0;
@@ -24,7 +40,6 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
             <p className="text-muted-foreground text-sm">{t("subtitle", { days: data.periodDays })}</p>
           </div>
         </div>
-        <PeriodSelector current={data.periodDays} base="/dashboard/pipeline/funnel" />
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -35,7 +50,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="font-bold text-2xl">{data.totals.totalLeads.toLocaleString()}</div>
+            <div className="font-bold text-2xl">{format.number(data.totals.totalLeads)}</div>
             <p className="mt-1 text-muted-foreground text-xs">{t("totalLeadsDesc")}</p>
           </CardContent>
         </Card>
@@ -47,7 +62,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="font-bold text-2xl">{data.totals.totalWon.toLocaleString()}</div>
+            <div className="font-bold text-2xl">{format.number(data.totals.totalWon)}</div>
             <p className="mt-1 text-muted-foreground text-xs">{t("wonDesc")}</p>
           </CardContent>
         </Card>
@@ -59,7 +74,9 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="font-bold text-2xl">{overallRate}%</div>
+            <div className="font-bold text-2xl">
+              {format.number(overallRate / 100, { style: "percent", maximumFractionDigits: 2 })}
+            </div>
             <p className="mt-1 text-muted-foreground text-xs">{t("overallRateDesc")}</p>
           </CardContent>
         </Card>
@@ -71,7 +88,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="font-bold text-2xl">{data.avgDealCycleDays}d</div>
+            <div className="font-bold text-2xl">{t("daysShort", { days: data.avgDealCycleDays })}</div>
             <p className="mt-1 text-muted-foreground text-xs">{t("avgCycleDesc")}</p>
           </CardContent>
         </Card>
@@ -83,7 +100,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
             <CardTitle className="text-base">{t("conversionFunnel")}</CardTitle>
           </CardHeader>
           <CardContent>
-            <FunnelChart stages={data.stages} conversionRates={data.conversionRates} />
+            <FunnelChart stages={stages} conversionRates={conversionRates} />
           </CardContent>
         </Card>
 
@@ -92,7 +109,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
             <CardTitle className="text-base">{t("stageRates")}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {data.conversionRates.map((cr) => (
+            {conversionRates.map((cr) => (
               <div key={`${cr.from}-${cr.to}`}>
                 <div className="mb-1 flex items-center justify-between">
                   <span className="text-muted-foreground text-sm">
@@ -121,11 +138,11 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
             <div className="space-y-2 border-t pt-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("avgLeadConversion")}</span>
-                <span className="font-medium">{data.avgLeadConversionDays}d</span>
+                <span className="font-medium">{t("daysShort", { days: data.avgLeadConversionDays })}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">{t("avgDealCycle")}</span>
-                <span className="font-medium">{data.avgDealCycleDays}d</span>
+                <span className="font-medium">{t("daysShort", { days: data.avgDealCycleDays })}</span>
               </div>
             </div>
           </CardContent>
@@ -142,9 +159,9 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
               {data.sourceBreakdown.map((s) => {
                 const pct = data.totals.totalLeads > 0 ? Math.round((s.count / data.totals.totalLeads) * 100) : 0;
                 return (
-                  <div key={s.source} className="rounded-lg border p-3 text-center">
-                    <div className="font-bold text-lg">{s.count}</div>
-                    <div className="text-muted-foreground text-xs capitalize">{s.source}</div>
+                  <div key={s.source ?? "unknown"} className="rounded-lg border p-3 text-center">
+                    <div className="font-bold text-lg">{format.number(s.count)}</div>
+                    <div className="text-muted-foreground text-xs capitalize">{s.source ?? t("unknownSource")}</div>
                     <div className="font-medium text-primary text-xs">{pct}%</div>
                   </div>
                 );

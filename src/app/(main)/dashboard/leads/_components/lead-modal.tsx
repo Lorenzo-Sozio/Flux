@@ -58,14 +58,15 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useDuplicateWatch } from "@/hooks/use-duplicate-watch";
+import { useMessageText } from "@/hooks/use-message-text";
 import { actionErrorMessage, isPlanLimit } from "@/lib/action-error";
 
 import { MergeLeadsModal } from "./merge-leads-modal";
 
 const leadSchema = z.object({
-  firstName: z.string().min(1, "Required"),
-  lastName: z.string().min(1, "Required"),
-  email: z.string().email("Invalid email").optional().or(z.literal("")),
+  firstName: z.string().min(1, "validation.crm.firstNameRequired"),
+  lastName: z.string().min(1, "validation.crm.lastNameRequired"),
+  email: z.string().email("validation.crm.emailInvalid").optional().or(z.literal("")),
   phone: z.string().optional(),
   mobile: z.string().optional(),
   jobTitle: z.string().optional(),
@@ -103,6 +104,7 @@ function F({
   required?: boolean;
   children: React.ReactNode;
 }) {
+  const say = useMessageText();
   return (
     <div className="flex flex-col gap-1.5">
       <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
@@ -110,7 +112,7 @@ function F({
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p className="text-destructive text-xs">{say(error)}</p>}
     </div>
   );
 }
@@ -131,6 +133,7 @@ export function LeadModal({
   const t = useTranslations("leads");
   const tc = useTranslations("common");
   const tf = useTranslations("recordForm");
+  const say = useMessageText();
   const [open, setOpen] = useState(false);
   const [duplicates, setDuplicates] = useState<Awaited<ReturnType<typeof checkLeadDuplicates>>>([]);
   const [pendingPayload, setPendingPayload] = useState<Record<string, unknown> | null>(null);
@@ -279,7 +282,7 @@ export function LeadModal({
         if (!result.ok) {
           // The guards write these messages for the person reading them; the old
           // catch-all threw them away (audit rilievo U-01).
-          toast.error(result.message, {
+          toast.error(say(result.message), {
             action: isPlanLimit(result)
               ? {
                   label: tf("upgrade"),
@@ -297,7 +300,7 @@ export function LeadModal({
         if (!result.ok) {
           // The guards write these messages for the person reading them; the old
           // catch-all threw them away (audit rilievo U-01).
-          toast.error(result.message, {
+          toast.error(say(result.message), {
             action: isPlanLimit(result)
               ? {
                   label: tf("upgrade"),

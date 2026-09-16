@@ -38,6 +38,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { useMessageText } from "@/hooks/use-message-text";
 
 type Sla = {
   id: string;
@@ -82,6 +83,7 @@ interface Props {
 export function SlaClient({ slas: initial, groups }: Props) {
   const t = useTranslations("support.sla");
   const tc = useTranslations("common");
+  const say = useMessageText();
   const [slas, setSlas] = useState(initial);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Sla | null>(null);
@@ -280,7 +282,7 @@ export function SlaClient({ slas: initial, groups }: Props) {
               </Label>
               <Input placeholder={t("dialog.namePlaceholder")} {...form.register("name")} />
               {form.formState.errors.name && (
-                <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
+                <p className="text-xs text-destructive">{say(form.formState.errors.name.message)}</p>
               )}
             </div>
 
@@ -314,7 +316,7 @@ export function SlaClient({ slas: initial, groups }: Props) {
                 </SelectContent>
               </Select>
               {form.formState.errors.priority && (
-                <p className="text-xs text-destructive">{form.formState.errors.priority.message}</p>
+                <p className="text-xs text-destructive">{say(form.formState.errors.priority.message)}</p>
               )}
             </div>
 
@@ -331,7 +333,9 @@ export function SlaClient({ slas: initial, groups }: Props) {
                   onChange={(e) => form.setValue("firstResponseTimeMinutes", e.target.valueAsNumber)}
                 />
                 {form.formState.errors.firstResponseTimeMinutes && (
-                  <p className="text-xs text-destructive">{form.formState.errors.firstResponseTimeMinutes.message}</p>
+                  <p className="text-xs text-destructive">
+                    {say(form.formState.errors.firstResponseTimeMinutes.message)}
+                  </p>
                 )}
               </div>
               <div className="space-y-2">
@@ -346,7 +350,7 @@ export function SlaClient({ slas: initial, groups }: Props) {
                   onChange={(e) => form.setValue("resolutionTimeMinutes", e.target.valueAsNumber)}
                 />
                 {form.formState.errors.resolutionTimeMinutes && (
-                  <p className="text-xs text-destructive">{form.formState.errors.resolutionTimeMinutes.message}</p>
+                  <p className="text-xs text-destructive">{say(form.formState.errors.resolutionTimeMinutes.message)}</p>
                 )}
               </div>
             </div>

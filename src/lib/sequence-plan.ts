@@ -1,4 +1,5 @@
 import { findUnknownPlaceholders } from "@/lib/email-placeholders";
+import { type Refusal, refuse } from "@/lib/i18n-message";
 
 /**
  * Follow-up sequences: the rules, with no database in sight.
@@ -114,27 +115,28 @@ const isBlankHtml = (html: string) =>
     .trim() === "";
 
 /** A sequence as it will be stored, or the reason it cannot be. */
-export function cleanSequence(input: SequenceInput): { ok: true; value: CleanSequence } | { ok: false; error: string } {
+export function cleanSequence(input: SequenceInput): { ok: true; value: CleanSequence } | Refusal {
   const name = input.name.trim().slice(0, 120);
-  if (!name) return { ok: false, error: "A sequence needs a name." };
+  if (!name) return refuse("validation.sequences.nameRequired");
   if (!(SEQUENCE_ENTITIES as readonly string[]).includes(input.entityType)) {
-    return { ok: false, error: "A sequence is for leads or for contacts." };
+    return refuse("validation.sequences.entityUnknown");
   }
-  if (input.steps.length === 0) return { ok: false, error: "A sequence needs at least one step." };
-  if (input.steps.length > MAX_STEPS) return { ok: false, error: `A sequence has at most ${MAX_STEPS} steps.` };
+  if (input.steps.length === 0) return refuse("validation.sequences.stepsRequired");
+  if (input.steps.length > MAX_STEPS) return refuse("validation.sequences.tooManySteps", { max: MAX_STEPS });
 
   const steps: SequenceStep[] = [];
   for (const [i, step] of input.steps.entries()) {
     const n = i + 1;
     const delayDays = Math.trunc(Number(step.delayDays));
-    if (!(delayDays >= 0 && delayDays <= 365)) return { ok: false, error: `Step ${n}: wait between 0 and 365 days.` };
+    if (!(delayDays >= 0 && delayDays <= 365)) return refuse("validation.sequences.stepDelayRange", { step: n });
     const subject = step.subject.trim().slice(0, 200);
-    if (!subject) return { ok: false, error: `Step ${n} needs a subject.` };
-    if (isBlankHtml(step.body)) return { ok: false, error: `Step ${n} has no text.` };
-    if (step.body.length > 100_000) return { ok: false, error: `Step ${n} is too long.` };
+    if (!subject) return refuse("validation.sequences.stepSubjectRequired", { step: n });
+    if (isBlankHtml(step.body)) return refuse("validation.sequences.stepBodyRequired", { step: n });
+    if (step.body.length > 100_000) return refuse("validation.sequences.stepBodyTooLong", { step: n });
     // A placeholder nothing fills in reaches the customer exactly as typed.
     const unknown = findUnknownPlaceholders(`${subject} ${step.body}`);
-    if (unknown.length) return { ok: false, error: `Step ${n} uses unknown placeholders: ${unknown.join(", ")}` };
+    if (unknown.length)
+      return refuse("validation.sequences.stepUnknownPlaceholders", { step: n, names: unknown.join(", ") });
     steps.push({ delayDays, subject, body: step.body });
   }
 

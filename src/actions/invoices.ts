@@ -11,6 +11,7 @@ import { documentLanguage, formatDocumentMoney } from "@/lib/document-language";
 import { sendInvoiceCopyEmail } from "@/lib/email";
 import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { customerGaps, type Gap, issuerGaps } from "@/lib/fiscal-ids";
+import { serverT } from "@/lib/i18n-server";
 import { archiveInvoice, readInvoiceFile } from "@/lib/invoice-archive";
 import { cleanDraft, customerSnapshot, type DraftInput, italianToday, linesFromOrder } from "@/lib/invoice-draft";
 import { issueInvoice } from "@/lib/invoice-issue";
@@ -396,7 +397,7 @@ export async function createInvoice(
   const db = await getDb();
 
   const [company] = await db.select({ id: companies.id }).from(companies).where(eq(companies.id, input.companyId));
-  if (!company) return { ok: false, error: "Choose the customer to invoice." };
+  if (!company) return { ok: false, error: (await serverT("serverErrors.invoices"))("chooseCustomer") };
 
   const orderId = input.orderId || null;
   if (orderId) {
@@ -404,7 +405,8 @@ export async function createInvoice(
       .select({ id: invoices.id })
       .from(invoices)
       .where(and(eq(invoices.orderId, orderId), eq(invoices.status, "draft"), eq(invoices.documentType, "TD01")));
-    if (draft) return { ok: false, error: "This order already has a draft invoice.", existingId: draft.id };
+    if (draft)
+      return { ok: false, error: (await serverT("serverErrors.invoices"))("orderHasDraft"), existingId: draft.id };
   }
 
   const final = finalLines(lines, header.discountPercent, header.stampDutyMode, await issuerRecharges(db));
@@ -457,8 +459,8 @@ export async function createCreditNote(
   const db = await getDb();
 
   const room = await creditRoom(db, invoiceId);
-  if (!room) return { ok: false, error: "Only an issued invoice can be credited." };
-  if (room.residual <= 0) return { ok: false, error: "This invoice has already been credited in full." };
+  if (!room) return { ok: false, error: (await serverT("serverErrors.invoices"))("creditOnlyIssued") };
+  if (room.residual <= 0) return { ok: false, error: (await serverT("serverErrors.invoices"))("creditedInFull") };
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, invoiceId));
 
   const frozen = (
@@ -474,7 +476,7 @@ export async function createCreditNote(
       taxPercent: Number(l.taxPercent),
       nature: l.nature ?? null,
     }));
-  if (frozen.length === 0) return { ok: false, error: "The invoice has no lines to credit." };
+  if (frozen.length === 0) return { ok: false, error: (await serverT("serverErrors.invoices"))("noLinesToCredit") };
 
   const discount = Number(invoice.discountPercent);
   const final = finalLines(frozen, discount, invoice.stampDutyMode, false);
@@ -556,7 +558,7 @@ export async function saveInvoiceDraft(
     })
     .where(and(eq(invoices.id, id), eq(invoices.status, "draft"), eq(invoices.revision, revision)))
     .returning({ revision: invoices.revision });
-  if (!bumped) return { ok: false, error: "This invoice was issued or changed by someone else. Reload it." };
+  if (!bumped) return { ok: false, error: (await serverT("serverErrors.invoices"))("changedBySomeoneElse") };
 
   await writeLines(db, id, lines);
   revalidatePath(`${LIST}/${id}`);
@@ -587,8 +589,10 @@ export async function issueInvoiceAction(
   const db = await getDb();
 
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
-  if (!invoice || invoice.status !== "draft") return { ok: false, error: "This invoice is not a draft any more." };
-  if (invoice.revision !== revision) return { ok: false, error: "This draft changed since you opened it. Reload it." };
+  if (!invoice || invoice.status !== "draft")
+    return { ok: false, error: (await serverT("serverErrors.invoices"))("notDraft") };
+  if (invoice.revision !== revision)
+    return { ok: false, error: (await serverT("serverErrors.invoices"))("draftChanged") };
 
   const [items, [company], [issuer]] = await Promise.all([
     db.select().from(invoiceItems).where(eq(invoiceItems.invoiceId, id)).orderBy(asc(invoiceItems.position)),
@@ -612,7 +616,7 @@ export async function issueInvoiceAction(
   if (isCredit && !room) blockers.draft.push({ kind: "credit_without_original" });
   if (room && totals.total > room.residual) blockers.draft.push({ kind: "credit_exceeds_residual" });
   if (blockers.issuer.length || blockers.customer.length || blockers.draft.length) {
-    return { ok: false, error: "This invoice cannot be issued yet.", blockers };
+    return { ok: false, error: (await serverT("serverErrors.invoices"))("cannotIssueYet"), blockers };
   }
 
   const issueDate = italianToday();
@@ -637,9 +641,7 @@ export async function issueInvoiceAction(
   if (!result) {
     return {
       ok: false,
-      error: isCredit
-        ? "This credit note was not issued: it was changed, already issued, or more than what is left on the invoice was credited in the meantime. Reload it."
-        : "This invoice was issued or changed in the meantime. Reload it.",
+      error: (await serverT("serverErrors.invoices"))(isCredit ? "creditNoteNotIssued" : "changedInTheMeantime"),
     };
   }
   if (room) revalidatePath(`${LIST}/${room.id}`);
@@ -668,11 +670,14 @@ export async function archiveInvoiceAction(id: string): Promise<{ ok: boolean; e
     if (outcome === "archived" || outcome === "already" || outcome === "lost_race") return { ok: true };
     return {
       ok: false,
-      error: outcome === "missing" ? "This invoice no longer exists." : "Only an issued invoice is archived.",
+      error: (await serverT("serverErrors.invoices"))(outcome === "missing" ? "notFound" : "archiveOnlyIssued"),
     };
   } catch (err) {
     console.error(`[invoice-archive] invoice ${id} not archived`, err);
-    return { ok: false, error: err instanceof Error ? err.message : "The files could not be stored." };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : (await serverT("serverErrors.invoices"))("archiveFailed"),
+    };
   }
 }
 
@@ -688,13 +693,13 @@ export async function sendInvoiceCopy(id: string, to: string): Promise<{ ok: tru
   await requireCapability("invoice:write");
   await requirePlanModule("sales");
   const address = to.trim();
-  if (!EMAIL.test(address)) return { ok: false, error: "The email address is not valid." };
+  if (!EMAIL.test(address)) return { ok: false, error: (await serverT("serverErrors.invoices"))("emailInvalid") };
 
   const db = await getDb();
   const [invoice] = await db.select().from(invoices).where(eq(invoices.id, id));
-  if (!invoice) return { ok: false, error: "This invoice no longer exists." };
+  if (!invoice) return { ok: false, error: (await serverT("serverErrors.invoices"))("notFound") };
   if (invoice.status !== "issued" || !invoice.documentNumber || !invoice.issueDate) {
-    return { ok: false, error: "Only an issued invoice can be sent." };
+    return { ok: false, error: (await serverT("serverErrors.invoices"))("sendOnlyIssued") };
   }
 
   const pdf = await readInvoiceFile(db, invoice, "pdf");
@@ -713,7 +718,8 @@ export async function sendInvoiceCopy(id: string, to: string): Promise<{ ok: tru
     replyTo: issuer.email,
     lang,
   });
-  if (!sent.success) return { ok: false, error: sent.error ?? "The email could not be sent." };
+  if (!sent.success)
+    return { ok: false, error: sent.error ?? (await serverT("serverErrors.invoices"))("emailNotSent") };
 
   await db.update(invoices).set({ emailedAt: new Date(), emailedTo: address }).where(eq(invoices.id, id));
   if (!pdf.archived) {

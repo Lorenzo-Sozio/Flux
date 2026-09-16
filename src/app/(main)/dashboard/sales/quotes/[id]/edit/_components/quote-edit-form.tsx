@@ -38,14 +38,14 @@ type FormDataType = Awaited<ReturnType<typeof getQuoteFormData>>;
  * about what a line is.
  */
 const EditQuoteSchema = z.object({
-  dealId: z.string().min(1, "Deal is required"),
-  companyId: z.string().min(1, "Company is required"),
+  dealId: z.string().min(1, "validation.quotes.dealRequired"),
+  companyId: z.string().min(1, "validation.quotes.companyRequired"),
   contactId: z.string().optional(),
   expiresAt: z.string().optional(),
   discountPercent: z.coerce.number().min(0).max(100).default(0),
   taxPercent: z.coerce.number().min(0).max(100).default(0),
   notes: z.string().optional(),
-  items: z.array(QuoteItemSchema).min(1, "At least one item is required"),
+  items: z.array(QuoteItemSchema).min(1, "validation.quotes.itemsRequired"),
 });
 
 type FormValues = z.infer<typeof EditQuoteSchema>;

@@ -32,7 +32,7 @@
   {
     "file": "src/app/api/crm/orders/route.ts",
     "description": "nessuno viene avvisato che e' arrivato un ordine: chi sorvegliava quella coda non lo sa",
-    "find": "    dispatchWebhook(\"order.created\", { order: { ...ordine, contactId } }, API_ORIGIN);",
+    "find": "        dispatchWebhook(\"order.created\", { order: { ...ordine, contactId } }, API_ORIGIN, db);",
     "replace": ""
   },
   {
@@ -44,8 +44,8 @@
   {
     "file": "src/app/api/crm/orders/route.ts",
     "description": "le etichette si scrivono anche senza il dato: «Consegna:» seguito dal vuoto manda a cercare un'informazione che non e' stata data",
-    "find": "  const note = [\n    [\"Consegna\", typeof dati.fulfillment === \"string\" ? dati.fulfillment.trim() : \"\"],\n    [\"Per quando\", typeof dati.when === \"string\" ? dati.when.trim() : \"\"],\n    [\"Indirizzo\", typeof dati.address === \"string\" ? dati.address.trim() : \"\"],\n  ]\n    .filter(([, valore]) => valore)",
-    "replace": "  const note = [\n    [\"Consegna\", typeof dati.fulfillment === \"string\" ? dati.fulfillment.trim() : \"\"],\n    [\"Per quando\", typeof dati.when === \"string\" ? dati.when.trim() : \"\"],\n    [\"Indirizzo\", typeof dati.address === \"string\" ? dati.address.trim() : \"\"],\n  ]"
+    "find": "      const note = [\n        [\"Consegna\", typeof dati.fulfillment === \"string\" ? dati.fulfillment.trim() : \"\"],\n        [\"Per quando\", typeof dati.when === \"string\" ? dati.when.trim() : \"\"],\n        [\"Indirizzo\", typeof dati.address === \"string\" ? dati.address.trim() : \"\"],\n      ]\n        .filter(([, valore]) => valore)",
+    "replace": "      const note = [\n        [\"Consegna\", typeof dati.fulfillment === \"string\" ? dati.fulfillment.trim() : \"\"],\n        [\"Per quando\", typeof dati.when === \"string\" ? dati.when.trim() : \"\"],\n        [\"Indirizzo\", typeof dati.address === \"string\" ? dati.address.trim() : \"\"],\n      ]"
   },
   {
     "file": "src/app/api/crm/orders/route.ts",

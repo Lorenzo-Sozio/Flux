@@ -1,10 +1,8 @@
-import Link from "next/link";
-
-import { ChevronLeft } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { getWinLossAnalysis } from "@/actions/pipeline";
 import { requirePageCapability } from "@/lib/page-guard";
+import { parsePipelineFilters, pipelineView } from "@/lib/pipeline-filters";
 
 import { WinLossFigures } from "./_components/win-loss-figures";
 
@@ -26,27 +24,23 @@ import { WinLossFigures } from "./_components/win-loss-figures";
  * formatted as euro regardless of the workspace currency, which is why they now
  * live in a client component like the ones on the sibling pages.
  */
-export default async function WinLossPage() {
+export default async function WinLossPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   await requirePageCapability("report:read");
+  const { owners, period } = parsePipelineFilters(await searchParams, {
+    period: pipelineView("winLoss").defaultPeriod,
+  });
 
-  const [analysis, t, tp] = await Promise.all([
-    getWinLossAnalysis(),
-    getTranslations("pipeline.winLoss"),
-    getTranslations("pipeline"),
-  ]);
+  const [analysis, t] = await Promise.all([getWinLossAnalysis(period, owners), getTranslations("pipeline.winLoss")]);
 
   return (
     <div className="space-y-6">
       <div>
-        <Link
-          href="/dashboard/pipeline"
-          className="mb-3 inline-flex items-center gap-1 text-muted-foreground text-sm transition-colors hover:text-foreground"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          {tp("backToPipeline")}
-        </Link>
         <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
-        <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
+        <p className="text-muted-foreground text-sm">{t("subtitlePeriod", { days: period })}</p>
       </div>
 
       <WinLossFigures analysis={analysis} />

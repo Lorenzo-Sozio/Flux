@@ -1,11 +1,9 @@
-import Link from "next/link";
-
-import { ChevronLeft } from "lucide-react";
 import { getTranslations } from "next-intl/server";
 
 import { getTerritoryReport } from "@/actions/territory-report";
 import { requirePageCapability } from "@/lib/page-guard";
 import { can } from "@/lib/permissions";
+import { parsePipelineFilters, pipelineView } from "@/lib/pipeline-filters";
 
 import { TerritoryTable } from "./_components/territory-table";
 
@@ -16,26 +14,21 @@ import { TerritoryTable } from "./_components/territory-table";
  * win/loss beside it: it answers a sales question and should not need the
  * reporting package to open.
  */
-export default async function TerritoryReportPage({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
+export default async function TerritoryReportPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const actor = await requirePageCapability("report:read");
-  const { days } = await searchParams;
+  const { owners, period } = parsePipelineFilters(await searchParams, {
+    period: pipelineView("territories").defaultPeriod,
+  });
 
-  const [report, t, tp] = await Promise.all([
-    getTerritoryReport(Number(days) || 90),
-    getTranslations("pipeline.territories"),
-    getTranslations("pipeline"),
-  ]);
+  const [report, t] = await Promise.all([getTerritoryReport(period, owners), getTranslations("pipeline.territories")]);
 
   return (
     <div className="space-y-6">
       <div className="min-w-0">
-        <Link
-          href="/dashboard/pipeline"
-          className="mb-3 inline-flex items-center gap-1 text-muted-foreground text-sm transition-colors hover:text-foreground"
-        >
-          <ChevronLeft className="h-4 w-4" />
-          {tp("backToPipeline")}
-        </Link>
         <h1 className="font-bold text-2xl tracking-tight">{t("title")}</h1>
         <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
       </div>

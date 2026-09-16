@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useCurrency } from "@/hooks/use-currency";
 
 type StageReport = {
   id: string;
@@ -15,11 +16,10 @@ type StageReport = {
   avgDaysInStage: number;
 };
 
-const fmt = (v: number) =>
-  new Intl.NumberFormat(undefined, { style: "currency", currency: "EUR", maximumFractionDigits: 0 }).format(v);
-
 export function PipelineReportCharts({ stageReport }: { stageReport: StageReport[] }) {
   const t = useTranslations("pipeline");
+  const { formatAmount } = useCurrency();
+  const fmt = (v: number) => formatAmount(v, { noDecimals: true });
 
   const valueData = stageReport.map((s) => ({
     name: s.name,

@@ -43,6 +43,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useDuplicateWatch } from "@/hooks/use-duplicate-watch";
+import { useMessageText } from "@/hooks/use-message-text";
 import { actionErrorMessage, isPlanLimit } from "@/lib/action-error";
 
 import { MergeCompaniesModal } from "./merge-companies-modal";
@@ -50,7 +51,7 @@ import { MergeCompaniesModal } from "./merge-companies-modal";
 type LookupItem = { id: string; name: string };
 
 const companySchema = z.object({
-  name: z.string().min(1, "Company name is required"),
+  name: z.string().min(1, "validation.crm.companyNameRequired"),
   type: z.string().default("prospect"),
   status: z.string().default("active"),
   companyCategoryId: z.string().optional().nullable(),
@@ -93,6 +94,7 @@ function F({
   required?: boolean;
   children: React.ReactNode;
 }) {
+  const say = useMessageText();
   return (
     <div className="flex flex-col gap-1.5">
       <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
@@ -100,7 +102,7 @@ function F({
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p className="text-destructive text-xs">{say(error)}</p>}
     </div>
   );
 }
@@ -120,6 +122,7 @@ export function CompanyModal({
   const t = useTranslations("companies");
   const tc = useTranslations("common");
   const tf = useTranslations("recordForm");
+  const say = useMessageText();
   const [open, setOpen] = useState(false);
   const [duplicates, setDuplicates] = useState<Awaited<ReturnType<typeof checkCompanyDuplicates>>>([]);
   const [pendingPayload, setPendingPayload] = useState<Record<string, unknown> | null>(null);
@@ -277,7 +280,7 @@ export function CompanyModal({
         if (!result.ok) {
           // The guards write these messages for the person reading them; the old
           // catch-all threw them away (audit rilievo U-01).
-          toast.error(result.message, {
+          toast.error(say(result.message), {
             action: isPlanLimit(result)
               ? {
                   label: tf("upgrade"),
@@ -295,7 +298,7 @@ export function CompanyModal({
         if (!result.ok) {
           // The guards write these messages for the person reading them; the old
           // catch-all threw them away (audit rilievo U-01).
-          toast.error(result.message, {
+          toast.error(say(result.message), {
             action: isPlanLimit(result)
               ? {
                   label: tf("upgrade"),

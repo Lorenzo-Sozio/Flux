@@ -45,6 +45,7 @@ import {
   type BlockProps,
   type BlockType,
   type ButtonProps,
+  blockTextDefaults,
   compileToHtml,
   type DividerProps,
   type EmailDesign,
@@ -322,6 +323,7 @@ function AlignButtons({ value, onChange }: { value: string; onChange: (v: string
 
 function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block) => void }) {
   const t = useTranslations("marketing.emailBuilder");
+  const tPlaceholders = useTranslations("placeholders");
   const set = (patch: Partial<BlockProps>) => onChange({ ...block, props: { ...block.props, ...patch } });
 
   const p = block.props;
@@ -740,7 +742,7 @@ function BlockInspector({ block, onChange }: { block: Block; onChange: (b: Block
               key={v.key}
               variant="outline"
               className="cursor-pointer font-mono text-[9px] hover:bg-primary hover:text-primary-foreground transition-colors"
-              title={v.label}
+              title={`${tPlaceholders(`catalogue.${v.placeholder}.label`)} — ${tPlaceholders(`catalogue.${v.placeholder}.description`)}`}
               onClick={() => {
                 // Copy to clipboard
                 navigator.clipboard.writeText(v.key).then(() => toast.success(t("copied", { variable: v.key })));
@@ -829,7 +831,7 @@ export function EmailBuilder({
   const tm = useTranslations("marketing");
   const tc = useTranslations("common");
   const router = useRouter();
-  const [design, setDesign] = useState<EmailDesign>(initialDesign ?? emptyDesign());
+  const [design, setDesign] = useState<EmailDesign>(() => initialDesign ?? emptyDesign(blockTextDefaults(t)));
   const [selectedId, setSelectedId] = useState<string | "settings" | null>("settings");
   const [preview, setPreview] = useState<"desktop" | "mobile" | null>(null);
   const [name, setName] = useState(initialName);
@@ -859,7 +861,7 @@ export function EmailBuilder({
   }, []);
 
   const addBlock = (type: BlockType) => {
-    const block = newBlock(type);
+    const block = newBlock(type, blockTextDefaults(t));
     pushHistory({ ...design, blocks: [...design.blocks, block] });
     setSelectedId(block.id);
   };

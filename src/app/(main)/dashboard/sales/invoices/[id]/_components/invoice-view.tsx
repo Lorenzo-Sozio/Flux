@@ -34,6 +34,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
+import { useMessageText } from "@/hooks/use-message-text";
 import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { PAYMENT_METHODS } from "@/lib/invoice-draft";
 import { draftProblems } from "@/lib/invoice-rules";
@@ -48,6 +49,7 @@ type Data = NonNullable<Awaited<ReturnType<typeof getInvoice>>>;
 
 export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite: boolean; canIssue: boolean }) {
   const t = useTranslations("invoices");
+  const say = useMessageText();
   const tI = useTranslations("invoicing");
   const router = useRouter();
   const { formatMoney } = useCurrency();
@@ -132,7 +134,7 @@ export function InvoiceView({ data, canWrite, canIssue }: { data: Data; canWrite
       lines: draftLines,
     });
     if (!result.ok) {
-      toast.error(result.error);
+      toast.error(say(result));
       return null;
     }
     setRevision(result.revision);

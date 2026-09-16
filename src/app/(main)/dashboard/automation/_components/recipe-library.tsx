@@ -36,7 +36,11 @@ import { AUTOMATION_RECIPES } from "@/lib/automation-recipes";
  */
 export function RecipeLibrary() {
   const t = useTranslations("automation.recipes");
+  const tEntities = useTranslations("automation.entities");
   const router = useRouter();
+  // The catalogue in automation-recipes.ts is English; items.<id> carries the reader's language.
+  const text = (id: string, part: "summary" | "why", fallback: string) =>
+    t.has(`items.${id}.${part}`) ? t(`items.${id}.${part}`) : fallback;
   const [open, setOpen] = useState(false);
   const [counts, setCounts] = useState<Record<string, number | null> | null>(null);
   const [installed, setInstalled] = useState<Set<string>>(new Set());
@@ -96,8 +100,10 @@ export function RecipeLibrary() {
               <div key={recipe.id} className="rounded-lg border p-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 space-y-1">
-                    <p className="font-medium text-sm leading-snug">{recipe.summary}</p>
-                    <p className="text-muted-foreground text-xs leading-relaxed">{recipe.why}</p>
+                    <p className="font-medium text-sm leading-snug">{text(recipe.id, "summary", recipe.summary)}</p>
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                      {text(recipe.id, "why", recipe.why)}
+                    </p>
                   </div>
                   <Button
                     size="sm"
@@ -120,7 +126,9 @@ export function RecipeLibrary() {
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className="text-[10px]">
-                    {recipe.rule.targetEntity}
+                    {tEntities.has(recipe.rule.targetEntity)
+                      ? tEntities(recipe.rule.targetEntity)
+                      : recipe.rule.targetEntity}
                   </Badge>
                   {counts === null ? null : count === null || count === undefined ? (
                     <span className="text-muted-foreground text-xs">{t("onChange")}</span>

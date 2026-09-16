@@ -6,6 +6,7 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { notificationPreferences, pushSubscriptions } from "@/db/schema";
+import { serverT } from "@/lib/i18n-server";
 import { devicesOf, subscriptionsFor, touch, vapidKeys } from "@/lib/push-send";
 import { isPushType, type PushType, parseOverrides, resolveAll, serialiseOverrides } from "@/lib/push-types";
 import { getDb } from "@/lib/tenant-context";
@@ -94,7 +95,7 @@ export async function savePushSubscription(input: {
   const db = await getDb();
 
   if (!/^https:\/\//.test(input.endpoint) || !input.p256dh || !input.auth) {
-    return { error: "Invalid subscription." };
+    return { error: (await serverT())("push.invalidSubscription") };
   }
 
   await db
@@ -204,7 +205,7 @@ export async function sendTestPush() {
 
   const payload = JSON.stringify({
     title: "Flux",
-    body: "Le notifiche funzionano su questo dispositivo.",
+    body: (await serverT())("push.testBody"),
     link: SETTINGS_PATH,
     tag: "flux-test",
   });

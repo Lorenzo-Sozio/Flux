@@ -1,5 +1,35 @@
 import { z } from "zod";
 
+// ─── Validation messages ──────────────────────────────────────────────────────
+//
+//  The schema runs on the server too, where there is no reader's language, so it
+//  raises these English sentences. The rule builder shows each one under
+//  automation.ruleBuilder.validation.<key>; a message missing from this table is
+//  shown as written.
+
+export const RULE_FORM_MESSAGES = {
+  dottedEventName: "use a dotted name, e.g. lead.escalate",
+  routeNeedsCriteria: "A route needs at least one territory or source.",
+  choosePeople: "Choose the people to share records out among.",
+  duplicateRouteId: "Two routes have the same id.",
+  scheduledTriggerFormat: "Scheduled trigger must be in the form 'scheduled:<cron>'",
+  nameRequired: "Name is required",
+  triggerRequired: "Select at least one trigger event",
+  conditionRequired: "At least one condition is required",
+  actionRequired: "At least one action is required",
+} as const;
+
+export type RuleFormMessageKey = keyof typeof RULE_FORM_MESSAGES;
+
+const MESSAGE_KEY_BY_TEXT = new Map<string, RuleFormMessageKey>(
+  Object.entries(RULE_FORM_MESSAGES).map(([k, v]) => [v, k as RuleFormMessageKey]),
+);
+
+/** The translation key for a message the schema raised, or null for one it does not own. */
+export function ruleFormMessageKey(message: string | undefined): RuleFormMessageKey | null {
+  return message ? (MESSAGE_KEY_BY_TEXT.get(message) ?? null) : null;
+}
+
 // ─── Entities & Events ────────────────────────────────────────────────────────
 
 export const TARGET_ENTITIES = ["deal", "lead", "contact", "company", "ticket", "order"] as const;
@@ -156,7 +186,7 @@ export const EmitEventActionSchema = z.object({
       .string()
       .min(3)
       .max(80)
-      .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/, "use a dotted name, e.g. lead.escalate"),
+      .regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/, RULE_FORM_MESSAGES.dottedEventName),
     // Extra fields merged into the payload alongside the entity. Supports merge fields.
     payload: z.record(z.any()).optional(),
   }),
@@ -180,7 +210,7 @@ export const AssignmentRouteSchema = z
   })
   .refine((r) => r.territoryIds.length + r.sources.length > 0, {
     // A route with no criteria would take nothing, and look like it takes everything.
-    message: "A route needs at least one territory or source.",
+    message: RULE_FORM_MESSAGES.routeNeedsCriteria,
   });
 
 export const AssignOwnerActionSchema = z.object({
@@ -197,12 +227,12 @@ export const AssignOwnerActionSchema = z.object({
       overwrite: z.boolean().default(false),
     })
     .refine((p) => p.userIds.length > 0 || p.routes.length > 0, {
-      message: "Choose the people to share records out among.",
+      message: RULE_FORM_MESSAGES.choosePeople,
       path: ["userIds"],
     })
     .refine((p) => new Set(p.routes.map((r) => r.id)).size === p.routes.length, {
       // Two routes with one id would share one rotation.
-      message: "Two routes have the same id.",
+      message: RULE_FORM_MESSAGES.duplicateRouteId,
       path: ["routes"],
     }),
 });
@@ -238,22 +268,22 @@ export type AutomationAction = z.infer<typeof ActionSchema>;
 // or a scheduled cron string in the form "scheduled:0 8 * * *".
 const TriggerItemSchema = z.union([
   z.enum(TRIGGER_EVENTS),
-  z.string().regex(/^scheduled:.+/, "Scheduled trigger must be in the form 'scheduled:<cron>'"),
+  z.string().regex(/^scheduled:.+/, RULE_FORM_MESSAGES.scheduledTriggerFormat),
 ]);
 
 export const AutomationRuleFormSchema = z.object({
-  name: z.string().min(1, "Name is required").max(255),
+  name: z.string().min(1, RULE_FORM_MESSAGES.nameRequired).max(255),
   description: z.string().max(1000).optional(),
   isActive: z.boolean().default(true),
   targetEntity: z.enum(TARGET_ENTITIES),
-  triggerOn: z.array(TriggerItemSchema).min(1, "Select at least one trigger event"),
+  triggerOn: z.array(TriggerItemSchema).min(1, RULE_FORM_MESSAGES.triggerRequired),
   // Legacy: supporto backward compatibility
   conditionLogic: z.enum(["AND", "OR"]).default("AND").optional(),
-  conditions: z.array(ConditionSchema).min(1, "At least one condition is required"),
+  conditions: z.array(ConditionSchema).min(1, RULE_FORM_MESSAGES.conditionRequired),
   // Espressione logica avanzata per condizioni complesse
   // Esempi: "(C0 AND C1) OR C2", "NOT C0 AND (C1 OR C2)"
   conditionExpression: z.string().max(1000).optional(),
-  actions: z.array(ActionSchema).min(1, "At least one action is required"),
+  actions: z.array(ActionSchema).min(1, RULE_FORM_MESSAGES.actionRequired),
 });
 
 export type AutomationRuleFormData = z.infer<typeof AutomationRuleFormSchema>;

@@ -13,10 +13,10 @@ import { getDb } from "@/lib/tenant-context";
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const productSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().min(1, "validation.products.nameRequired"),
   description: z.string().optional(),
   sku: z.string().optional(),
-  price: z.coerce.number().min(0, "Price must be ≥ 0"),
+  price: z.coerce.number().min(0, "validation.products.priceNegative"),
   taxPercent: z.coerce.number().min(0).max(100).default(0),
   unit: z.string().optional().nullable(),
   category: z.string().optional().nullable(),

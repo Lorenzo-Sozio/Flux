@@ -13,6 +13,7 @@ import { getAdminSession } from "@/lib/admin-session";
 import { assertLimit, EntitlementError, getEntitlements, requireModule } from "@/lib/billing/licensing";
 import type { PlanLimits, PlanModule } from "@/lib/billing/plans-config";
 import { getTenantById } from "@/lib/get-tenant";
+import { serverT } from "@/lib/i18n-server";
 import {
   type Actor,
   type Capability,
@@ -75,7 +76,7 @@ export async function getActor(): Promise<Actor | null> {
 /** Resolves the current actor or throws. */
 export async function requireActor(): Promise<Actor> {
   const actor = await getActor();
-  if (!actor) throw new UnauthenticatedError();
+  if (!actor) throw new UnauthenticatedError((await serverT())("generic.unauthenticated"));
   return actor;
 }
 
@@ -88,7 +89,8 @@ export async function requireActor(): Promise<Actor> {
 export async function requireCapability(capability: Capability): Promise<Actor> {
   const actor = await requireActor();
   if (!can(actor, capability)) {
-    throw new ForbiddenError(FORBIDDEN_MESSAGES[capability] ?? DEFAULT_FORBIDDEN, capability);
+    const t = await serverT();
+    throw new ForbiddenError(t(FORBIDDEN_MESSAGES[capability] ?? DEFAULT_FORBIDDEN), capability);
   }
   return actor;
 }
@@ -102,26 +104,31 @@ export async function hasCapability(capability: Capability): Promise<boolean> {
 /**
  * Messages worth writing by hand, because the generic one leaves the user with
  * nothing to do next. Anything absent falls back to DEFAULT_FORBIDDEN.
+ *
+ * Keys under `serverErrors`, translated when thrown: the person reading the
+ * refusal reads the rest of the product in their own language too.
  */
-const DEFAULT_FORBIDDEN = "You do not have permission to perform this action.";
+const DEFAULT_FORBIDDEN = "generic.forbidden";
+
+const READ_ONLY = "capability.readOnly";
 
 const FORBIDDEN_MESSAGES: Partial<Record<Capability, string>> = {
-  "record:write": "Your role is read-only. Ask a workspace admin for edit access.",
-  "record:delete": "Your role is read-only. Ask a workspace admin for edit access.",
-  "quote:write": "Your role is read-only. Ask a workspace admin for edit access.",
-  "quote:approve": "Only workspace admins can approve quotes.",
-  "ticket:write": "Your role is read-only. Ask a workspace admin for edit access.",
-  "ticket:delete": "Only workspace admins can delete tickets.",
-  "sla:manage": "Only workspace admins can change SLA policies.",
-  "settings:manage": "Only workspace admins can change settings.",
-  "pipeline:manage": "Only workspace admins can change the pipeline.",
-  "customField:manage": "Only workspace admins can manage custom fields.",
-  "webhook:manage": "Only workspace admins can manage webhooks.",
-  "automation:manage": "Only workspace admins can manage automation rules.",
-  "user:manage": "Only workspace admins can manage users.",
-  "group:manage": "Only workspace admins can manage groups.",
-  "billing:manage": "Only the workspace owner can change the subscription.",
-  "report:manage": "Only workspace admins can save or delete shared reports.",
+  "record:write": READ_ONLY,
+  "record:delete": READ_ONLY,
+  "quote:write": READ_ONLY,
+  "quote:approve": "capability.quoteApprove",
+  "ticket:write": READ_ONLY,
+  "ticket:delete": "capability.ticketDelete",
+  "sla:manage": "capability.slaManage",
+  "settings:manage": "capability.settingsManage",
+  "pipeline:manage": "capability.pipelineManage",
+  "customField:manage": "capability.customFieldManage",
+  "webhook:manage": "capability.webhookManage",
+  "automation:manage": "capability.automationManage",
+  "user:manage": "capability.userManage",
+  "group:manage": "capability.groupManage",
+  "billing:manage": "capability.billingManage",
+  "report:manage": "capability.reportManage",
 };
 
 // ─── Backwards-compatible aliases ─────────────────────────────────────────────
@@ -173,10 +180,10 @@ export async function requireActiveSubscription() {
   if (!ent) return; // outside tenant context — no subscription check
 
   if (ent.isSuspended) {
-    throw new ForbiddenError("Your account is suspended. Please contact support to reactivate.");
+    throw new ForbiddenError((await serverT())("plan.suspended"));
   }
   if (!ent.isActive) {
-    throw new ForbiddenError("Your subscription is inactive. Please update your billing details.");
+    throw new ForbiddenError((await serverT())("plan.inactive"));
   }
 }
 

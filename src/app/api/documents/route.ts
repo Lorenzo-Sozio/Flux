@@ -11,6 +11,7 @@ import { and, eq } from "drizzle-orm";
 
 import { auth } from "@/auth";
 import { documents } from "@/db/schema";
+import { serverT } from "@/lib/i18n-server";
 import { getStorage } from "@/lib/storage";
 import { getDb } from "@/lib/tenant-context";
 
@@ -20,17 +21,20 @@ export async function GET(req: NextRequest) {
   const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: (await serverT())("generic.unauthenticated") }, { status: 401 });
   }
 
   const entityType = req.nextUrl.searchParams.get("entityType");
   const entityId = req.nextUrl.searchParams.get("entityId");
 
   if (!entityType || !VALID_ENTITY_TYPES.has(entityType)) {
-    return NextResponse.json({ error: "Invalid entity type." }, { status: 400 });
+    return NextResponse.json(
+      { error: (await serverT("serverErrors.documents"))("invalidEntityType") },
+      { status: 400 },
+    );
   }
   if (!entityId || !/^[a-zA-Z0-9_-]{1,128}$/.test(entityId)) {
-    return NextResponse.json({ error: "Invalid entity ID." }, { status: 400 });
+    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("invalidEntityId") }, { status: 400 });
   }
 
   const docs = await db
@@ -46,21 +50,24 @@ export async function DELETE(req: NextRequest) {
   const db = await getDb();
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: (await serverT())("generic.unauthenticated") }, { status: 401 });
   }
 
   const id = req.nextUrl.searchParams.get("id");
   if (!id || !/^[a-zA-Z0-9_-]{1,128}$/.test(id)) {
-    return NextResponse.json({ error: "Invalid document ID." }, { status: 400 });
+    return NextResponse.json(
+      { error: (await serverT("serverErrors.documents"))("invalidDocumentId") },
+      { status: 400 },
+    );
   }
 
   // Verify the document exists and belongs to this user
   const [doc] = await db.select().from(documents).where(eq(documents.id, id));
   if (!doc) {
-    return NextResponse.json({ error: "Document not found." }, { status: 404 });
+    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("notFound") }, { status: 404 });
   }
   if (doc.ownerId !== session.user.id) {
-    return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("notOwner") }, { status: 403 });
   }
 
   // Remove the row first: it is what makes the file reachable. If the object then

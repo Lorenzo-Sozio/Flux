@@ -6,6 +6,7 @@ import { and, eq, gte, inArray, isNotNull, isNull, lte, or } from "drizzle-orm";
 
 import { taskAssignees, taskDependencies, tasks, users } from "@/db/schema";
 import { requireCapability } from "@/lib/auth-guard";
+import { serverT } from "@/lib/i18n-server";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -196,7 +197,7 @@ export async function rescheduleTaskDueDate(
     revalidatePath("/dashboard/tasks");
     return { success: true };
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : "Errore sconosciuto" };
+    return { success: false, error: err instanceof Error ? err.message : (await serverT())("generic.unknown") };
   }
 }
 

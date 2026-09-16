@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
+import { useMessageText } from "@/hooks/use-message-text";
 import {
   addDays,
   BILLING_PERIODS,
@@ -56,6 +57,7 @@ export interface ContractInitial extends Partial<ContractFormValues> {
 export function ContractForm({ initial, data }: { initial: ContractInitial | null; data: FormData | null }) {
   const t = useTranslations("contracts");
   const tf = useTranslations("contracts.form");
+  const say = useMessageText();
   const router = useRouter();
   const { formatMoney } = useCurrency();
   const [saving, setSaving] = useState(false);
@@ -134,7 +136,7 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
       };
       const result = initial ? await updateContract(initial.id, payload) : await createContract(payload);
       if (!result.ok) {
-        toast.error(result.error);
+        toast.error(say(result));
         return;
       }
       toast.success(t("saved"));

@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 
 import { addMonths, format, startOfMonth } from "date-fns";
 import { Loader2, Plus, Save, Target, Trash2, X } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { useFormatter, useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { deleteSalesTarget, upsertSalesTarget } from "@/actions/targets";
@@ -36,6 +36,8 @@ type SalesTarget = {
 interface Props {
   users: User[];
   initialTargets: SalesTarget[];
+  /** Setting targets is for admins; everyone else reads them. */
+  canManage: boolean;
 }
 
 function getNextMonths(count = 6): string[] {
@@ -43,8 +45,10 @@ function getNextMonths(count = 6): string[] {
   return Array.from({ length: count }, (_, i) => format(addMonths(today, i - 1), "yyyy-MM"));
 }
 
-export function TargetsClient({ users, initialTargets }: Props) {
+export function TargetsClient({ users, initialTargets, canManage }: Props) {
   const t = useTranslations("settings.targets");
+  const formatter = useFormatter();
+  const tr = useTranslations("roles.roleLabel");
   const [targets, setTargets] = useState(initialTargets);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState("");
@@ -160,7 +164,7 @@ export function TargetsClient({ users, initialTargets }: Props) {
                       key={m}
                       className="min-w-[140px] px-3 py-2.5 text-center font-medium text-muted-foreground text-xs"
                     >
-                      {format(new Date(`${m}-01`), "MMM yyyy")}
+                      {formatter.dateTime(new Date(`${m}-01T00:00:00`), { month: "short", year: "numeric" })}
                     </th>
                   ))}
                 </tr>
@@ -171,9 +175,11 @@ export function TargetsClient({ users, initialTargets }: Props) {
                     <td className="sticky left-0 bg-background px-4 py-3">
                       <div>
                         <p className="font-medium leading-none">{user.name ?? user.email}</p>
-                        <Badge variant="outline" className="mt-1 text-xs capitalize">
-                          {user.role}
-                        </Badge>
+                        {user.role && (
+                          <Badge variant="outline" className="mt-1 text-xs">
+                            {tr.has(user.role as never) ? tr(user.role as never) : user.role}
+                          </Badge>
+                        )}
                       </div>
                     </td>
                     {months.map((period) => {
@@ -245,8 +251,9 @@ export function TargetsClient({ users, initialTargets }: Props) {
                             <div className="group relative inline-flex flex-col items-center gap-0.5">
                               <button
                                 type="button"
-                                onClick={() => startEdit(target)}
-                                className="font-semibold text-sm tabular-nums transition-colors hover:text-primary"
+                                onClick={() => canManage && startEdit(target)}
+                                disabled={!canManage}
+                                className="font-semibold text-sm tabular-nums transition-colors enabled:hover:text-primary disabled:cursor-default"
                               >
                                 {formatCurrency(parseFloat(target.targetAmount), {
                                   currency: target.currency,
@@ -258,16 +265,21 @@ export function TargetsClient({ users, initialTargets }: Props) {
                                   {t("dealsLabel", { count: target.targetDeals })}
                                 </span>
                               )}
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="-right-5 absolute top-0 h-5 w-5 text-destructive opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
-                                onClick={() => handleDelete(target.id)}
-                                disabled={isPending}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
+                              {canManage && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="-right-5 absolute top-0 h-5 w-5 text-destructive opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                                  onClick={() => handleDelete(target.id)}
+                                  disabled={isPending}
+                                  aria-label={t("removeTarget")}
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              )}
                             </div>
+                          ) : !canManage ? (
+                            <span className="text-muted-foreground/40">—</span>
                           ) : (
                             <button
                               type="button"

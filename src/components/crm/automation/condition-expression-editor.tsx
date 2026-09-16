@@ -151,7 +151,7 @@ const ValidationFeedback: React.FC<{
           <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
           <div className="flex-1">
             <div className="font-semibold">{error.type === "syntax" ? t("syntaxError") : t("logicError")}</div>
-            <div>{error.message}</div>
+            <div>{t(`errors.${error.code}`, error.params ?? {})}</div>
           </div>
         </div>
       ))}
@@ -169,6 +169,7 @@ export const ConditionExpressionEditor: React.FC<ConditionExpressionEditorProps>
   onValidationChange,
 }) => {
   const t = useTranslations("automation.expressionEditor");
+  const tRule = useTranslations("automation.ruleBuilder");
   const code = (chunks: React.ReactNode) => <span className="font-mono">{chunks}</span>;
   const [_showAdvanced, _setShowAdvanced] = useState(false);
   const [showTree, setShowTree] = useState(false);
@@ -176,8 +177,15 @@ export const ConditionExpressionEditor: React.FC<ConditionExpressionEditorProps>
 
   // Crea etichette per le condizioni
   const conditionLabels = useMemo(
-    () => conditions.map((c) => createConditionLabel(c.field, c.operator, c.value)),
-    [conditions],
+    () =>
+      conditions.map((c) =>
+        createConditionLabel(
+          tRule.has(`fields.${c.field}`) ? tRule(`fields.${c.field}`) : c.field,
+          tRule.has(`operators.${c.operator}`) ? tRule(`operators.${c.operator}`) : c.operator,
+          c.value,
+        ),
+      ),
+    [conditions, tRule],
   );
 
   // Regenerate the expression when the conditions change

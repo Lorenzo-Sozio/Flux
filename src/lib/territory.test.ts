@@ -166,7 +166,7 @@ describe("saving a territory", () => {
 
   it("refuses an unknown country code rather than storing one that never matches", () => {
     const r = cleanTerritory({ name: "x", countries: ["IT", "XX"], states: [], postalPrefixes: [] });
-    expect(r).toEqual({ ok: false, error: "Not a country code: XX" });
+    expect(r).toEqual({ ok: false, error: "validation.territories.countryUnknown", params: { codes: "XX" } });
   });
 
   it("refuses a nameless territory", () => {

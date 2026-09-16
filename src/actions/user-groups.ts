@@ -12,11 +12,11 @@ import { getDb } from "@/lib/tenant-context";
 // ─── Schemas ──────────────────────────────────────────────────────────────────
 
 const UserGroupFormSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100),
+  name: z.string().min(1, "validation.userGroups.nameRequired").max(100),
   description: z.string().max(255).optional(),
   color: z
     .string()
-    .regex(/^#[0-9a-fA-F]{6}$/, "Invalid color")
+    .regex(/^#[0-9a-fA-F]{6}$/, "validation.userGroups.colorInvalid")
     .default("#6366f1"),
   memberIds: z.array(z.string()).default([]),
 });
@@ -88,7 +88,7 @@ export async function createUserGroup(data: UserGroupFormData) {
 
   const parsed = UserGroupFormSchema.safeParse(data);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0]?.message ?? "Invalid data" };
+    return { success: false, error: parsed.error.errors[0]?.message ?? "validation.userGroups.invalidData" };
   }
 
   const { name, description, color, memberIds } = parsed.data;
@@ -114,7 +114,7 @@ export async function updateUserGroup(id: string, data: UserGroupFormData) {
 
   const parsed = UserGroupFormSchema.safeParse(data);
   if (!parsed.success) {
-    return { success: false, error: parsed.error.errors[0]?.message ?? "Invalid data" };
+    return { success: false, error: parsed.error.errors[0]?.message ?? "validation.userGroups.invalidData" };
   }
 
   const { name, description, color, memberIds } = parsed.data;

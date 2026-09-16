@@ -98,7 +98,7 @@
   {
     "file": "src/lib/invoice-draft.ts",
     "description": "⚠️ si salva un codice Natura inesistente",
-    "find": "    if (nature && !Object.hasOwn(NATURE_CODES, nature)) return { ok: false, error: `Line ${n}: unknown Natura code.` };",
+    "find": "    if (nature && !Object.hasOwn(NATURE_CODES, nature))\n      return refuse(\"validation.invoices.lineNatureUnknown\", { line: n });",
     "replace": ""
   },
   {

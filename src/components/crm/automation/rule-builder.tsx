@@ -35,6 +35,7 @@ import {
   CONDITION_OPERATORS,
   ENTITY_FIELDS,
   OPERATORS_BY_TYPE,
+  ruleFormMessageKey,
   TARGET_ENTITIES,
   TRIGGER_EVENTS,
 } from "@/components/crm/automation/types";
@@ -321,6 +322,21 @@ function ListInput({
 
 type RouteDraft = { id: string; territoryIds: string[]; sources: string[]; userIds: string[] };
 
+/**
+ * A schema message in the reader's language.
+ *
+ * types.ts raises English, because the same schema validates on the server; the
+ * ones it owns are listed in RULE_FORM_MESSAGES and translated here. Anything else
+ * (zod's own defaults) is shown as it came.
+ */
+function useRuleFormMessage() {
+  const t = useTranslations("automation.ruleBuilder.validation");
+  return (text: string | undefined) => {
+    const key = ruleFormMessageKey(text);
+    return key ? t(key) : text;
+  };
+}
+
 function F({
   label,
   error,
@@ -332,6 +348,7 @@ function F({
   required?: boolean;
   children: React.ReactNode;
 }) {
+  const message = useRuleFormMessage();
   return (
     <div className="flex flex-col gap-1.5">
       <Label className="font-medium text-muted-foreground text-xs uppercase tracking-wide">
@@ -339,7 +356,7 @@ function F({
         {required && <span className="ml-0.5 text-destructive">*</span>}
       </Label>
       {children}
-      {error && <p className="text-destructive text-xs">{error}</p>}
+      {error && <p className="text-destructive text-xs">{message(error)}</p>}
     </div>
   );
 }
@@ -385,6 +402,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
   const t = useTranslations("automation.ruleBuilder");
   const tAutomation = useTranslations("automation");
   const tCommon = useTranslations("common");
+  const formMessage = useRuleFormMessage();
   const [open, setOpen] = useState(false);
   const [userList, setUserList] = useState<{ id: string; name: string | null; email: string | null }[]>([]);
   const [territoryList, setTerritoryList] = useState<{ id: string; name: string }[]>([]);
@@ -1451,7 +1469,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                     </Button>
                                   </div>
                                   {actionErrs?.routes?.message && (
-                                    <p className="text-destructive text-xs">{actionErrs.routes.message}</p>
+                                    <p className="text-destructive text-xs">{formMessage(actionErrs.routes.message)}</p>
                                   )}
                                   {routes.map((route, i) => {
                                     const routeErr = actionErrs?.routes?.[i];
@@ -1497,7 +1515,7 @@ export function RuleModal({ rule, children, onSaved }: RuleModalProps) {
                                           </div>
                                         </div>
                                         {routeErr?.message && (
-                                          <p className="text-destructive text-xs">{routeErr.message}</p>
+                                          <p className="text-destructive text-xs">{formMessage(routeErr.message)}</p>
                                         )}
                                         <F label={t("assign.territories")}>
                                           {territoryList.length === 0 ? (

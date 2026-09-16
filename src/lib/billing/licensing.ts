@@ -12,6 +12,7 @@ import { and, eq } from "drizzle-orm";
 
 import { platformDb } from "@/db";
 import { billingAuditLog, billingPlans, billingSubscriptions, billingTenantAddons } from "@/db/schema";
+import { serverT } from "@/lib/i18n-server";
 
 import type { PlanLimits, PlanModule, SubscriptionStatus } from "./plans-config";
 
@@ -174,10 +175,11 @@ export function invalidateAllCaches(): void {
 export async function requireModule(tenantId: string, module: PlanModule): Promise<void> {
   const ent = await getEntitlements(tenantId);
   if (!ent.isActive || ent.isSuspended) {
-    throw new EntitlementError(`Subscription inactive. Please update your billing.`);
+    throw new EntitlementError((await serverT())("plan.subscriptionInactive"));
   }
   if (!ent.enabledModules.includes(module)) {
-    throw new EntitlementError(`The "${module}" module is not available on your current plan. Please upgrade.`);
+    const t = await serverT();
+    throw new EntitlementError(t("plan.moduleUnavailable", { module: t(`plan.modules.${module}`) }));
   }
 }
 
@@ -193,15 +195,14 @@ export async function canAddUser(tenantId: string, currentActiveUsers: number): 
 export async function assertLimit(tenantId: string, metric: keyof PlanLimits, currentValue: number): Promise<void> {
   const ent = await getEntitlements(tenantId);
   if (!ent.isActive || ent.isSuspended) {
-    throw new EntitlementError("Subscription inactive. Please update your billing.");
+    throw new EntitlementError((await serverT())("plan.subscriptionInactive"));
   }
   const limit = ent.limits[metric];
   // Allow currentValue == limit (the tenant has exactly filled the quota).
   // Block when they would exceed it (currentValue is already at limit, next op would go over).
   if (limit !== null && currentValue >= limit) {
-    throw new EntitlementError(
-      `You have reached the ${metric} limit (${limit}) on your current plan. Please upgrade to continue.`,
-    );
+    const t = await serverT();
+    throw new EntitlementError(t("plan.limitReached", { metric: t(`plan.metrics.${metric}`), limit }));
   }
 }
 

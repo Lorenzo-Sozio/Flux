@@ -18,6 +18,7 @@ import {
   termsOf,
   today,
 } from "@/lib/contract-terms";
+import { serverT } from "@/lib/i18n-server";
 import { type ListParams, offsetOf, type Page, toPage } from "@/lib/pagination";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { getDb } from "@/lib/tenant-context";
@@ -220,7 +221,7 @@ export async function updateContract(id: string, input: ContractInput): Promise<
     .select({ status: contracts.status, cancelledAt: contracts.cancelledAt })
     .from(contracts)
     .where(eq(contracts.id, id));
-  if (!existing) return { ok: false, error: "This contract no longer exists." };
+  if (!existing) return { ok: false, error: (await serverT())("contracts.notFound") };
 
   const cancelling = cleaned.value.status === "cancelled";
   await db

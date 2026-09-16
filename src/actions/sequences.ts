@@ -6,6 +6,7 @@ import { and, asc, count, desc, eq, gte, sql } from "drizzle-orm";
 
 import { contacts, emailSequenceEnrollments, emailSequenceSteps, emailSequences, leads } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
+import { serverT } from "@/lib/i18n-server";
 import { tolerateUnmigrated } from "@/lib/schema-ready";
 import { cleanSequence, type SequenceEntity, type SequenceInput, type StopReason } from "@/lib/sequence-plan";
 import { enroll, stopEnrollments } from "@/lib/sequence-runner";
@@ -129,7 +130,7 @@ export async function saveSequence(id: string | null, input: SequenceInput): Pro
       .set({ ...fields, updatedAt: new Date() })
       .where(eq(emailSequences.id, sequenceId))
       .returning({ id: emailSequences.id });
-    if (updated.length === 0) return { ok: false, error: "This sequence no longer exists." };
+    if (updated.length === 0) return { ok: false, error: (await serverT())("sequences.notFound") };
   } else {
     const [row] = await db
       .insert(emailSequences)
@@ -195,15 +196,16 @@ export async function getSequencesForEnrolling(entity: SequenceEntity) {
   );
 }
 
+/** Why an enrollment was refused, as keys under `serverErrors.sequences.refusals`. */
 const REFUSALS: Record<string, string> = {
-  sequence_unavailable: "This sequence is paused, deleted, or for another kind of record.",
-  no_steps: "This sequence has no steps.",
-  already_enrolled: "Already in this sequence.",
-  unsubscribed: "This address has unsubscribed.",
-  bounced: "Email to this address bounces.",
-  missing_email: "This record has no email address.",
-  converted: "This lead has already been converted.",
-  record_deleted: "This record no longer exists.",
+  sequence_unavailable: "sequenceUnavailable",
+  no_steps: "noSteps",
+  already_enrolled: "alreadyEnrolled",
+  unsubscribed: "unsubscribed",
+  bounced: "bounced",
+  missing_email: "missingEmail",
+  converted: "converted",
+  record_deleted: "recordDeleted",
 };
 
 export async function enrollRecord(
@@ -215,7 +217,10 @@ export async function enrollRecord(
   await requirePlanModule("marketing");
   const db = await getDb();
   const result = await enroll(db, { sequenceId, entity, recordId, enrolledBy: actor.userId });
-  if (!result.ok) return { ok: false, error: REFUSALS[result.reason] ?? "Could not enroll." };
+  if (!result.ok) {
+    const t = await serverT("serverErrors.sequences");
+    return { ok: false, error: t(`refusals.${REFUSALS[result.reason] ?? "unknown"}`) };
+  }
   revalidatePath(`${PAGE}/${sequenceId}`);
   return { ok: true };
 }

@@ -1,0 +1,44 @@
+[
+  {
+    "file": "src/lib/pipeline-filters.ts",
+    "description": "⚠️⚠️ 'non assegnate' diventa IN (NULL): le trattative senza agente spariscono dal filtro che le chiede",
+    "find": "  if (unassigned) return isNull(column);",
+    "replace": "  if (unassigned) return inArray(column, owners);"
+  },
+  {
+    "file": "src/lib/pipeline-filters.ts",
+    "description": "⚠️ agenti e 'non assegnate' insieme: si perde una delle due metà",
+    "find": "  if (ids.length > 0 && unassigned) return or(inArray(column, ids), isNull(column));",
+    "replace": "  if (ids.length > 0 && unassigned) return inArray(column, ids);"
+  },
+  {
+    "file": "src/lib/pipeline-filters.ts",
+    "description": "⚠️ owners=all letto come un agente chiamato 'all': la pagina resta vuota",
+    "find": "  if (!raw || raw === ALL_OWNERS) return [];",
+    "replace": "  if (!raw) return [];"
+  },
+  {
+    "file": "src/lib/pipeline-filters.ts",
+    "description": "tutte le caselle spuntate scrivono ogni id invece di 'all'",
+    "find": "  if (everyone.length > 0 && everyone.every((id) => chosen.has(id))) return ALL_OWNERS;",
+    "replace": ""
+  },
+  {
+    "file": "src/lib/pipeline-filters.ts",
+    "description": "qualsiasi periodo passa, anche quelli non offerti",
+    "find": "    period: (PERIOD_OPTIONS as readonly number[]).includes(period) ? (period as PeriodDays) : (defaults.period ?? 90),",
+    "replace": "    period: (period || defaults.period || 90) as PeriodDays,"
+  },
+  {
+    "file": "src/lib/pipeline-filters.ts",
+    "description": "un id non valido arriva fino alla query",
+    "find": "    if (ID.test(id)) out.add(id);",
+    "replace": "    if (id) out.add(id);"
+  },
+  {
+    "file": "src/lib/territory-report-queries.ts",
+    "description": "⚠️ il report per territorio ignora il filtro agenti sulle trattative",
+    "find": "    .where(ownerCondition(deals.ownerId, owners))\n",
+    "replace": ""
+  }
+]

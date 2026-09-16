@@ -18,6 +18,8 @@
  * record.
  */
 
+import { type Refusal, refuse } from "@/lib/i18n-message";
+
 export interface TerritoryRule {
   id: string;
   name: string;
@@ -435,21 +437,19 @@ function cleanList(values: readonly string[], limit: number, each: (v: string) =
  * ⚠️ A territory with no criteria is refused rather than stored: it would cover
  * nothing, and it would sit in the list looking like it covers everything.
  */
-export function cleanTerritory(
-  input: TerritoryInput,
-): { ok: true; value: TerritoryInput } | { ok: false; error: string } {
+export function cleanTerritory(input: TerritoryInput): { ok: true; value: TerritoryInput } | Refusal {
   const name = input.name.trim().slice(0, 80);
-  if (!name) return { ok: false, error: "A territory needs a name." };
+  if (!name) return refuse("validation.territories.nameRequired");
 
   const countries = cleanList(input.countries, 250, (c) => c.trim().toUpperCase());
   const unknown = countries.filter((c) => !isCountryCode(c));
-  if (unknown.length) return { ok: false, error: `Not a country code: ${unknown.join(", ")}` };
+  if (unknown.length) return refuse("validation.territories.countryUnknown", { codes: unknown.join(", ") });
 
   const states = cleanList(input.states, 200, (s) => s.trim().slice(0, 80));
   const postalPrefixes = cleanList(input.postalPrefixes, 500, (p) => foldPostal(p).slice(0, 12));
 
   if (specificity({ countries, states, postalPrefixes }) === 0) {
-    return { ok: false, error: "Choose at least one country, province or region, or postal code prefix." };
+    return refuse("validation.territories.criteriaRequired");
   }
   const description = input.description?.trim().slice(0, 500) || null;
   return { ok: true, value: { name, description, countries, states, postalPrefixes } };

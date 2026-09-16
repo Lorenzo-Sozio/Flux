@@ -81,6 +81,25 @@ const CHART_ICONS: Record<ChartType, string> = {
   pie: "◑",
 };
 
+/**
+ * Labels for the registry in report-builder-config.ts, which carries English.
+ *
+ * Messages live under reports.builder.entities / fields / values; the English in
+ * the registry is the fallback, so a field added there without a translation
+ * still reads as a word rather than as a key path.
+ */
+function useReportLabels() {
+  const t = useTranslations("reports.builder");
+  const entity = (key: string, fallback?: string) =>
+    t.has(`entities.${key}`) ? t(`entities.${key}`) : (fallback ?? key);
+  const field = (key: string, fallback?: string) => (t.has(`fields.${key}`) ? t(`fields.${key}`) : (fallback ?? key));
+  const value = (entityKey: string, fieldKey: string, v: string) => {
+    const k = `values.${entityKey}.${fieldKey}.${v}`;
+    return t.has(k) ? t(k) : v;
+  };
+  return { entity, field, value };
+}
+
 function defaultConfig(entity: string): ReportConfig {
   return {
     entity,
@@ -105,15 +124,17 @@ interface Props {
 // ── FilterValueInput — defined outside parent to prevent re-mount on state change ──
 
 interface FilterValueInputProps {
+  entity: string;
   filter: FilterCondition;
   index: number;
   fields: EntityConfig["fields"];
   onUpdate: (i: number, patch: Partial<FilterCondition>) => void;
 }
 
-function FilterValueInput({ filter, index, fields, onUpdate }: FilterValueInputProps) {
+function FilterValueInput({ entity, filter, index, fields, onUpdate }: FilterValueInputProps) {
   const tUi = useTranslations("reports.builder.ui");
   const tCommon = useTranslations("common");
+  const labels = useReportLabels();
   if (filter.operator === "is_empty" || filter.operator === "is_not_empty") return null;
   const def = fields.find((f) => f.key === filter.field);
 
@@ -126,7 +147,7 @@ function FilterValueInput({ filter, index, fields, onUpdate }: FilterValueInputP
         <SelectContent>
           {def.enumValues.map((v) => (
             <SelectItem key={v} value={v}>
-              {v}
+              {labels.value(entity, def.key, v)}
             </SelectItem>
           ))}
         </SelectContent>
@@ -179,6 +200,10 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
   const firstEntity = Object.keys(entityConfigs)[0];
   const [config, setConfig] = useState<ReportConfig>(defaultConfig(firstEntity));
   const [result, setResult] = useState<ReportResult | null>(null);
+  // The config the result was computed from: headers are labelled from it, not
+  // from whatever the panel has been changed to since.
+  const [ranConfig, setRanConfig] = useState<ReportConfig | null>(null);
+  const labels = useReportLabels();
   const [saved, setSaved] = useState<SavedReport[]>(initialSaved);
   const [reportName, setReportName] = useState("");
   const [isRunning, setIsRunning] = useState(false);
@@ -236,6 +261,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
     try {
       const res = await runReport(config);
       setResult(res);
+      setRanConfig(config);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("runFailed"));
     } finally {
@@ -278,9 +304,43 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
     });
   }
 
+  /**
+   * A result column's header in the reader's language.
+   *
+   * The server labels columns with the registry's English; the keys it returns
+   * (`_group`, `_count`, `_agg`, or a field key) are enough to label them here.
+   */
+  function columnLabel(col: { key: string; label: string }): string {
+    const rc = ranConfig ?? config;
+    const defs = entityConfigs[rc.entity]?.fields ?? [];
+    if (col.key === "_count") return tUi("count");
+    if (col.key === "_group") {
+      const def = defs.find((f) => f.key === rc.groupBy);
+      const name = labels.field(rc.groupBy ?? "", def?.label ?? col.label);
+      if (def?.type !== "date") return name;
+      return tUi("groupColumn", { field: name, bucket: tUi(`bucketNames.${rc.groupByBucket ?? "month"}`) });
+    }
+    if (col.key === "_agg") {
+      const def = defs.find((f) => f.key === rc.aggregationField);
+      return tUi("aggColumn", {
+        fn: tUi(`aggregations.${rc.aggregation ?? "count"}`),
+        field: labels.field(rc.aggregationField ?? "", def?.label ?? ""),
+      }).trim();
+    }
+    return labels.field(col.key, col.label);
+  }
+
+  /** An enum group value in the reader's language; anything else as it came. */
+  function groupValue(v: unknown): string {
+    const rc = ranConfig ?? config;
+    if (v == null) return "—";
+    const def = entityConfigs[rc.entity]?.fields.find((f) => f.key === rc.groupBy);
+    return def?.type === "enum" ? labels.value(rc.entity, def.key, String(v)) : String(v);
+  }
+
   function exportCsv() {
     if (!result) return;
-    const header = result.columns.map((c) => `"${c.label}"`).join(",");
+    const header = result.columns.map((c) => `"${columnLabel(c).replace(/"/g, '""')}"`).join(",");
     const rows = result.rows.map((row) =>
       result.columns
         .map((c) => {
@@ -306,13 +366,14 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
   function renderChart() {
     if (!result || config.chartType === "table" || !config.groupBy) return null;
     const data = result.rows.map((r) => ({
-      name: String(r._group ?? "—"),
+      name: groupValue(r._group),
       count: Number(r._count ?? 0),
       ...(r._agg != null ? { agg: Number(r._agg) } : {}),
     }));
 
     const dataKey = result.columns.find((c) => c.key === "_agg") ? "agg" : "count";
-    const dataLabel = result.columns.find((c) => c.key === "_agg")?.label ?? tUi("count");
+    const aggColumn = result.columns.find((c) => c.key === "_agg");
+    const dataLabel = aggColumn ? columnLabel(aggColumn) : tUi("count");
 
     if (config.chartType === "pie") {
       return (
@@ -442,7 +503,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
               <SelectContent>
                 {Object.entries(entityConfigs).map(([key, ec]) => (
                   <SelectItem key={key} value={key}>
-                    {ec.label}
+                    {labels.entity(key, ec.label)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -469,8 +530,8 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                       onChange={() => toggleField(f.key)}
                       className="rounded"
                     />
-                    <span>{f.label}</span>
-                    <span className="ml-auto text-[10px] text-muted-foreground">{f.type}</span>
+                    <span>{labels.field(f.key, f.label)}</span>
+                    <span className="ml-auto text-[10px] text-muted-foreground">{tUi(`types.${f.type}`)}</span>
                   </label>
                 ))}
               </div>
@@ -501,7 +562,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                       <SelectContent>
                         {fields.map((d) => (
                           <SelectItem key={d.key} value={d.key}>
-                            {d.label}
+                            {labels.field(d.key, d.label)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -526,7 +587,13 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                       ))}
                     </SelectContent>
                   </Select>
-                  <FilterValueInput filter={f} index={i} fields={fields} onUpdate={updateFilter} />
+                  <FilterValueInput
+                    entity={config.entity}
+                    filter={f}
+                    index={i}
+                    fields={fields}
+                    onUpdate={updateFilter}
+                  />
                 </div>
               );
             })}
@@ -548,7 +615,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                 <SelectItem value="__none__">{t("groupByNone")}</SelectItem>
                 {groupableFields.map((f) => (
                   <SelectItem key={f.key} value={f.key}>
-                    {f.label}
+                    {labels.field(f.key, f.label)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -586,7 +653,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                   <SelectContent>
                     {["count", "sum", "avg", "min", "max"].map((fn) => (
                       <SelectItem key={fn} value={fn}>
-                        {fn.toUpperCase()}
+                        {tUi(`aggregations.${fn}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -602,7 +669,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                     <SelectContent>
                       {aggrFields.map((f) => (
                         <SelectItem key={f.key} value={f.key}>
-                          {f.label}
+                          {labels.field(f.key, f.label)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -652,7 +719,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                   </SelectTrigger>
                   <SelectContent>
                     {(config.fields.length > 0 ? config.fields : fields.map((f) => f.key)).map((k) => {
-                      const label = fields.find((f) => f.key === k)?.label ?? k;
+                      const label = labels.field(k, fields.find((f) => f.key === k)?.label);
                       return (
                         <SelectItem key={k} value={k}>
                           {label}
@@ -741,8 +808,11 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm text-muted-foreground">
                       {tUi("chartTitle", {
-                        entity: entityConfigs[config.entity]?.label ?? "",
-                        field: entityConfigs[config.entity]?.fields.find((f) => f.key === config.groupBy)?.label ?? "",
+                        entity: labels.entity(config.entity, entityConfigs[config.entity]?.label),
+                        field: labels.field(
+                          config.groupBy ?? "",
+                          entityConfigs[config.entity]?.fields.find((f) => f.key === config.groupBy)?.label,
+                        ),
                       })}
                     </CardTitle>
                   </CardHeader>
@@ -768,7 +838,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                                 key={col.key}
                                 className="text-left px-4 py-2.5 font-medium text-xs text-muted-foreground uppercase tracking-wide whitespace-nowrap"
                               >
-                                {col.label}
+                                {columnLabel(col)}
                               </th>
                             ))}
                           </tr>
@@ -780,6 +850,7 @@ export function ReportBuilderClient({ entityConfigs, savedReports: initialSaved 
                                 const v = row[col.key];
                                 let display: string;
                                 if (v == null) display = "—";
+                                else if (col.key === "_group") display = groupValue(v);
                                 else if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}T/.test(v))
                                   display = format.dateTime(new Date(v), { dateStyle: "short" });
                                 else if (typeof v === "boolean") display = v ? tCommon("yes") : tCommon("no");

@@ -70,7 +70,7 @@ export function PlaceholderHelp({ subject, body }: { subject: string; body: stri
           {PLACEHOLDERS.map((p) => (
             <li key={p.key} className="text-sm">
               <code className="rounded bg-background px-1 py-0.5 font-mono text-xs">{`{{${p.aliases[0]}}}`}</code>
-              <span className="ml-2 text-muted-foreground">{p.description}</span>
+              <span className="ml-2 text-muted-foreground">{t(`catalogue.${p.key}.description`)}</span>
             </li>
           ))}
         </ul>

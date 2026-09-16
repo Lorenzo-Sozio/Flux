@@ -32,7 +32,7 @@
   {
     "file": "src/lib/stamp-duty.ts",
     "description": "⚠️⚠️ la soglia si confronta sul totale della fattura invoce che sulle righe senza IVA",
-    "find": "    if (l.taxPercent !== 0) return;",
+    "find": "    if (row.rate !== 0) continue;",
     "replace": ""
   },
   {
@@ -44,8 +44,8 @@
   {
     "file": "src/lib/stamp-duty.ts",
     "description": "⚠️ lo sconto sul documento non riduce la base del bollo",
-    "find": "    const net = totals.lines[i].netAfterDocumentDiscount;",
-    "replace": "    const net = totals.lines[i].net;"
+    "find": "    discountPercent,\n  );\n  let base = 0;",
+    "replace": "    0,\n  );\n  let base = 0;"
   },
   {
     "file": "src/lib/stamp-duty.ts",

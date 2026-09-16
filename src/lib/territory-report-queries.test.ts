@@ -59,3 +59,13 @@ describe("deals by place", () => {
     expect(q).toContain(`coalesce(sum("deal"."amount") filter (where "deal"."status" = 'open'), 0)`);
   });
 });
+
+describe("for some agents", () => {
+  it("narrows leads and deals to their owners, and filters nothing for everyone", () => {
+    expect(flat(leadsByPlace(db, since, ["u1"]).toSQL().sql)).toContain('where "lead"."owner_id" in ($3)');
+    expect(flat(dealsByPlace(db, since, ["u1", "none"]).toSQL().sql)).toContain(
+      'where ("deal"."owner_id" in ($4) or "deal"."owner_id" is null)',
+    );
+    expect(flat(leadsByPlace(db, since).toSQL().sql)).not.toContain("owner_id");
+  });
+});

@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { Textarea } from "@/components/ui/textarea";
+import { useMessageText } from "@/hooks/use-message-text";
 import { countryCode, countryOptions, readStateEntry, territoryOf } from "@/lib/territory";
 
 interface Form {
@@ -45,6 +46,7 @@ const lines = (text: string) =>
 
 export function TerritoriesClient({ initial }: { initial: Territory[] }) {
   const t = useTranslations("settings.territories");
+  const say = useMessageText();
   const locale = useLocale();
   const [items, setItems] = useState<Territory[]>(initial);
   const [editing, setEditing] = useState<Territory | null>(null);
@@ -87,7 +89,7 @@ export function TerritoriesClient({ initial }: { initial: Territory[] }) {
       };
       const result = editing ? await updateTerritory(editing.id, input) : await createTerritory(input);
       if (!result.ok) {
-        toast.error(result.error);
+        toast.error(say(result));
         return;
       }
       setItems((prev) =>

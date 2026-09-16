@@ -92,7 +92,7 @@
   {
     "file": "src/lib/sequence-plan.ts",
     "description": "⚠️⚠️ si salva un passo con un segnaposto che nessuno compilera'",
-    "find": "    if (unknown.length) return { ok: false, error: `Step ${n} uses unknown placeholders: ${unknown.join(\", \")}` };",
+    "find": "    if (unknown.length)\n      return refuse(\"validation.sequences.stepUnknownPlaceholders\", { step: n, names: unknown.join(\", \") });",
     "replace": ""
   },
   {

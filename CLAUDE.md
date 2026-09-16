@@ -929,6 +929,31 @@ remain as aliases over `record:write` and `settings:manage`.
 | Automation Rules | `/dashboard/automation` | [src/actions/automation.ts](src/actions/automation.ts) |
 | Marketing | `/dashboard/marketing` | [src/actions/marketing.ts](src/actions/marketing.ts) |
 
+### One registry of entities
+
+[src/lib/entities.ts](src/lib/entities.ts) lists every kind of record once. Global
+search (one provider per type in `src/lib/search/providers.ts`), quick create and the
+recents list all read it. ⚠️ A new section is added **there**, not in three menus:
+`src/lib/entities.test.ts` fails when a type has no provider, no translation, a link to
+a page that does not exist, or a `[id]/page.tsx` without `<RecordVisit>`.
+
+### Pipeline filters
+
+Every page under `/dashboard/pipeline` reads the same URL parameters —
+`owners=a,b,none|all`, `period`, `status`, `q` — parsed and turned into SQL by
+[src/lib/pipeline-filters.ts](src/lib/pipeline-filters.ts), drawn once by the section
+layout. ⚠️ `none` is `IS NULL`, never `IN (NULL)`. `PIPELINE_VIEWS` says which controls
+each page has; a new page goes there.
+
+### Translations are checked on the screens, not only in the files
+
+`src/i18n/coverage.test.ts` runs `scripts/i18n-audit.mjs` (text typed into a component)
+and `scripts/i18n-keys-check.mjs` (a `t("key")` missing in either language). Zod
+messages are `validation.*` keys translated by `FormMessage` / `useMessageText`;
+messages a server action *returns* go through `serverT` in
+[src/lib/i18n-server.ts](src/lib/i18n-server.ts). A thrown message never reaches the
+screen in production, so it is not the place for user-facing text.
+
 ### Sidebar navigation
 
 Defined in [src/navigation/sidebar/sidebar-items.ts](src/navigation/sidebar/sidebar-items.ts) as typed `NavGroup[]`. Add new routes here to make them appear in the sidebar.

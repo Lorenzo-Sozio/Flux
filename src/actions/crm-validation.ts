@@ -8,7 +8,8 @@
  * wrong (audit rilievo M-08).
  *
  * Plain module, no `"use server"`: the same schemas are used by the client forms,
- * so a rule cannot be enforced on one side and forgotten on the other.
+ * so a rule cannot be enforced on one side and forgotten on the other. Messages are
+ * `validation.*` keys, translated where they are shown (see src/lib/i18n-message.ts).
  */
 import { z } from "zod";
 
@@ -27,7 +28,7 @@ const optionalEmail = z
   .optional()
   .nullable()
   .refine((v) => v == null || z.string().email().safeParse(v).success, {
-    message: "Enter a valid email address.",
+    message: "validation.crm.emailInvalid",
   });
 
 const optionalUrl = z
@@ -37,7 +38,7 @@ const optionalUrl = z
   .optional()
   .nullable()
   .refine((v) => v == null || /^https?:\/\/.+/.test(v), {
-    message: "Enter a full address, starting with http:// or https://",
+    message: "validation.crm.urlInvalid",
   });
 
 /** Accepts an array, or the comma-separated string the tag inputs produce. */
@@ -98,8 +99,8 @@ const consentFields = {
 // ─── Lead ─────────────────────────────────────────────────────────────────────
 
 export const LeadSchema = z.object({
-  firstName: z.string().trim().min(1, "First name is required."),
-  lastName: z.string().trim().min(1, "Last name is required."),
+  firstName: z.string().trim().min(1, "validation.crm.firstNameRequired"),
+  lastName: z.string().trim().min(1, "validation.crm.lastNameRequired"),
   jobTitle: optionalText,
   email: optionalEmail,
   phone: optionalText,
@@ -120,15 +121,15 @@ export const LeadSchema = z.object({
 });
 
 export const LeadUpdateSchema = LeadSchema.partial().extend({
-  firstName: z.string().trim().min(1, "First name is required.").optional(),
-  lastName: z.string().trim().min(1, "Last name is required.").optional(),
+  firstName: z.string().trim().min(1, "validation.crm.firstNameRequired").optional(),
+  lastName: z.string().trim().min(1, "validation.crm.lastNameRequired").optional(),
 });
 
 // ─── Contact ──────────────────────────────────────────────────────────────────
 
 export const ContactSchema = z.object({
-  firstName: z.string().trim().min(1, "First name is required."),
-  lastName: z.string().trim().min(1, "Last name is required."),
+  firstName: z.string().trim().min(1, "validation.crm.firstNameRequired"),
+  lastName: z.string().trim().min(1, "validation.crm.lastNameRequired"),
   jobTitle: optionalText,
   department: optionalText,
   email: optionalEmail,
@@ -146,14 +147,14 @@ export const ContactSchema = z.object({
 });
 
 export const ContactUpdateSchema = ContactSchema.partial().extend({
-  firstName: z.string().trim().min(1, "First name is required.").optional(),
-  lastName: z.string().trim().min(1, "Last name is required.").optional(),
+  firstName: z.string().trim().min(1, "validation.crm.firstNameRequired").optional(),
+  lastName: z.string().trim().min(1, "validation.crm.lastNameRequired").optional(),
 });
 
 // ─── Company ──────────────────────────────────────────────────────────────────
 
 export const CompanySchema = z.object({
-  name: z.string().trim().min(1, "Company name is required."),
+  name: z.string().trim().min(1, "validation.crm.companyNameRequired"),
   industry: optionalText,
   website: optionalUrl,
   description: optionalText,
@@ -186,7 +187,7 @@ export const CompanySchema = z.object({
 });
 
 export const CompanyUpdateSchema = CompanySchema.partial().extend({
-  name: z.string().trim().min(1, "Company name is required.").optional(),
+  name: z.string().trim().min(1, "validation.crm.companyNameRequired").optional(),
 });
 
 export type LeadInput = z.input<typeof LeadSchema>;

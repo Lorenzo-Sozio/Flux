@@ -22,6 +22,14 @@
  * Server Action and the component that called it.
  */
 
+/**
+ * The two sentences this module writes itself. Exported so a server caller can
+ * recognise them and put them in the reader's language (`guardedT` in
+ * src/lib/i18n-server.ts); this module cannot, because the browser imports it.
+ */
+export const VALIDATION_FALLBACK = "Some fields need attention.";
+export const UNKNOWN_FALLBACK = "Something went wrong on our side. Please try again.";
+
 export type ActionErrorCode = "FORBIDDEN" | "UNAUTHENTICATED" | "PLAN_LIMIT" | "VALIDATION" | "UNKNOWN";
 
 export interface ActionFailure {
@@ -56,13 +64,13 @@ export function toActionFailure(error: unknown): ActionFailure {
   }
   if (name === "ZodError") {
     const issues = (error as unknown as { errors?: { message?: string }[] }).errors ?? [];
-    return { ok: false, code: "VALIDATION", message: issues[0]?.message ?? "Some fields need attention." };
+    return { ok: false, code: "VALIDATION", message: issues[0]?.message ?? VALIDATION_FALLBACK };
   }
 
   // Anything else is genuinely unexpected. The real message goes to the server
   // log; the client gets something true but not internal.
   console.error("[action]", error);
-  return { ok: false, code: "UNKNOWN", message: "Something went wrong on our side. Please try again." };
+  return { ok: false, code: "UNKNOWN", message: UNKNOWN_FALLBACK };
 }
 
 /**

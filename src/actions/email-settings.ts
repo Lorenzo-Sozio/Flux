@@ -9,6 +9,7 @@ import { requireCapability } from "@/lib/auth-guard";
 import { changeFor } from "@/lib/email-credentials";
 import { type EmailConfig, testEmailConfig } from "@/lib/email-provider";
 import { chooseTestTarget } from "@/lib/email-test-target";
+import { serverT } from "@/lib/i18n-server";
 import { getDb } from "@/lib/tenant-context";
 
 // ─── Load current settings (secrets masked) ───────────────────────────────────
@@ -136,11 +137,9 @@ export async function testEmailConnection(data: {
 
   if (target.use === "refuse") {
     return {
-      error:
-        target.reason === "no-stored-config"
-          ? "There is no saved configuration to test."
-          : "You have changed the server, so its password has to be typed in before it can be tested. " +
-            "The saved one belongs to the previous server.",
+      error: (await serverT("serverErrors.emailSettings"))(
+        target.reason === "no-stored-config" ? "noStoredConfig" : "passwordRequiredForNewServer",
+      ),
     };
   }
 
@@ -172,6 +171,6 @@ export async function testEmailConnection(data: {
   // The test message goes to the person who asked for it, never to an address
   // supplied alongside someone else's credentials.
   const recipient = actor.email ?? data.testTo;
-  if (!recipient) return { error: "No address to send the test to." };
+  if (!recipient) return { error: (await serverT("serverErrors.emailSettings"))("noTestRecipient") };
   return testEmailConfig(config, recipient);
 }

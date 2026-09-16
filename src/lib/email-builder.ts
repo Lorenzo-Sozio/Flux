@@ -146,11 +146,61 @@ export const DEFAULT_SETTINGS: EmailSettings = {
   previewText: "",
 };
 
-export function defaultProps(type: BlockType): BlockProps {
+/**
+ * The words a new block starts with.
+ *
+ * They become the email's content the moment a block is added, so they are in
+ * the language of whoever is writing it: the builder passes them in from its
+ * messages (marketing.emailBuilder.defaults). The English here is the fallback.
+ */
+export interface BlockTextDefaults {
+  heading: string;
+  textHtml: string;
+  buttonLabel: string;
+  leftColumnHtml: string;
+  rightColumnHtml: string;
+  footerHtml: string;
+}
+
+export const DEFAULT_BLOCK_TEXT: BlockTextDefaults = {
+  heading: "Your Heading Here",
+  textHtml: "<p>Write your message here. Use <strong>bold</strong> or <em>italic</em> to highlight key points.</p>",
+  buttonLabel: "Click Here",
+  leftColumnHtml: "<p style='margin:0;'>Left column content</p>",
+  rightColumnHtml: "<p style='margin:0;'>Right column content</p>",
+  footerHtml: "<p>© 2025 Company Name. All rights reserved.</p>",
+};
+
+/** What `blockTextDefaults` needs from a next-intl translator scoped to marketing.emailBuilder. */
+export interface BlockTextTranslator {
+  (key: string, values?: Record<string, string | number>): string;
+  markup: (key: string, values: Record<string, (chunks: string) => string>) => string;
+}
+
+/** The default block text, in the language of the translator handed in. */
+export function blockTextDefaults(t: BlockTextTranslator, year = new Date().getFullYear()): BlockTextDefaults {
+  const p = (text: string) => `<p>${text}</p>`;
+  const tight = (text: string) => `<p style='margin:0;'>${text}</p>`;
+  return {
+    heading: t("defaults.heading"),
+    textHtml: p(
+      t.markup("defaults.text", {
+        strong: (chunks) => `<strong>${chunks}</strong>`,
+        em: (chunks) => `<em>${chunks}</em>`,
+      }),
+    ),
+    buttonLabel: t("defaults.button"),
+    leftColumnHtml: tight(t("defaults.leftColumn")),
+    rightColumnHtml: tight(t("defaults.rightColumn")),
+    footerHtml: p(t("defaults.footer", { year })),
+  };
+}
+
+export function defaultProps(type: BlockType, text: BlockTextDefaults = DEFAULT_BLOCK_TEXT): BlockProps {
   switch (type) {
     case "heading":
       return {
-        text: "Your Heading Here",
+        text: text.heading,
         level: "h2",
         align: "center",
         color: "#111827",
@@ -160,7 +210,7 @@ export function defaultProps(type: BlockType): BlockProps {
       } as HeadingProps;
     case "text":
       return {
-        html: "<p>Write your message here. Use <strong>bold</strong> or <em>italic</em> to highlight key points.</p>",
+        html: text.textHtml,
         align: "left",
         color: "#374151",
         backgroundColor: "#ffffff",
@@ -182,7 +232,7 @@ export function defaultProps(type: BlockType): BlockProps {
       } as ImageProps;
     case "button":
       return {
-        label: "Click Here",
+        label: text.buttonLabel,
         href: "#",
         bgColor: "#2563eb",
         textColor: "#ffffff",
@@ -208,8 +258,8 @@ export function defaultProps(type: BlockType): BlockProps {
       } as SpacerProps;
     case "two_column":
       return {
-        leftHtml: "<p style='margin:0;'>Left column content</p>",
-        rightHtml: "<p style='margin:0;'>Right column content</p>",
+        leftHtml: text.leftColumnHtml,
+        rightHtml: text.rightColumnHtml,
         leftBg: "#ffffff",
         rightBg: "#f9fafb",
         gap: 2,
@@ -217,7 +267,7 @@ export function defaultProps(type: BlockType): BlockProps {
       } as TwoColumnProps;
     case "footer":
       return {
-        html: "<p>© 2025 Company Name. All rights reserved.</p>",
+        html: text.footerHtml,
         backgroundColor: "#f3f4f6",
         textColor: "#9ca3af",
         fontSize: 12,
@@ -231,19 +281,19 @@ export function defaultProps(type: BlockType): BlockProps {
   }
 }
 
-export function newBlock(type: BlockType): Block {
+export function newBlock(type: BlockType, text?: BlockTextDefaults): Block {
   return {
     id: Math.random().toString(36).slice(2, 9),
     type,
-    props: defaultProps(type),
+    props: defaultProps(type, text),
   };
 }
 
-export function emptyDesign(): EmailDesign {
+export function emptyDesign(text?: BlockTextDefaults): EmailDesign {
   return {
     version: 1,
     settings: { ...DEFAULT_SETTINGS },
-    blocks: [newBlock("heading"), newBlock("text"), newBlock("button"), newBlock("footer")],
+    blocks: [newBlock("heading", text), newBlock("text", text), newBlock("button", text), newBlock("footer", text)],
   };
 }
 
@@ -445,6 +495,8 @@ export function estimateHtmlSize(html: string): { bytes: number; kb: number; war
  */
 export const VARIABLES = PLACEHOLDERS.map((p) => ({
   key: `{{${p.aliases[0]}}}`,
+  /** For the label in the reader's language: placeholders.catalogue.<placeholder>. */
+  placeholder: p.key,
   label: p.label,
   description: p.description,
 }));

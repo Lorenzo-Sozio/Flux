@@ -21,6 +21,7 @@ import { sql } from "drizzle-orm";
 import { auth } from "@/auth";
 import { documents } from "@/db/schema";
 import { EntitlementError, requirePlanLimit } from "@/lib/auth-guard";
+import { serverT } from "@/lib/i18n-server";
 import { getStorage, newStorageKey } from "@/lib/storage";
 import { getDb } from "@/lib/tenant-context";
 
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
   // ── Auth ────────────────────────────────────────────────────────────────────
   const session = await auth();
   if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: (await serverT())("generic.unauthenticated") }, { status: 401 });
   }
   const userId = session.user.id;
 
@@ -119,7 +120,7 @@ export async function POST(req: NextRequest) {
   try {
     formData = await req.formData();
   } catch {
-    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("invalidRequest") }, { status: 400 });
   }
 
   const file = formData.get("file") as File | null;
@@ -128,33 +129,39 @@ export async function POST(req: NextRequest) {
 
   // ── Validate inputs ─────────────────────────────────────────────────────────
   if (!file) {
-    return NextResponse.json({ error: "No file provided." }, { status: 400 });
+    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("noFile") }, { status: 400 });
   }
   if (file.size === 0) {
-    return NextResponse.json({ error: "File is empty." }, { status: 400 });
+    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("emptyFile") }, { status: 400 });
   }
   if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "File too large (max 10 MB)." }, { status: 413 });
+    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("tooLarge") }, { status: 413 });
   }
   if (!entityType || !VALID_ENTITY_TYPES.has(entityType)) {
-    return NextResponse.json({ error: "Invalid entity type." }, { status: 400 });
+    return NextResponse.json(
+      { error: (await serverT("serverErrors.documents"))("invalidEntityType") },
+      { status: 400 },
+    );
   }
   if (!entityId || !/^[a-zA-Z0-9_-]{1,128}$/.test(entityId)) {
-    return NextResponse.json({ error: "Invalid entity ID." }, { status: 400 });
+    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("invalidEntityId") }, { status: 400 });
   }
 
   // ── MIME type check ─────────────────────────────────────────────────────────
   const declaredMime = file.type.toLowerCase().split(";")[0].trim();
   const allowedExts = ALLOWED[declaredMime];
   if (!allowedExts) {
-    return NextResponse.json({ error: `File type "${declaredMime}" is not allowed.` }, { status: 415 });
+    return NextResponse.json(
+      { error: (await serverT("serverErrors.documents"))("typeNotAllowed", { type: declaredMime }) },
+      { status: 415 },
+    );
   }
 
   // ── Extension check (cross-validate against MIME) ───────────────────────────
   const originalExt = extname(file.name).toLowerCase();
   if (!allowedExts.includes(originalExt)) {
     return NextResponse.json(
-      { error: `Extension "${originalExt}" does not match the declared file type.` },
+      { error: (await serverT("serverErrors.documents"))("extensionMismatch", { extension: originalExt }) },
       { status: 415 },
     );
   }
@@ -163,10 +170,7 @@ export async function POST(req: NextRequest) {
   const bytes = await file.arrayBuffer();
   const buffer = Buffer.from(bytes);
   if (!verifyMagicBytes(buffer, declaredMime)) {
-    return NextResponse.json(
-      { error: "File content does not match the declared type (magic bytes mismatch)." },
-      { status: 415 },
-    );
+    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("contentMismatch") }, { status: 415 });
   }
 
   // ── Plan storage quota ──────────────────────────────────────────────────────
@@ -202,7 +206,7 @@ export async function POST(req: NextRequest) {
     await storage.put(storageKey, new Uint8Array(buffer), declaredMime);
   } catch (err) {
     console.error("[documents] upload failed", { driver: storage.name, err });
-    return NextResponse.json({ error: "Upload failed. Please try again." }, { status: 500 });
+    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("uploadFailed") }, { status: 500 });
   }
 
   // ── Persist record ──────────────────────────────────────────────────────────
@@ -228,6 +232,6 @@ export async function POST(req: NextRequest) {
     // unreferenced bytes accruing cost. Remove it.
     await storage.delete(storageKey).catch(() => undefined);
     console.error("[documents] record insert failed", err);
-    return NextResponse.json({ error: "Failed to save document record." }, { status: 500 });
+    return NextResponse.json({ error: (await serverT("serverErrors.documents"))("saveFailed") }, { status: 500 });
   }
 }

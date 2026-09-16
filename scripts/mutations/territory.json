@@ -56,7 +56,7 @@
   {
     "file": "src/lib/territory.ts",
     "description": "⚠️ si salva un codice paese inesistente, che non abbinera' mai niente",
-    "find": "  if (unknown.length) return { ok: false, error: `Not a country code: ${unknown.join(\", \")}` };",
+    "find": "  if (unknown.length) return refuse(\"validation.territories.countryUnknown\", { codes: unknown.join(\", \") });",
     "replace": ""
   },
   {

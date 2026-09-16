@@ -130,7 +130,8 @@ export function LayoutControls() {
                               (resolvedThemeMode ?? "light") === "dark" ? preset.primary.dark : preset.primary.light,
                           }}
                         />
-                        {preset.label}
+                        {/* Preset names are names; only the generic one ("Default") is a word to translate. */}
+                        {t.has(`presets.${preset.value}`) ? t(`presets.${preset.value}`) : preset.label}
                       </SelectItem>
                     ))}
                   </SelectGroup>

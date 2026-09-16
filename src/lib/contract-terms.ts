@@ -13,6 +13,8 @@
  * make it 30 March for half the world.
  */
 
+import { type Refusal, refuse } from "@/lib/i18n-message";
+
 export const BILLING_PERIODS = ["monthly", "quarterly", "semiannual", "annual"] as const;
 export type BillingPeriod = (typeof BILLING_PERIODS)[number];
 
@@ -201,36 +203,36 @@ export interface ContractInput {
 export type CleanContract = Omit<ContractInput, "billingPeriod"> & { billingPeriod: BillingPeriod };
 
 /** A contract as it will be stored, or the reason it cannot be. */
-export function cleanContract(input: ContractInput): { ok: true; value: CleanContract } | { ok: false; error: string } {
+export function cleanContract(input: ContractInput): { ok: true; value: CleanContract } | Refusal {
   const title = input.title.trim().slice(0, 200);
-  if (!title) return { ok: false, error: "A contract needs a title." };
-  if (!input.companyId) return { ok: false, error: "A contract needs a company." };
-  if (!["draft", "active", "cancelled"].includes(input.status)) return { ok: false, error: "Unknown status." };
+  if (!title) return refuse("validation.contracts.titleRequired");
+  if (!input.companyId) return refuse("validation.contracts.companyRequired");
+  if (!["draft", "active", "cancelled"].includes(input.status)) return refuse("validation.contracts.statusUnknown");
   if (!(BILLING_PERIODS as readonly string[]).includes(input.billingPeriod)) {
-    return { ok: false, error: "Unknown billing period." };
+    return refuse("validation.contracts.billingPeriodUnknown");
   }
   if (!Number.isFinite(input.amount) || input.amount < 0) {
-    return { ok: false, error: "The recurring amount must be zero or more." };
+    return refuse("validation.contracts.amountNegative");
   }
-  if (!isDay(input.startDate)) return { ok: false, error: "The start date is not a valid date." };
+  if (!isDay(input.startDate)) return refuse("validation.contracts.startDateInvalid");
 
   const endDate = input.endDate || null;
   if (endDate !== null) {
-    if (!isDay(endDate)) return { ok: false, error: "The end date is not a valid date." };
-    if (endDate < input.startDate) return { ok: false, error: "The end date is before the start date." };
+    if (!isDay(endDate)) return refuse("validation.contracts.endDateInvalid");
+    if (endDate < input.startDate) return refuse("validation.contracts.endBeforeStart");
   }
 
   const noticeDays = Math.trunc(input.noticeDays);
-  if (!(noticeDays >= 0 && noticeDays <= 365)) return { ok: false, error: "Notice must be between 0 and 365 days." };
+  if (!(noticeDays >= 0 && noticeDays <= 365)) return refuse("validation.contracts.noticeRange");
 
   let renewalTermMonths: number | null = null;
   if (input.autoRenew) {
     // Renewing needs something to renew from and a length to renew by; without
     // either the contract would read as renewing while in fact simply expiring.
-    if (endDate === null) return { ok: false, error: "A contract that renews itself needs an end date." };
+    if (endDate === null) return refuse("validation.contracts.autoRenewNeedsEnd");
     renewalTermMonths = Math.trunc(Number(input.renewalTermMonths));
     if (!(renewalTermMonths >= 1 && renewalTermMonths <= 120)) {
-      return { ok: false, error: "The renewal length must be between 1 and 120 months." };
+      return refuse("validation.contracts.renewalTermRange");
     }
   }
 

@@ -11,8 +11,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useCurrency } from "@/hooks/use-currency";
 import { cn } from "@/lib/utils";
 
-const PERIODS = [30, 90, 365] as const;
-
 /** On the client because money is shown in the workspace currency, which lives in a client context. */
 export function TerritoryTable({ report, canManage }: { report: TerritoryReport; canManage: boolean }) {
   const t = useTranslations("pipeline.territories");
@@ -20,16 +18,6 @@ export function TerritoryTable({ report, canManage }: { report: TerritoryReport;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        {PERIODS.map((days) => (
-          <Button key={days} asChild size="sm" variant={report.days === days ? "default" : "outline"}>
-            <Link href={`?days=${days}`} scroll={false}>
-              {t("lastDays", { days })}
-            </Link>
-          </Button>
-        ))}
-      </div>
-
       {report.territoryCount === 0 && (
         <Card>
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
