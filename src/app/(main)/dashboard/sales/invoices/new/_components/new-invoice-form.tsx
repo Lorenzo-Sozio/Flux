@@ -251,7 +251,9 @@ export function NewInvoiceForm({
           {/* ── Customer ── */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{tn("customerTitle")}</CardTitle>
+              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                {tn("customerTitle")}
+              </CardTitle>
               <CardDescription>{tn("customerHint")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -360,7 +362,9 @@ export function NewInvoiceForm({
           {/* ── Lines ── */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{t("lines")}</CardTitle>
+              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                {t("lines")}
+              </CardTitle>
               <CardDescription>{tn("linesHint")}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
@@ -379,7 +383,9 @@ export function NewInvoiceForm({
           {/* ── Payment and details ── */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{tn("paymentTitle")}</CardTitle>
+              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                {tn("paymentTitle")}
+              </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
@@ -438,7 +444,9 @@ export function NewInvoiceForm({
           <div className="space-y-6 xl:sticky xl:top-20">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base">{tn("summaryTitle")}</CardTitle>
+                <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                  {tn("summaryTitle")}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <InvoiceTotals totals={totals} money={money} />
@@ -448,7 +456,9 @@ export function NewInvoiceForm({
             <Card>
               <CardHeader className="pb-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <CardTitle className="text-base">{t("stampTitle")}</CardTitle>
+                  <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                    {t("stampTitle")}
+                  </CardTitle>
                   <Badge variant={stamp.applied ? "secondary" : "outline"}>
                     {stamp.applied ? t("stampApplied") : t("stampNotApplied")}
                   </Badge>

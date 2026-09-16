@@ -35,12 +35,12 @@ const CUSTOM = "_custom";
 
 /**
  * One column template, shared by the header strip and every line, so the two
- * cannot drift apart. Below `xl` there is not enough room for nine columns, so a
+ * cannot drift apart. Below `2xl`, beside the summary column, there is not enough room for nine columns, so a
  * line folds: four fields to the row on a laptop, two on a phone, each under its
  * own label.
  */
 const LINE_GRID =
-  "grid grid-cols-2 gap-x-3 gap-y-3 lg:grid-cols-4 xl:grid-cols-[28px_minmax(0,1.6fr)_minmax(0,2fr)_76px_116px_84px_84px_minmax(92px,auto)_36px] xl:items-center xl:gap-x-2 xl:gap-y-0";
+  "grid grid-cols-2 gap-x-3 gap-y-3 lg:grid-cols-4 2xl:grid-cols-[28px_minmax(0,1.6fr)_minmax(0,2fr)_76px_116px_84px_84px_minmax(92px,auto)_36px] 2xl:items-center 2xl:gap-x-2 2xl:gap-y-0";
 
 const emptyLine = () => ({
   productId: "",
@@ -189,7 +189,7 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col gap-6">
         {/* ── The bar that stays put ─────────────────────────────────────── */}
-        <div className="-mx-4 -mt-4 md:-mx-6 md:-mt-6 sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/85 px-4 py-3 backdrop-blur-md md:px-6">
+        <div className="-mx-4 md:-mx-6 sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/85 px-4 py-3 backdrop-blur-md md:px-6">
           <div className="flex min-w-0 items-center gap-2">
             <Button
               asChild
@@ -226,467 +226,472 @@ export function NewQuoteForm({ initialData }: { initialData: FormData | null }) 
           </div>
         </div>
 
-        {/* ── Band one: who it is for, and what applies to all of it ─────── */}
-        <div className="grid gap-6 md:grid-cols-12">
-          <Card className="md:col-span-6">
-            <CardHeader>
-              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                {t("customerTitle")}
-              </CardTitle>
-              <CardDescription>{t("customerSubtitle")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="dealId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">
-                      {t("deal")} <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={(data?.deals ?? []).map((d) => ({ value: d.id, label: d.name }))}
-                        value={field.value}
-                        onChange={selectDeal}
-                        placeholder={t("dealPlaceholder")}
-                        searchPlaceholder={t("searchPlaceholder")}
-                        emptyText={t("dealEmpty")}
-                        className="h-9"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="companyId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">
-                      {t("company")} <span className="text-destructive">*</span>
-                    </FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={(data?.companies ?? []).map((c) => ({ value: c.id, label: c.name }))}
-                        value={field.value}
-                        onChange={(v) => {
-                          field.onChange(v);
-                          // A contact from the previous company is worse than none.
-                          form.setValue("contactId", "");
-                        }}
-                        placeholder={t("companyPlaceholder")}
-                        searchPlaceholder={t("searchPlaceholder")}
-                        emptyText={t("companyEmpty")}
-                        className="h-9"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="contactId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">{t("contact")}</FormLabel>
-                    <FormControl>
-                      <SearchableSelect
-                        options={contactOptions}
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder={t("contactPlaceholder")}
-                        searchPlaceholder={t("searchPlaceholder")}
-                        emptyText={companyId ? t("contactEmptyAtCompany") : t("contactEmpty")}
-                        className="h-9"
-                      />
-                    </FormControl>
-                    <p className="text-muted-foreground text-xs">{t("contactHint")}</p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-
-          {/* Three answers on each side, so the two cards end level. */}
-          <Card className="md:col-span-6">
-            <CardHeader>
-              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                {t("detailsTitle")}
-              </CardTitle>
-              <CardDescription>{t("detailsSubtitle")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="expiresAt"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">{t("expiresAt")}</FormLabel>
-                    <FormControl>
-                      <Input type="date" className="h-9" {...field} value={field.value ?? ""} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="discountPercent"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">{t("quoteDiscount")}</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        className="h-9 tabular-nums"
-                        {...field}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="taxPercent"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">{t("quoteTax")}</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        className="h-9 tabular-nums"
-                        {...field}
-                        onChange={(e) => field.onChange(e.target.valueAsNumber)}
-                      />
-                    </FormControl>
-                    <p className="text-muted-foreground text-xs">{t("quoteTaxHint")}</p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* ── Band two: what is being quoted ─────────────────────────────── */}
-        <Card>
-          <CardHeader className="flex flex-row items-start justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                {t("linesTitle")}
-              </CardTitle>
-              <CardDescription>{t("linesSubtitle")}</CardDescription>
-            </div>
-            <Button type="button" variant="outline" size="sm" className="gap-1.5" onClick={() => append(emptyLine())}>
-              <Plus className="h-3.5 w-3.5" /> {t("addLine")}
-            </Button>
-          </CardHeader>
-
-          <CardContent>
-            {/* Column names once, at the top, instead of on every field of every line. */}
-            <div
-              className={cn(
-                LINE_GRID,
-                "hidden border-b pb-2 font-medium text-[11px] text-muted-foreground uppercase tracking-wide xl:grid",
-              )}
-            >
-              <span />
-              <span>{t("product")}</span>
-              <span>{t("description")}</span>
-              <span>{t("qty")}</span>
-              <span>{t("unitPrice")}</span>
-              <span>{t("discountShort")}</span>
-              <span>{t("tax")}</span>
-              <span className="text-right">{t("lineTotal")}</span>
-              <span />
-            </div>
-
-            <div className="space-y-3 xl:space-y-0">
-              {fields.map((field, index) => {
-                const line = items?.[index];
-                const isCustom = !line?.productId;
-                const lineTotal =
-                  (Number(line?.quantity) || 0) *
-                  (Number(line?.unitPrice) || 0) *
-                  (1 - (Number(line?.discountPercent) || 0) / 100);
-
-                return (
-                  <div
-                    key={field.id}
-                    className="rounded-lg border bg-muted/20 p-3 xl:rounded-none xl:border-0 xl:border-b xl:bg-transparent xl:px-0 xl:py-2 xl:hover:bg-muted/20 xl:last:border-b-0"
-                  >
-                    {/* Narrow screens get the line's own header; wide ones read it off the row. */}
-                    <div className="mb-3 flex items-center justify-between gap-2 xl:hidden">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-muted-foreground text-xs">
-                          {t("line", { number: index + 1 })}
-                        </span>
-                        {isCustom && (
-                          <Badge
-                            variant="outline"
-                            className="h-5 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
-                          >
-                            {t("offCatalogue")}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="mr-1 font-semibold text-sm tabular-nums">{formatAmount(lineTotal)}</span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => remove(index)}
-                          disabled={fields.length === 1}
-                          aria-label={t("removeLine")}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className={LINE_GRID}>
-                      <span className="hidden text-muted-foreground text-xs tabular-nums xl:block">{index + 1}</span>
-
-                      <div className="col-span-2 space-y-1.5 xl:col-span-1 xl:space-y-0">
-                        <Label className="text-xs xl:hidden">{t("product")}</Label>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          {/* ── Main column: who it is for, what is quoted, on what terms ── */}
+          <div className="min-w-0 space-y-6 xl:col-span-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                  {t("customerTitle")}
+                </CardTitle>
+                <CardDescription>{t("customerSubtitle")}</CardDescription>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <FormField
+                    control={form.control}
+                    name="dealId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">
+                          {t("deal")} <span className="text-destructive">*</span>
+                        </FormLabel>
+                        <FormControl>
+                          <SearchableSelect
+                            options={(data?.deals ?? []).map((d) => ({ value: d.id, label: d.name }))}
+                            value={field.value}
+                            onChange={selectDeal}
+                            placeholder={t("dealPlaceholder")}
+                            searchPlaceholder={t("searchPlaceholder")}
+                            emptyText={t("dealEmpty")}
+                            className="h-9"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <FormField
+                  control={form.control}
+                  name="companyId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">
+                        {t("company")} <span className="text-destructive">*</span>
+                      </FormLabel>
+                      <FormControl>
                         <SearchableSelect
-                          options={[
-                            { value: CUSTOM, label: t("offCatalogue") },
-                            ...(data?.products ?? []).map((p) => ({ value: p.id, label: p.name })),
-                          ]}
-                          value={line?.productId || CUSTOM}
-                          onChange={(v) => selectProduct(index, v)}
-                          placeholder={t("offCatalogue")}
-                          searchPlaceholder={t("productSearchPlaceholder")}
-                          emptyText={t("productEmpty")}
+                          options={(data?.companies ?? []).map((c) => ({ value: c.id, label: c.name }))}
+                          value={field.value}
+                          onChange={(v) => {
+                            field.onChange(v);
+                            // A contact from the previous company is worse than none.
+                            form.setValue("contactId", "");
+                          }}
+                          placeholder={t("companyPlaceholder")}
+                          searchPlaceholder={t("searchPlaceholder")}
+                          emptyText={t("companyEmpty")}
                           className="h-9"
                         />
-                      </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="contactId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">{t("contact")}</FormLabel>
+                      <FormControl>
+                        <SearchableSelect
+                          options={contactOptions}
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          placeholder={t("contactPlaceholder")}
+                          searchPlaceholder={t("searchPlaceholder")}
+                          emptyText={companyId ? t("contactEmptyAtCompany") : t("contactEmpty")}
+                          className="h-9"
+                        />
+                      </FormControl>
+                      <p className="text-muted-foreground text-xs">{t("contactHint")}</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
 
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.description`}
-                        render={({ field: f }) => (
-                          <FormItem className="col-span-2 space-y-1.5 xl:col-span-1 xl:space-y-0">
-                            <FormLabel className="text-xs xl:hidden">
-                              {t("description")} <span className="text-destructive">*</span>
-                            </FormLabel>
-                            <FormControl>
-                              <Input className="h-9" placeholder={t("descriptionPlaceholder")} {...f} />
-                            </FormControl>
-                            <FormMessage className="text-[11px]" />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.quantity`}
-                        render={({ field: f }) => (
-                          <FormItem className="space-y-1.5 xl:space-y-0">
-                            <FormLabel className="text-xs xl:hidden">{t("qty")}</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="1"
-                                step="1"
-                                className="h-9 tabular-nums"
-                                {...f}
-                                onChange={(e) => f.onChange(e.target.valueAsNumber)}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.unitPrice`}
-                        render={({ field: f }) => (
-                          <FormItem className="space-y-1.5 xl:space-y-0">
-                            <FormLabel className="text-xs xl:hidden">{t("unitPrice")}</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                className="h-9 tabular-nums"
-                                {...f}
-                                onChange={(e) => f.onChange(e.target.valueAsNumber)}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.discountPercent`}
-                        render={({ field: f }) => (
-                          <FormItem className="space-y-1.5 xl:space-y-0">
-                            <FormLabel className="text-xs xl:hidden">{t("discount")}</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.1"
-                                className="h-9 tabular-nums"
-                                {...f}
-                                onChange={(e) => f.onChange(e.target.valueAsNumber)}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name={`items.${index}.taxPercent`}
-                        render={({ field: f }) => (
-                          <FormItem className="space-y-1.5 xl:space-y-0">
-                            <FormLabel className="text-xs xl:hidden">{t("tax")}</FormLabel>
-                            <FormControl>
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.1"
-                                className="h-9 tabular-nums"
-                                {...f}
-                                onChange={(e) => f.onChange(e.target.valueAsNumber)}
-                              />
-                            </FormControl>
-                          </FormItem>
-                        )}
-                      />
-
-                      <span className="hidden text-right font-semibold text-sm tabular-nums xl:block">
-                        {formatAmount(lineTotal)}
-                      </span>
-
-                      <div className="hidden items-center justify-end xl:flex">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => remove(index)}
-                          disabled={fields.length === 1}
-                          aria-label={t("removeLine")}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {fields.length === 0 && (
-              <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
-                <Package className="h-8 w-8 opacity-30" />
-                <p className="text-sm">{t("noLines")}</p>
-              </div>
-            )}
-
-            {/* A second way to add one, at the end, where the hand already is. */}
-            <Button
-              type="button"
-              variant="ghost"
-              className="mt-3 h-10 w-full gap-1.5 border border-dashed text-muted-foreground hover:text-foreground"
-              onClick={() => append(emptyLine())}
-            >
-              <Plus className="h-4 w-4" /> {t("addAnotherLine")}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* ── Band three: what to know about it, and what it comes to ────── */}
-        <div className="grid items-start gap-6 lg:grid-cols-12">
-          <Card className="lg:col-span-7 xl:col-span-8">
-            <CardHeader>
-              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                {t("notesTitle")}
-              </CardTitle>
-              <CardDescription>{t("notesSubtitle")}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex-1">
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <Textarea
-                        className="h-full min-h-[168px] resize-y leading-relaxed"
-                        placeholder={t("notesPlaceholder")}
-                        {...field}
-                        value={field.value ?? ""}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-
-          {/* The money, where the eye ends. */}
-          <Card className="lg:col-span-5 xl:col-span-4">
-            <CardHeader>
-              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                {t("summaryTitle")}
-              </CardTitle>
-              <CardDescription>{t("summarySubtitle")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2.5 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">{t("subtotal")}</span>
-                <span className="tabular-nums">{formatAmount(totals.subtotal)}</span>
-              </div>
-
-              {totals.discountAmount > 0 && (
-                <div className="flex items-center justify-between text-muted-foreground">
-                  <span>
-                    {t("discountAmount")} · {headerDiscount}%
-                  </span>
-                  <span className="tabular-nums">−{formatAmount(totals.discountAmount)}</span>
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                    {t("linesTitle")}
+                  </CardTitle>
+                  <CardDescription>{t("linesSubtitle")}</CardDescription>
                 </div>
-              )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => append(emptyLine())}
+                >
+                  <Plus className="h-3.5 w-3.5" /> {t("addLine")}
+                </Button>
+              </CardHeader>
 
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">{t("taxAmount")}</span>
-                <span className="tabular-nums">{formatAmount(totals.taxAmount)}</span>
-              </div>
+              <CardContent>
+                {/* Column names once, at the top, instead of on every field of every line. */}
+                <div
+                  className={cn(
+                    LINE_GRID,
+                    "hidden border-b pb-2 font-medium text-[11px] text-muted-foreground uppercase tracking-wide 2xl:grid",
+                  )}
+                >
+                  <span />
+                  <span>{t("product")}</span>
+                  <span>{t("description")}</span>
+                  <span>{t("qty")}</span>
+                  <span>{t("unitPrice")}</span>
+                  <span>{t("discountShort")}</span>
+                  <span>{t("tax")}</span>
+                  <span className="text-right">{t("lineTotal")}</span>
+                  <span />
+                </div>
 
-              <Separator className="my-1" />
+                <div className="space-y-3 2xl:space-y-0">
+                  {fields.map((field, index) => {
+                    const line = items?.[index];
+                    const isCustom = !line?.productId;
+                    const lineTotal =
+                      (Number(line?.quantity) || 0) *
+                      (Number(line?.unitPrice) || 0) *
+                      (1 - (Number(line?.discountPercent) || 0) / 100);
 
-              <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2.5">
-                <span className="font-semibold">{t("total")}</span>
-                <span className="font-bold text-lg tabular-nums">{formatAmount(totals.total)}</span>
-              </div>
-            </CardContent>
-          </Card>
+                    return (
+                      <div
+                        key={field.id}
+                        className="rounded-lg border bg-muted/20 p-3 2xl:rounded-none 2xl:border-0 2xl:border-b 2xl:bg-transparent 2xl:px-0 2xl:py-2 2xl:hover:bg-muted/20 2xl:last:border-b-0"
+                      >
+                        {/* Narrow screens get the line's own header; wide ones read it off the row. */}
+                        <div className="mb-3 flex items-center justify-between gap-2 2xl:hidden">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-muted-foreground text-xs">
+                              {t("line", { number: index + 1 })}
+                            </span>
+                            {isCustom && (
+                              <Badge
+                                variant="outline"
+                                className="h-5 border-amber-300 text-[10px] text-amber-700 dark:border-amber-800 dark:text-amber-400"
+                              >
+                                {t("offCatalogue")}
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="mr-1 font-semibold text-sm tabular-nums">{formatAmount(lineTotal)}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => remove(index)}
+                              disabled={fields.length === 1}
+                              aria-label={t("removeLine")}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className={LINE_GRID}>
+                          <span className="hidden text-muted-foreground text-xs tabular-nums 2xl:block">
+                            {index + 1}
+                          </span>
+
+                          <div className="col-span-2 space-y-1.5 2xl:col-span-1 2xl:space-y-0">
+                            <Label className="text-xs 2xl:hidden">{t("product")}</Label>
+                            <SearchableSelect
+                              options={[
+                                { value: CUSTOM, label: t("offCatalogue") },
+                                ...(data?.products ?? []).map((p) => ({ value: p.id, label: p.name })),
+                              ]}
+                              value={line?.productId || CUSTOM}
+                              onChange={(v) => selectProduct(index, v)}
+                              placeholder={t("offCatalogue")}
+                              searchPlaceholder={t("productSearchPlaceholder")}
+                              emptyText={t("productEmpty")}
+                              className="h-9"
+                            />
+                          </div>
+
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.description`}
+                            render={({ field: f }) => (
+                              <FormItem className="col-span-2 space-y-1.5 2xl:col-span-1 2xl:space-y-0">
+                                <FormLabel className="text-xs 2xl:hidden">
+                                  {t("description")} <span className="text-destructive">*</span>
+                                </FormLabel>
+                                <FormControl>
+                                  <Input className="h-9" placeholder={t("descriptionPlaceholder")} {...f} />
+                                </FormControl>
+                                <FormMessage className="text-[11px]" />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.quantity`}
+                            render={({ field: f }) => (
+                              <FormItem className="space-y-1.5 2xl:space-y-0">
+                                <FormLabel className="text-xs 2xl:hidden">{t("qty")}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min="1"
+                                    step="1"
+                                    className="h-9 tabular-nums"
+                                    {...f}
+                                    onChange={(e) => f.onChange(e.target.valueAsNumber)}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.unitPrice`}
+                            render={({ field: f }) => (
+                              <FormItem className="space-y-1.5 2xl:space-y-0">
+                                <FormLabel className="text-xs 2xl:hidden">{t("unitPrice")}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    className="h-9 tabular-nums"
+                                    {...f}
+                                    onChange={(e) => f.onChange(e.target.valueAsNumber)}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.discountPercent`}
+                            render={({ field: f }) => (
+                              <FormItem className="space-y-1.5 2xl:space-y-0">
+                                <FormLabel className="text-xs 2xl:hidden">{t("discount")}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                    className="h-9 tabular-nums"
+                                    {...f}
+                                    onChange={(e) => f.onChange(e.target.valueAsNumber)}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name={`items.${index}.taxPercent`}
+                            render={({ field: f }) => (
+                              <FormItem className="space-y-1.5 2xl:space-y-0">
+                                <FormLabel className="text-xs 2xl:hidden">{t("tax")}</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                    className="h-9 tabular-nums"
+                                    {...f}
+                                    onChange={(e) => f.onChange(e.target.valueAsNumber)}
+                                  />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+
+                          <span className="hidden text-right font-semibold text-sm tabular-nums 2xl:block">
+                            {formatAmount(lineTotal)}
+                          </span>
+
+                          <div className="hidden items-center justify-end 2xl:flex">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => remove(index)}
+                              disabled={fields.length === 1}
+                              aria-label={t("removeLine")}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {fields.length === 0 && (
+                  <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+                    <Package className="h-8 w-8 opacity-30" />
+                    <p className="text-sm">{t("noLines")}</p>
+                  </div>
+                )}
+
+                {/* A second way to add one, at the end, where the hand already is. */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="mt-3 h-10 w-full gap-1.5 border border-dashed text-muted-foreground hover:text-foreground"
+                  onClick={() => append(emptyLine())}
+                >
+                  <Plus className="h-4 w-4" /> {t("addAnotherLine")}
+                </Button>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                  {t("termsTitle")}
+                </CardTitle>
+                <CardDescription>{t("termsSubtitle")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <FormField
+                    control={form.control}
+                    name="expiresAt"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">{t("expiresAt")}</FormLabel>
+                        <FormControl>
+                          <Input type="date" className="h-9" {...field} value={field.value ?? ""} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="discountPercent"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">{t("quoteDiscount")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            className="h-9 tabular-nums"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="taxPercent"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs">{t("quoteTax")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            className="h-9 tabular-nums"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.valueAsNumber)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <p className="-mt-2 text-muted-foreground text-xs">{t("quoteTaxHint")}</p>
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-xs">{t("notes")}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          className="min-h-[120px] resize-y leading-relaxed"
+                          placeholder={t("notesPlaceholder")}
+                          {...field}
+                          value={field.value ?? ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ── Side column: the money, kept in view while the lines are written ── */}
+          <div className="min-w-0 xl:col-span-4">
+            <div className="space-y-6 xl:sticky xl:top-20">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                    {t("summaryTitle")}
+                  </CardTitle>
+                  <CardDescription>{t("summarySubtitle")}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2.5 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">{t("subtotal")}</span>
+                    <span className="tabular-nums">{formatAmount(totals.subtotal)}</span>
+                  </div>
+
+                  {totals.discountAmount > 0 && (
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>
+                        {t("discountAmount")} · {headerDiscount}%
+                      </span>
+                      <span className="tabular-nums">−{formatAmount(totals.discountAmount)}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">{t("taxAmount")}</span>
+                    <span className="tabular-nums">{formatAmount(totals.taxAmount)}</span>
+                  </div>
+
+                  <Separator className="my-1" />
+
+                  <div className="flex items-center justify-between rounded-lg bg-muted/40 px-3 py-2.5">
+                    <span className="font-semibold">{t("total")}</span>
+                    <span className="font-bold text-lg tabular-nums">{formatAmount(totals.total)}</span>
+                  </div>
+                </CardContent>
+                <div className="px-6 pb-6">
+                  <Button type="submit" disabled={submitting} className="w-full gap-2">
+                    {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                    {t("createQuote")}
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          </div>
         </div>
       </form>
     </Form>
