@@ -108,7 +108,7 @@ describe("where the customer's language reaches", () => {
   const read = (p: string) => readFileSync(p, "utf8").split("\r\n").join("\n");
 
   it("⚠️⚠️ the quote PDF, its print view, the public page and the email all take it", () => {
-    expect(read("src/app/api/quotes/[id]/pdf/route.tsx")).toContain("documentLanguage(q.company)");
+    expect(read("src/app/api/quotes/[id]/pdf/route.ts")).toContain("documentLanguage(q.company)");
     expect(read("src/app/api/quotes/[id]/route.ts")).toContain("documentLanguage(q.company)");
     expect(read("src/app/api/quotes/public/route.ts")).toContain("language: documentLanguage(quote.company)");
     expect(read("src/actions/quotes.ts")).toContain("const lang = documentLanguage(quote.company);");

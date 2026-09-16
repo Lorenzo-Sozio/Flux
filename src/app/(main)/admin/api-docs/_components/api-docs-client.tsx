@@ -4143,22 +4143,47 @@ const GROUPS: ApiGroup[] = [
         id: "quote-read",
         method: "GET",
         path: "/api/quotes/{id}",
-        summary: "Leggi un preventivo",
+        summary: "Stampa un preventivo",
         description:
-          "Il preventivo con le sue righe, usato dalle schermate interne. ⚠️ Lo vede chi ne è proprietario, chi possiede la trattativa collegata, o chi ha rango di amministratore nel workspace — non nella scala di piattaforma, che per ogni cliente vale «utente» e quindi non avrebbe mai concesso niente a nessuno.",
+          "La pagina HTML di stampa del preventivo, con il pulsante «Stampa / Salva come PDF». È scritta nella lingua del cliente (campo `language` dell'azienda, oppure dedotta dal paese) e gli importi sono nella valuta del preventivo, qualunque sia la lingua di chi la apre. ⚠️ La vede chi ne è proprietario, chi possiede la trattativa collegata, o chi ha rango di amministratore nel workspace.",
         auth: "session",
         parameters: [
           { name: "id", in: "path", required: true, type: "string", description: "Identificativo del preventivo" },
         ],
         responses: [
-          {
-            status: 200,
-            description: "Il preventivo",
-            example: JSON.stringify({ id: "qte_1a2b", quoteNumber: "Q-2026-014" }, null, 2),
-          },
+          { status: 200, description: "La pagina di stampa (text/html)", example: "<!DOCTYPE html>…" },
           { status: 401, description: "Sessione assente", example: "Unauthorized" },
           { status: 403, description: "Non è tuo e non hai il rango per vederlo", example: "Forbidden" },
           { status: 404, description: "Preventivo inesistente", example: "Not found" },
+        ],
+      },
+      {
+        id: "quote-pdf",
+        method: "GET",
+        path: "/api/quotes/{id}/pdf",
+        summary: "Scarica il PDF di un preventivo",
+        description:
+          "Il PDF del preventivo nella lingua del cliente e nella valuta del documento, intestato alla denominazione del profilo di fatturazione. Con una sessione lo scarica chi può vedere il preventivo; senza sessione serve il `token` pubblico del preventivo, lo stesso del link inviato al cliente, e il workspace è ricavato da quello.",
+        auth: "session",
+        parameters: [
+          { name: "id", in: "path", required: true, type: "string", description: "Identificativo del preventivo" },
+          {
+            name: "token",
+            in: "query",
+            required: false,
+            type: "string",
+            description: "Token pubblico del preventivo, per scaricarlo senza sessione",
+          },
+        ],
+        responses: [
+          {
+            status: 200,
+            description: "Il PDF (application/pdf), allegato come Preventivo-{numero}.pdf o Quote-{numero}.pdf",
+            example: "%PDF-1.7 …",
+          },
+          { status: 401, description: "Nessuna sessione e nessun token", example: "Unauthorized" },
+          { status: 403, description: "Token errato, o preventivo non visibile a chi lo chiede", example: "Forbidden" },
+          { status: 404, description: "Preventivo o token inesistente", example: "Not found" },
         ],
       },
       {

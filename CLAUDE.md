@@ -561,7 +561,7 @@ as they are now: `/api/invoices/{id}/xml` returns the same bytes next year.
 
 [src/lib/invoice-archive.ts](src/lib/invoice-archive.ts) keeps both files of an
 issued invoice in object storage: the XML, and the PDF from
-[src/components/pdf/invoice-pdf.tsx](src/components/pdf/invoice-pdf.tsx). Migration
+[src/lib/pdf/invoice-pdf.ts](src/lib/pdf/invoice-pdf.ts). Migration
 `0025_kept_as_it_was_sent` adds the keys, their SHA-256 and when a copy was emailed.
 
 ⚠️⚠️ **Written once, and the write decides.** Each archiving request uploads under
@@ -581,6 +581,23 @@ and this archive is not *conservazione sostitutiva*.
 `src/lib/invoice-archive.test.ts` runs on PGlite with an in-memory store;
 `scripts/mutations/invoice-archive.json` breaks the conditional record, the
 hash check and the draft refusal.
+
+### PDFs are drawn with pdf-lib, never @react-pdf
+
+⚠️⚠️ **@react-pdf/renderer cannot run on Workers.** Its layout engine is Yoga
+compiled to WebAssembly and instantiated from bytes at runtime, which Workers
+forbid ("Wasm code generation disallowed by embedder"). It rendered perfectly in
+Node and in every test, and every quote and invoice PDF answered 500 in
+production — found on 16 September 2026 by tailing the Worker, not by any test.
+[src/lib/pdf/](src/lib/pdf/) draws with pdf-lib, which is plain JavaScript;
+`src/lib/pdf/pdf.test.ts` fails if @react-pdf comes back.
+
+⚠️ The standard fonts encode WinAnsi only, and one character outside it (an
+emoji, "−", Intl's narrow no-break space) throws. `canvas.clean` replaces them.
+
+⚠️ A library that works in `npm test` is not evidence it works on Workers. Anything
+that renders, compresses or parses with WebAssembly has to be tried on the Worker
+itself (`npx wrangler tail flux`).
 
 ### Documents: the customer's language and the document's currency
 

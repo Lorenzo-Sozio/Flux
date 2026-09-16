@@ -1,0 +1,20 @@
+[
+  {
+    "file": "src/lib/pdf/canvas.ts",
+    "description": "⚠️⚠️ un carattere fuori da WinAnsi (emoji, meno tipografico) fa fallire tutto il PDF",
+    "find": "        return REPLACEMENTS[ch] ?? \"?\";",
+    "replace": "        return ch;"
+  },
+  {
+    "file": "src/lib/pdf/canvas.ts",
+    "description": "⚠️ le righe proseguono sotto il piè di pagina invece di andare a pagina nuova",
+    "find": "      if (c.y + height <= c.bottomLimit) return false;",
+    "replace": "      return false;"
+  },
+  {
+    "file": "src/lib/pdf/canvas.ts",
+    "description": "⚠️ una parola più larga della colonna non viene spezzata",
+    "find": "          if (!fits(piece + ch) && piece) {",
+    "replace": "          if (false) {"
+  }
+]

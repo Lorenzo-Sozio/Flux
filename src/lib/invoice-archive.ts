@@ -1,11 +1,7 @@
-import { createElement } from "react";
-
 import { randomUUID } from "node:crypto";
 
-import { renderToBuffer } from "@react-pdf/renderer";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
-import { InvoicePDF, type InvoicePdfData } from "@/components/pdf/invoice-pdf";
 import { invoices } from "@/db/schema";
 import { documentLanguage, INVOICE_TEXT } from "@/lib/document-language";
 import { type InvoiceLine, invoiceTotals } from "@/lib/fatturapa/totals";
@@ -16,6 +12,7 @@ import {
   type XmlInvoice,
   type XmlParty,
 } from "@/lib/fatturapa/xml";
+import { type InvoicePdfData, renderInvoicePdfDocument } from "@/lib/pdf/invoice-pdf";
 import { contentHash, getStorage, type StorageDriver } from "@/lib/storage";
 
 /**
@@ -122,9 +119,7 @@ export function fileNameOf(input: XmlInvoice, kind: ArchiveKind): string {
 }
 
 export async function renderInvoicePdf(input: XmlInvoice): Promise<Uint8Array> {
-  // biome-ignore lint/suspicious/noExplicitAny: renderToBuffer wants a <Document> element type
-  const element = createElement(InvoicePDF, { data: pdfDataOf(input) }) as any;
-  return new Uint8Array(await renderToBuffer(element));
+  return renderInvoicePdfDocument(pdfDataOf(input));
 }
 
 export async function buildFile(input: XmlInvoice, kind: ArchiveKind): Promise<Uint8Array> {

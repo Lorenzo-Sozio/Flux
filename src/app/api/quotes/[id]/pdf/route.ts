@@ -1,12 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-import { renderToBuffer } from "@react-pdf/renderer";
 import { desc, eq } from "drizzle-orm";
 
-import { QuotePDF } from "@/components/pdf/quote-pdf";
 import { quoteActivities, quotes } from "@/db/schema";
 import { getActor } from "@/lib/auth-guard";
 import { documentLanguage, QUOTE_TEXT } from "@/lib/document-language";
+import { renderQuotePdf } from "@/lib/pdf/quote-pdf";
 import { can } from "@/lib/permissions";
 import { sellerIdentity } from "@/lib/seller-identity";
 import { getDb } from "@/lib/tenant-context";
@@ -73,7 +72,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const lang = documentLanguage(q.company);
   const seller = await sellerIdentity(db, workspaceName);
   if (!seller.email && q.owner?.email) seller.email = q.owner.email;
-  const buffer = await renderToBuffer(<QuotePDF quote={q} seller={seller} lang={lang} />);
+  const buffer = await renderQuotePdf({ quote: q, seller, lang });
   const fileName = `${QUOTE_TEXT[lang].documentTitle}-${q.quoteNumber}`.replace(/[^A-Za-z0-9-]/g, "-");
 
   return new NextResponse(new Uint8Array(buffer), {
