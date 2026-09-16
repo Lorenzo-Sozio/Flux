@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { asc, eq } from "drizzle-orm";
 
-import { companies, contracts, users } from "@/db/schema";
+import { companies, contacts, contracts, users } from "@/db/schema";
 import { requireCapability, requirePlanModule } from "@/lib/auth-guard";
 import {
   type ContractInput,
@@ -105,6 +105,40 @@ export async function getRecurringRevenueSummary(): Promise<{ mrr: number; earni
     earning: phases.filter((p) => p === "active" || p === "renewal_due").length,
     renewalsDue: phases.filter((p) => p === "renewal_due").length,
   };
+}
+
+/** One contract, for the edit page. */
+export async function getContract(id: string) {
+  await requireCapability("record:read");
+  const db = await getDb();
+  const [row] = await db.select().from(contracts).where(eq(contracts.id, id));
+  return row ?? null;
+}
+
+/**
+ * The pickers the contract form needs, loaded on the server.
+ *
+ * Same reason as the quote form: fetching them from the browser draws the page with
+ * three empty selects and fills them a round trip later.
+ */
+export async function getContractFormData() {
+  await requireCapability("record:read");
+  await requirePlanModule("sales");
+  const db = await getDb();
+  const [companyList, contactList, userList] = await Promise.all([
+    db.select({ id: companies.id, name: companies.name }).from(companies).orderBy(asc(companies.name)),
+    db
+      .select({
+        id: contacts.id,
+        firstName: contacts.firstName,
+        lastName: contacts.lastName,
+        companyId: contacts.companyId,
+      })
+      .from(contacts)
+      .orderBy(asc(contacts.firstName), asc(contacts.lastName)),
+    db.select({ id: users.id, name: users.name, email: users.email }).from(users).orderBy(asc(users.name)),
+  ]);
+  return { companies: companyList, contacts: contactList, users: userList };
 }
 
 export async function createContract(input: ContractInput): Promise<ContractResult> {

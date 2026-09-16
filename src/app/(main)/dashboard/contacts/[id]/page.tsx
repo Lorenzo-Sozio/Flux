@@ -46,6 +46,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { companies, contacts } from "@/db/schema";
+import { getTenantEntitlements } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 
 const STATUS_STYLES: Record<string, string> = {
@@ -67,6 +68,9 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
   const session = await auth();
   const userId = session?.user?.id;
   const db = await getDb();
+  // Sequences belong to the marketing module: without it the button opens a
+  // dialog whose every action is refused by the server.
+  const hasMarketing = (await getTenantEntitlements().catch(() => null))?.enabledModules?.includes("marketing") ?? true;
 
   let contactRow: Awaited<ReturnType<typeof loadContact>>;
   let templates: Awaited<ReturnType<typeof getEmailTemplates>> = [];
@@ -164,7 +168,7 @@ export default async function ContactDetailPage({ params }: { params: Promise<{ 
                 </Button>
               </ContactModal>
               <SendEmailModal entity={cData} templates={templates} ownerId={userId} />
-              <EnrollInSequence entity="contact" recordId={cData.id} />
+              {hasMarketing && <EnrollInSequence entity="contact" recordId={cData.id} />}
             </div>
           </div>
         </CardContent>

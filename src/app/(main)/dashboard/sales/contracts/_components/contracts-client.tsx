@@ -9,7 +9,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
-import { type ContractRow, createContract, deleteContract, updateContract } from "@/actions/contracts";
+import { type ContractRow, deleteContract } from "@/actions/contracts";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,16 +23,9 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SearchableSelect } from "@/components/ui/searchable-select";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
-import { BILLING_PERIODS, type ContractPhase } from "@/lib/contract-terms";
+import type { ContractPhase } from "@/lib/contract-terms";
 import { cn } from "@/lib/utils";
 
 const VIEWS = ["all", "renewal_due", "active", "expired", "cancelled"] as const;
@@ -47,38 +40,6 @@ const PHASE_STYLE: Record<ContractPhase, string> = {
   cancelled: "text-muted-foreground line-through",
 };
 
-interface Form {
-  title: string;
-  companyId: string;
-  ownerId: string;
-  status: "draft" | "active" | "cancelled";
-  amount: string;
-  currency: string;
-  billingPeriod: string;
-  startDate: string;
-  endDate: string;
-  autoRenew: boolean;
-  renewalTermMonths: string;
-  noticeDays: string;
-  notes: string;
-}
-
-const EMPTY: Form = {
-  title: "",
-  companyId: "",
-  ownerId: "",
-  status: "active",
-  amount: "",
-  currency: "EUR",
-  billingPeriod: "annual",
-  startDate: new Date().toISOString().slice(0, 10),
-  endDate: "",
-  autoRenew: false,
-  renewalTermMonths: "12",
-  noticeDays: "30",
-  notes: "",
-};
-
 function inView(row: ContractRow, view: string): boolean {
   if (view === "all") return true;
   if (view === "active") return row.phase === "active" || row.phase === "upcoming";
@@ -87,15 +48,11 @@ function inView(row: ContractRow, view: string): boolean {
 
 export function ContractsClient({
   data,
-  companies,
-  users,
   view,
   canWrite,
   canDelete,
 }: {
   data: { rows: ContractRow[]; on: string; mrr: number };
-  companies: { id: string; name: string }[];
-  users: { id: string; name: string | null; email: string | null }[];
   view: string;
   canWrite: boolean;
   canDelete: boolean;
@@ -103,75 +60,11 @@ export function ContractsClient({
   const t = useTranslations("contracts");
   const router = useRouter();
   const { formatAmount } = useCurrency();
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<ContractRow | null>(null);
-  const [form, setForm] = useState<Form>(EMPTY);
-  const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const rows = data.rows.filter((r) => inView(r, view));
   const due = data.rows.filter((r) => r.phase === "renewal_due").length;
   const earning = data.rows.filter((r) => r.phase === "active" || r.phase === "renewal_due").length;
-  const set = (patch: Partial<Form>) => setForm((f) => ({ ...f, ...patch }));
-
-  const openCreate = () => {
-    setEditing(null);
-    setForm(EMPTY);
-    setOpen(true);
-  };
-
-  const openEdit = (row: ContractRow) => {
-    setEditing(row);
-    setForm({
-      title: row.title,
-      companyId: row.companyId ?? "",
-      ownerId: row.ownerId ?? "",
-      status: row.status as Form["status"],
-      amount: String(row.amount),
-      currency: row.currency,
-      billingPeriod: row.billingPeriod,
-      startDate: row.startDate,
-      endDate: row.endDate ?? "",
-      autoRenew: row.autoRenew,
-      renewalTermMonths: String(row.renewalTermMonths ?? 12),
-      noticeDays: String(row.noticeDays),
-      notes: row.notes ?? "",
-    });
-    setOpen(true);
-  };
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const input = {
-        title: form.title,
-        companyId: form.companyId,
-        ownerId: form.ownerId || null,
-        status: form.status,
-        amount: Number(form.amount.replace(",", ".")),
-        currency: form.currency,
-        billingPeriod: form.billingPeriod,
-        startDate: form.startDate,
-        endDate: form.endDate || null,
-        autoRenew: form.autoRenew,
-        renewalTermMonths: form.autoRenew ? Number(form.renewalTermMonths) : null,
-        noticeDays: Number(form.noticeDays),
-        notes: form.notes,
-      };
-      const result = editing ? await updateContract(editing.id, input) : await createContract(input);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
-      }
-      toast.success(t("saved"));
-      setOpen(false);
-      router.refresh();
-    } catch {
-      toast.error(t("failed"));
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const remove = async () => {
     if (!deleteId) return;
@@ -194,9 +87,11 @@ export function ContractsClient({
           <p className="text-muted-foreground text-sm">{t("subtitle")}</p>
         </div>
         {canWrite && (
-          <Button onClick={openCreate} className="gap-2">
-            <Plus className="h-4 w-4" />
-            {t("newContract")}
+          <Button asChild className="gap-2">
+            <Link href="/dashboard/sales/contracts/new">
+              <Plus className="h-4 w-4" />
+              {t("newContract")}
+            </Link>
           </Button>
         )}
       </div>
@@ -298,14 +193,10 @@ export function ContractsClient({
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1">
                         {canWrite && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => openEdit(row)}
-                            aria-label={t("edit")}
-                          >
-                            <Pencil className="h-3.5 w-3.5" />
+                          <Button asChild variant="ghost" size="icon" className="h-8 w-8">
+                            <Link href={`/dashboard/sales/contracts/${row.id}`} aria-label={t("edit")}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Link>
                           </Button>
                         )}
                         {canDelete && (
@@ -330,174 +221,6 @@ export function ContractsClient({
       </Card>
 
       <p className="text-muted-foreground text-xs">{t("footnote", { on: data.on })}</p>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>{editing ? t("edit") : t("newContract")}</DialogTitle>
-          </DialogHeader>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Label htmlFor="contract-title">{t("titleLabel")}</Label>
-              <Input
-                id="contract-title"
-                className="mt-1.5"
-                value={form.title}
-                placeholder={t("titlePlaceholder")}
-                onChange={(e) => set({ title: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>{t("company")}</Label>
-              <div className="mt-1.5">
-                <SearchableSelect
-                  options={companies.map((c) => ({ value: c.id, label: c.name }))}
-                  value={form.companyId}
-                  onChange={(companyId) => set({ companyId })}
-                  placeholder={t("chooseCompany")}
-                />
-              </div>
-            </div>
-            <div>
-              <Label>{t("owner")}</Label>
-              <div className="mt-1.5">
-                <SearchableSelect
-                  options={users.map((u) => ({ value: u.id, label: u.name ?? u.email ?? u.id }))}
-                  value={form.ownerId}
-                  onChange={(ownerId) => set({ ownerId })}
-                  placeholder={t("ownerDefault")}
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="contract-amount">{t("amountLabel")}</Label>
-              <Input
-                id="contract-amount"
-                className="mt-1.5"
-                inputMode="decimal"
-                value={form.amount}
-                onChange={(e) => set({ amount: e.target.value })}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>{t("period")}</Label>
-                <Select value={form.billingPeriod} onValueChange={(billingPeriod) => set({ billingPeriod })}>
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BILLING_PERIODS.map((p) => (
-                      <SelectItem key={p} value={p}>
-                        {t(`periods.${p}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="contract-currency">{t("currency")}</Label>
-                <Input
-                  id="contract-currency"
-                  className="mt-1.5 uppercase"
-                  maxLength={3}
-                  value={form.currency}
-                  onChange={(e) => set({ currency: e.target.value })}
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="contract-start">{t("startDate")}</Label>
-              <Input
-                id="contract-start"
-                type="date"
-                className="mt-1.5"
-                value={form.startDate}
-                onChange={(e) => set({ startDate: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="contract-end">{t("endDate")}</Label>
-              <Input
-                id="contract-end"
-                type="date"
-                className="mt-1.5"
-                value={form.endDate}
-                onChange={(e) => set({ endDate: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="contract-notice">{t("noticeDays")}</Label>
-              <Input
-                id="contract-notice"
-                type="number"
-                min={0}
-                max={365}
-                className="mt-1.5"
-                value={form.noticeDays}
-                onChange={(e) => set({ noticeDays: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>{t("statusLabel")}</Label>
-              <Select value={form.status} onValueChange={(status) => set({ status: status as Form["status"] })}>
-                <SelectTrigger className="mt-1.5">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(["draft", "active", "cancelled"] as const).map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {t(`statuses.${s}`)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2 sm:col-span-2">
-              <Checkbox
-                id="contract-autorenew"
-                checked={form.autoRenew}
-                onCheckedChange={(on) => set({ autoRenew: on === true })}
-              />
-              <Label htmlFor="contract-autorenew" className="cursor-pointer">
-                {t("autoRenewLabel")}
-              </Label>
-              {form.autoRenew && (
-                <div className="flex items-center gap-2">
-                  <Input
-                    aria-label={t("renewalMonths")}
-                    type="number"
-                    min={1}
-                    max={120}
-                    className="h-8 w-20"
-                    value={form.renewalTermMonths}
-                    onChange={(e) => set({ renewalTermMonths: e.target.value })}
-                  />
-                  <span className="text-muted-foreground text-sm">{t("renewalMonths")}</span>
-                </div>
-              )}
-            </div>
-            <div className="sm:col-span-2">
-              <Label htmlFor="contract-notes">{t("notes")}</Label>
-              <Textarea
-                id="contract-notes"
-                rows={3}
-                className="mt-1.5"
-                value={form.notes}
-                onChange={(e) => set({ notes: e.target.value })}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)}>
-              {t("cancel")}
-            </Button>
-            <Button onClick={save} disabled={saving}>
-              {saving ? t("saving") : t("save")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <AlertDialog open={!!deleteId} onOpenChange={(o) => !o && setDeleteId(null)}>
         <AlertDialogContent>

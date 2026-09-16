@@ -47,6 +47,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { companies, contacts, deals, leads } from "@/db/schema";
+import { getTenantEntitlements } from "@/lib/auth-guard";
 import { getDb } from "@/lib/tenant-context";
 
 import { ConvertLeadButton } from "./_components/convert-lead-button";
@@ -96,6 +97,9 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   const session = await auth();
   const userId = session?.user?.id;
   const db = await getDb();
+  // Sequences belong to the marketing module: without it the button opens a
+  // dialog whose every action is refused by the server.
+  const hasMarketing = (await getTenantEntitlements().catch(() => null))?.enabledModules?.includes("marketing") ?? true;
 
   let lead: typeof leads.$inferSelect | undefined;
   let templates: Awaited<ReturnType<typeof getEmailTemplates>> = [];
@@ -237,7 +241,7 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
                 </Button>
               </LeadModal>
               <SendEmailModal entity={lead} templates={templates} ownerId={userId} />
-              {!lead.isConverted && <EnrollInSequence entity="lead" recordId={lead.id} />}
+              {hasMarketing && !lead.isConverted && <EnrollInSequence entity="lead" recordId={lead.id} />}
               {!lead.isConverted && (
                 <ConvertLeadButton
                   leadId={lead.id}
