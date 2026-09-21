@@ -89,8 +89,15 @@ function carico(src: string, inizio: number): string {
  * `quote-events.ts`, which announces from a lib rather than an action. A test that has to
  * be told where to look proves only that somebody remembered to tell it.
  */
-const SORGENTI = ["src/actions/pipeline.ts", "src/actions/orders.ts", "src/lib/quote-events.ts"];
-const EVENTI_SULLA_PERSONA = ['"deal.won"', '"deal.lost"', '"quote.sent"', '"quote.accepted"'];
+const SORGENTI = [
+  "src/actions/pipeline.ts",
+  "src/actions/orders.ts",
+  "src/lib/quote-events.ts",
+  // ⚠️ Converting a lead is about a person too, and it was the one event of this set that
+  // travelled with ids only: the receiver could not place the human being and dropped it.
+  "src/actions/crm.ts",
+];
+const EVENTI_SULLA_PERSONA = ['"deal.won"', '"deal.lost"', '"quote.sent"', '"quote.accepted"', '"lead.converted"'];
 
 describe("⚠️⚠️ every event about a person says which person", () => {
   const siti: [string, string][] = [];
@@ -105,9 +112,10 @@ describe("⚠️⚠️ every event about a person says which person", () => {
   it("finds every one there is", () => {
     // Five ways a deal closes — dragged into a terminal column, saved as won, saved as
     // lost, closed as lost without a losing column, an accepted quote turning into an
-    // order — plus the quote leaving and the customer answering. If a new one appears this
-    // number moves and the author has to read the test below, which is the point of it.
-    expect(siti).toHaveLength(7);
+    // order — plus the quote leaving, the customer answering, and the salesperson taking the
+    // lead on. If a new one appears this number moves and the author has to read the test
+    // below, which is the point of it.
+    expect(siti).toHaveLength(8);
   });
 
   it.each(siti.map(([f, p], n) => [n, f, p] as const))("site %i in %s carries the person", (_n, _f, payload) => {

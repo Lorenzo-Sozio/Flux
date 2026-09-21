@@ -34,6 +34,7 @@ import {
 } from "@/db/schema";
 import { requireCapability, requirePlanLimit, requireWriteAccess } from "@/lib/auth-guard";
 import { isSameCompanyName, normalizeCompanyName } from "@/lib/company-name";
+import { contactReach } from "@/lib/contact-reach";
 import {
   buildWhereClause,
   COMPANY_FIELDS,
@@ -431,11 +432,20 @@ export async function convertLead(leadId: string, shouldCreateDeal: boolean) {
 
   const result = { contactId, companyId, dealId };
 
+  // ⚠️⚠️ **Who this is about, not just which rows moved.** The payload used to carry ids
+  // only, and ours mean nothing outside this database: a subscriber heard "a lead was
+  // converted" and could not tell **which person**, so it dropped the fact. The VoipAI
+  // assistant, which delivers and chases the quote this salesperson is about to write, never
+  // learned that the trattativa had started — measured on its side on 2026-09-16, where the
+  // event was discarded for having no recapito. Same `contactReach` as every quote and deal
+  // event: the telephone number and the email are what both sides already know.
+  const reach = await contactReach(db, result.contactId);
   dispatchWebhook("lead.converted", {
     leadId,
     contactId: result.contactId,
     companyId: result.companyId,
     dealId: result.dealId,
+    ...reach,
     // biome-ignore lint/suspicious/noEmptyBlockStatements: fire-and-forget
   }).catch(() => {});
 
