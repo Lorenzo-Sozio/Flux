@@ -132,8 +132,15 @@
   // ⚠️ Il piano Free consente 5 Cron Trigger per account. I sette job dell'app sono
   // raggruppati in cinque schedule proprio per starci dentro; aggiungerne uno sesto
   // richiede Workers Paid.
+  //
+  // ⚠️⚠️ La frequenza qui decide la bolletta del database, non solo la reattività:
+  // ogni esecuzione sveglia il Postgres serverless, che si sospende dopo qualche
+  // minuto di silenzio e si paga a tempo di attività. Il job ogni minuto lo teneva
+  // sveglio ventiquattro ore su ventiquattro e ha esaurito il piano gratuito in
+  // sedici giorni, senza un solo utente collegato: da lì in poi ogni pagina
+  // risponde 402 e sembra un guasto dell'applicazione.
   "triggers": {
-    "crons": ["* * * * *", "*/5 * * * *", "*/15 * * * *", "0 6 * * *", "0 3 * * *"]
+    "crons": ["*/10 * * * *", "0 6 * * *", "0 3 * * *"]
   },
 
   // One bucket, two bindings, and exactly one `r2_buckets` key.

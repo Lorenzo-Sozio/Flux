@@ -80,21 +80,36 @@ Outside the dashboard the tenant comes from the data, not from the request:
 opaque token (see [src/lib/tenant-resolve.ts](src/lib/tenant-resolve.ts)).
 
 ```
-webhook-retry        every 5 minutes   redelivers failed webhook events
-email-worker         every minute      sends queued emails; queues due follow-up sequence steps
-campaign-scheduler   every 5 minutes   starts due campaigns
-task-reminders       every 15 minutes  reminds about tasks
-ticket-sla-check     every 15 minutes  flags tickets past their SLA
+email-worker         every 10 minutes  sends queued emails; queues due follow-up sequence steps
+webhook-retry        every 10 minutes  redelivers failed webhook events
+campaign-scheduler   every 10 minutes  starts due campaigns
+task-reminders       every 10 minutes  reminds about tasks
+ticket-sla-check     every 10 minutes  flags tickets past their SLA
 task-overdue-check   daily at 06:00    flags overdue tasks; tells owners of contracts due for renewal
 ticket-autoclose     daily at 03:00    closes resolved tickets
 idempotency-sweep    daily at 03:00    forgets Idempotency-Keys older than 30 days
 ```
 
-⚠️ Two jobs share `0 3 * * *` because the Free plan allows five cron *triggers*
-per account and all five are spoken for. Another job on an existing schedule is
-free; a sixth schedule is not. `src/lib/repeating-jobs.test.ts` checks this table
-against custom-worker.ts, because a table that quietly stops listing a job is how
-somebody concludes the job does not exist.
+⚠️⚠️ **The frequency of these is a database bill, not just a latency.** Serverless
+Postgres (Neon here) suspends its compute after a few minutes of silence and charges
+for the time it is awake. `email-worker` ran every minute, so it woke the platform
+database *and every workspace's* around the clock: about 180 CU-hours a month against
+a free allowance of 100, exhausted around day sixteen — on a deployment nobody was
+using. Neon then answers **HTTP 402 on every query**, which reaches the screen as
+"This page couldn't load" and reads exactly like a broken application. It happened on
+22 September 2026.
+
+So the five frequent jobs share one ten-minute schedule: six wakes an hour instead of
+sixty, roughly 90 CU-hours a month, and a queued email leaves within ten minutes
+rather than one. ⚠️ That leaves little headroom on the free plan for anything else —
+browsing the dashboard wakes the same compute. A deployment on a paid plan, or one
+whose database is busy anyway, should put `email-worker` back to `* * * * *`.
+
+⚠️ Jobs share schedules rather than taking one each because the Free plan allows five
+cron *triggers* per account. Another job on an existing schedule is free; a sixth
+schedule is not. `src/lib/repeating-jobs.test.ts` checks this table against
+custom-worker.ts, because a table that quietly stops listing a job is how somebody
+concludes the job does not exist.
 
 ⚠️ `webhook-retry` is what makes outgoing events at-least-once instead of
 at-most-once. Without it a lost event is lost, and whoever was waiting for it has no

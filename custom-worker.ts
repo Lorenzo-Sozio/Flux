@@ -33,13 +33,30 @@ import { default as handler } from "./.open-next/worker.js";
  * occupano cinque Cron Trigger.
  */
 const CRON_JOBS: Record<string, readonly string[]> = {
-  "* * * * *": ["/api/cron/email-worker"],
-  "*/5 * * * *": ["/api/cron/webhook-retry", "/api/cron/campaign-scheduler"],
-  "*/15 * * * *": ["/api/cron/task-reminders", "/api/cron/ticket-sla-check"],
+  // ⚠️⚠️ **Every frequent job on one schedule, and that schedule as rare as the
+  // product can stand.** Not to save cron triggers — those were never the scarce
+  // thing — but because each run wakes the database. Serverless Postgres suspends
+  // its compute after a few minutes of silence and bills for the time it is awake,
+  // so a job every minute kept every workspace's database awake around the clock
+  // and burned a month of the free allowance in about sixteen days, on a
+  // deployment nobody was using. The product then answers HTTP 402 on every page,
+  // which looks like the application breaking and is not.
+  //
+  // Ten minutes is the figure this deployment chose: the database wakes six times
+  // an hour instead of sixty. The cost is latency — a queued email leaves within
+  // ten minutes rather than within one, and an SLA breach is noticed just as late.
+  // A deployment whose database is awake anyway should put this back to a minute.
+  "*/10 * * * *": [
+    "/api/cron/email-worker",
+    "/api/cron/webhook-retry",
+    "/api/cron/campaign-scheduler",
+    "/api/cron/task-reminders",
+    "/api/cron/ticket-sla-check",
+  ],
   "0 6 * * *": ["/api/cron/task-overdue-check"],
-  // Two jobs on one schedule: the Free plan allows five cron triggers per account
-  // and all five are spoken for, so a sixth *schedule* needs Workers Paid while
-  // another job on an existing one is free.
+  // Two jobs on one schedule: the Free plan allows five cron triggers per account,
+  // so a sixth *schedule* needs Workers Paid while another job on an existing one
+  // is free.
   "0 3 * * *": ["/api/cron/ticket-autoclose", "/api/cron/idempotency-sweep"],
 };
 
