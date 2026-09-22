@@ -14,7 +14,7 @@ import { useEffect, useRef } from "react";
  *
  * Three changes, none of which need an event stream:
  *
- *  • A hidden tab does not poll at all. Nothing it learns can be seen.
+ *  • A hidden tab barely polls. Nothing it learns can be seen.
  *  • Becoming visible polls immediately, so coming back to the tab is not a wait.
  *  • A tick that finds nothing backs off, up to a ceiling; a tick that finds
  *    something resets to the fast rate. Quiet periods cost little and busy ones
@@ -23,11 +23,23 @@ import { useEffect, useRef } from "react";
  * `tick` returns whether it found anything. Returning `false` from a tick that
  * failed is right: a failure is not news.
  */
+/**
+ * ⚠️⚠️ **How rarely a hidden tab asks is a database bill.** Serverless Postgres
+ * suspends its compute after a few minutes of silence and charges for the time it is
+ * awake — five minutes on Neon's free plan, which is exactly what `maxMs` was. A tab
+ * left open overnight in a window nobody was looking at therefore woke the database
+ * just before it could sleep, all night, every night: the compute never suspended and
+ * a month's free allowance went in about a fortnight, with no user and no request
+ * anybody made on purpose. The figure has to sit *above* the database's idle timeout,
+ * not on it.
+ */
+const HIDDEN_MS = 30 * 60_000;
+
 export function useLivePoll(
   tick: () => Promise<boolean>,
-  options: { baseMs?: number; maxMs?: number; enabled?: boolean } = {},
+  options: { baseMs?: number; maxMs?: number; hiddenMs?: number; enabled?: boolean } = {},
 ): void {
-  const { baseMs = 30_000, maxMs = 5 * 60_000, enabled = true } = options;
+  const { baseMs = 30_000, maxMs = 5 * 60_000, hiddenMs = HIDDEN_MS, enabled = true } = options;
 
   const tickRef = useRef(tick);
   tickRef.current = tick;
@@ -49,11 +61,11 @@ export function useLivePoll(
     async function run() {
       if (!live) return;
 
-      // A hidden tab learns nothing anyone can see. Check back at the ceiling
-      // rather than stopping outright, so a tab that is never focused again still
-      // eventually catches up without the visibility event.
+      // A hidden tab learns nothing anyone can see. It still checks back, so a tab
+      // that never gets the visibility event catches up eventually — but at half an
+      // hour, far enough apart to let the database sleep in between.
       if (hidden()) {
-        schedule(maxMs);
+        schedule(hiddenMs);
         return;
       }
 
@@ -85,5 +97,5 @@ export function useLivePoll(
       if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [baseMs, maxMs, enabled]);
+  }, [baseMs, maxMs, hiddenMs, enabled]);
 }

@@ -111,6 +111,13 @@ schedule is not. `src/lib/repeating-jobs.test.ts` checks this table against
 custom-worker.ts, because a table that quietly stops listing a job is how somebody
 concludes the job does not exist.
 
+⚠️⚠️ **The cron is not the only thing that wakes the database — an open tab is.**
+`useLivePoll` (notifications, chat) used to check back every five minutes while its
+tab was hidden, and five minutes is exactly Neon's free-plan idle timeout: a dashboard
+left open overnight kept the compute awake all night, for nobody. A hidden tab now
+waits half an hour, which is *above* the timeout rather than on it. Anything else that
+polls has to clear that bar too.
+
 ⚠️ `webhook-retry` is what makes outgoing events at-least-once instead of
 at-most-once. Without it a lost event is lost, and whoever was waiting for it has no
 way of knowing.
