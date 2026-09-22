@@ -1095,7 +1095,8 @@
       "languageHint": "Quotes, emails and invoice courtesy copies for this customer. Automatic: Italian for an address in Italy or with no country, English otherwise.",
       "priceList": "Price list",
       "priceListNone": "No price list (catalogue prices)",
-      "priceListHint": "Quotes, orders and invoices for this customer propose the prices on this list."
+      "priceListHint": "Quotes, orders and invoices for this customer propose the prices on this list.",
+      "priceListRetired": "{name} (retired)"
     },
     "createSuccess": "Company created.",
     "updateSuccess": "Company updated.",

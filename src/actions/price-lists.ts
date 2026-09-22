@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { asc, count, eq, ilike, inArray, or, type SQL, sql } from "drizzle-orm";
+import { and, asc, count, eq, ilike, inArray, or, type SQL, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { companies, priceListItems, priceLists, products } from "@/db/schema";
@@ -60,8 +60,13 @@ export async function listPriceLists(params: ListParams, filter?: string) {
         adjustmentPercent: priceLists.adjustmentPercent,
         isActive: priceLists.isActive,
         updatedAt: priceLists.updatedAt,
-        priceCount: sql<number>`(select count(*) from ${priceListItems} where ${priceListItems.priceListId} = ${priceLists.id})`,
-        companyCount: sql<number>`(select count(*) from ${companies} where ${companies.priceListId} = ${priceLists.id})`,
+        // ⚠️⚠️ Written out with the table names, not as `${priceListItems.priceListId}`.
+        // Drizzle renders a column inside a raw fragment **unqualified**, so the
+        // subquery became `where "price_list_id" = "id"` — and inside it both names
+        // resolve to the subquery's own table. Every list then counted zero prices and
+        // zero customers, which reads exactly like a list nobody uses.
+        priceCount: sql<number>`(select count(*) from "price_list_item" where "price_list_item"."price_list_id" = "price_list"."id")`,
+        companyCount: sql<number>`(select count(*) from "company" where "company"."price_list_id" = "price_list"."id")`,
       })
       .from(priceLists)
       .where(where)
@@ -101,14 +106,26 @@ export async function getPriceList(id: string) {
   return { list, items, companyCount: Number(used?.value ?? 0) };
 }
 
-/** The lists a customer or a document can be put on. Active only, like the product picker. */
-export async function getPriceListsForSelect() {
+/**
+ * The lists a customer or a document can be put on. Active only, like the product picker.
+ *
+ * ⚠️ `keepId` is the list a record is *already* on. A retired list is not offered to
+ * anybody new, but leaving it out of the options of the record that still points at it
+ * showed that customer an empty select — a screen saying "no price list" about a
+ * customer who has one, and one save away from making that true.
+ */
+export async function getPriceListsForSelect(keepId?: string | null) {
   await requireCapability("record:read");
   const db = await getDb();
   return db
-    .select({ id: priceLists.id, name: priceLists.name, adjustmentPercent: priceLists.adjustmentPercent })
+    .select({
+      id: priceLists.id,
+      name: priceLists.name,
+      adjustmentPercent: priceLists.adjustmentPercent,
+      isActive: priceLists.isActive,
+    })
     .from(priceLists)
-    .where(eq(priceLists.isActive, true))
+    .where(keepId ? or(eq(priceLists.isActive, true), eq(priceLists.id, keepId)) : eq(priceLists.isActive, true))
     .orderBy(asc(priceLists.name));
 }
 
@@ -118,15 +135,26 @@ export async function getPriceListsForSelect() {
  * ⚠️ Fetched per list rather than sent with the whole catalogue, because the customer
  * on a quote can change after the lines exist — and because a workspace that imported a
  * supplier's list has thousands of prices that no screen should carry until it needs them.
+ *
+ * Nothing comes back for a list that has been turned off: the price of the catalogue is
+ * what a customer on a retired list pays.
  */
 export async function getPriceRules(id: string): Promise<PriceRules | null> {
   await requireCapability("record:read");
   const db = await getDb();
   const [list] = await db
-    .select({ id: priceLists.id, name: priceLists.name, adjustmentPercent: priceLists.adjustmentPercent })
+    .select({
+      id: priceLists.id,
+      name: priceLists.name,
+      adjustmentPercent: priceLists.adjustmentPercent,
+      isActive: priceLists.isActive,
+    })
     .from(priceLists)
     .where(eq(priceLists.id, id));
-  if (!list) return null;
+  // ⚠️⚠️ A retired list prices nothing. Without this, turning a list off stopped it
+  // being offered to new customers and went on quoting the customers already on it —
+  // which is the one thing switching it off was meant to stop, and nothing said so.
+  if (!list || !list.isActive) return null;
 
   const items = await db
     .select({ productId: priceListItems.productId, unitPrice: priceListItems.unitPrice })
@@ -234,7 +262,9 @@ export async function removePriceListItem(priceListId: string, productId: string
   const db = await getDb();
   await db
     .delete(priceListItems)
-    .where(sql`${priceListItems.priceListId} = ${priceListId} and ${priceListItems.productId} = ${productId}`);
+    // Built rather than written out: a raw fragment renders these columns unqualified,
+    // which is harmless in a single-table delete and a defect the moment anyone adds a join.
+    .where(and(eq(priceListItems.priceListId, priceListId), eq(priceListItems.productId, productId)));
   revalidatePath(`/dashboard/sales/price-lists/${priceListId}`);
 }
 

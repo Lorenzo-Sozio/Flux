@@ -1095,7 +1095,8 @@
       "languageHint": "Preventivi, email e copie di cortesia delle fatture per questo cliente. Automatica: italiano per un indirizzo in Italia o senza paese, inglese negli altri casi.",
       "priceList": "Listino",
       "priceListNone": "Nessun listino (prezzi di catalogo)",
-      "priceListHint": "I preventivi, gli ordini e le fatture intestati a questo cliente propongono i prezzi di questo listino."
+      "priceListHint": "I preventivi, gli ordini e le fatture intestati a questo cliente propongono i prezzi di questo listino.",
+      "priceListRetired": "{name} (non più attivo)"
     },
     "createSuccess": "Azienda creata.",
     "updateSuccess": "Azienda aggiornata.",

@@ -95,7 +95,9 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     getCustomerRecord({ companyId }),
     getCompanyCategories().catch(() => []),
     getCompanyTypes().catch(() => []),
-    getPriceListsForSelect().catch(() => []),
+    // The list this customer is on comes back even if it has been retired: a screen
+    // that hides it says "no price list" about a customer who has one.
+    getPriceListsForSelect(company.priceListId).catch(() => []),
     getTranslations("companies"),
     getTranslations("entityDetail"),
   ]);

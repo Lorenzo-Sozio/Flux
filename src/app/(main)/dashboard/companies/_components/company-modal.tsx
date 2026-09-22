@@ -49,6 +49,8 @@ import { actionErrorMessage, isPlanLimit } from "@/lib/action-error";
 import { MergeCompaniesModal } from "./merge-companies-modal";
 
 type LookupItem = { id: string; name: string };
+/** A price list, which may be one that has been retired and is still assigned here. */
+type PriceListItem = LookupItem & { isActive?: boolean };
 
 /**
  * ⚠️ Radix refuses an empty string as a `SelectItem` value, so "no price list"
@@ -128,7 +130,7 @@ export function CompanyModal({
   categories?: LookupItem[];
   companyTypes?: LookupItem[];
   /** The lists a customer can be put on, from `getPriceListsForSelect()`. */
-  priceLists?: LookupItem[];
+  priceLists?: PriceListItem[];
 }) {
   const t = useTranslations("companies");
   const tc = useTranslations("common");
@@ -667,7 +669,9 @@ export function CompanyModal({
                             <SelectItem value={NO_PRICE_LIST}>{t("form.priceListNone")}</SelectItem>
                             {priceLists.map((l) => (
                               <SelectItem key={l.id} value={l.id}>
-                                {l.name}
+                                {/* A retired list is offered only to the customer already
+                                    on it, and says so rather than looking like a choice. */}
+                                {l.isActive === false ? t("form.priceListRetired", { name: l.name }) : l.name}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -801,7 +805,7 @@ export function CompanyActions({
   company: any;
   categories?: LookupItem[];
   companyTypes?: LookupItem[];
-  priceLists?: LookupItem[];
+  priceLists?: PriceListItem[];
   readonly hideView?: boolean;
 }) {
   // An icon on its own is a target with no name — on a phone there is no

@@ -46,5 +46,47 @@
     "description": "⚠️ la direzione della variazione si perde: lo schermo dice «sconto» anche per una maggiorazione",
     "find": "  return percent < 0 ? { direction: \"off\", percent: Math.abs(percent) } : { direction: \"on\", percent };",
     "replace": "  return { direction: \"off\", percent: Math.abs(percent) };"
+  },
+  {
+    "file": "src/actions/price-lists.ts",
+    "description": "⚠️⚠️ le sottoquery tornano a colonne non qualificate: ogni listino mostra zero prezzi e zero clienti, e sembra un listino che non usa nessuno",
+    "find": "`(select count(*) from \"price_list_item\" where \"price_list_item\".\"price_list_id\" = \"price_list\".\"id\")`",
+    "replace": "`(select count(*) from \"price_list_item\" where \"price_list_item\".\"price_list_id\" = \"price_list_item\".\"id\")`"
+  },
+  {
+    "file": "src/actions/price-lists.ts",
+    "description": "⚠️⚠️ fissare due volte il prezzo di un prodotto crea una seconda riga: il prezzo dipende da quale delle due si legge per prima",
+    "find": "    .onConflictDoUpdate({",
+    "replace": "    .onConflictDoNothing({"
+  },
+  {
+    "file": "src/actions/price-lists.ts",
+    "description": "⚠️ un prezzo negativo entra nel listino",
+    "find": "  if (!Number.isFinite(unitPrice) || unitPrice < 0) throw new Error(\"validation.priceLists.priceNegative\");",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/price-lists.ts",
+    "description": "⚠️ le regole del listino perdono i prezzi espliciti: ogni riga prende la percentuale anche dove c'era un prezzo concordato",
+    "find": "  for (const item of items) overrides[item.productId] = Number(item.unitPrice);",
+    "replace": ""
+  },
+  {
+    "file": "src/actions/price-lists.ts",
+    "description": "il listino del cliente viene ignorato: il modulo propone sempre il prezzo di catalogo",
+    "find": "  if (!company?.priceListId) return null;",
+    "replace": "  return null;"
+  },
+  {
+    "file": "src/actions/price-lists.ts",
+    "description": "⚠️⚠️ un listino spento continua a valorizzare le righe dei clienti che ce l'hanno già: spegnerlo vorrebbe dire «nessuno nuovo», e nessuno lo direbbe",
+    "find": "  if (!list || !list.isActive) return null;",
+    "replace": "  if (!list) return null;"
+  },
+  {
+    "file": "src/actions/price-lists.ts",
+    "description": "⚠️ il listino ritirato sparisce dalle opzioni del cliente che ce l'ha: la scheda dice «nessun listino» di un cliente che ne ha uno",
+    "find": "    .where(keepId ? or(eq(priceLists.isActive, true), eq(priceLists.id, keepId)) : eq(priceLists.isActive, true))",
+    "replace": "    .where(eq(priceLists.isActive, true))"
   }
 ]
