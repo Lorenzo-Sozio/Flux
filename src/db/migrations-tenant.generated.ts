@@ -485,4 +485,18 @@ export const tenantMigrations: EmbeddedMigration[] = [
       '\nCREATE INDEX IF NOT EXISTS "invoice_original_idx" ON "invoice" USING btree ("original_invoice_id");\n',
     ],
   },
+  {
+    tag: "0028_what_this_customer_pays",
+    folderMillis: 1790000000000,
+    hash: "be28e6c5cd3cc8234852c3ba2fdd0dcffc3358907b7f83b94a7d951d5a307b8e",
+    sql: [
+      '-- Listini: quello che paga questo cliente, invece di quello che dice il catalogo.\n--\n-- Due modi di dirlo, perche\' entrambi sono come si lavora davvero (decisione D4):\n-- `adjustment_percent` sposta tutti i prezzi base insieme, e una riga di\n-- `price_list_item` fissa il prezzo di un prodotto e vince sulla percentuale.\n--\n-- Il segno e\' la direzione della variazione, non uno sconto: -10 e\' il dieci per cento\n-- in meno, +5 il cinque per cento in piu\'.\n--\n-- Additiva e rieseguibile, come ogni migrazione tenant.\nCREATE TABLE IF NOT EXISTS "price_list" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"name" text NOT NULL,\n\t"description" text,\n\t"adjustment_percent" numeric(5, 2) DEFAULT \'0\' NOT NULL,\n\t"is_active" boolean DEFAULT true NOT NULL,\n\t"created_at" timestamp DEFAULT now() NOT NULL,\n\t"updated_at" timestamp DEFAULT now() NOT NULL\n);\n',
+      '\nCREATE TABLE IF NOT EXISTS "price_list_item" (\n\t"id" text PRIMARY KEY NOT NULL,\n\t"price_list_id" text NOT NULL,\n\t"product_id" text NOT NULL,\n\t"unit_price" numeric(12, 2) NOT NULL,\n\t"created_at" timestamp DEFAULT now() NOT NULL,\n\t"updated_at" timestamp DEFAULT now() NOT NULL\n);\n',
+      '\n-- Un solo prezzo per prodotto in ogni listino: una seconda riga renderebbe il prezzo\n-- dipendente da quale delle due il lettore trova per prima.\nCREATE UNIQUE INDEX IF NOT EXISTS "price_list_item_unique" ON "price_list_item" USING btree ("price_list_id","product_id");\n',
+      '\nALTER TABLE "company" ADD COLUMN IF NOT EXISTS "price_list_id" text;\n',
+      '\n-- Le chiavi esterne si aggiungono solo se non ci sono gia\': ripetere un ADD CONSTRAINT\n-- fallirebbe, e ogni migrazione qui deve poter essere rieseguita.\nDO $$ BEGIN\n\tALTER TABLE "price_list_item" ADD CONSTRAINT "price_list_item_price_list_id_price_list_id_fk" FOREIGN KEY ("price_list_id") REFERENCES "public"."price_list"("id") ON DELETE cascade ON UPDATE no action;\nEXCEPTION WHEN duplicate_object THEN null; END $$;\n',
+      '\nDO $$ BEGIN\n\tALTER TABLE "price_list_item" ADD CONSTRAINT "price_list_item_product_id_product_id_fk" FOREIGN KEY ("product_id") REFERENCES "public"."product"("id") ON DELETE cascade ON UPDATE no action;\nEXCEPTION WHEN duplicate_object THEN null; END $$;\n',
+      '\n-- Cancellare un listino non cancella i clienti che lo usavano: restano senza listino,\n-- cioe\' al prezzo di catalogo.\nDO $$ BEGIN\n\tALTER TABLE "company" ADD CONSTRAINT "company_price_list_id_price_list_id_fk" FOREIGN KEY ("price_list_id") REFERENCES "public"."price_list"("id") ON DELETE set null ON UPDATE no action;\nEXCEPTION WHEN duplicate_object THEN null; END $$;\n',
+    ],
+  },
 ];

@@ -50,6 +50,13 @@ import { MergeCompaniesModal } from "./merge-companies-modal";
 
 type LookupItem = { id: string; name: string };
 
+/**
+ * ⚠️ Radix refuses an empty string as a `SelectItem` value, so "no price list"
+ * needs a value of its own; it is turned back into null on submit. Without it the
+ * only way to take a customer off a list would be to never have put them on one.
+ */
+const NO_PRICE_LIST = "__none__";
+
 const companySchema = z.object({
   name: z.string().min(1, "validation.crm.companyNameRequired"),
   type: z.string().default("prospect"),
@@ -80,6 +87,7 @@ const companySchema = z.object({
   fiscalCode: z.string().optional(),
   pec: z.string().optional(),
   language: z.string().optional(),
+  priceListId: z.string().optional().nullable(),
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
@@ -112,12 +120,15 @@ export function CompanyModal({
   children,
   categories = [],
   companyTypes = [],
+  priceLists = [],
 }: {
   // biome-ignore lint/suspicious/noExplicitAny: typing this as the schema row surfaces three real mismatches — annualRevenue and employeeCount come back from the numeric columns as strings while the form expects numbers, and CompaniesTable passes a narrower row. That is a change to the form, not to this signature.
   company?: any;
   children: React.ReactNode;
   categories?: LookupItem[];
   companyTypes?: LookupItem[];
+  /** The lists a customer can be put on, from `getPriceListsForSelect()`. */
+  priceLists?: LookupItem[];
 }) {
   const t = useTranslations("companies");
   const tc = useTranslations("common");
@@ -187,6 +198,7 @@ export function CompanyModal({
       fiscalCode: company?.fiscalCode || "",
       pec: company?.pec || "",
       language: company?.language || "auto",
+      priceListId: company?.priceListId ?? null,
     },
   });
 
@@ -250,6 +262,7 @@ export function CompanyModal({
         fiscalCode: company.fiscalCode || "",
         pec: company.pec || "",
         language: company.language || "auto",
+        priceListId: company.priceListId ?? null,
       });
     }
   }, [open, company, form.reset]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -331,6 +344,9 @@ export function CompanyModal({
       companyCategoryId: data.companyCategoryId || null,
       companyTypeId: data.companyTypeId || null,
       language: data.language === "it" || data.language === "en" ? data.language : null,
+      // The empty option is a real answer — "catalogue prices" — so it is written
+      // as null rather than left out of the payload for the column to keep.
+      priceListId: data.priceListId === NO_PRICE_LIST ? null : data.priceListId || null,
     };
 
     const found = await checkCompanyDuplicates({
@@ -631,6 +647,35 @@ export function CompanyModal({
                     />
                     <p className="text-muted-foreground text-xs">{t("form.languageHint")}</p>
                   </F>
+                  {/* A plain select, not the creatable combobox the categories use:
+                      a price list is a commercial decision made on its own screen,
+                      with prices in it, and not something to invent while typing a
+                      customer's VAT number. */}
+                  <F label={t("form.priceList")} error={e.priceListId?.message}>
+                    <Controller
+                      control={control}
+                      name="priceListId"
+                      render={({ field }) => (
+                        <Select
+                          value={field.value || NO_PRICE_LIST}
+                          onValueChange={(v) => field.onChange(v === NO_PRICE_LIST ? null : v)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={NO_PRICE_LIST}>{t("form.priceListNone")}</SelectItem>
+                            {priceLists.map((l) => (
+                              <SelectItem key={l.id} value={l.id}>
+                                {l.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                    <p className="text-muted-foreground text-xs">{t("form.priceListHint")}</p>
+                  </F>
                   <div className="col-span-1 sm:col-span-2 rounded-md border bg-muted/30 px-4 py-3 text-muted-foreground text-xs">
                     <p className="mb-1 font-medium text-foreground">{t("modal.einvoicingTitle")}</p>
                     <p>{t.rich("modal.einvoicingBody", { strong: (chunks) => <strong>{chunks}</strong> })}</p>
@@ -749,12 +794,14 @@ export function CompanyActions({
   company,
   categories = [],
   companyTypes = [],
+  priceLists = [],
   hideView = false,
 }: {
   // biome-ignore lint/suspicious/noExplicitAny: typing this as the schema row surfaces three real mismatches — annualRevenue and employeeCount come back from the numeric columns as strings while the form expects numbers, and CompaniesTable passes a narrower row. That is a change to the form, not to this signature.
   company: any;
   categories?: LookupItem[];
   companyTypes?: LookupItem[];
+  priceLists?: LookupItem[];
   readonly hideView?: boolean;
 }) {
   // An icon on its own is a target with no name — on a phone there is no
@@ -771,7 +818,7 @@ export function CompanyActions({
           </Button>
         </Link>
       )}
-      <CompanyModal company={company} categories={categories} companyTypes={companyTypes}>
+      <CompanyModal company={company} categories={categories} companyTypes={companyTypes} priceLists={priceLists}>
         <Button variant="ghost" size="icon" aria-label={tc("edit")}>
           <PencilIcon className="h-4 w-4" />
         </Button>

@@ -10,6 +10,8 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
 import { createInvoice, type getNewInvoiceData, getOrderForInvoice, issueInvoiceAction } from "@/actions/invoices";
+import { PriceListNote } from "@/components/crm/price-list-note";
+import { usePriceRules } from "@/components/crm/use-price-rules";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,6 +37,7 @@ import { invoiceTotals } from "@/lib/fatturapa/totals";
 import { customerGaps } from "@/lib/fiscal-ids";
 import { PAYMENT_METHODS } from "@/lib/invoice-draft";
 import { draftProblems } from "@/lib/invoice-rules";
+import { priceFor } from "@/lib/price-list";
 import { assessStampDuty, type StampMode, withStampRecharge } from "@/lib/stamp-duty";
 
 import { asDraftLines, blankLine, type EditableLine, editableFields, num } from "../../_components/invoice-lines";
@@ -101,6 +104,30 @@ export function NewInvoiceForm({
   const rechargeLine = stamp.applied && data.rechargeStamp;
   const totals = invoiceTotals(withStampRecharge(draftLines, stamp.applied, data.rechargeStamp), num(discount));
   const money = (n: number) => formatMoney(n, currency);
+
+  /**
+   * The customer's price list, fetched when the customer changes.
+   *
+   * ⚠️ It prices the next product picked, and nothing already on the invoice —
+   * which on this screen often came from an order, at figures the customer has
+   * already seen. Re-pricing those is the button, pressed deliberately.
+   */
+  const { rules: priceRules } = usePriceRules(companyId || null);
+  const tPl = useTranslations("documents.priceList");
+
+  function applyPriceList() {
+    if (!priceRules) return;
+    setLines((current) =>
+      current.map((line) => {
+        const product = data.products.find((p) => p.id === line.productId);
+        // An off-catalogue line has no list price to look up, so it is left
+        // exactly as it was typed.
+        if (!product) return line;
+        return { ...line, unitPrice: String(priceFor(product.id, product.price, priceRules)) };
+      }),
+    );
+    toast.success(tPl("applied"));
+  }
 
   const customerProblems = company ? customerGaps(company) : [];
   const problems = [
@@ -370,6 +397,7 @@ export function NewInvoiceForm({
                 {t("lines")}
               </CardTitle>
               <CardDescription>{tn("linesHint")}</CardDescription>
+              <PriceListNote rules={priceRules} onApply={applyPriceList} className="mt-1.5" />
             </CardHeader>
             <CardContent className="p-0">
               <InvoiceLinesTable
@@ -380,6 +408,7 @@ export function NewInvoiceForm({
                 rechargeLine={rechargeLine}
                 money={money}
                 products={data.products}
+                priceRules={priceRules}
               />
             </CardContent>
           </Card>

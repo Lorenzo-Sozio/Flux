@@ -199,6 +199,8 @@ export const companies = pgTable("company", {
   sourceLeadId: text("source_lead_id"), // FK set via migration → lead.id (set null)
   companyCategoryId: text("company_category_id").references(() => companyCategories.id, { onDelete: "set null" }),
   companyTypeId: text("company_type_id").references(() => companyTypes.id, { onDelete: "set null" }),
+  // What this customer pays; the product picker on their quotes and orders starts here.
+  priceListId: text("price_list_id"),
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
@@ -289,6 +291,57 @@ export const products = pgTable("product", {
   createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
 });
+
+/**
+ * A price list: what this group of customers pays, rather than what the catalogue says.
+ *
+ * Two ways of saying it, because both are how people actually work (decision D4):
+ * `adjustmentPercent` moves every base price at once, and a row in `price_list_item`
+ * names the price of one product outright and wins over the percentage.
+ *
+ * ⚠️ The sign is the direction of the change, not a discount: -10 is ten per cent off,
+ * +5 is five per cent on top. Every other percentage column in this schema
+ * (`discountPercent`) means a reduction, so this one is named differently on purpose.
+ *
+ * ⚠️ A price list carries no currency, because a product's price carries none either:
+ * both are in the workspace's own currency. A document in another currency takes these
+ * figures as they are, exactly as it already takes the base price.
+ */
+export const priceLists = pgTable("price_list", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  name: text("name").notNull(),
+  description: text("description"),
+  adjustmentPercent: numeric("adjustment_percent", { precision: 5, scale: 2 }).default("0").notNull(),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+});
+
+/** One product's price in one list, which replaces the percentage for that product. */
+export const priceListItems = pgTable(
+  "price_list_item",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    priceListId: text("price_list_id")
+      .notNull()
+      .references(() => priceLists.id, { onDelete: "cascade" }),
+    productId: text("product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    unitPrice: numeric("unit_price", { precision: 12, scale: 2 }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    // One price per product per list: a second row would make the price of a product
+    // depend on which of the two the reader happened to find.
+    uniqueIndex("price_list_item_unique").on(table.priceListId, table.productId),
+  ],
+);
 
 export const orders = pgTable("order", {
   id: text("id")

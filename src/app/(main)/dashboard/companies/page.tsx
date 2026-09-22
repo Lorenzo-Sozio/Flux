@@ -5,6 +5,7 @@ import { getTranslations } from "next-intl/server";
 import { getAllUsers, getCompanyCategories, getCompanyTypes, listCompanies } from "@/actions/crm";
 import { getCustomFieldDefinitions } from "@/actions/custom-fields";
 import { getCustomFilters } from "@/actions/filters";
+import { getPriceListsForSelect } from "@/actions/price-lists";
 import { FilterBuilder } from "@/components/crm/filter-builder";
 import { ImportExportButtons } from "@/components/crm/import-export-buttons";
 import { ListToolbar } from "@/components/crm/list-toolbar";
@@ -30,13 +31,16 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
   // only fail (audit rilievo U-02).
   const canEdit = await hasCapability("record:write");
 
-  const [pageResult, savedFilters, customDefs, users, categories, companyTypes] = await Promise.all([
+  const [pageResult, savedFilters, customDefs, users, categories, companyTypes, priceLists] = await Promise.all([
     listCompanies(listParams),
     getCustomFilters("companies").catch(() => []),
     getCustomFieldDefinitions("company").catch(() => []),
     getAllUsers(),
     getCompanyCategories().catch(() => []),
     getCompanyTypes().catch(() => []),
+    // A workspace that never made a list gets an empty select and catalogue
+    // prices; the module being off is not a reason to fail the page.
+    getPriceListsForSelect().catch(() => []),
   ]);
 
   const t = await getTranslations("companies");
@@ -86,7 +90,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
           />
           <ImportExportButtons entityType="companies" />
           {canEdit && (
-            <CompanyModal categories={categories} companyTypes={companyTypes}>
+            <CompanyModal categories={categories} companyTypes={companyTypes} priceLists={priceLists}>
               <Button>{t("newCompany")}</Button>
             </CompanyModal>
           )}
@@ -110,6 +114,7 @@ export default async function CompaniesPage({ searchParams }: { searchParams: Pr
         narrowed={activeCount > 0 || listParams.search.length > 0}
         categories={categories}
         companyTypes={companyTypes}
+        priceLists={priceLists}
       />
     </div>
   );

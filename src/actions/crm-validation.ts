@@ -184,6 +184,9 @@ export const CompanySchema = z.object({
   tags: tagList,
   companyCategoryId: optionalId,
   companyTypeId: optionalId,
+  // The list this customer's documents are priced from. Empty means the
+  // catalogue, which is a real choice and not a missing one.
+  priceListId: optionalId,
 });
 
 export const CompanyUpdateSchema = CompanySchema.partial().extend({

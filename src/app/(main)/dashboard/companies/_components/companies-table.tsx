@@ -58,9 +58,18 @@ interface Props {
   narrowed: boolean;
   categories?: LookupItem[];
   companyTypes?: LookupItem[];
+  priceLists?: LookupItem[];
 }
 
-export function CompaniesTable({ companies, users, canEdit, narrowed, categories = [], companyTypes = [] }: Props) {
+export function CompaniesTable({
+  companies,
+  users,
+  canEdit,
+  narrowed,
+  categories = [],
+  companyTypes = [],
+  priceLists = [],
+}: Props) {
   const t = useTranslations("companies");
   const te = useTranslations("emptyStates");
   const tr = useTranslations("recordTable");
@@ -141,7 +150,7 @@ export function CompaniesTable({ companies, users, canEdit, narrowed, categories
       description={te("companies.description")}
       action={
         canEdit ? (
-          <CompanyModal categories={categories} companyTypes={companyTypes}>
+          <CompanyModal categories={categories} companyTypes={companyTypes} priceLists={priceLists}>
             <Button size="sm">{t("newCompany")}</Button>
           </CompanyModal>
         ) : undefined
@@ -189,7 +198,13 @@ export function CompaniesTable({ companies, users, canEdit, narrowed, categories
                   { label: t("columns.assignedTo"), value: company.ownerName },
                 ],
                 actions: canEdit ? (
-                  <CompanyActions company={company} categories={categories} companyTypes={companyTypes} hideView />
+                  <CompanyActions
+                    company={company}
+                    categories={categories}
+                    companyTypes={companyTypes}
+                    priceLists={priceLists}
+                    hideView
+                  />
                 ) : undefined,
                 selected: selected.has(company.id),
                 onToggle: canEdit ? () => toggle(company.id) : undefined,
@@ -266,7 +281,12 @@ export function CompaniesTable({ companies, users, canEdit, narrowed, categories
                     </TableCell>
                     {canEdit && (
                       <TableCell className="text-right">
-                        <CompanyActions company={company} categories={categories} companyTypes={companyTypes} />
+                        <CompanyActions
+                          company={company}
+                          categories={categories}
+                          companyTypes={companyTypes}
+                          priceLists={priceLists}
+                        />
                       </TableCell>
                     )}
                   </TableRow>

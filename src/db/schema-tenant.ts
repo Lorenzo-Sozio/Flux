@@ -88,6 +88,9 @@ export {
   // Pipeline / deals
   pipelineStages,
   pipelineStagesRelations,
+  // Price lists
+  priceListItems,
+  priceLists,
   // Products / orders / quotes
   products,
   // Web push

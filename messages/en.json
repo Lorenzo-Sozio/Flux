@@ -1092,7 +1092,10 @@
       "pec": "PEC",
       "language": "Document language",
       "languageAuto": "Automatic, from the country",
-      "languageHint": "Quotes, emails and invoice courtesy copies for this customer. Automatic: Italian for an address in Italy or with no country, English otherwise."
+      "languageHint": "Quotes, emails and invoice courtesy copies for this customer. Automatic: Italian for an address in Italy or with no country, English otherwise.",
+      "priceList": "Price list",
+      "priceListNone": "No price list (catalogue prices)",
+      "priceListHint": "Quotes, orders and invoices for this customer propose the prices on this list."
     },
     "createSuccess": "Company created.",
     "updateSuccess": "Company updated.",
@@ -1107,6 +1110,9 @@
       "einvoicingTitle": "Italian e-invoicing",
       "einvoicingBody": "The <strong>SDI Code</strong> (Codice Destinatario) is the 7-character code used to route electronic invoices through the Sistema di Interscambio.",
       "similarExist": "Similar companies already exist:"
+    },
+    "fields": {
+      "priceList": "Price list"
     }
   },
   "contacts": {
@@ -2390,7 +2396,8 @@
       "contracts": "Contracts",
       "sequences": "Sequences",
       "invoicing": "E-invoicing",
-      "invoices": "Invoices"
+      "invoices": "Invoices",
+      "priceLists": "Price lists"
     },
     "user": {
       "profile": "Profile",
@@ -4967,6 +4974,17 @@
       "deleted": "\"{name}\" deleted.",
       "deleteFailed": "Failed to delete document.",
       "openPdf": "Open PDF"
+    },
+    "priceList": {
+      "headerNone": "Price list: {name}",
+      "headerOff": "Price list: {name} (−{percent}%)",
+      "headerOn": "Price list: {name} (+{percent}%)",
+      "apply": "Apply price list to lines",
+      "applied": "Line prices updated from the price list.",
+      "manualPricesKept": "Prices already entered are left as they are: apply the list to update them.",
+      "fromPercent": "From price list",
+      "fromOverride": "Agreed price",
+      "badgeTitle": "Price from the {name} price list"
     }
   },
   "pushNotifications": {
@@ -5591,6 +5609,11 @@
         "one": "Document",
         "other": "Documents",
         "new": "New document"
+      },
+      "priceList": {
+        "one": "Price list",
+        "other": "Price lists",
+        "new": "New price list"
       }
     },
     "statuses": {
@@ -5941,6 +5964,18 @@
           "t03": {
             "q": "How do I deactivate a product I no longer sell?",
             "a": "Instead of deleting it (which would break the references in historical documents), use the 'Active/Inactive' toggle. Inactive products do not appear in the selection when creating new quotes, but remain visible in historical documents."
+          },
+          "t04": {
+            "q": "What is a price list for?",
+            "a": "A price list says what a group of customers pays, instead of the catalogue price. You define it in Sales → Price lists in two ways, which work together: a percentage adjustment on the base price (say -10% for resellers, +5% for a channel with a different margin) and, where it matters, the exact price of individual products, which beats the percentage. The list is assigned on the company record: from then on, when you write a quote, an order or an invoice for that customer, the price proposed when you pick a product is the one from their list."
+          },
+          "t05": {
+            "q": "If I change a price list, do documents already written change too?",
+            "a": "No. Quotes, orders and invoices keep the prices they were written with: a list changed today does not rewrite a quote sent last month. Even in the document you are filling in, changing the customer or the list leaves the lines you have already added as they are: a price you typed by hand is never overwritten unless you ask for it."
+          },
+          "t06": {
+            "q": "What happens if I delete a list, or a customer has none?",
+            "a": "A customer with no price list pays the catalogue price. If you delete a list, the customers who were on it are left without one, so they go back to catalogue prices, and documents already written do not change. Mind the sign of the adjustment: it is the direction of the change, not a discount, so -10 means ten per cent less and +10 ten per cent more."
           }
         }
       },
@@ -6690,6 +6725,110 @@
       "nameRequired": "A territory needs a name.",
       "countryUnknown": "Not a country code: {codes}",
       "criteriaRequired": "Choose at least one country, province or region, or postal code prefix."
+    },
+    "priceLists": {
+      "nameRequired": "Give the price list a name",
+      "adjustmentRange": "The adjustment must be between -100% and +100%",
+      "priceNegative": "The price cannot be negative"
+    }
+  },
+  "priceLists": {
+    "title": "Price lists",
+    "subtitle": "What a group of customers pays, instead of the catalogue price.",
+    "newPriceList": "New price list",
+    "edit": "Edit price list",
+    "deletePriceList": "Delete price list",
+    "cancel": "Cancel",
+    "searchPlaceholder": "Search by name or description…",
+    "filters": {
+      "all": "All",
+      "active": "Active",
+      "inactive": "Inactive"
+    },
+    "columns": {
+      "name": "Name",
+      "adjustment": "Adjustment on the base price",
+      "prices": "Named prices",
+      "customers": "Customers",
+      "active": "Status"
+    },
+    "adjustment": {
+      "off": "{percent, number}% off",
+      "on": "{percent, number}% on top",
+      "none": "Catalogue price"
+    },
+    "empty": {
+      "title": "No price lists yet",
+      "description": "A price list moves the catalogue price by a percentage and can name the price of individual products. Customers assigned to it get those prices on quotes and orders."
+    },
+    "dialog": {
+      "newTitle": "New price list",
+      "editTitle": "Edit price list",
+      "nameLabel": "Name",
+      "adjustmentLabel": "Adjustment on the base price (%)",
+      "adjustmentHelp": "A negative value takes money off the catalogue price, a positive one adds it. For example, -10 is ten per cent off.",
+      "descriptionLabel": "Description",
+      "optional": "(optional)",
+      "activeLabel": "Active",
+      "activeDesc": "Inactive price lists are not offered on quotes and orders",
+      "saveChanges": "Save changes",
+      "createPriceList": "Create price list"
+    },
+    "form": {
+      "namePlaceholder": "e.g. Resellers, Long-standing customers…",
+      "descriptionPlaceholder": "Who this price list is for, and why…"
+    },
+    "createSuccess": "Price list created.",
+    "updateSuccess": "Price list updated.",
+    "deleteSuccess": "Price list deleted.",
+    "createFailed": "The price list could not be created.",
+    "updateFailed": "The price list could not be updated.",
+    "deleteFailed": "The price list could not be deleted.",
+    "deleteTitle": "Delete this price list?",
+    "deleteDesc": "will be deleted permanently, along with the prices it names. Customers on it go back to the catalogue price; documents already written keep the figures they were written with.",
+    "detail": {
+      "back": "Back to price lists",
+      "edit": "Edit",
+      "pricesTitle": "Named prices",
+      "pricesSubtitle": "A price written here replaces the percentage for that product.",
+      "product": "Product",
+      "sku": "SKU",
+      "basePrice": "Catalogue price",
+      "listPrice": "List price",
+      "difference": "Difference",
+      "addPrice": "Add price",
+      "removePrice": "Remove price",
+      "pickProduct": "Choose a product…",
+      "searchProduct": "Search products…",
+      "noProducts": "No products found.",
+      "noProductsLeft": "Every product already has a price in this list.",
+      "noPrices": "No prices named",
+      "noPricesDesc": "With no specific prices, this list only applies its percentage to the catalogue price.",
+      "priceSaved": "Price saved.",
+      "priceRemoved": "Price removed.",
+      "priceFailed": "The price could not be saved.",
+      "previewTitle": "Try the adjustment",
+      "previewSubtitle": "What a product costs to somebody on this price list.",
+      "resultLabel": "Price applied",
+      "previewEmpty": "Choose a product to see the price applied.",
+      "source": {
+        "base": "Catalogue price",
+        "percent": "From the percentage",
+        "override": "Named price"
+      },
+      "customersTitle": "Customers on this price list",
+      "customersSubtitle": "Quotes, orders and invoices made out to these customers start from these prices.",
+      "company": "Company",
+      "pickCompany": "Choose a company…",
+      "searchCompany": "Search companies…",
+      "noCompaniesLeft": "No companies left to add.",
+      "addCustomer": "Add customer",
+      "removeCustomer": "Remove from the list",
+      "customerAdded": "Customer added to the price list.",
+      "customerRemoved": "Customer removed from the price list.",
+      "customerFailed": "The customers of this price list could not be updated.",
+      "noCustomers": "No customers assigned",
+      "noCustomersDesc": "Until somebody is on this list, the prices named here appear on no document."
     }
   }
 }

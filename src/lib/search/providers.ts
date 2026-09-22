@@ -14,6 +14,7 @@ import {
   leads,
   marketingCampaigns,
   orders,
+  priceLists,
   products,
   quotes,
   tasks,
@@ -212,6 +213,35 @@ export const SEARCH_PROVIDERS: Record<EntityType, Provider> = {
       sub: [r.sku, r.category].filter(Boolean).join(" · ") || null,
       url: entityHref("product", r.id, r.name),
     }));
+  },
+
+  /**
+   * ⚠️ `sub` is the percentage as a signed figure, not a sentence: this runs on
+   * the server, where the reader's language is not the one to guess at, and the
+   * sign is the whole meaning — negative takes money off, positive adds it.
+   */
+  async priceList(db, { like }) {
+    const rows = await db
+      .select({
+        id: priceLists.id,
+        name: priceLists.name,
+        description: priceLists.description,
+        adjustmentPercent: priceLists.adjustmentPercent,
+      })
+      .from(priceLists)
+      .where(or(ilike(priceLists.name, like), ilike(priceLists.description, like)))
+      .orderBy(priceLists.name)
+      .limit(PER_ENTITY);
+    return rows.map((r: { id: string; name: string; description: string | null; adjustmentPercent: string }) => {
+      const percent = Number(r.adjustmentPercent);
+      return {
+        id: r.id,
+        type: "priceList",
+        label: r.name,
+        sub: percent === 0 ? r.description : `${percent > 0 ? "+" : ""}${percent}%`,
+        url: entityHref("priceList", r.id),
+      };
+    });
   },
 
   async quote(db, { like }) {

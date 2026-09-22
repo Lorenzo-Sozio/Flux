@@ -16,9 +16,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildCompanyPayload,
   buildLeadPayload,
   digitsForMatching,
   parseOnDuplicate,
+  validateCompanyInput,
   validateContactInput,
   validateLeadInput,
 } from "@/lib/api-import-validators";
@@ -187,5 +189,26 @@ describe("the row that gets written", () => {
     const { data } = validateLeadInput({ firstName: "Anna", lastName: "Rossi" });
 
     expect(() => buildLeadPayload(data as NonNullable<typeof data>, null)).not.toThrow();
+  });
+});
+
+describe("a company can be put on a price list", () => {
+  it("carries the list id through to the row that gets written", () => {
+    const { errors, data } = validateCompanyInput({ name: "Rossi SpA", priceListId: "pl-7" });
+
+    expect(errors).toEqual([]);
+    expect(buildCompanyPayload(data as NonNullable<typeof data>, null).priceListId).toBe("pl-7");
+  });
+
+  it("means catalogue prices when nobody said, rather than leaving the column out", () => {
+    const { data } = validateCompanyInput({ name: "Rossi SpA" });
+
+    expect(buildCompanyPayload(data as NonNullable<typeof data>, null).priceListId).toBeNull();
+  });
+
+  it("refuses anything that is not a string id — there is no lookup by name here", () => {
+    const { errors } = validateCompanyInput({ name: "Rossi SpA", priceListId: 7 });
+
+    expect(errors.map((e) => e.field)).toContain("priceListId");
   });
 });

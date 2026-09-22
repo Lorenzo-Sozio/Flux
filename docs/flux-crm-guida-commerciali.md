@@ -594,6 +594,24 @@ Il modulo **Prodotti** contiene il catalogo dei tuoi prodotti e servizi. Ogni pr
 
 Quando crei un preventivo o un ordine, selezioni i prodotti dal catalogo. I prezzi, sconti e IVA vengono calcolati automaticamente. Questo garantisce coerenza e velocità nella preparazione delle offerte.
 
+### Listini
+
+Un **listino** dice quanto paga un gruppo di clienti, invece del prezzo di catalogo. Si crea in **Vendite → Listini** e si compone di due cose, che convivono:
+
+- una **variazione percentuale** sul prezzo base, che sposta tutto il catalogo insieme: `-10` significa dieci per cento in meno, `+5` cinque per cento in più. Il segno è la direzione della variazione, non uno sconto;
+- i **prezzi espliciti** di singoli prodotti, che vincono sulla percentuale. Servono per i prodotti trattati a parte in un accordo.
+
+Il listino si assegna alla **scheda dell'azienda**. Da quel momento, scrivendo un preventivo, un ordine o una fattura per quel cliente, il prezzo proposto quando scegli un prodotto è quello del suo listino, e la riga dice da dove arriva.
+
+**Quello che un listino non fa:**
+
+- non riscrive i documenti già scritti: preventivi, ordini e fatture conservano i prezzi con cui sono nati;
+- non sovrascrive le righe già inserite nel documento che stai compilando, nemmeno cambiando cliente: un prezzo corretto a mano resta come l'hai scritto;
+- non ha una valuta propria, esattamente come il prezzo del prodotto: le cifre sono nella valuta del workspace.
+
+Un cliente senza listino paga il prezzo di catalogo. Eliminando un listino, i clienti che lo usavano tornano al prezzo di catalogo.
+
+
 ---
 
 ## 18. Ordini

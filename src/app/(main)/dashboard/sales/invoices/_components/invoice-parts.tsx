@@ -3,6 +3,8 @@
 import { Plus, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
+import { PriceSourceBadge } from "@/components/crm/price-list-note";
+import { listPriceSource } from "@/components/crm/use-price-rules";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SearchableSelect } from "@/components/ui/searchable-select";
@@ -10,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { invoiceTotals } from "@/lib/fatturapa/totals";
 import { NATURE_CODES } from "@/lib/invoice-rules";
+import { type PriceRules, priceFor } from "@/lib/price-list";
 import { STAMP_DUTY_AMOUNT } from "@/lib/stamp-duty";
 
 import { blankLine, type CatalogueProduct, type EditableLine, num } from "./invoice-lines";
@@ -32,6 +35,7 @@ export function InvoiceLinesTable({
   rechargeLine,
   money,
   products,
+  priceRules,
 }: {
   lines: EditableLine[];
   onChange: (lines: EditableLine[]) => void;
@@ -41,6 +45,14 @@ export function InvoiceLinesTable({
   money: (n: number) => string;
   /** Given, each line can be picked from the catalogue. */
   products?: CatalogueProduct[];
+  /**
+   * Given, the customer's price list prices the product as it is picked.
+   *
+   * ⚠️ It reaches no line that already exists. An invoice line may have come
+   * from an order, or from somebody's hands; re-pricing it here would change a
+   * figure the customer has already been told, invisibly.
+   */
+  priceRules?: PriceRules | null;
 }) {
   const t = useTranslations("invoices");
   const put = (i: number, patch: Partial<EditableLine>) =>
@@ -52,7 +64,7 @@ export function InvoiceLinesTable({
     put(i, {
       productId: p.id,
       description: lines[i].description.trim() ? lines[i].description : p.name,
-      unitPrice: String(p.price),
+      unitPrice: String(priceFor(p.id, p.price, priceRules)),
       taxPercent: String(p.taxPercent),
       nature: p.taxPercent > 0 ? "" : lines[i].nature,
     });
@@ -110,6 +122,17 @@ export function InvoiceLinesTable({
                 </TableCell>
                 {(["quantity", "unitPrice", "discountPercent", "taxPercent"] as const).map((f) => (
                   <TableCell key={f} className="text-right tabular-nums">
+                    {f === "unitPrice" && (
+                      <PriceSourceBadge
+                        source={listPriceSource(
+                          priceRules,
+                          products?.find((p) => p.id === l.productId),
+                          l.unitPrice,
+                        )}
+                        listName={priceRules?.name}
+                        className="mb-1"
+                      />
+                    )}
                     {editable ? (
                       <Input
                         aria-label={t(f === "discountPercent" ? "discount" : f === "taxPercent" ? "vat" : f)}

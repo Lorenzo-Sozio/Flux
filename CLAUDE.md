@@ -929,6 +929,25 @@ remain as aliases over `record:write` and `settings:manage`.
 | Automation Rules | `/dashboard/automation` | [src/actions/automation.ts](src/actions/automation.ts) |
 | Marketing | `/dashboard/marketing` | [src/actions/marketing.ts](src/actions/marketing.ts) |
 
+### Price lists
+
+[src/lib/price-list.ts](src/lib/price-list.ts) decides what a customer pays: a price
+written for that product in their list wins, otherwise the list's percentage moves the
+catalogue price. Tables `price_list` / `price_list_item`, `company.price_list_id`,
+migration `0028_what_this_customer_pays`.
+
+⚠️⚠️ **The percentage is a direction, not a discount.** `adjustmentPercent` −10 is ten
+per cent off, +5 is five per cent on top — the opposite convention to every
+`discountPercent` beside it, which is why it is named differently.
+
+⚠️ **Nothing reaches back into a document.** Quote, order and invoice lines store their
+own `unitPrice`; a list changed today does not rewrite what was sent last month, and
+changing the customer on an open form never overwrites a price somebody typed.
+
+⚠️ A list carries no currency, because a product's price carries none either.
+`scripts/mutations/price-list.json` breaks the sign, the override, the zero price and
+the rounding.
+
 ### One registry of entities
 
 [src/lib/entities.ts](src/lib/entities.ts) lists every kind of record once. Global

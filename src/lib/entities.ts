@@ -26,6 +26,7 @@ export const ENTITY_TYPES = [
   "company",
   "deal",
   "product",
+  "priceList",
   "quote",
   "order",
   "contract",
@@ -117,6 +118,19 @@ export const ENTITIES: readonly EntityDef[] = [
     create: { href: "/dashboard/sales/products?new=true", capability: "product:manage" },
     list: "/dashboard/sales/products",
     keywords: ["product", "item", "sku", "prodotto", "articolo", "listino"],
+  },
+  {
+    // Read by anyone who reads the catalogue; changed only by whoever may change
+    // the prices in it, which is the same authority `product:manage` already names.
+    type: "priceList",
+    group: "sales",
+    icon: "Tags",
+    module: "sales",
+    read: "record:read",
+    create: { href: "/dashboard/sales/price-lists?new=true", capability: "product:manage" },
+    detail: "/dashboard/sales/price-lists/{id}",
+    list: "/dashboard/sales/price-lists",
+    keywords: ["price list", "pricing", "discount", "listino", "listini", "prezzi", "sconto", "maggiorazione"],
   },
   {
     type: "quote",

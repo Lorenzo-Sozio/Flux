@@ -15,6 +15,8 @@ import { z } from "zod";
 
 import { type getQuoteById, type getQuoteFormData, updateQuoteAction } from "@/actions/quotes";
 import { QuoteItemSchema } from "@/actions/quotes-validation";
+import { PriceListNote, PriceSourceBadge } from "@/components/crm/price-list-note";
+import { listPriceSource, usePriceRules } from "@/components/crm/use-price-rules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +29,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrency } from "@/hooks/use-currency";
 import { computeDocument } from "@/lib/document-totals";
+import { priceFor } from "@/lib/price-list";
 import { cn } from "@/lib/utils";
 
 type Quote = Awaited<ReturnType<typeof getQuoteById>>;
@@ -120,6 +123,33 @@ export function QuoteEditForm({ quote, formData }: Props) {
 
   const items = form.watch("items");
   const companyId = form.watch("companyId");
+  /**
+   * The customer's price list, fetched when the customer changes.
+   *
+   * ⚠️ It prices the *next* line picked from the catalogue and never a line
+   * already written: a unit price on the screen may have been agreed on the
+   * telephone, and rewriting it here would change a figure nobody asked to
+   * change, with nothing to say it had happened. `applyPriceList` is the button
+   * that does it on purpose.
+   */
+  const { rules: priceRules } = usePriceRules(companyId);
+  const tPl = useTranslations("documents.priceList");
+
+  function applyPriceList() {
+    if (!priceRules) return;
+    const lines = form.getValues("items") ?? [];
+    lines.forEach((line, index) => {
+      const product = formData.products.find((p) => p.id === line.productId);
+      // An off-catalogue line has no list price — there is nothing to look it
+      // up by — so it is left exactly as it was typed.
+      if (!product) return;
+      form.setValue(`items.${index}.unitPrice`, priceFor(product.id, product.price, priceRules), {
+        shouldDirty: true,
+      });
+    });
+    toast.success(tPl("applied"));
+  }
+
   const headerDiscount = Number(form.watch("discountPercent")) || 0;
   const headerTax = Number(form.watch("taxPercent")) || 0;
 
@@ -165,7 +195,7 @@ export function QuoteEditForm({ quote, formData }: Props) {
     const product = formData.products.find((p) => p.id === value);
     if (!product) return;
     form.setValue(`items.${index}.productId`, product.id);
-    form.setValue(`items.${index}.unitPrice`, Number(product.price ?? 0));
+    form.setValue(`items.${index}.unitPrice`, priceFor(product.id, product.price ?? 0, priceRules));
     form.setValue(`items.${index}.taxPercent`, Number(product.taxPercent ?? 0));
     if (!form.getValues(`items.${index}.description`)) {
       form.setValue(`items.${index}.description`, product.name);
@@ -321,6 +351,7 @@ export function QuoteEditForm({ quote, formData }: Props) {
                     {t("linesTitle")}
                   </CardTitle>
                   <CardDescription>{t("linesSubtitle")}</CardDescription>
+                  <PriceListNote rules={priceRules} onApply={applyPriceList} className="mt-1.5" />
                 </div>
                 <Button
                   type="button"
@@ -470,6 +501,14 @@ export function QuoteEditForm({ quote, formData }: Props) {
                                     onChange={(e) => f.onChange(e.target.valueAsNumber)}
                                   />
                                 </FormControl>
+                                <PriceSourceBadge
+                                  source={listPriceSource(
+                                    priceRules,
+                                    formData.products.find((p) => p.id === line?.productId),
+                                    line?.unitPrice,
+                                  )}
+                                  listName={priceRules?.name}
+                                />
                               </FormItem>
                             )}
                           />

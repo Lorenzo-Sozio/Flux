@@ -37,7 +37,9 @@ import {
 } from "@/actions/orders";
 import { getProductsForSelect } from "@/actions/products";
 import { getTicketsForOrder } from "@/actions/support";
+import { PriceListNote, PriceSourceBadge } from "@/components/crm/price-list-note";
 import { RecordVisit } from "@/components/crm/record-visit";
+import { listPriceSource, usePriceRules } from "@/components/crm/use-price-rules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -48,6 +50,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useCurrency } from "@/hooks/use-currency";
 import { advanceLabelKey, isTerminalStatus, nextStatus } from "@/lib/order-status";
+import { priceFor } from "@/lib/price-list";
 import { cn } from "@/lib/utils";
 
 import { CreateInvoiceButton } from "./_components/create-invoice-button";
@@ -94,9 +97,12 @@ const addItemSchema = z.object({
 
 function AddItemDialog({
   products,
+  companyId,
   onAdded,
 }: {
   products: Product[];
+  /** Whose order this is: the customer decides which price list prices the line. */
+  companyId: string | null;
   onAdded: (item: { productId: string; quantity: number; unitPrice: number }) => void;
 }) {
   const t = useTranslations("orders.detail");
@@ -104,6 +110,9 @@ function AddItemDialog({
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const active = products.filter((p) => p.isActive);
+  // The customer's list, read once and kept: this dialog is opened again for
+  // every line an order gains.
+  const { rules: priceRules } = usePriceRules(companyId);
 
   const form = useForm<z.infer<typeof addItemSchema>>({
     resolver: zodResolver(addItemSchema),
@@ -113,7 +122,9 @@ function AddItemDialog({
   const handleProductChange = (id: string) => {
     const p = active.find((x) => x.id === id);
     form.setValue("productId", id);
-    if (p) form.setValue("unitPrice", Number(p.price));
+    // ⚠️ A proposal only. The field stays editable, and what the reader types
+    // over it is what is added to the order.
+    if (p) form.setValue("unitPrice", priceFor(p.id, p.price, priceRules));
   };
 
   const onSubmit = async (data: z.infer<typeof addItemSchema>) => {
@@ -144,6 +155,7 @@ function AddItemDialog({
         <DialogContent className="gap-0 p-0 sm:max-w-sm">
           <DialogHeader className="border-b px-4 md:px-5 pt-5 pb-4">
             <DialogTitle>{t("addLineItem")}</DialogTitle>
+            <PriceListNote rules={priceRules} className="pt-1" />
           </DialogHeader>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <div className="space-y-3 px-5 py-4">
@@ -174,6 +186,14 @@ function AddItemDialog({
                 <div className="space-y-1.5">
                   <Label>{t("unitPrice")}</Label>
                   <Input type="number" step="0.01" min="0" {...form.register("unitPrice")} className="h-9 font-mono" />
+                  <PriceSourceBadge
+                    source={listPriceSource(
+                      priceRules,
+                      active.find((p) => p.id === form.watch("productId")),
+                      form.watch("unitPrice"),
+                    )}
+                    listName={priceRules?.name}
+                  />
                 </div>
               </div>
             </div>
@@ -341,7 +361,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 <Package className="h-4 w-4 text-muted-foreground" />
                 {t("lineItems")}
               </CardTitle>
-              <AddItemDialog products={products} onAdded={handleAddItem} />
+              <AddItemDialog products={products} companyId={order.companyId} onAdded={handleAddItem} />
             </CardHeader>
             <CardContent className="p-0">
               {order.items.length === 0 ? (

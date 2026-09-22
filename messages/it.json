@@ -1092,7 +1092,10 @@
       "pec": "PEC",
       "language": "Lingua dei documenti",
       "languageAuto": "Automatica dal paese",
-      "languageHint": "Preventivi, email e copie di cortesia delle fatture per questo cliente. Automatica: italiano per un indirizzo in Italia o senza paese, inglese negli altri casi."
+      "languageHint": "Preventivi, email e copie di cortesia delle fatture per questo cliente. Automatica: italiano per un indirizzo in Italia o senza paese, inglese negli altri casi.",
+      "priceList": "Listino",
+      "priceListNone": "Nessun listino (prezzi di catalogo)",
+      "priceListHint": "I preventivi, gli ordini e le fatture intestati a questo cliente propongono i prezzi di questo listino."
     },
     "createSuccess": "Azienda creata.",
     "updateSuccess": "Azienda aggiornata.",
@@ -1107,6 +1110,9 @@
       "einvoicingTitle": "Fatturazione elettronica",
       "einvoicingBody": "Il <strong>Codice SDI</strong> (Codice Destinatario) è il codice di 7 caratteri con cui il Sistema di Interscambio recapita le fatture elettroniche.",
       "similarExist": "Esistono già aziende simili:"
+    },
+    "fields": {
+      "priceList": "Listino"
     }
   },
   "contacts": {
@@ -2390,7 +2396,8 @@
       "contracts": "Contratti",
       "sequences": "Sequenze",
       "invoicing": "Fatturazione elettronica",
-      "invoices": "Fatture"
+      "invoices": "Fatture",
+      "priceLists": "Listini"
     },
     "user": {
       "profile": "Profilo",
@@ -4967,6 +4974,17 @@
       "deleted": "\"{name}\" eliminato.",
       "deleteFailed": "Impossibile eliminare il documento.",
       "openPdf": "Apri PDF"
+    },
+    "priceList": {
+      "headerNone": "Listino: {name}",
+      "headerOff": "Listino: {name} (−{percent}%)",
+      "headerOn": "Listino: {name} (+{percent}%)",
+      "apply": "Applica listino alle righe",
+      "applied": "Prezzi delle righe aggiornati secondo il listino.",
+      "manualPricesKept": "I prezzi già inseriti restano invariati: applicare il listino per aggiornarli.",
+      "fromPercent": "Da listino",
+      "fromOverride": "Prezzo dedicato",
+      "badgeTitle": "Prezzo dal listino {name}"
     }
   },
   "pushNotifications": {
@@ -5591,6 +5609,11 @@
         "one": "Documento",
         "other": "Documenti",
         "new": "Nuovo documento"
+      },
+      "priceList": {
+        "one": "Listino",
+        "other": "Listini",
+        "new": "Nuovo listino"
       }
     },
     "statuses": {
@@ -5941,6 +5964,18 @@
           "t03": {
             "q": "Come disattivo un prodotto che non vendo più?",
             "a": "Invece di eliminarlo (il che romperebbe i riferimenti nei documenti storici), usa il toggle 'Attivo/Inattivo'. I prodotti inattivi non appaiono nella selezione durante la creazione di nuovi preventivi, ma rimangono visibili nei documenti storici."
+          },
+          "t04": {
+            "q": "A che cosa serve un listino?",
+            "a": "Un listino dice quanto paga un gruppo di clienti, invece del prezzo di catalogo. Si definisce in Vendite → Listini in due modi, che convivono: una variazione percentuale sul prezzo base (per esempio -10% per i rivenditori, +5% per un canale con margine diverso) e, dove serve, il prezzo esatto di singoli prodotti, che vince sulla percentuale. Il listino si assegna alla scheda dell'azienda: da quel momento, quando scrivi un preventivo, un ordine o una fattura per quel cliente, il prezzo proposto quando scegli un prodotto è quello del suo listino."
+          },
+          "t05": {
+            "q": "Se cambio un listino, cambiano anche i documenti già scritti?",
+            "a": "No. Preventivi, ordini e fatture conservano i prezzi con cui sono stati scritti: un listino modificato oggi non riscrive un preventivo mandato il mese scorso. Anche nel documento che stai compilando, cambiando cliente o listino le righe già inserite restano come sono: un prezzo corretto a mano non viene mai sovrascritto senza che tu lo chieda."
+          },
+          "t06": {
+            "q": "Che cosa succede se elimino un listino o un cliente non ne ha nessuno?",
+            "a": "Un cliente senza listino paga il prezzo di catalogo. Se elimini un listino, i clienti che lo usavano restano senza listino, quindi tornano al prezzo di catalogo, e i documenti già scritti non cambiano. Attenzione al segno della variazione: è la direzione del cambiamento, non uno sconto, quindi -10 significa dieci per cento in meno e +10 dieci per cento in più."
           }
         }
       },
@@ -6690,6 +6725,110 @@
       "nameRequired": "Un territorio ha bisogno di un nome.",
       "countryUnknown": "Codice paese non valido: {codes}",
       "criteriaRequired": "Scegli almeno un paese, una provincia o regione, o un prefisso di codice postale."
+    },
+    "priceLists": {
+      "nameRequired": "Indicare un nome per il listino",
+      "adjustmentRange": "La variazione deve essere compresa tra -100% e +100%",
+      "priceNegative": "Il prezzo non può essere negativo"
+    }
+  },
+  "priceLists": {
+    "title": "Listini",
+    "subtitle": "Quanto paga un gruppo di clienti, al posto del prezzo di catalogo.",
+    "newPriceList": "Nuovo listino",
+    "edit": "Modifica listino",
+    "deletePriceList": "Elimina listino",
+    "cancel": "Annulla",
+    "searchPlaceholder": "Cerca per nome o descrizione…",
+    "filters": {
+      "all": "Tutti",
+      "active": "Attivo",
+      "inactive": "Non attivo"
+    },
+    "columns": {
+      "name": "Nome",
+      "adjustment": "Variazione sul prezzo base",
+      "prices": "Prezzi indicati",
+      "customers": "Clienti",
+      "active": "Stato"
+    },
+    "adjustment": {
+      "off": "{percent, number}% di sconto",
+      "on": "{percent, number}% di maggiorazione",
+      "none": "Prezzo di catalogo"
+    },
+    "empty": {
+      "title": "Nessun listino",
+      "description": "Un listino applica una variazione percentuale al prezzo di catalogo e può indicare il prezzo di singoli prodotti. I clienti assegnati lo ritrovano su preventivi e ordini."
+    },
+    "dialog": {
+      "newTitle": "Nuovo listino",
+      "editTitle": "Modifica listino",
+      "nameLabel": "Nome",
+      "adjustmentLabel": "Variazione sul prezzo base (%)",
+      "adjustmentHelp": "Un valore negativo riduce il prezzo di catalogo, uno positivo lo aumenta. Esempio: -10 applica il 10% di sconto.",
+      "descriptionLabel": "Descrizione",
+      "optional": "(facoltativo)",
+      "activeLabel": "Attivo",
+      "activeDesc": "I listini non attivi non vengono proposti su preventivi e ordini",
+      "saveChanges": "Salva modifiche",
+      "createPriceList": "Crea listino"
+    },
+    "form": {
+      "namePlaceholder": "es. Rivenditori, Clienti storici…",
+      "descriptionPlaceholder": "A chi si applica questo listino e perché…"
+    },
+    "createSuccess": "Listino creato.",
+    "updateSuccess": "Listino aggiornato.",
+    "deleteSuccess": "Listino eliminato.",
+    "createFailed": "Non è stato possibile creare il listino.",
+    "updateFailed": "Non è stato possibile aggiornare il listino.",
+    "deleteFailed": "Non è stato possibile eliminare il listino.",
+    "deleteTitle": "Eliminare il listino?",
+    "deleteDesc": "verrà eliminato definitivamente, insieme ai prezzi che indica. I clienti assegnati tornano al prezzo di catalogo; i documenti già emessi mantengono gli importi con cui sono stati scritti.",
+    "detail": {
+      "back": "Torna ai listini",
+      "edit": "Modifica",
+      "pricesTitle": "Prezzi indicati",
+      "pricesSubtitle": "Il prezzo scritto qui sostituisce la percentuale per quel prodotto.",
+      "product": "Prodotto",
+      "sku": "SKU",
+      "basePrice": "Prezzo di catalogo",
+      "listPrice": "Prezzo di listino",
+      "difference": "Differenza",
+      "addPrice": "Aggiungi prezzo",
+      "removePrice": "Rimuovi prezzo",
+      "pickProduct": "Scegliere un prodotto…",
+      "searchProduct": "Cerca prodotto…",
+      "noProducts": "Nessun prodotto trovato.",
+      "noProductsLeft": "Tutti i prodotti hanno già un prezzo in questo listino.",
+      "noPrices": "Nessun prezzo indicato",
+      "noPricesDesc": "Senza prezzi specifici il listino applica soltanto la variazione percentuale al prezzo di catalogo.",
+      "priceSaved": "Prezzo salvato.",
+      "priceRemoved": "Prezzo rimosso.",
+      "priceFailed": "Non è stato possibile salvare il prezzo.",
+      "previewTitle": "Prova la variazione",
+      "previewSubtitle": "Quanto costa un prodotto a chi si trova su questo listino.",
+      "resultLabel": "Prezzo applicato",
+      "previewEmpty": "Scegliere un prodotto per vedere il prezzo applicato.",
+      "source": {
+        "base": "Prezzo di catalogo",
+        "percent": "Dalla percentuale",
+        "override": "Prezzo indicato"
+      },
+      "customersTitle": "Clienti su questo listino",
+      "customersSubtitle": "Preventivi, ordini e fatture intestati a questi clienti partono da questi prezzi.",
+      "company": "Azienda",
+      "pickCompany": "Scegliere un'azienda…",
+      "searchCompany": "Cerca azienda…",
+      "noCompaniesLeft": "Nessuna azienda da aggiungere.",
+      "addCustomer": "Aggiungi cliente",
+      "removeCustomer": "Togli dal listino",
+      "customerAdded": "Cliente aggiunto al listino.",
+      "customerRemoved": "Cliente tolto dal listino.",
+      "customerFailed": "Non è stato possibile aggiornare i clienti del listino.",
+      "noCustomers": "Nessun cliente assegnato",
+      "noCustomersDesc": "Finché nessuno è su questo listino, i prezzi qui indicati non compaiono su alcun documento."
     }
   }
 }

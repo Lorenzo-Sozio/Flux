@@ -294,6 +294,16 @@ export interface CompanyInput {
   fiscalCode: string | null;
   pec: string | null;
   language: "it" | "en" | null;
+  /**
+   * The list this customer's documents are priced from.
+   *
+   * ⚠️ An id, never a name. A name lookup here would be a second way of saying
+   * which list — one that silently picks the wrong list when two are called
+   * something similar, and that creates nothing when it matches none. A caller
+   * that has the id got it from this CRM; a caller that has only a name has not
+   * chosen yet.
+   */
+  priceListId: string | null;
   tags: string[];
 }
 
@@ -328,6 +338,7 @@ export function validateCompanyInput(body: unknown): { errors: ValidationError[]
     chkStr(b.fiscalCode, "fiscalCode", 16),
     chkEmail(b.pec, "pec"),
     chkEnum(b.language, "language", COMPANY_LANGUAGES),
+    chkStr(b.priceListId, "priceListId", 40),
   );
 
   if (errors.length > 0) return { errors, data: null };
@@ -357,6 +368,7 @@ export function validateCompanyInput(body: unknown): { errors: ValidationError[]
       fiscalCode: str(b.fiscalCode),
       pec: str(b.pec)?.toLowerCase() ?? null,
       language: (str(b.language) as CompanyInput["language"]) ?? null,
+      priceListId: str(b.priceListId),
       tags: parseTags(b.tags),
     },
   };
@@ -386,6 +398,7 @@ export function buildCompanyPayload(data: CompanyInput, ownerId: string | null) 
     fiscalCode: data.fiscalCode,
     pec: data.pec,
     language: data.language,
+    priceListId: data.priceListId,
     tags: data.tags,
     ownerId: ownerId ?? undefined,
   };

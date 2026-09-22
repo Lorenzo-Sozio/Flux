@@ -22,8 +22,10 @@ import {
 import { getLocale, getTranslations } from "next-intl/server";
 
 import { createActivity, getActivitiesByCompany } from "@/actions/activities";
+import { getCompanyCategories, getCompanyTypes } from "@/actions/crm";
 import { getCustomFieldDefinitions, getCustomFieldValues } from "@/actions/custom-fields";
 import { getCustomerRecord } from "@/actions/customer-record";
+import { getPriceListsForSelect } from "@/actions/price-lists";
 import { deleteTask, getAllUsers, getTasksByCompany, updateTaskStatus } from "@/actions/tasks";
 import { CompanyModal } from "@/app/(main)/dashboard/companies/_components/company-modal";
 import { auth } from "@/auth";
@@ -68,7 +70,22 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
   const [company] = await db.select().from(companies).where(eq(companies.id, companyId));
   if (!company) return notFound();
 
-  const [activitiesList, tasksList, allUsers, customFieldDefs, customFieldVals, record, t, tD] = await Promise.all([
+  const [
+    activitiesList,
+    tasksList,
+    allUsers,
+    customFieldDefs,
+    customFieldVals,
+    record,
+    // The edit dialog opened from here used to be handed none of its lookups, so
+    // opening a company from its own page offered empty category and type
+    // selects — and saving from that dialog wrote the blanks back.
+    categories,
+    companyTypeOptions,
+    priceLists,
+    t,
+    tD,
+  ] = await Promise.all([
     getActivitiesByCompany(companyId),
     getTasksByCompany(companyId),
     getAllUsers(),
@@ -76,11 +93,19 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
     getCustomFieldValues("company", companyId),
     // What has been sold here, which is what a business opens a customer for.
     getCustomerRecord({ companyId }),
+    getCompanyCategories().catch(() => []),
+    getCompanyTypes().catch(() => []),
+    getPriceListsForSelect().catch(() => []),
     getTranslations("companies"),
     getTranslations("entityDetail"),
   ]);
 
   const ownerName = allUsers.find((u) => u.id === company.ownerId)?.name ?? null;
+  // Named, not just present: "Rivenditori" is what the reader can check against
+  // the quote they are about to send; an id is not.
+  const priceListName = company.priceListId
+    ? (priceLists.find((l) => l.id === company.priceListId)?.name ?? null)
+    : null;
   const initial = company.name?.[0]?.toUpperCase() ?? "C";
   const hasAddressInfo = !!(company.street || company.city || company.state || company.zipCode || company.country);
   const hasContactInfo = !!(company.mainEmail || company.mainPhone || company.website);
@@ -151,7 +176,12 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
             </div>
 
             <div className="flex flex-shrink-0 items-center gap-2">
-              <CompanyModal company={company}>
+              <CompanyModal
+                company={company}
+                categories={categories}
+                companyTypes={companyTypeOptions}
+                priceLists={priceLists}
+              >
                 <Button variant="outline" size="sm">
                   <PencilIcon className="mr-1.5 h-4 w-4" />
                   {t("editCompany")}
@@ -259,6 +289,14 @@ export default async function CompanyDetailPage({ params }: { params: Promise<{ 
                     currency: "EUR",
                     maximumFractionDigits: 0,
                   })}
+                </InfoRow>
+              )}
+              {priceListName && (
+                <InfoRow label={t("fields.priceList")}>
+                  <Badge variant="outline" className="gap-1.5">
+                    <ReceiptIcon className="h-3 w-3" />
+                    {priceListName}
+                  </Badge>
                 </InfoRow>
               )}
               {ownerName && (

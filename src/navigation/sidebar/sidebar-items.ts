@@ -32,6 +32,7 @@ import {
   Settings2,
   ShoppingCart,
   Swords,
+  Tags,
   Target,
   TrendingUp,
   Users,
@@ -180,6 +181,9 @@ export const sidebarItems: NavGroup[] = [
       { titleKey: "invoices", url: "/dashboard/sales/invoices", icon: Receipt, module: "sales" },
       { titleKey: "orders", url: "/dashboard/sales/orders", icon: ShoppingCart, module: "sales" },
       { titleKey: "products", url: "/dashboard/sales/products", icon: Package, module: "sales" },
+      // Beside the catalogue, because a price list is the catalogue for one group
+      // of customers — not a separate thing they buy.
+      { titleKey: "priceLists", url: "/dashboard/sales/price-lists", icon: Tags, module: "sales" },
     ],
   },
   {
