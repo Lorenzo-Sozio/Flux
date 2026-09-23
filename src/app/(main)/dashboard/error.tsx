@@ -20,43 +20,35 @@ import { AlertTriangle, ArrowLeft, Lock, RefreshCw, Sparkles } from "lucide-reac
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
-
-type Kind = "forbidden" | "entitlement" | "unknown";
-
-function classify(message: string): Kind {
-  const m = message.toLowerCase();
-  if (
-    m.includes("permission") ||
-    m.includes("read-only") ||
-    m.includes("only workspace") ||
-    m.includes("only the workspace")
-  ) {
-    return "forbidden";
-  }
-  if (m.includes("plan") || m.includes("limit") || m.includes("upgrade") || m.includes("subscription")) {
-    return "entitlement";
-  }
-  return "unknown";
-}
+import { classifyError, type ErrorKind, shouldReloadForStaleBuild } from "@/lib/error-kind";
 
 /**
  * ⚠️ Keys, not sentences. This page said "Something went wrong loading this
  * page" in English to every workspace, and it is the screen somebody reads
  * precisely when they are already confused.
  */
-const ICONS: Record<Kind, typeof Lock> = {
+const ICONS: Record<ErrorKind, typeof Lock> = {
   forbidden: Lock,
   entitlement: Sparkles,
+  stale: RefreshCw,
   unknown: AlertTriangle,
 };
 
+/** Reloads the tab, once per window — see `shouldReloadForStaleBuild`. */
+function reloadOnce(): void {
+  const store = typeof window === "undefined" ? undefined : window.sessionStorage;
+  if (shouldReloadForStaleBuild(store)) window.location.reload();
+}
+
 export default function DashboardError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  const kind = classifyError(error.message ?? "");
+
   useEffect(() => {
     console.error("[dashboard]", error);
-  }, [error]);
+    if (kind === "stale") reloadOnce();
+  }, [error, kind]);
 
   const t = useTranslations("errorPage");
-  const kind = classify(error.message ?? "");
   const Icon = ICONS[kind];
   const title = t(`${kind}Title` as never);
   const hint = t(`${kind}Hint` as never);
@@ -76,10 +68,10 @@ export default function DashboardError({ error, reset }: { error: Error & { dige
         <p className="mt-2 text-muted-foreground text-sm">{hint}</p>
 
         <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
-          {kind === "unknown" && (
-            <Button onClick={reset} variant="default">
+          {(kind === "unknown" || kind === "stale") && (
+            <Button onClick={() => (kind === "stale" ? window.location.reload() : reset())} variant="default">
               <RefreshCw className="mr-2 size-4" />
-              {t("tryAgain")}
+              {kind === "stale" ? t("reloadNow") : t("tryAgain")}
             </Button>
           )}
           {kind === "entitlement" && (

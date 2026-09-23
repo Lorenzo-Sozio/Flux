@@ -4946,7 +4946,10 @@
     "viewPlans": "Vedi i piani",
     "dashboardBoundary": {
       "reference": "Riferimento: {digest}"
-    }
+    },
+    "staleTitle": "Flux è stato aggiornato",
+    "staleHint": "Questa scheda stava usando una versione precedente. La ricarico da sola; se non succede nulla, usa il pulsante qui sotto.",
+    "reloadNow": "Ricarica la pagina"
   },
   "documents": {
     "accepted": "PDF, Word, Excel, immagini — max {mb} MB",

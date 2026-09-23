@@ -4946,7 +4946,10 @@
     "viewPlans": "View plans",
     "dashboardBoundary": {
       "reference": "Reference: {digest}"
-    }
+    },
+    "staleTitle": "Flux has been updated",
+    "staleHint": "This tab was running an earlier version. It reloads by itself; if nothing happens, use the button below.",
+    "reloadNow": "Reload the page"
   },
   "documents": {
     "accepted": "PDF, Word, Excel, images — max {mb} MB",
