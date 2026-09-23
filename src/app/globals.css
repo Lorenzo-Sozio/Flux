@@ -416,3 +416,48 @@ body {
     opacity: 1;
   }
 }
+
+/* ⚠️ A board scrolls sideways; a platform scrollbar says so badly.
+ *
+ * The pipeline is three nested scroll areas — the board sideways, each column
+ * downwards — and on Windows each one draws a 17px grey slab that never fades,
+ * so a screen that holds six columns spends fifty pixels on furniture and looks
+ * broken rather than scrollable.
+ *
+ * `scrollbar-slim` keeps the scrollbar (hiding it would hide the only sign that
+ * there is more to the right) and makes it thin, rounded and quiet, in both
+ * themes. Firefox gets the two properties it supports; WebKit and Chromium get
+ * the pseudo-elements. A coarse pointer keeps the platform's own, because a
+ * touch device draws an overlay bar that is already right. */
+@utility scrollbar-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border) transparent;
+
+  &::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklab, var(--color-foreground) 18%, transparent);
+    border: 3px solid transparent;
+    border-radius: 9999px;
+    background-clip: content-box;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in oklab, var(--color-foreground) 32%, transparent);
+  }
+
+  &::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  @media (pointer: coarse) {
+    scrollbar-width: auto;
+  }
+}

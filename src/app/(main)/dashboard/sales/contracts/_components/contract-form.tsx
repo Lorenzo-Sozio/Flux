@@ -160,7 +160,7 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
     <Form {...form}>
       <form onSubmit={form.handleSubmit(submit)} className="space-y-6">
         {/* ── The bar that stays put: where you are, what it is worth, what to do ── */}
-        <div className="-mx-4 sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur md:-mx-6 md:px-6">
+        <div className="-mx-4 sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b bg-background/95 px-4 py-3 backdrop-blur before:pointer-events-none before:absolute before:inset-x-0 before:-top-4 before:h-4 before:bg-background/95 md:-mx-6 md:px-6 md:before:-top-6 md:before:h-6">
           <div className="flex min-w-0 items-center gap-3">
             <Button asChild type="button" variant="ghost" size="icon" className="h-9 w-9 shrink-0">
               <Link href="/dashboard/sales/contracts" aria-label={t("back")}>
@@ -192,112 +192,26 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-12">
-          {/* ── Who it is with ── */}
-          <Card className="md:col-span-6">
-            <CardHeader>
-              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                {tf("customerTitle")}
-              </CardTitle>
-              <CardDescription>{tf("customerSubtitle")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    {label("title", true)}
-                    <FormControl>
-                      <Input {...field} placeholder={tf("titlePlaceholder")} className="h-9" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="companyId"
-                render={({ field }) => (
-                  <FormItem>
-                    {label("company", true)}
-                    <FormControl>
-                      <SearchableSelect
-                        options={(data?.companies ?? []).map((c) => ({ value: c.id, label: c.name }))}
-                        value={field.value}
-                        onChange={(v) => {
-                          field.onChange(v);
-                          // A contact from the previous company is worse than none.
-                          form.setValue("contactId", "");
-                        }}
-                        placeholder={tf("companyPlaceholder")}
-                        className="h-9"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="contactId"
-                render={({ field }) => (
-                  <FormItem>
-                    {label("contact")}
-                    <FormControl>
-                      <SearchableSelect
-                        options={contactOptions}
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder={tf("contactPlaceholder")}
-                        className="h-9"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="ownerId"
-                render={({ field }) => (
-                  <FormItem>
-                    {label("owner")}
-                    <FormControl>
-                      <SearchableSelect
-                        options={(data?.users ?? []).map((u) => ({ value: u.id, label: u.name ?? u.email ?? u.id }))}
-                        value={field.value ?? ""}
-                        onChange={field.onChange}
-                        placeholder={tf("ownerPlaceholder")}
-                        className="h-9"
-                      />
-                    </FormControl>
-                    <p className="text-muted-foreground text-xs">{tf("ownerHint")}</p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
-
-          {/* ── What it is worth ── */}
-          <Card className="md:col-span-6">
-            <CardHeader>
-              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                {tf("valueTitle")}
-              </CardTitle>
-              <CardDescription>{tf("valueSubtitle")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid items-start gap-6 lg:grid-cols-12">
+          {/* What the contract is, and how long it runs: the part being filled in. */}
+          <div className="space-y-6 lg:col-span-8">
+            {/* ── Who it is with ── */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                  {tf("customerTitle")}
+                </CardTitle>
+                <CardDescription>{tf("customerSubtitle")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
                 <FormField
                   control={form.control}
-                  name="amount"
+                  name="title"
                   render={({ field }) => (
                     <FormItem>
-                      {label("amount", true)}
+                      {label("title", true)}
                       <FormControl>
-                        <Input {...field} inputMode="decimal" className="h-9 text-right tabular-nums" />
+                        <Input {...field} placeholder={tf("titlePlaceholder")} className="h-9" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -305,144 +219,20 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
                 />
                 <FormField
                   control={form.control}
-                  name="billingPeriod"
+                  name="companyId"
                   render={({ field }) => (
                     <FormItem>
-                      {label("billingPeriod", true)}
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="h-9">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {BILLING_PERIODS.map((p) => (
-                            <SelectItem key={p} value={p}>
-                              {t(`periods.${p}`)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="currency"
-                  render={({ field }) => (
-                    <FormItem>
-                      {label("currency")}
+                      {label("company", true)}
                       <FormControl>
-                        <CurrencySelect value={field.value ?? "EUR"} onChange={field.onChange} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      {label("status")}
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <FormControl>
-                          <SelectTrigger className="h-9">
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {(["draft", "active", "cancelled"] as const).map((s) => (
-                            <SelectItem key={s} value={s}>
-                              {t(`statuses.${s}`)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-              <div className="rounded-md bg-muted/50 p-3 text-sm">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-muted-foreground text-xs uppercase tracking-wide">{tf("perMonth")}</span>
-                  <span className="font-semibold tabular-nums">
-                    {formatMoney(preview.monthly, values.currency || "EUR")}
-                  </span>
-                </div>
-                <div className="mt-1 flex items-baseline justify-between">
-                  <span className="text-muted-foreground text-xs uppercase tracking-wide">{tf("perYear")}</span>
-                  <span className="tabular-nums">{formatMoney(preview.monthly * 12, values.currency || "EUR")}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ── How long it runs ── */}
-          <Card className="md:col-span-12">
-            <CardHeader>
-              <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
-                {tf("termTitle")}
-              </CardTitle>
-              <CardDescription>{tf("termSubtitle")}</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <FormField
-                  control={form.control}
-                  name="startDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      {label("startDate", true)}
-                      <FormControl>
-                        <Input {...field} type="date" className="h-9" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="endDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      {label("endDate")}
-                      <FormControl>
-                        <Input {...field} type="date" className="h-9" />
-                      </FormControl>
-                      <p className="text-muted-foreground text-xs">{tf("endDateHint")}</p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="noticeDays"
-                  render={({ field }) => (
-                    <FormItem>
-                      {label("noticeDays")}
-                      <FormControl>
-                        <Input {...field} type="number" min={0} max={365} className="h-9" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="renewalTermMonths"
-                  render={({ field }) => (
-                    <FormItem>
-                      {label("renewalTermMonths")}
-                      <FormControl>
-                        <Input
-                          {...field}
-                          type="number"
-                          min={1}
-                          max={120}
-                          disabled={!values.autoRenew}
+                        <SearchableSelect
+                          options={(data?.companies ?? []).map((c) => ({ value: c.id, label: c.name }))}
+                          value={field.value}
+                          onChange={(v) => {
+                            field.onChange(v);
+                            // A contact from the previous company is worse than none.
+                            form.setValue("contactId", "");
+                          }}
+                          placeholder={tf("companyPlaceholder")}
                           className="h-9"
                         />
                       </FormControl>
@@ -450,60 +240,282 @@ export function ContractForm({ initial, data }: { initial: ContractInitial | nul
                     </FormItem>
                   )}
                 />
-              </div>
+                <FormField
+                  control={form.control}
+                  name="contactId"
+                  render={({ field }) => (
+                    <FormItem>
+                      {label("contact")}
+                      <FormControl>
+                        <SearchableSelect
+                          options={contactOptions}
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          placeholder={tf("contactPlaceholder")}
+                          className="h-9"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="ownerId"
+                  render={({ field }) => (
+                    <FormItem>
+                      {label("owner")}
+                      <FormControl>
+                        <SearchableSelect
+                          options={(data?.users ?? []).map((u) => ({ value: u.id, label: u.name ?? u.email ?? u.id }))}
+                          value={field.value ?? ""}
+                          onChange={field.onChange}
+                          placeholder={tf("ownerPlaceholder")}
+                          className="h-9"
+                        />
+                      </FormControl>
+                      <p className="text-muted-foreground text-xs">{tf("ownerHint")}</p>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
 
-              <FormField
-                control={form.control}
-                name="autoRenew"
-                render={({ field }) => (
-                  <FormItem className="flex items-center gap-3 space-y-0 rounded-md border p-3">
-                    <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
-                    </FormControl>
-                    <div className="min-w-0">
-                      <FormLabel className="cursor-pointer">{tf("autoRenew")}</FormLabel>
-                      <p className="text-muted-foreground text-xs">{tf("autoRenewHint")}</p>
-                    </div>
-                  </FormItem>
-                )}
-              />
-
-              {/* What those dates will mean, rather than three dates to hold in the head. */}
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-md bg-muted/50 p-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("status")}</span>
-                  <Badge variant="outline">{t(`phases.${preview.phase}`)}</Badge>
+            {/* ── How long it runs ── */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                  {tf("termTitle")}
+                </CardTitle>
+                <CardDescription>{tf("termSubtitle")}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="startDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        {label("startDate", true)}
+                        <FormControl>
+                          <Input {...field} type="date" className="h-9" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="endDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        {label("endDate")}
+                        <FormControl>
+                          <Input {...field} type="date" className="h-9" />
+                        </FormControl>
+                        <p className="text-muted-foreground text-xs">{tf("endDateHint")}</p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="noticeDays"
+                    render={({ field }) => (
+                      <FormItem>
+                        {label("noticeDays")}
+                        <FormControl>
+                          <Input {...field} type="number" min={0} max={365} className="h-9" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="renewalTermMonths"
+                    render={({ field }) => (
+                      <FormItem>
+                        {label("renewalTermMonths")}
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type="number"
+                            min={1}
+                            max={120}
+                            disabled={!values.autoRenew}
+                            className="h-9"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("termEnd")}</span>
-                  <span className="tabular-nums">{preview.termEnd ?? tf("noEnd")}</span>
-                </div>
-                {preview.noticeBy && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("noticeBy")}</span>
-                      <span className="tabular-nums">{preview.noticeBy}</span>
-                    </div>
-                    <p className="text-muted-foreground text-xs">{tf("asksFrom", { date: preview.asksFrom ?? "" })}</p>
-                  </>
-                )}
-              </div>
 
-              <FormField
-                control={form.control}
-                name="notes"
-                render={({ field }) => (
-                  <FormItem>
-                    {label("notes")}
-                    <FormControl>
-                      <Textarea {...field} rows={3} placeholder={tf("notesPlaceholder")} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-          </Card>
+                <FormField
+                  control={form.control}
+                  name="autoRenew"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center gap-3 space-y-0 rounded-md border p-3">
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <div className="min-w-0">
+                        <FormLabel className="cursor-pointer">{tf("autoRenew")}</FormLabel>
+                        <p className="text-muted-foreground text-xs">{tf("autoRenewHint")}</p>
+                      </div>
+                    </FormItem>
+                  )}
+                />
+
+                {/* What those dates will mean, rather than three dates to hold in the head. */}
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-md bg-muted/50 p-3 text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("status")}</span>
+                    <Badge variant="outline">{t(`phases.${preview.phase}`)}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("termEnd")}</span>
+                    <span className="tabular-nums">{preview.termEnd ?? tf("noEnd")}</span>
+                  </div>
+                  {preview.noticeBy && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-xs uppercase tracking-wide">{t("noticeBy")}</span>
+                        <span className="tabular-nums">{preview.noticeBy}</span>
+                      </div>
+                      <p className="text-muted-foreground text-xs">
+                        {tf("asksFrom", { date: preview.asksFrom ?? "" })}
+                      </p>
+                    </>
+                  )}
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="notes"
+                  render={({ field }) => (
+                    <FormItem>
+                      {label("notes")}
+                      <FormControl>
+                        <Textarea {...field} rows={3} placeholder={tf("notesPlaceholder")} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* What it is worth, kept in view while the dates above are edited. */}
+          <div className="lg:col-span-4">
+            <div className="space-y-6 lg:sticky lg:top-24">
+              {/* ── What it is worth ── */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="font-semibold text-muted-foreground text-sm uppercase tracking-wide">
+                    {tf("valueTitle")}
+                  </CardTitle>
+                  <CardDescription>{tf("valueSubtitle")}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="amount"
+                      render={({ field }) => (
+                        <FormItem>
+                          {label("amount", true)}
+                          <FormControl>
+                            <Input {...field} inputMode="decimal" className="h-9 text-right tabular-nums" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="billingPeriod"
+                      render={({ field }) => (
+                        <FormItem>
+                          {label("billingPeriod", true)}
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {BILLING_PERIODS.map((p) => (
+                                <SelectItem key={p} value={p}>
+                                  {t(`periods.${p}`)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="currency"
+                      render={({ field }) => (
+                        <FormItem>
+                          {label("currency")}
+                          <FormControl>
+                            <CurrencySelect value={field.value ?? "EUR"} onChange={field.onChange} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          {label("status")}
+                          <Select value={field.value} onValueChange={field.onChange}>
+                            <FormControl>
+                              <SelectTrigger className="h-9">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {(["draft", "active", "cancelled"] as const).map((s) => (
+                                <SelectItem key={s} value={s}>
+                                  {t(`statuses.${s}`)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <div className="rounded-md bg-muted/50 p-3 text-sm">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide">{tf("perMonth")}</span>
+                      <span className="font-semibold tabular-nums">
+                        {formatMoney(preview.monthly, values.currency || "EUR")}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex items-baseline justify-between">
+                      <span className="text-muted-foreground text-xs uppercase tracking-wide">{tf("perYear")}</span>
+                      <span className="tabular-nums">
+                        {formatMoney(preview.monthly * 12, values.currency || "EUR")}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </div>
       </form>
     </Form>

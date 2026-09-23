@@ -5,16 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
-import {
-  BarChart2,
-  CalendarIcon,
-  CoinsIcon,
-  MoreHorizontal,
-  PencilIcon,
-  PlusIcon,
-  Settings2,
-  TrendingUp,
-} from "lucide-react";
+import { CalendarIcon, CoinsIcon, PencilIcon, PlusIcon, Settings2 } from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 
 import { getLossReasons, updateDealStage } from "@/actions/pipeline";
@@ -23,12 +14,6 @@ import { type LossAnswer, type LossReason, LostDealDialog } from "@/components/c
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useCurrency } from "@/hooks/use-currency";
 import { cn } from "@/lib/utils";
 
@@ -137,10 +122,11 @@ export function PipelineBoard({
   if (!isMounted) return null;
 
   return (
-    // ⚠️ The height has to clear the bottom bar as well as the header, or the
-    // last card in every column sits behind the tabs and the board's own
-    // scrollbar is unreachable.
-    <div className="flex h-[calc(100dvh-260px-var(--mobile-nav-height)-var(--safe-bottom))] min-h-[420px] w-full flex-col overflow-hidden md:h-[calc(100dvh-230px)]">
+    // Fills the height the section gives it (see the section layout) rather than
+    // subtracting a measured constant from the viewport, which was wrong the moment
+    // the filters wrapped onto a second line. The floor is there for the short
+    // window a phone in landscape leaves: a board of 200px is not a board.
+    <div className="flex h-full min-h-[26rem] w-full flex-col overflow-hidden">
       <LostDealDialog
         open={pendingLoss !== null}
         dealName={pendingLoss?.dealName ?? ""}
@@ -155,66 +141,28 @@ export function PipelineBoard({
         }}
       />
 
-      <div className="mb-6 flex shrink-0 items-center justify-between gap-3 px-1">
+      {/*
+        ⚠️ The ways of *looking* at the pipeline — forecast, funnel, report — are the
+        section's tabs now, drawn above this by the section layout. They were also three
+        buttons here, so the same four destinations appeared twice on one screen, and the
+        pair disagreed about which one you were on. What is left is what belongs to the
+        board itself: changing its stages, and adding a deal.
+      */}
+      <div className="mb-4 flex shrink-0 items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="truncate font-bold text-xl">{t("title")}</h2>
-          <p className="text-muted-foreground text-sm">{t("boardSubtitle")}</p>
+          <h2 className="truncate font-semibold text-lg tracking-tight">{t("title")}</h2>
+          <p className="truncate text-muted-foreground text-sm">{t("boardSubtitle")}</p>
         </div>
 
-        {/*
-          Four buttons and a title in one row is 520px of controls on a screen
-          that has 343. Below md the three ways of *looking* at the pipeline
-          collapse into one menu and only "New deal" — the thing anyone actually
-          comes here to do — keeps its button.
-        */}
         <div className="flex shrink-0 items-center gap-2">
-          <div className="hidden items-center gap-2 md:flex">
+          {canManageStages && (
             <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/pipeline/forecast">
-                <TrendingUp className="mr-2 h-4 w-4" /> {t("forecast.title")}
+              <Link href="/dashboard/settings/pipeline">
+                <Settings2 className="h-4 w-4 sm:mr-2" />
+                <span className="max-sm:sr-only">{t("manageStages")}</span>
               </Link>
             </Button>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/pipeline/report">
-                <BarChart2 className="mr-2 h-4 w-4" /> {t("report")}
-              </Link>
-            </Button>
-            {canManageStages && (
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/dashboard/settings/pipeline">
-                  <Settings2 className="mr-2 h-4 w-4" /> {t("manageStages")}
-                </Link>
-              </Button>
-            )}
-          </div>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild className="md:hidden">
-              <Button variant="outline" size="icon" aria-label={t("report")}>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52">
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard/pipeline/forecast">
-                  <TrendingUp className="mr-2 h-4 w-4" /> {t("forecast.title")}
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard/pipeline/report">
-                  <BarChart2 className="mr-2 h-4 w-4" /> {t("report")}
-                </Link>
-              </DropdownMenuItem>
-              {canManageStages && (
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard/settings/pipeline">
-                    <Settings2 className="mr-2 h-4 w-4" /> {t("manageStages")}
-                  </Link>
-                </DropdownMenuItem>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
+          )}
           {canEdit && (
             <DealModal stages={initialStages} companies={companies} contacts={contacts}>
               <Button size="sm" className="gap-2">
@@ -230,7 +178,9 @@ export function PipelineBoard({
             seven stages rendered as unreadable strips and adding a stage made the
             board worse instead of richer (audit rilievo U-05). They now keep a
             legible width and the board scrolls sideways instead. */}
-        <div className="flex w-full flex-1 gap-4 overflow-x-auto pb-4">
+        {/* One horizontal scrollbar for the board, styled rather than left to the
+            platform's default, which draws a grey slab across the bottom on Windows. */}
+        <div className="scrollbar-slim flex min-h-0 w-full flex-1 gap-4 overflow-x-auto pb-3">
           {initialStages.map((stage) => {
             const stageDeals = deals.filter((d) => d.stageId === stage.id);
             const totalAmount = stageDeals.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
@@ -273,7 +223,7 @@ export function PipelineBoard({
                     <div
                       {...provided.droppableProps}
                       ref={provided.innerRef}
-                      className={`flex flex-1 flex-col gap-3 overflow-y-auto p-3 transition-colors ${
+                      className={`scrollbar-slim flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3 transition-colors ${
                         snapshot.isDraggingOver ? "bg-primary/5" : "bg-transparent"
                       }`}
                     >

@@ -87,8 +87,8 @@ function Bar({ view, members }: { view: PipelineView; members: PipelineMember[] 
     (has("q") && filters.q !== "");
 
   return (
-    <div className="mb-6 space-y-3">
-      <nav aria-label={t("sections")} className="-mx-1 overflow-x-auto px-1">
+    <div className="mb-4 shrink-0 space-y-3">
+      <nav aria-label={t("sections")} className="scrollbar-slim -mx-1 shrink-0 overflow-x-auto px-1">
         <ul className="flex min-w-max gap-1 border-b">
           {PIPELINE_VIEWS.map((v) => (
             <li key={v.key}>
