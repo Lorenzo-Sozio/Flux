@@ -174,7 +174,14 @@ export async function createTenant(name: string, subdomain: string, dbUrl: strin
   if (creatorId) {
     const [creator] = await platformDb.select({ id: users.id }).from(users).where(eq(users.id, creatorId));
     if (!creator) {
-      throw new Error("Your session belongs to an account that no longer exists. Sign out, sign in again, and retry.");
+      // ⚠️ Naming the address matters: there are two sessions here, the admin panel's
+      // and the application's, and "log out" in the panel clears only the first. The
+      // id in this message comes from the second — a signed token that survives the
+      // account, and the database, it was minted against.
+      throw new Error(
+        "Your session names an account that does not exist in this platform database. " +
+          "This is the application session, not the admin panel one: sign out at /api/auth/signout, sign in again, and retry.",
+      );
     }
   }
 
