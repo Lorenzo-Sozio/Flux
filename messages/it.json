@@ -2842,7 +2842,9 @@
       "searchDeals": "Cerca trattativa…",
       "reset": "Azzera filtri"
     },
-    "reportSubtitlePeriod": "Pipeline aperta oggi; vinte e perse chiuse negli ultimi {days} giorni."
+    "reportSubtitlePeriod": "Pipeline aperta oggi; vinte e perse chiuse negli ultimi {days} giorni.",
+    "foldStage": "Riduci la fase",
+    "unfoldStage": "Espandi la fase"
   },
   "placeholders": {
     "unknown": "Niente riempirà {list}. Arriverà al destinatario esattamente com'è scritto.",

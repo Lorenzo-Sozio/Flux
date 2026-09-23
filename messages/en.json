@@ -2842,7 +2842,9 @@
       "searchDeals": "Search deals…",
       "reset": "Reset filters"
     },
-    "reportSubtitlePeriod": "Open pipeline as of today; won and lost closed in the last {days} days."
+    "reportSubtitlePeriod": "Open pipeline as of today; won and lost closed in the last {days} days.",
+    "foldStage": "Fold this stage",
+    "unfoldStage": "Unfold this stage"
   },
   "placeholders": {
     "unknown": "Nothing will fill in {list}. It will reach the recipient exactly as written.",

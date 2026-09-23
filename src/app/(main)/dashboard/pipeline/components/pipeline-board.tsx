@@ -5,12 +5,21 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { DragDropContext, Draggable, Droppable, type DropResult } from "@hello-pangea/dnd";
-import { CalendarIcon, CoinsIcon, PencilIcon, PlusIcon, Settings2 } from "lucide-react";
+import {
+  CalendarIcon,
+  ChevronsLeftRight,
+  ChevronsRightLeft,
+  CoinsIcon,
+  PencilIcon,
+  PlusIcon,
+  Settings2,
+} from "lucide-react";
 import { useFormatter, useTranslations } from "next-intl";
 
 import { getLossReasons, updateDealStage } from "@/actions/pipeline";
 import { DealModal } from "@/components/crm/deal-modal";
 import { type LossAnswer, type LossReason, LostDealDialog } from "@/components/crm/lost-deal-dialog";
+import { useWorkspaceScope } from "@/components/crm/workspace-scope";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +56,9 @@ type Stage = {
   updatedAt: Date;
 };
 
+/** Where the folded stages are remembered, per workspace. */
+const FOLDED_KEY = "flux.pipeline.folded:";
+
 export function PipelineBoard({
   initialStages,
   initialDeals,
@@ -66,6 +78,10 @@ export function PipelineBoard({
   const format = useFormatter();
   const { formatAmount, formatMoney } = useCurrency();
   const [isMounted, setIsMounted] = useState(false);
+  const scope = useWorkspaceScope();
+  // Which stages are folded away, per workspace and per browser. A preference about
+  // how somebody looks at their own board: worth remembering, worth nothing if lost.
+  const [folded, setFolded] = useState<string[]>([]);
   const [deals, setDeals] = useState(initialDeals);
   const [pendingLoss, setPendingLoss] = useState<{ dealId: string; dealName: string; stageId: string } | null>(null);
   const [lossReasons, setLossReasons] = useState<LossReason[]>([]);
@@ -73,6 +89,28 @@ export function PipelineBoard({
   useEffect(() => {
     setIsMounted(true);
   }, []);
+
+  useEffect(() => {
+    if (!scope) return;
+    try {
+      const stored = window.localStorage.getItem(`${FOLDED_KEY}${scope}`);
+      setFolded(stored ? (JSON.parse(stored) as string[]) : []);
+    } catch {
+      // A browser that will not store this is not a problem worth reporting.
+    }
+  }, [scope]);
+
+  const toggleFold = (stageId: string) => {
+    setFolded((current) => {
+      const next = current.includes(stageId) ? current.filter((id) => id !== stageId) : [...current, stageId];
+      try {
+        if (scope) window.localStorage.setItem(`${FOLDED_KEY}${scope}`, JSON.stringify(next));
+      } catch {
+        // Same again: the board still works, it just forgets by tomorrow.
+      }
+      return next;
+    });
+  };
 
   // Loaded once, and only where there is a losing column to drop into.
   useEffect(() => {
@@ -180,35 +218,90 @@ export function PipelineBoard({
             legible width and the board scrolls sideways instead. */}
         {/* One horizontal scrollbar for the board, styled rather than left to the
             platform's default, which draws a grey slab across the bottom on Windows. */}
-        <div className="scrollbar-slim flex min-h-0 w-full flex-1 gap-4 overflow-x-auto pb-3">
+        {/* ⚠️⚠️ Columns **share** the width and scroll only when sharing it would make
+            them unreadable. They used to be `min-w-[280px] shrink-0`, so six stages were
+            1700px wide on a 1200px screen and the board scrolled sideways from the first
+            visit: the stages past the edge were invisible, and finding a deal meant
+            dragging a scrollbar. They now shrink to 13rem before the board scrolls at
+            all, which fits six stages on a laptop — and a workspace with more than that
+            can fold the ones it is not working in (the button in each header). */}
+        <div className="scrollbar-slim flex min-h-0 w-full flex-1 gap-3 overflow-x-auto pb-3">
           {initialStages.map((stage) => {
             const stageDeals = deals.filter((d) => d.stageId === stage.id);
             const totalAmount = stageDeals.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+
+            // A folded stage keeps its place in the order and stays a drop target: the
+            // point of folding one is to move a deal *past* it, not to hide it from the
+            // drag that is already under way.
+            if (folded.includes(stage.id)) {
+              return (
+                <Droppable droppableId={stage.id} key={stage.id}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={cn(
+                        "flex h-full w-11 shrink-0 flex-col items-center gap-2 rounded-xl border bg-muted/30 py-3 shadow-sm transition-colors",
+                        snapshot.isDraggingOver && "border-primary/40 bg-primary/10",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => toggleFold(stage.id)}
+                        title={t("unfoldStage")}
+                        aria-label={t("unfoldStage")}
+                        className="rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <ChevronsLeftRight className="h-3.5 w-3.5" />
+                      </button>
+                      <Badge variant="secondary" className="h-5 rounded-full px-1.5 text-[10px]">
+                        {stageDeals.length}
+                      </Badge>
+                      <span
+                        className="min-h-0 flex-1 truncate font-bold text-xs uppercase tracking-tight [writing-mode:vertical-rl]"
+                        style={{ color: stage.color || "inherit" }}
+                      >
+                        {stage.name}
+                      </span>
+                      <span className="hidden">{provided.placeholder}</span>
+                    </div>
+                  )}
+                </Droppable>
+              );
+            }
 
             return (
               <div
                 key={stage.id}
                 className={cn(
-                  "flex h-full min-w-[280px] flex-1 shrink-0 flex-col overflow-hidden rounded-xl border bg-muted/30 shadow-sm",
-                  // ⚠️ `flex-1` means basis 0, so a width is ignored and every
-                  // column is exactly its 280px minimum — which lands one column
-                  // per screen with nothing of the next one showing, and a board
-                  // that scrolls sideways with no sign that it does. Below sm a
-                  // column takes 85% and the edge of the next one is the sign.
-                  "max-sm:w-[85%] max-sm:flex-none",
+                  "flex h-full min-w-[13rem] flex-1 basis-0 flex-col overflow-hidden rounded-xl border bg-muted/30 shadow-sm",
+                  // ⚠️ On a phone the sharing stops: a column takes 85% of the screen and
+                  // the edge of the next one is what says the board scrolls.
+                  "max-sm:w-[85%] max-sm:min-w-0 max-sm:flex-none",
                 )}
               >
                 <div className="flex shrink-0 flex-col gap-1 border-b bg-background/50 p-4 backdrop-blur-sm">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-1">
                     <h3
-                      className="truncate font-bold text-sm uppercase tracking-tight"
+                      className="min-w-0 truncate font-bold text-sm uppercase tracking-tight"
                       style={{ color: stage.color || "inherit" }}
                     >
                       {stage.name}
                     </h3>
-                    <Badge variant="secondary" className="h-5 rounded-full text-[10px]">
-                      {stageDeals.length}
-                    </Badge>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Badge variant="secondary" className="h-5 rounded-full text-[10px]">
+                        {stageDeals.length}
+                      </Badge>
+                      <button
+                        type="button"
+                        onClick={() => toggleFold(stage.id)}
+                        title={t("foldStage")}
+                        aria-label={t("foldStage")}
+                        className="hidden rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:block"
+                      >
+                        <ChevronsRightLeft className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                   <p className="flex items-center gap-1 font-semibold text-muted-foreground text-xs">
                     <CoinsIcon className="h-3 w-3" />
