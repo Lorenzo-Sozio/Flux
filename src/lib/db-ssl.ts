@@ -47,15 +47,37 @@ lZOqgR8iXm6J/acGym/OIBOAqeV06TlW7uhFnvdluS8HHeuxe4fZhwlHQ03Bc32b
 
 /** True for a connection string Neon's HTTP driver can serve. */
 export function isNeonUrl(url: string): boolean {
-  return /\.neon\.tech(?:[:/]|$)/i.test(hostOf(url));
+  // Whole labels, anchored at the end: `neon.tech.example.com` is somebody else's
+  // domain, and treating it as Neon would send the credentials to an HTTP endpoint
+  // of their choosing.
+  const host = hostOf(url);
+  return host === "neon.tech" || host.endsWith(".neon.tech");
 }
 
+/** The host, without the port and without the credentials before it. */
 function hostOf(url: string): string {
   // Not `new URL()`: a Postgres password may carry characters that make the URL
   // parser throw, and a connection string that cannot be read is not a reason to
   // fall back to an unverified connection.
   const match = /^[a-z+]+:\/\/(?:[^@/]*@)?([^/?#]+)/i.exec(url.trim());
-  return match?.[1] ?? "";
+  const authority = match?.[1]?.toLowerCase() ?? "";
+  // [::1]:5432 → ::1 ; host:5432 → host
+  const bracketed = /^\[([^\]]+)\]/.exec(authority);
+  if (bracketed) return bracketed[1];
+  return authority.split(":")[0];
+}
+
+/**
+ * ⚠️⚠️ **Whole names only.** `host.startsWith("localhost")` also accepts
+ * `localhost.example.com`, which is a name anybody can register and point anywhere:
+ * the connection would then be made to a stranger's server, over the open internet,
+ * **with TLS switched off entirely** — because "this is local" is what turns it off.
+ * A prefix test is the whole vulnerability; the comparison has to be for the name
+ * itself, or for a label under `.localhost`, which is reserved and never resolves off
+ * the machine.
+ */
+function isLoopback(host: string): boolean {
+  return host === "localhost" || host.endsWith(".localhost") || host === "127.0.0.1" || host === "::1";
 }
 
 export interface DbSslOptions {
@@ -70,8 +92,9 @@ export interface DbSslOptions {
  * there is no certificate to pin and nothing crosses a network).
  */
 export function sslFor(url: string): DbSslOptions | undefined {
-  const host = hostOf(url).toLowerCase();
-  if (!host || host.startsWith("localhost") || host.startsWith("127.0.0.1")) return undefined;
+  const host = hostOf(url);
+  // An unreadable connection string is not a local one: it keeps the pinned CA.
+  if (host && isLoopback(host)) return undefined;
 
   const ca = process.env.DATABASE_CA_PEM?.trim() || RAILWAY_ROOT_CA;
   return {

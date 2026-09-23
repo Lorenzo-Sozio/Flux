@@ -1,0 +1,32 @@
+[
+  {
+    "file": "src/lib/db-ssl.ts",
+    "description": "⚠️⚠️ torna il confronto per prefisso: «localhost.attaccante.example» viene creduto locale e la connessione parte in chiaro su internet",
+    "find": "  return host === \"localhost\" || host.endsWith(\".localhost\") || host === \"127.0.0.1\" || host === \"::1\";",
+    "replace": "  return host.startsWith(\"localhost\") || host.startsWith(\"127.0.0.1\");"
+  },
+  {
+    "file": "src/lib/db-ssl.ts",
+    "description": "⚠️⚠️ un dominio che contiene «neon.tech» viene trattato come Neon: le credenziali partono verso l'endpoint HTTP di uno sconosciuto",
+    "find": "  return host === \"neon.tech\" || host.endsWith(\".neon.tech\");",
+    "replace": "  return host.includes(\"neon.tech\");"
+  },
+  {
+    "file": "src/lib/db-ssl.ts",
+    "description": "⚠️⚠️ il certificato non viene più verificato: la connessione resta cifrata ma accetta qualunque server",
+    "find": "    rejectUnauthorized: true,",
+    "replace": "    rejectUnauthorized: false as true,"
+  },
+  {
+    "file": "src/lib/db-ssl.ts",
+    "description": "⚠️ una stringa di connessione illeggibile viene trattata come locale, quindi senza TLS",
+    "find": "  if (host && isLoopback(host)) return undefined;",
+    "replace": "  if (!host || isLoopback(host)) return undefined;"
+  },
+  {
+    "file": "src/lib/db-ssl.ts",
+    "description": "la porta resta attaccata al nome host, quindi «localhost:5432» non viene riconosciuto e ogni sviluppo locale pretende un certificato",
+    "find": "  return authority.split(\":\")[0];",
+    "replace": "  return authority;"
+  }
+]
