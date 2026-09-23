@@ -162,30 +162,48 @@ export async function createTenant(name: string, subdomain: string, dbUrl: strin
     throw new Error("Invalid database URL. Must be a PostgreSQL connection string (postgresql://host/database).");
   }
 
-  const id = crypto.randomUUID();
-  await platformDb.insert(tenants).values({
-    id,
-    name: name.trim(),
-    subdomain: subdomain.toLowerCase(),
-    dbUrl: encryptDbUrl(dbUrl),
-    settings: settings ? JSON.stringify(settings) : null,
-  });
-
-  // Auto-add the creator as the tenant owner
+  // ⚠️ Who is creating this, and do they still exist?
+  //
+  // The session is a signed token, not a row: it outlives the account it names —
+  // through a deleted user, and through the platform database being replaced, which
+  // is how this was found. The owner row then failed on its foreign key *after* the
+  // workspace row was written, leaving a workspace with no owner, no subscription and
+  // an unmigrated database, and an error naming a constraint rather than the problem.
   const session = await auth();
-  if (session?.user?.id) {
-    await platformDb.insert(tenantMembers).values({
-      tenantId: id,
-      userId: session.user.id,
-      role: "owner",
-    });
+  const creatorId = session?.user?.id ?? null;
+  if (creatorId) {
+    const [creator] = await platformDb.select({ id: users.id }).from(users).where(eq(users.id, creatorId));
+    if (!creator) {
+      throw new Error("Your session belongs to an account that no longer exists. Sign out, sign in again, and retry.");
+    }
   }
 
-  // Provision a free subscription so the licensing engine always finds one
-  await platformDb.insert(billingSubscriptions).values({
-    tenantId: id,
-    status: "free",
-  });
+  const id = crypto.randomUUID();
+  // ⚠️⚠️ One batch, so a workspace is created whole or not at all. `batch` is a real
+  // transaction on both drivers (Neon maps it to its transaction endpoint; the pooled
+  // one runs it on a single connection), which is what the three statements need:
+  // a workspace without its owner cannot be opened by anybody, and one without a
+  // subscription is invisible to the licensing engine.
+  // `unknown[]`: the three inserts are different tables, and an inferred array takes
+  // the type of the first one.
+  const writes: unknown[] = [
+    platformDb.insert(tenants).values({
+      id,
+      name: name.trim(),
+      subdomain: subdomain.toLowerCase(),
+      dbUrl: encryptDbUrl(dbUrl),
+      settings: settings ? JSON.stringify(settings) : null,
+    }),
+    // Provision a free subscription so the licensing engine always finds one
+    platformDb
+      .insert(billingSubscriptions)
+      .values({ tenantId: id, status: "free" }),
+  ];
+  // Auto-add the creator as the tenant owner
+  if (creatorId) {
+    writes.push(platformDb.insert(tenantMembers).values({ tenantId: id, userId: creatorId, role: "owner" }));
+  }
+  await platformDb.batch(writes as unknown as Parameters<typeof platformDb.batch>[0]);
 
   // Run migrations immediately — idempotent, so safe to retry via "Migrate DB" if this fails.
   let migrationError: string | null = null;
