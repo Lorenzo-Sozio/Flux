@@ -198,9 +198,9 @@ export function SearchDialog({
         // one 680px column came to some 700px of content in a 460px window, so the
         // first thing anybody saw was half a list.
         // Sits higher than the default third of the way down, because it is taller
-        // now, and is capped against the window rather than against a number: the
-        // list inside takes what is left, so a short palette stays short.
-        className="sm:top-[9vh] sm:max-h-[82dvh] sm:max-w-[920px]"
+        // now. No height cap of its own: the dialog already caps itself against the
+        // window, and a second cap here only ever made it shorter.
+        className="sm:top-[8vh] sm:max-w-[920px]"
       >
         <CommandPrimitive shouldFilter={false} className="flex size-full flex-col">
           <div className="flex shrink-0 items-center gap-3 border-b py-3.5 pr-12 pl-4 sm:pr-4">
@@ -252,7 +252,13 @@ export function SearchDialog({
             </fieldset>
           )}
 
-          <CommandList className="scrollbar-slim min-h-0 flex-1 overflow-y-auto">
+          {/* ⚠️⚠️ An explicit height, not `flex-1`. The dialog is a flex column whose
+              own height is `max-height` only — auto, in other words — so a child with
+              `flex-1` has a *basis of zero* and nothing to grow into: the list came out
+              shorter than the content it held, which is the opposite of what taking the
+              remaining space means. `dvh` rather than `vh`: on iOS the latter is the
+              window without the address bar. */}
+          <CommandList className="scrollbar-slim max-h-[min(70dvh,780px)] overflow-y-auto">
             {!query && (
               // Two columns where there is room for two: what you were working on, and
               // what you can start. On a narrow screen they stack, in that order,
@@ -294,14 +300,19 @@ export function SearchDialog({
                     <p className="mb-2 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
                       {te("search.create")}
                     </p>
-                    <div className="space-y-2">
+                    {/* ⚠️ Laid out in two text columns rather than stacked: six section
+                        headings and fourteen buttons down a single column is 450px, which
+                        is most of the window on a laptop and the reason this opened on a
+                        scrollbar. `break-inside-avoid` keeps a heading with its own
+                        buttons — a section split across the fold reads as two sections. */}
+                    <div className="gap-x-4 sm:columns-2">
                       {ENTITY_GROUPS.map((g) => {
                         const inGroup = createCommands.filter((c) => c.group === g);
                         if (inGroup.length === 0) return null;
                         return (
-                          <div key={g}>
+                          <div key={g} className="mb-2.5 break-inside-avoid">
                             <p className="mb-1 px-1 text-[11px] text-muted-foreground">{te(`groups.${g}` as never)}</p>
-                            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                            <div className="grid grid-cols-1 gap-1.5">
                               {inGroup.map((command) => {
                                 const Icon = entityIcon(command.entity ?? "");
                                 return (
