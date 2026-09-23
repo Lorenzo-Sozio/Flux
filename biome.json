@@ -43,7 +43,8 @@
       "!.wrangler",
       "!dist",
       "!out",
-      "!src/components/ui"
+      "!src/components/ui",
+      "!vendor"
     ]
   },
   "formatter": {

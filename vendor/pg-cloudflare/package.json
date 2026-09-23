@@ -1,0 +1,8 @@
+{
+  "name": "pg-cloudflare",
+  "version": "1.4.0",
+  "description": "Local stand-in for pg-cloudflare: pg resolves it at build time, Flux never runs it (see index.js).",
+  "main": "index.js",
+  "license": "MIT",
+  "private": true
+}
