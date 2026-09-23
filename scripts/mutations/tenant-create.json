@@ -1,0 +1,26 @@
+[
+  {
+    "file": "src/actions/tenants.ts",
+    "description": "⚠️⚠️ il proprietario del nuovo workspace torna a essere chi è loggato all'applicazione in quel browser: un cliente diventa proprietario di un workspace che non ha mai visto",
+    "find": "  const creatorId = admin.id;",
+    "replace": "  const creatorId = (await import(\"@/auth\")).auth ? admin.id : admin.id;"
+  },
+  {
+    "file": "src/actions/tenants.ts",
+    "description": "⚠️ sparisce il controllo che l'account esista: la creazione fallisce a metà sulla chiave esterna, lasciando un workspace senza proprietario",
+    "find": "  if (!creator) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/actions/tenants.ts",
+    "description": "⚠️⚠️ un workspace può essere puntato sul database di piattaforma: le migrazioni del workspace riscrivono il registro di tutti i workspace",
+    "find": "  if (sameDatabase(dbUrl, process.env.DATABASE_URL)) {",
+    "replace": "  if (false) {"
+  },
+  {
+    "file": "src/actions/tenants.ts",
+    "description": "⚠️⚠️ le tre scritture tornano separate: se la seconda fallisce resta un workspace senza proprietario e senza abbonamento",
+    "find": "  await platformDb.batch(writes as unknown as Parameters<typeof platformDb.batch>[0]);",
+    "replace": "  for (const w of writes) await (w as Promise<unknown>);"
+  }
+]

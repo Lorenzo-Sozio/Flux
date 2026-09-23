@@ -20,6 +20,8 @@
  * the day Railway rotates this one (`npm run db:ca` prints the current one).
  */
 
+import { parseDbUrl } from "@/lib/db-url";
+
 /**
  * Railway Postgres root CA, fetched from the instance on 23 September 2026.
  * SHA-256 16:9A:AF:B2:AF:66:41:42:F0:61:2A:7B:86:02:68:B4:6D:A1:EC:0F:28:7A:1C:2B:55:4C:17:87:8E:77:20:D9
@@ -56,15 +58,7 @@ export function isNeonUrl(url: string): boolean {
 
 /** The host, without the port and without the credentials before it. */
 function hostOf(url: string): string {
-  // Not `new URL()`: a Postgres password may carry characters that make the URL
-  // parser throw, and a connection string that cannot be read is not a reason to
-  // fall back to an unverified connection.
-  const match = /^[a-z+]+:\/\/(?:[^@/]*@)?([^/?#]+)/i.exec(url.trim());
-  const authority = match?.[1]?.toLowerCase() ?? "";
-  // [::1]:5432 → ::1 ; host:5432 → host
-  const bracketed = /^\[([^\]]+)\]/.exec(authority);
-  if (bracketed) return bracketed[1];
-  return authority.split(":")[0];
+  return parseDbUrl(url)?.host ?? "";
 }
 
 /**

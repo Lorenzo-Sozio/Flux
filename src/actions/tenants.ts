@@ -4,12 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import { and, eq, gt, isNull } from "drizzle-orm";
 
-import { auth } from "@/auth";
 import { createTenantDb, invalidateTenantDbCache, platformDb } from "@/db";
 import { applyTenantMigrations } from "@/db/migrate-tenant";
 import { billingPlans, billingSubscriptions, tenantMembers, tenants, userInvitations, users } from "@/db/schema";
 import { seedWorkspace } from "@/db/seed-workspace";
 import { requireAdminPanelAccess } from "@/lib/auth-guard";
+import { redactDbUrl, sameDatabase } from "@/lib/db-url";
 import { sendInvitationEmail } from "@/lib/email";
 import { invalidateTenantCache } from "@/lib/get-tenant";
 import { decryptDbUrl, encryptDbUrl } from "@/lib/tenant-db";
@@ -136,7 +136,7 @@ export async function getTenant(subdomain: string) {
  * - Doesn't expose DB credentials in response
  */
 export async function createTenant(name: string, subdomain: string, dbUrl: string, settings?: unknown) {
-  await requireAdminPanelAccess();
+  const { user: admin } = await requireAdminPanelAccess();
 
   // Validate inputs
   if (!validateName(name)) {
@@ -162,27 +162,39 @@ export async function createTenant(name: string, subdomain: string, dbUrl: strin
     throw new Error("Invalid database URL. Must be a PostgreSQL connection string (postgresql://host/database).");
   }
 
-  // ⚠️ Who is creating this, and do they still exist?
+  // ⚠️⚠️ **The owner is the admin who is operating the panel** — `admin.id`, from the
+  // session that authorised this action two lines above.
   //
-  // The session is a signed token, not a row: it outlives the account it names —
-  // through a deleted user, and through the platform database being replaced, which
-  // is how this was found. The owner row then failed on its foreign key *after* the
-  // workspace row was written, leaving a workspace with no owner, no subscription and
-  // an unmigrated database, and an error naming a constraint rather than the problem.
-  const session = await auth();
-  const creatorId = session?.user?.id ?? null;
-  if (creatorId) {
-    const [creator] = await platformDb.select({ id: users.id }).from(users).where(eq(users.id, creatorId));
-    if (!creator) {
-      // ⚠️ Naming the address matters: there are two sessions here, the admin panel's
-      // and the application's, and "log out" in the panel clears only the first. The
-      // id in this message comes from the second — a signed token that survives the
-      // account, and the database, it was minted against.
-      throw new Error(
-        "Your session names an account that does not exist in this platform database. " +
-          "This is the application session, not the admin panel one: sign out at /api/auth/signout, sign in again, and retry.",
-      );
-    }
+  // It used to be `auth()`: the *application's* session, in whatever browser the panel
+  // happened to be open in. Three different wrong answers came out of that. With
+  // nobody signed into the application, the workspace was created with no owner at
+  // all, silently, and nobody could open it. With somebody else signed in — a
+  // customer's account, on a shared machine — that person became owner of a workspace
+  // they had never heard of. And with a session left over from a previous platform
+  // database, the owner row failed on its foreign key while the workspace row was
+  // already written.
+  //
+  // The existence check stays, because the panel's own cookie is a signed token too:
+  // it names a user id and outlives the row for up to eight hours.
+  const creatorId = admin.id;
+  const [creator] = await platformDb.select({ id: users.id }).from(users).where(eq(users.id, creatorId));
+  if (!creator) {
+    throw new Error(
+      "Your admin session names an account that does not exist in this platform database. " +
+        "Sign out of the panel and sign in again.",
+    );
+  }
+
+  // ⚠️⚠️ **Never the platform's own database.** A workspace gets the tenant migrations
+  // run over it, so pointing one at the registry creates and alters tables in the
+  // database that holds every workspace's connection string. It happened: the admin
+  // panel took the platform URL, the migrations started rewriting it, and the run only
+  // stopped because a foreign key found a column the platform schema does not have.
+  if (sameDatabase(dbUrl, process.env.DATABASE_URL)) {
+    throw new Error(
+      `${redactDbUrl(dbUrl)} is the platform database. A workspace needs its own database — ` +
+        "create one and give its connection string here.",
+    );
   }
 
   const id = crypto.randomUUID();
@@ -206,10 +218,8 @@ export async function createTenant(name: string, subdomain: string, dbUrl: strin
       .insert(billingSubscriptions)
       .values({ tenantId: id, status: "free" }),
   ];
-  // Auto-add the creator as the tenant owner
-  if (creatorId) {
-    writes.push(platformDb.insert(tenantMembers).values({ tenantId: id, userId: creatorId, role: "owner" }));
-  }
+  // The admin who created it is its first owner, so somebody can open it.
+  writes.push(platformDb.insert(tenantMembers).values({ tenantId: id, userId: creatorId, role: "owner" }));
   await platformDb.batch(writes as unknown as Parameters<typeof platformDb.batch>[0]);
 
   // Run migrations immediately — idempotent, so safe to retry via "Migrate DB" if this fails.
