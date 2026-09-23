@@ -192,7 +192,15 @@ export function SearchDialog({
           if (!v) handleClose();
           else setOpen(true);
         }}
-        className="sm:max-w-[680px]"
+        // ⚠️ Wide enough to put what you have open beside what you can create,
+        // instead of stacking them into a column taller than the box. The palette
+        // opened on a scrollbar: six recent records and fourteen create commands in
+        // one 680px column came to some 700px of content in a 460px window, so the
+        // first thing anybody saw was half a list.
+        // Sits higher than the default third of the way down, because it is taller
+        // now, and is capped against the window rather than against a number: the
+        // list inside takes what is left, so a short palette stays short.
+        className="sm:top-[9vh] sm:max-h-[82dvh] sm:max-w-[920px]"
       >
         <CommandPrimitive shouldFilter={false} className="flex size-full flex-col">
           <div className="flex shrink-0 items-center gap-3 border-b py-3.5 pr-12 pl-4 sm:pr-4">
@@ -244,9 +252,12 @@ export function SearchDialog({
             </fieldset>
           )}
 
-          <CommandList className="max-h-[min(460px,60dvh)] overflow-y-auto">
+          <CommandList className="scrollbar-slim min-h-0 flex-1 overflow-y-auto">
             {!query && (
-              <div className="space-y-4 p-4">
+              // Two columns where there is room for two: what you were working on, and
+              // what you can start. On a narrow screen they stack, in that order,
+              // because coming back to a record is the commoner errand of the two.
+              <div className="grid items-start gap-x-8 gap-y-5 p-4 lg:grid-cols-2">
                 {recent.length > 0 && (
                   <div>
                     <p className="mb-2 flex items-center gap-1.5 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
@@ -290,7 +301,7 @@ export function SearchDialog({
                         return (
                           <div key={g}>
                             <p className="mb-1 px-1 text-[11px] text-muted-foreground">{te(`groups.${g}` as never)}</p>
-                            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+                            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
                               {inGroup.map((command) => {
                                 const Icon = entityIcon(command.entity ?? "");
                                 return (
