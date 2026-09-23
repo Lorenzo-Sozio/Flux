@@ -471,21 +471,26 @@ any certificate, which on a public endpoint is an invitation; instead the issuer
 pinned and only the hostname check is relaxed. `npm run db:ca <url>` prints the
 current root when a provider rotates it, and `DATABASE_CA_PEM` overrides it.
 
-⚠️⚠️ **`pg-cloudflare` resolves to a stub in this repository** —
-`vendor/pg-cloudflare`, wired through `dependencies` as a `file:` path. `pg` requires
-it by name to open a TCP socket on Workers and declares it *optional*, so it is on a
-developer's machine and missing from a clean CI install; esbuild resolves that require
-whether or not the path can run, and the deploy failed at its last step with `Could
-not resolve "pg-cloudflare"` after a Next build that had succeeded. Declaring it as a
-normal dependency was not enough — the failure came back — so the resolution is no
-longer left to npm's flags.
+⚠️⚠️ **`pg-cloudflare` is a direct dependency, and must stay one.** `pg` requires it
+by name to open a TCP socket on Workers and declares it *optional*, so a clean CI
+install can leave it out — and the Worker bundle then fails at its last step with
+`Could not resolve "pg-cloudflare"`, after a Next build that succeeded. Declaring it
+outright fixes that.
 
-⚠️ Two approaches were tried and rejected before it: loading `pg` through
-`createRequire` kept it out of the bundle but Turbopack followed the literal anyway,
-and a specifier built at runtime defeated every bundler *and* Turbopack's own loader
-("Cannot find module as expression is too dynamic"). The stub throws if anything
-calls it, which is honest: a Worker here cannot open a TCP connection to Postgres.
-The day it should, that stub goes and Hyperdrive takes its place.
+⚠️⚠️ **Do not replace it with a stub.** That was tried, on 23 September 2026, to make
+the resolution independent of npm's flags — and it deployed, and every query in
+production started throwing: the Worker really does use it to reach Railway. The two
+other routes tried the same evening are dead ends worth not repeating: loading `pg`
+through `createRequire` (Turbopack follows the literal into the bundle anyway) and
+building the specifier at runtime (defeats every bundler, and Turbopack's own loader
+with it: "Cannot find module as expression is too dynamic").
+
+⚠️⚠️ **On Workers the pinned CA is not applied.** `sslFor` hands `pg` a certificate
+authority and asks for verification; `CloudflareSocket` opens the connection through
+`cloudflare:sockets`, which takes no CA, so on Workers the traffic is encrypted and
+the server is **not** authenticated. It is verified in Node — the dev server, the
+scripts, Vercel. Closing that gap on Workers means Hyperdrive, which terminates TLS
+itself, or a database whose certificate a public root signs (Neon's is).
 
 ⚠️ Whether `pg` works on **Cloudflare Workers** is unverified: the bundle builds, but
 the runtime has not been exercised. A deployment on Workers pointed at plain Postgres
