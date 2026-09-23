@@ -471,6 +471,12 @@ any certificate, which on a public endpoint is an invitation; instead the issuer
 pinned and only the hostname check is relaxed. `npm run db:ca <url>` prints the
 current root when a provider rotates it, and `DATABASE_CA_PEM` overrides it.
 
+⚠️⚠️ **`pg-cloudflare` is a direct dependency on purpose.** `pg` declares it as an
+*optional* one, so a developer's machine has it and a clean CI install does not — and
+the Worker bundle then fails at the last step with `Could not resolve "pg-cloudflare"`
+(node_modules/pg/lib/stream.js), on a build whose Next step succeeded. It is the
+module `pg` opens a TCP socket with on Workers; do not move it back under `pg`.
+
 ⚠️ Whether `pg` works on **Cloudflare Workers** is unverified: the bundle builds, but
 the runtime has not been exercised. A deployment on Workers pointed at plain Postgres
 has to be tried before it is trusted (`npm run cf:preview`), and Hyperdrive is the
