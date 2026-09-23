@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+
+import { DEMO_FILL_EVENT, type DemoCredentials } from "./demo-credentials";
 
 const makeFormSchema = (emailInvalid: string, passwordRequired: string) =>
   z.object({
@@ -40,6 +42,18 @@ export function LoginForm() {
     resolver: zodResolver(formSchema),
     defaultValues: { email: "", password: "", remember: false },
   });
+
+  // The demo banner asks for the fields to be filled. Through the form rather than
+  // the DOM, so the values are the ones that get submitted and the validation clears.
+  useEffect(() => {
+    const fill = (event: Event) => {
+      const { email, password } = (event as CustomEvent<DemoCredentials>).detail;
+      form.setValue("email", email, { shouldValidate: true });
+      form.setValue("password", password, { shouldValidate: true });
+    };
+    window.addEventListener(DEMO_FILL_EVENT, fill);
+    return () => window.removeEventListener(DEMO_FILL_EVENT, fill);
+  }, [form]);
 
   const onSubmit = async (data: FormValues) => {
     setIsPending(true);

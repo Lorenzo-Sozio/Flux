@@ -233,7 +233,8 @@
       "title": "Credenziali demo",
       "copyEmail": "Copia email",
       "password": "Password",
-      "copyPassword": "Copia password"
+      "copyPassword": "Copia password",
+      "fill": "Compila i campi"
     }
   },
   "automation": {

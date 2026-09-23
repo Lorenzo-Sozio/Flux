@@ -2,25 +2,14 @@
 
 import { useEffect, useState } from "react";
 
-import { Check, Copy, KeyRound } from "lucide-react";
+import { Check, Copy, KeyRound, Wand2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 
-/**
- * ⚠️⚠️ These are printed on screen. The banner is rendered only when
- * `DEMO_CREDENTIALS=1` (see the sign-in page) precisely because of that: an
- * account whose password is on the login page is public, and this pair named a
- * real platform administrator until 23 September 2026.
- */
-const DEMO_EMAIL = "admin@flux.local";
-const DEMO_PASSWORD = "admin";
+import { DEMO_EMAIL, DEMO_PASSWORD, requestDemoFill } from "./demo-credentials";
 
-interface Props {
-  onFill?: (email: string, password: string) => void;
-}
-
-export function DemoCredentialsBanner({ onFill }: Props) {
+export function DemoCredentialsBanner() {
   const t = useTranslations("auth.demoCredentials");
   const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState<"email" | "password" | null>(null);
@@ -79,6 +68,16 @@ export function DemoCredentialsBanner({ onFill }: Props) {
           </button>
         </div>
       </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={requestDemoFill}
+        className="mt-2.5 w-full gap-1.5 border-blue-200 bg-white/70 text-blue-700 hover:bg-white dark:border-blue-800 dark:bg-black/20 dark:text-blue-200"
+      >
+        <Wand2 className="h-3.5 w-3.5" />
+        {t("fill")}
+      </Button>
     </div>
   );
 }

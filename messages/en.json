@@ -233,7 +233,8 @@
       "title": "Demo credentials",
       "copyEmail": "Copy email",
       "password": "Password",
-      "copyPassword": "Copy password"
+      "copyPassword": "Copy password",
+      "fill": "Fill the fields"
     }
   },
   "automation": {
