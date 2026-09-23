@@ -1,8 +1,6 @@
-import { neon } from "@neondatabase/serverless";
 import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/neon-http";
 
-import { platformDb } from "@/db";
+import { createTenantDb, platformDb } from "@/db";
 import { applyTenantMigrations } from "@/db/migrate-tenant";
 import { tenants } from "@/db/schema";
 import { seedWorkspace } from "@/db/seed-workspace";
@@ -34,8 +32,9 @@ export async function GET() {
       for (const tenant of allTenants) {
         try {
           const dbUrl = decryptDbUrl(tenant.dbUrl);
-          const sql = neon(dbUrl);
-          const db = drizzle(sql);
+          // The shared factory, so a workspace on plain Postgres migrates like any
+          // other; building a Neon client here would quietly exclude it.
+          const db = createTenantDb(tenant.id, dbUrl);
 
           // Migrations are embedded in the build rather than read from disk. The
           // drizzle migrator wanted `meta/_journal.json` at runtime, which a

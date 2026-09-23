@@ -2,9 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
-import { neon } from "@neondatabase/serverless";
 import { and, eq, gt, isNull } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/neon-http";
 
 import { auth } from "@/auth";
 import { createTenantDb, invalidateTenantDbCache, platformDb } from "@/db";
@@ -45,12 +43,20 @@ function validateSettings(settings: unknown): boolean {
  * Prevents SSRF: without this check an admin could supply an internal-network
  * hostname (e.g., 169.254.169.254) and cause the app to probe cloud metadata.
  */
-function validateNeonDbUrl(url: string): boolean {
+/**
+ * A workspace's database can live anywhere that speaks Postgres.
+ *
+ * ⚠️ This used to insist on `*.neon.tech`, which was true of every workspace when it
+ * was written and stopped being true the day one moved to another provider: the admin
+ * panel then refused a database that works, with a message about a vendor. What has to
+ * hold is that it is a Postgres URL with a host — `src/db/index.ts` picks the driver
+ * from the host, and `src/lib/db-ssl.ts` decides how the certificate is checked.
+ */
+function validateDbUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
-    return (
-      (parsed.protocol === "postgresql:" || parsed.protocol === "postgres:") && parsed.hostname.endsWith(".neon.tech")
-    );
+    const isPostgres = parsed.protocol === "postgresql:" || parsed.protocol === "postgres:";
+    return isPostgres && parsed.hostname.length > 0;
   } catch {
     return false;
   }
@@ -152,8 +158,8 @@ export async function createTenant(name: string, subdomain: string, dbUrl: strin
     throw new Error(`Subdomain '${subdomain}' is already taken. Choose a different one.`);
   }
 
-  if (!validateNeonDbUrl(dbUrl)) {
-    throw new Error("Invalid database URL. Must be a Neon PostgreSQL connection string (*.neon.tech).");
+  if (!validateDbUrl(dbUrl)) {
+    throw new Error("Invalid database URL. Must be a PostgreSQL connection string (postgresql://host/database).");
   }
 
   const id = crypto.randomUUID();
@@ -303,8 +309,10 @@ export async function deleteTenant(subdomain: string) {
  * production failed at this step.
  */
 async function runMigrations(tenantId: string, dbUrl: string) {
-  const sql = neon(dbUrl);
-  const db = drizzle(sql);
+  // ⚠️ Through the shared factory, not `neon(dbUrl)` directly: a workspace's database
+  // no longer has to be a Neon one, and building the client here by hand is how a
+  // second driver gets forgotten. `createTenantDb` picks it from the URL.
+  const db = createTenantDb(tenantId, dbUrl);
   await applyTenantMigrations(db);
 
   // A migrated-but-empty workspace is not a usable one: with no pipeline stages the
@@ -312,7 +320,7 @@ async function runMigrations(tenantId: string, dbUrl: string) {
   // that was not in the menu (audit rilievi U-12, D-04). Seeding only ever adds, and
   // only into tables that are empty, so this is safe on an existing workspace too.
   try {
-    const seeded = await seedWorkspace(createTenantDb(tenantId, dbUrl));
+    const seeded = await seedWorkspace(db);
     if (seeded.stages > 0) {
       console.log(`[tenants] seeded workspace ${tenantId}:`, seeded);
     }

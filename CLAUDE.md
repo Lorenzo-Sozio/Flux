@@ -449,6 +449,31 @@ npx drizzle-kit studio
 
 Migrations live in [src/db/migrations/](src/db/migrations/). Schema is defined in [src/db/schema.ts](src/db/schema.ts).
 
+### A workspace's database does not have to be Neon
+
+[src/db/index.ts](src/db/index.ts) picks the driver from the connection string: Neon's
+HTTP driver for `*.neon.tech`, a pooled TCP connection (`pg`) for anything else. The
+declared type stays `NeonHttpDatabase` because every action is written against it and
+the query builders are identical.
+
+⚠️⚠️ **`db.batch([...])` must stay atomic.** On Neon it maps to the transaction
+endpoint; the pooled driver has no `batch`, so one is built from a real transaction on
+a single connection, running each statement as SQL. Running the *builders* inside the
+transaction would not work: a builder is bound to the pool and takes its own
+connection, committing outside the transaction it was meant to be part of.
+
+⚠️ **TLS is pinned, not disabled** ([src/lib/db-ssl.ts](src/lib/db-ssl.ts)). Managed
+Postgres over TCP (Railway among them) presents a self-signed certificate whose leaf
+says `CN=localhost`. `rejectUnauthorized: false` would keep the encryption and accept
+any certificate, which on a public endpoint is an invitation; instead the issuer is
+pinned and only the hostname check is relaxed. `npm run db:ca <url>` prints the
+current root when a provider rotates it, and `DATABASE_CA_PEM` overrides it.
+
+⚠️ Whether `pg` works on **Cloudflare Workers** is unverified: the bundle builds, but
+the runtime has not been exercised. A deployment on Workers pointed at plain Postgres
+has to be tried before it is trusted (`npm run cf:preview`), and Hyperdrive is the
+documented route if it does not.
+
 ### Tenant migrations are embedded, not read from disk
 
 ⚠️ Drizzle's migrator reads `meta/_journal.json` and the `.sql` files **at the moment it
@@ -1018,3 +1043,13 @@ Defined in [src/navigation/sidebar/sidebar-items.ts](src/navigation/sidebar/side
   is being edited for another reason, never in a sweep of their own: some of them are quoted
   verbatim inside `scripts/mutations/*.json`, and a rewrite that misses one turns
   `npm run test:mutations` red for a reason that has nothing to do with the code.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
