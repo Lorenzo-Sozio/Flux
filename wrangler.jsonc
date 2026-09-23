@@ -122,7 +122,11 @@
     // runtime (custom-worker.ts la usa come base URL dei cron). Senza slash finale.
     "NEXT_PUBLIC_APP_URL": "https://flux.schedulatore.workers.dev",
     // Dominio nudo, senza schema né slash.
-    "NEXT_PUBLIC_ROOT_DOMAIN": "flux.schedulatore.workers.dev"
+    "NEXT_PUBLIC_ROOT_DOMAIN": "flux.schedulatore.workers.dev",
+    // ⚠️⚠️ Stampa un utente e la sua password sulla pagina di accesso, a chiunque la
+    // apra. È una scelta: questa installazione è ancora una prova. Il giorno che ci
+    // sono clienti veri questa riga si toglie, e con essa il riquadro.
+    "DEMO_CREDENTIALS": "1"
   },
 
   // Sostituiscono i crons di vercel.json: su Cloudflare i job non sono richieste
