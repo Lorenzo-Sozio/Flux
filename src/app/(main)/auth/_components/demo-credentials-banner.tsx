@@ -7,6 +7,12 @@ import { useTranslations } from "next-intl";
 
 import { Button } from "@/components/ui/button";
 
+/**
+ * ⚠️⚠️ These are printed on screen. The banner is rendered only when
+ * `DEMO_CREDENTIALS=1` (see the sign-in page) precisely because of that: an
+ * account whose password is on the login page is public, and this pair named a
+ * real platform administrator until 23 September 2026.
+ */
 const DEMO_EMAIL = "admin@flux.local";
 const DEMO_PASSWORD = "admin";
 

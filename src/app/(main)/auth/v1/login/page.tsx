@@ -30,7 +30,13 @@ export default async function LoginV1() {
             <div className="mx-auto max-w-xl text-muted-foreground text-sm">{t("subtitle")}</div>
           </div>
 
-          <DemoCredentialsBanner />
+          {/* ⚠️⚠️ Only where somebody deliberately asked for it. This banner prints an
+              account and its password on the sign-in page, and it printed a **real**
+              platform administrator's — admin@flux.local / admin, which is what the
+              setup script used to create — on every deployment, in production, to
+              anybody who opened the page. It is a demo affordance and needs saying so
+              out loud: DEMO_CREDENTIALS=1. */}
+          {process.env.DEMO_CREDENTIALS === "1" && <DemoCredentialsBanner />}
 
           <div className="space-y-4">
             <LoginForm />
