@@ -260,10 +260,17 @@ export function SearchDialog({
               window without the address bar. */}
           <CommandList className="scrollbar-slim max-h-[min(70dvh,780px)] overflow-y-auto">
             {!query && (
-              // Two columns where there is room for two: what you were working on, and
-              // what you can start. On a narrow screen they stack, in that order,
-              // because coming back to a record is the commoner errand of the two.
-              <div className="grid items-start gap-x-8 gap-y-5 p-4 lg:grid-cols-2">
+              // ⚠️ Two columns only when there are two things to show. A workspace with
+              // no recent records — a new one, or a new browser — has nothing for the
+              // left column, and a fixed two-column grid then left half the palette
+              // blank with the create buttons squeezed into the other half. The create
+              // section spreads across the whole width instead, in more columns.
+              <div
+                className={cn(
+                  "grid items-start gap-x-8 gap-y-5 p-4",
+                  recent.length > 0 && "lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]",
+                )}
+              >
                 {recent.length > 0 && (
                   <div>
                     <p className="mb-2 flex items-center gap-1.5 px-1 font-medium text-muted-foreground text-xs uppercase tracking-wide">
@@ -305,7 +312,7 @@ export function SearchDialog({
                         is most of the window on a laptop and the reason this opened on a
                         scrollbar. `break-inside-avoid` keeps a heading with its own
                         buttons — a section split across the fold reads as two sections. */}
-                    <div className="gap-x-4 sm:columns-2">
+                    <div className={cn("gap-x-4 sm:columns-2", recent.length === 0 && "lg:columns-3")}>
                       {ENTITY_GROUPS.map((g) => {
                         const inGroup = createCommands.filter((c) => c.group === g);
                         if (inGroup.length === 0) return null;
