@@ -124,7 +124,7 @@ way of knowing.
 
 ### The import API
 
-`/api/crm/*` is the machine-to-machine surface: twenty-two routes, **all of them
+`/api/crm/*` is the machine-to-machine surface: twenty-three routes, **all of them
 POST**. It writes into the CRM and has no way to read out of it, which is a real
 gap and a deliberate one to notice rather than a thing to fix casually — see the
 end of this section.
@@ -200,8 +200,10 @@ The decision — replay, refuse, or take over — is a pure function returning
 `stale` rather than a `Claim`, because "no living request is behind this row" is a
 reason to *try* for the key, not permission to act as though it were held.
 
-⚠️ Only the **bulk** routes take the header. The single-record POSTs have the same
-problem and are not covered yet.
+⚠️ **Eighteen of the twenty-three routes take the header**, the single-record
+POSTs among them. The five that do not are `close`, `custom-fields`, `erasure`,
+`leads/stage` and `opt-out` — a retry of any of those is still a second write.
+(`find src/app/api/crm -name route.ts | xargs grep -L "claim("` is the list.)
 
 ⚠️ Reading a *list* back is still impossible, and that is the gap the response
 does not close. It closes the common case: a completed request tells the caller
@@ -215,9 +217,9 @@ Every route here records one line per successful request in `api_write_log`
 rows, and `via` — `session` or `apikey`, straight from `authenticateApiRequest`,
 which already knew and used to throw the answer away.
 [src/lib/api-write-log.ts](src/lib/api-write-log.ts) is the only place that
-writes it, and `src/lib/api-write-log.inventory.test.ts` reads all twenty-two
-route files to check they still call it. A guarantee twenty-two routes have to
-*remember* is one the twenty-third would not have, and a missing line is
+writes it, and `src/lib/api-write-log.inventory.test.ts` reads every
+route file to check they still call it. A guarantee each route has to
+*remember* is one the next one would not have, and a missing line is
 invisible by construction.
 
 ⚠️⚠️ **`source` is not that answer.** On lead, contact, company and order it means
@@ -759,8 +761,9 @@ cannot pass by sharing a mistake with the encryptor. `scripts/mutations/web-push
 breaks each one in turn.
 
 ⚠️ **Not every notification pushes.** The catalogue is in
-[src/lib/push-types.ts](src/lib/push-types.ts): `lead_assigned`, `task_due`,
-`sla_warning` and `sla_breach` default to on, the other eight default to off, and
+[src/lib/push-types.ts](src/lib/push-types.ts): of its fourteen types, six default
+to on — `lead_assigned`, `task_due`, `sla_warning`, `sla_breach`,
+`contract_renewal` and `sequence_reply` — and the other eight default to off, and
 a person changes any of them at `/dashboard/settings/notifications`. A type not in
 that catalogue never pushes — it still reaches the bell. Preferences are stored as
 *overrides* rather than as a list of enabled types, so a thirteenth type added

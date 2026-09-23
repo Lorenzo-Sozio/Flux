@@ -5808,12 +5808,31 @@
             "a": "The sidebar groups everything into seven sections: Work (dashboard, calendar, tasks, chat), Customers (contacts, companies, leads), Sales (pipeline with targets, funnel, win/loss, forecasts and reports, then quotes, orders, products and finance), Support (overview, tickets, SLA, macros), Marketing and automation, Analytics, and Administration (users, roles, settings). Some items only appear if your plan includes the corresponding module. On a phone the sidebar gives way to a tab bar at the bottom with the most used sections."
           },
           "t05": {
-            "q": "Can I install Flux on my phone?",
-            "a": "Yes. When you open Flux in your phone's browser you can add it to the home screen: from there it opens full screen, with its own icon and without the browser bar. On Android the browser offers 'Install' by itself; on iPhone use Share → Add to Home Screen. Without a connection a screen says so, instead of a browser error page."
-          },
-          "t06": {
             "q": "Can I customise the view?",
             "a": "Yes. From the header at the top right you can change the theme (light/dark), the language (Italian/English) and the display currency. You can also change the sidebar layout and enable the sticky navbar through the layout controls."
+          }
+        }
+      },
+      "quickAccess": {
+        "title": "Search and quick access",
+        "subtitle": "Ctrl+K, quick create, recents",
+        "description": "One field to reach any record without knowing which list it is in, a menu to create a new one from wherever you are, and the list of what you opened recently.",
+        "topics": {
+          "t01": {
+            "q": "How do I find a record quickly?",
+            "a": "Press Ctrl+K (⌘K on a Mac) from any screen; Ctrl+J works too, and there is a 'Search' button in the header for anyone who prefers the mouse. Type at least two letters and results come in as you type: up and down arrows to move, Enter to open, Esc to close. The tabs at the top of the panel narrow the search to one group — customers, sales, documents, support, work, marketing — and only appear if you have access to more than one. Besides records the search also understands commands: typing 'new contact' takes you straight to creating one."
+          },
+          "t02": {
+            "q": "What does the search look through?",
+            "a": "Leads, contacts and companies (name, email, phone, VAT number), deals, products and price lists, quotes, orders, contracts, invoices and credit notes (document number and customer name), tickets, tasks, appointments, campaigns, sequences, email templates, and attached documents, searched by file name. A phone number is found by typing at least four of its digits. It shows at most five results per type, and matches on text contained in the field: a name with a typo in it is not found.\nYou only see what you could already see: types excluded by your role or by the workspace's plan do not appear at all. Products and templates have no page of their own, so the result opens their list already filtered; a document opens the record it is attached to; a credit note opens its invoice."
+          },
+          "t03": {
+            "q": "How do I create something without hunting for the right page?",
+            "a": "Use 'Quick create', the button at the top of the sidebar: it lists everything you are allowed to create — lead, contact, company, deal, product, price list, quote, order, contract, invoice, ticket, task, appointment, campaign, sequence — and opens the create form on the right screen. The list is filtered by your permissions and by the plan, so it only holds things you can really create; if there are none, the menu says so instead of opening empty. The same entries appear in the search panel when you open it without typing anything."
+          },
+          "t04": {
+            "q": "What is the recents list for?",
+            "a": "For going back to what you were looking at. The circular-arrow icon in the header opens the records you opened recently, grouped by type, with how long ago; the same ones appear on the left of the search panel before you type. It fills in on its own when you open a record's page or a search result, newest at the top, and reopening something moves it back to the top instead of duplicating it; it keeps up to ten entries per type and eighty in all, and the panel shows twelve.\nIt is stored in this device's browser, for this workspace: it does not follow you from computer to phone, it disappears if you clear the site's data, and it is shared with anyone using the same browser profile. 'Clear' empties it, and on a group tab it clears only that group. Below a certain width the button is not there: on a phone the search remains."
           }
         }
       },
@@ -5989,58 +6008,30 @@
         "description": "The Quotes module manages the whole proposal process: from internal drafting with an approval workflow, to sending it by email to the customer with a viewing link, through to acceptance or rejection.",
         "topics": {
           "t01": {
-            "q": "How do I manage recurring contracts and renewals?",
-            "a": "In Sales → Contracts you record recurring agreements: company, amount per month, quarter, half-year or year, start date, end of the period, days of notice and, where applicable, automatic renewal with its duration. The status is not set by hand but calculated from the dates: 'Active', 'Decision due', 'Expired', 'Not started yet'. Only 'Draft' and 'Cancelled' are chosen by hand. A contract becomes 'Decision due' one month before the notice deadline (the end of the period minus the days of notice), so there is still time to renew or cancel; on that day the owner receives a notification, including push, once per period. A contract with automatic renewal never expires: its end date moves forward one period at a time and the reminder repeats before every renewal. At the top of the page and on the dashboard you will find monthly recurring revenue, calculated only on contracts active today. A signed contract starting next month, or an expired one, is not included. For a customer who cancels, set 'Cancelled' instead of deleting: it stays in the history."
-          },
-          "t02": {
-            "q": "How do I issue an electronic invoice?",
-            "a": "First complete Settings → E-invoicing (company name, VAT number, tax regime, registered office) and the customer's tax data on their record: VAT number or tax code, and recipient code or PEC. Then open Sales → Invoices → 'New invoice': on a single page you choose the customer, optionally an order to copy lines and discount from, and fill in lines, payment and due date (from an order's page, the 'Invoice' button opens the same page already filled in); on lines with 0% VAT choose the Natura, which is mandatory. A panel lists what is missing before you can issue. 'Issue' assigns the progressive number for the year and the numbering series, today's date, and freezes the issuer, customer and line data: an issued invoice cannot be edited or deleted, it is corrected with a credit note. A draft has no number, so deleting it leaves no gaps in the numbering."
-          },
-          "t03": {
-            "q": "Where do I find the invoice XML file?",
-            "a": "On the issued invoice, with the 'XML FatturaPA' button. The file is in FatturaPA FPR12 format (schema 1.2.3, specifications 1.4), with the name SDI expects, and is built from the data frozen at the time of issue: downloading it a year from now gives you the same file, even if the company's or your profile's data has changed in the meantime. Every generated file is validated against the official schema of the Agenzia delle Entrate. Automatic submission to SDI is not active yet: for now the file must be transmitted through the channel you already use."
-          },
-          "t04": {
-            "q": "How do I send the invoice to the customer, and where is it archived?",
-            "a": "On the issued invoice you will find 'Courtesy PDF', 'XML FatturaPA' and 'Send to customer'. The PDF is a readable copy built from the same data as the XML, with a footer stating that it has no tax value: the real invoice is the XML file transmitted through SDI, and the customer finds it in their reserved area on the Agenzia delle Entrate website. 'Send to customer' sends the PDF as an attachment from the address configured in Settings → Email, suggesting the company's main email; the invoice records when and to whom it was sent. Right after issue, the XML and PDF are saved in the document archive, with a fingerprint that makes it possible to detect if a file is altered: in that case it is not served, and the document is rebuilt from the frozen data. If archiving failed, the invoice says so and the 'Archive now' button retries it; it also happens on its own at the first download. Note: the Flux archive does not replace legally compliant digital preservation (conservazione sostitutiva), which remains the responsibility of the preservation service you use."
-          },
-          "t05": {
-            "q": "In which language and currency do my customers receive documents?",
-            "a": "In the language set on the company record, under 'Document language' (Billing tab): Italian or English. If you leave it on 'Automatic', it is Italian for an address in Italy or with no country, and English for all others. The language applies to the quote PDF and printout, the page the customer opens from the link, the email you send it with and the courtesy copy of the invoice, whatever language you use Flux in: a quote for a German customer goes out in English even if your system is in Italian. Amounts are always in the document's currency, chosen when you create the quote, order or contract, and are never converted: the currency selector in the header only changes the overall dashboard totals. The name at the top of the quote is the company name in Settings → E-invoicing, or the workspace name if you have not filled it in yet."
-          },
-          "t06": {
-            "q": "How do I correct or cancel an issued invoice?",
-            "a": "With a credit note: an issued invoice cannot be edited or deleted. On the invoice press 'Credit note' and choose 'Full reversal', which copies all the lines and is issued as it is, or 'Partial reversal', which starts from the same lines for you to reduce or remove. A TD04 draft is created, linked to the invoice, with the same numbering series, so numbering continues; change it in the draft if you use a series dedicated to credit notes. On issue the amount is deducted from the invoice's remaining balance, and you cannot reverse more than was invoiced: if two notes are issued at the same time, the second is rejected without using up numbers. On the invoice a panel shows invoiced, reversed and remaining amounts, and the list shows 'Reversed' or 'Partially reversed'. A credit note never charges stamp duty again: the recharge line would give the customer back the €2, while stamp duty already paid is not refunded. Stamp duty on the note itself is decided as for invoices, from the VAT Natura of its lines."
-          },
-          "t07": {
-            "q": "How is stamp duty calculated?",
-            "a": "Automatically, from the VAT Natura of each line. Stamp duty of €2.00 is due when the VAT-free lines that require it together exceed €77.47: what counts is their sum, not the invoice total, after the document discount. Exports (N3.1), intra-EU supplies (N3.2), supplies to San Marino (N3.3) and transactions treated as exports (N3.4) are exempt. Note: transactions under a declaration of intent (N3.5) are not exempt, even though they are non-taxable like exports. The margin scheme (N5) pays no stamp duty because VAT is included in the price. The draft shows whether stamp duty is due and why. You can force it or remove it for special cases, such as a customer's personal exemption, but only by writing the reason, which stays on the invoice. In Settings → E-invoicing you choose whether to charge it to the customer: in that case the invoice gets a line 'Imposta di bollo assolta in modo virtuale' of €2.00 excluding VAT (N1), which does not count towards the threshold. On the Invoices page a summary estimates the stamp duty for each quarter, with the F24 tax code (2521–2524) and due date, applying the deferrals below €5,000; the amount to pay remains the one the Agenzia delle Entrate publishes in the reserved area."
-          },
-          "t08": {
             "q": "How do I create a new quote?",
             "a": "Go to Quotes → 'New Quote'. Select the company, the contact and the linked deal. Add product/service lines from the catalogue (or enter free-form data), set any discounts, VAT and the expiry date. The system automatically calculates subtotal, discounts, VAT and final total."
           },
-          "t09": {
+          "t02": {
             "q": "What is the approval workflow?",
             "a": "It is an optional step, not a block. From a draft you can click 'Request Approval' and the quote moves to 'Pending approval': it is seen by whoever has the workspace admin or owner role, who can approve or reject it with a note. Once approved, the send button appears. Anyone with permission to write quotes can, however, send directly from the draft without going through this: approval is for those who want an internal review, it does not prevent sending for those who do not use it."
           },
-          "t10": {
+          "t03": {
             "q": "How do I send the quote to the customer?",
             "a": "The send button appears on a draft and on an approved quote. The system prepares an email with a unique link to the quote: the customer opens it without signing in and sees the formatted document. Subject and text can be edited before it goes out, and nothing is sent until you send it."
           },
-          "t11": {
+          "t04": {
             "q": "How does the customer see the quote?",
             "a": "The customer receives an email with a personal link. Clicking it opens a public page with all the quote details: items, prices, discounts, totals and notes. From the same page they can accept or reject the quote (with the option of leaving a reason if they reject it)."
           },
-          "t12": {
+          "t05": {
             "q": "How do I know whether the customer has opened the quote?",
             "a": "As soon as the customer opens the link, the quote status automatically changes from 'Sent' to 'Viewed' and the exact time it was opened is recorded. You will see this information in the quote's timeline and detail."
           },
-          "t13": {
+          "t06": {
             "q": "How do I chase a quote that got no reply?",
             "a": "On the quote detail a panel appears on its own when there is a reason to follow up, and says which: never opened, opened but no reply, about to expire, or already expired. These are four different situations and they suggest four different messages — someone who has not opened it is asked whether the email arrived, not for a decision. The panel does not appear on a quote already accepted or rejected, nor on one sent yesterday. The text is a draft: edit it as you like, and it only goes out when you press send."
           },
-          "t14": {
+          "t07": {
             "q": "Can I export the quote as a PDF?",
             "a": "Yes. On the quote detail you will find the 'Export PDF' button to download the formatted document, ready to send through other channels or to archive."
           }
@@ -6066,6 +6057,80 @@
           "t04": {
             "q": "Where do I record payments and delivery?",
             "a": "In the order detail you will find the payments panel: payments are listed one by one with date and amount, not added up into a single number, so you can see a deposit followed by a balance. Next to it you can record the actual delivery date."
+          }
+        }
+      },
+      "invoicing": {
+        "title": "Electronic invoicing",
+        "subtitle": "Invoices, credit notes and stamp duty",
+        "description": "The Invoices module issues Italian electronic invoices in FatturaPA format: numbering per series and year, stamp duty worked out from the VAT Natura of the lines, credit notes, and an archive of the XML and the courtesy PDF. Flux produces the file; transmitting it to SDI stays with the channel you already use.",
+        "topics": {
+          "t01": {
+            "q": "What do I have to fill in before issuing my first invoice?",
+            "a": "On your side: Settings → E-invoicing, which needs the company name, VAT number, tax regime (RF01 ordinary, RF19 flat-rate, and the others the format allows) and the registered office — street, postcode, town, province, country. The REA details are optional, but all or nothing: office, number and liquidation status together, because SDI rejects half a block. IBAN, bank, email and phone appear on the invoice if you fill them in. A panel at the top of the page says whether the profile is ready and what is missing or malformed.\nOn the customer's side, in the company's Billing tab: VAT number or tax code, the full address, and an electronic address — an SDI recipient code or a PEC. Without these an invoice can be written but not issued, and the draft says so."
+          },
+          "t02": {
+            "q": "How do I issue an electronic invoice?",
+            "a": "Sales → Invoices → 'New invoice': on a single page you choose the customer, optionally an order to copy lines and discount from, and fill in lines, payment and due date. From an order's page, the 'Invoice' button opens the same screen already filled in. On lines with 0% VAT the Natura is mandatory, and on lines with VAT it must not be there: those are the two mistakes SDI rejects. A panel lists what is missing before you can issue.\n'Issue' assigns the number, sets today's date and freezes the issuer, customer and line data. From then on the invoice cannot be edited or deleted: it is corrected with a credit note. A draft has no number, so deleting one leaves no gaps in the numbering."
+          },
+          "t03": {
+            "q": "How do numbering and series work?",
+            "a": "The number is not typed in: it is assigned at the moment of issue, from the counter for the invoice's series and year. The series is a short code of letters and digits you choose on the draft; leave it empty and you use the main numbering, where the number reads '12', otherwise '12/B'. Each series has its own counter and starts again at 1 every new year.\nThe number is taken in the same operation that issues the invoice, so two people pressing 'Issue' together cannot get the same number and a failed attempt uses none: the numbering has no gaps, as the law requires. A number is never reused and an issued invoice is never renumbered."
+          },
+          "t04": {
+            "q": "Does Flux send the invoice to SDI?",
+            "a": "No, not yet, and it is the most important thing to know before you start. Flux builds the XML file, validates it and keeps it; transmission to the Sistema di Interscambio and the receipts that come back — delivered, rejected, not delivered, outcome — have not been built, because the channel to transmit through has not been chosen. In practice: you download the XML from Flux and send it through the intermediary or portal you already use, and follow the outcomes there. So 'Issued' in Flux means the document has been numbered and frozen, not that it has reached the customer."
+          },
+          "t05": {
+            "q": "Where do I find the invoice XML file?",
+            "a": "On the issued invoice, with the 'XML FatturaPA' button. The file is in FatturaPA FPR12 format (schema 1.2.3, specifications 1.4), with the name SDI expects, and is built from the data frozen at the time of issue: downloading it a year from now gives you the same file, even if your company's or the customer's data has changed in the meantime. Every file produced is validated against the official schema of the Agenzia delle Entrate before it leaves."
+          },
+          "t06": {
+            "q": "How do I send the invoice to the customer, and where is it archived?",
+            "a": "On the issued invoice you will find 'Courtesy PDF', 'XML FatturaPA' and 'Send to customer'. The PDF is a readable copy built from the same data as the XML, with a footer stating that it has no tax value: the real invoice is the XML file transmitted through SDI, and the customer finds it in their reserved area on the Agenzia delle Entrate website. 'Send to customer' sends the PDF as an attachment from the address configured in Settings → Email, suggesting the company's main email; the invoice records when and to whom it was sent.\nRight after issue, the XML and PDF are saved in the document archive, with a fingerprint that makes it possible to detect if a file is altered: in that case it is not served, and the document is rebuilt from the frozen data. If archiving failed, the invoice says so and the 'Archive now' button retries it; it also happens on its own at the first download. Note: the Flux archive does not replace legally compliant digital preservation (conservazione sostitutiva), which remains the responsibility of the preservation service you use."
+          },
+          "t07": {
+            "q": "How do I correct or cancel an issued invoice?",
+            "a": "With a credit note: an issued invoice cannot be edited or deleted. On the invoice press 'Credit note' and choose 'Full reversal', which copies all the lines and is issued as it is, or 'Partial reversal', which starts from the same lines for you to reduce or remove. A TD04 draft is created, linked to the invoice, with the same numbering series, so numbering continues; change it in the draft if you use a series dedicated to credit notes.\nOn issue the amount is deducted from the invoice's remaining balance, and you cannot reverse more than was invoiced: if two notes are issued at the same time, the second is rejected without using up numbers. On the invoice a panel shows invoiced, reversed and remaining amounts, and the list shows 'Reversed' or 'Partially reversed'. A credit note never charges stamp duty again: the recharge line would give the customer back the €2, while stamp duty already paid is not refunded. Stamp duty on the note itself is decided as for invoices, from the VAT Natura of its lines."
+          },
+          "t08": {
+            "q": "How is stamp duty calculated?",
+            "a": "Automatically, from the VAT Natura of each line. Stamp duty of €2.00 is due when the VAT-free lines that require it together exceed €77.47: what counts is their sum, not the invoice total, after the document discount. Exports (N3.1), intra-EU supplies (N3.2), supplies to San Marino (N3.3) and transactions treated as exports (N3.4) are exempt. Note: transactions under a declaration of intent (N3.5) are not exempt, even though they are non-taxable like exports. The margin scheme (N5) pays no stamp duty because VAT is included in the price.\nThe draft shows whether stamp duty is due and why. You can force it or remove it for special cases, such as a customer's personal exemption, but only by writing the reason, which stays on the invoice. In Settings → E-invoicing you choose whether to charge it to the customer: in that case the invoice gets a line 'Imposta di bollo assolta in modo virtuale' of €2.00 excluding VAT (N1), which does not count towards the threshold."
+          },
+          "t09": {
+            "q": "What is the quarterly stamp duty summary for?",
+            "a": "For knowing how much to pay and when. On the Invoices page a panel estimates the stamp duty for each quarter of the year, counting the issued invoices that carry it, and for each gives the F24 tax code (2521, 2522, 2523, 2524) and the due date, applying the deferrals that apply when the amount stays below €5,000. It is an estimate made from your own data, not a statement from the tax authority: the amount to pay remains the one the Agenzia delle Entrate publishes in the reserved area, and Flux neither prepares nor files the F24."
+          },
+          "t10": {
+            "q": "In which language and currency do my customers receive documents?",
+            "a": "In the language set on the company record, under 'Document language' (Billing tab): Italian or English. If you leave it on 'Automatic', it is Italian for an address in Italy or with no country, and English for all others. The language applies to the quote PDF and printout, the page the customer opens from the link, the email you send it with and the courtesy copy of the invoice, whatever language you use Flux in: a quote for a German customer goes out in English even if your system is in Italian. An invoice freezes the language at issue, so a copy reprinted next year does not change language along with the customer record.\nAmounts are always in the document's currency, chosen when you create the quote, order, contract or invoice, and are never converted: the currency selector in the header only changes the overall dashboard totals. The name at the top of your documents is the company name in Settings → E-invoicing, or the workspace name if you have not filled it in yet."
+          }
+        }
+      },
+      "contracts": {
+        "title": "Contracts and renewals",
+        "subtitle": "Recurring agreements and deadlines",
+        "description": "In Sales → Contracts you record the agreements that repeat: an amount per period, a term, a notice period. Flux works out on its own where each contract stands, warns the owner before the deadline to decide, and adds up what they are worth in a month.",
+        "topics": {
+          "t01": {
+            "q": "How do I record a recurring contract?",
+            "a": "Sales → Contracts → 'New contract'. You need a title, the company and, if you want, the contact it goes through and the deal it came from; then the amount with its currency and the billing period — monthly, quarterly, half-yearly or yearly — the start date, the end of the period, the days of notice and, where applicable, automatic renewal with the length of each renewal. The end of the period can be left empty: that is a contract with no expiry. The owner is the person who will get the renewal warning, so it is worth choosing one rather than leaving whoever created the record."
+          },
+          "t02": {
+            "q": "What do a contract's statuses mean?",
+            "a": "Almost all of them are calculated from the dates, not chosen: 'Not started yet' before the start date, 'Active' while it runs, 'Decision due' as the deadline to renew or cancel approaches, 'Expired' once the period is over. A contract with no end date stays 'Active'. Only the two things that depend on a person are set by hand: 'Draft', until the agreement is closed, and 'Cancelled'.\nThat is deliberate: a stored status would be wrong from the first morning nobody touched the record, and a renewals list built on it would miss exactly the contracts nobody is looking after. For a customer who cancels use 'Cancelled' rather than deleting: the contract stays in the history."
+          },
+          "t03": {
+            "q": "How do the notice period and the reminder work?",
+            "a": "The deadline to decide is the end of the period minus the days of notice. The contract moves to 'Decision due' a month before that deadline, so there is still time to renew or cancel, and at that point the owner gets a notification in the bell — and a push too, if they have notifications on: 'A contract of mine reaches its notice period' is one of the types that are on by default. The warning comes from a check that runs once a day, so it arrives during the day rather than at an exact moment, and it goes out once per period even though the contract stays 'Decision due' for weeks. The next period of a self-renewing contract gets its own."
+          },
+          "t04": {
+            "q": "How does automatic renewal work?",
+            "a": "A contract with automatic renewal never expires: when the period ends the expiry moves forward on its own by the length you set, and the notice warning repeats before every renewal. Only the date arithmetic moves: renewal does not issue an invoice, does not create an order and does not change the amount — those stay things to do. If the customer cancels, you set 'Cancelled' and the contract stops renewing and stops counting towards recurring revenue."
+          },
+          "t05": {
+            "q": "What is monthly recurring revenue?",
+            "a": "What the contracts earning today are worth in a month. Each amount is brought back to a month — a yearly one divided by twelve, a quarterly one by three — and added up. Only contracts that have started and have not ended count, so neither a draft, nor a signed contract starting next month, nor an expired or cancelled one: counting those would turn a forecast into a fact. You will find it at the top of the Contracts page and on the dashboard, next to the number of contracts waiting for a decision. Contracts written in different currencies give separate figures, one per currency, never a single sum."
           }
         }
       },
@@ -6307,16 +6372,39 @@
             "a": "Settings → Email. Choose the provider: Resend (your API key is enough) or SMTP (host, port, credentials and TLS). Then set the sender name and the address everything goes out from: campaigns, invitations, notifications. ⚠️ That address is not only for sending: it is also the one customers reply to, and the one the system uses to recognise that an incoming email belongs to this workspace. If it is left empty, incoming emails do not become tickets."
           },
           "t03": {
-            "q": "How do I connect an external program to Flux?",
-            "a": "Settings → API Keys, where you generate a workspace key. It is passed as the header `Authorization: Bearer <key>` and is valid only for this workspace: the key itself says which one, so whoever integrates does not have to specify it anywhere else, and cannot pick the wrong workspace by mistake. The key is shown only once, when it is created: if you lose it you generate another one and the old one stops working. The available routes, with request bodies and responses, are in the API documentation in the administration panel."
-          },
-          "t04": {
             "q": "I can no longer find a ticket closed months ago.",
             "a": "The ticket list is a work queue: it always shows everything that is still open, in progress or pending, whatever the date, plus only what was resolved or closed in the last 30 days. When something is left out, a line above the status tabs says how many tickets are hidden, with a link to see them all. Nothing is deleted."
           },
-          "t05": {
+          "t04": {
             "q": "How do I manage canned replies for tickets?",
             "a": "Settings → Macros. Create new macros with a title and pre-filled text. Public macros are visible to the whole team in the tickets module; private ones are visible only to you. They are available directly in the ticket's reply box."
+          }
+        }
+      },
+      "integrations": {
+        "title": "Integrations and API",
+        "subtitle": "API key and the assistant's contribution",
+        "description": "An external system — a website, a back-office, an assistant — writes into Flux through the /api/crm/* routes, using a workspace key. In Analysis → Assistant's contribution you can see what it wrote.",
+        "topics": {
+          "t01": {
+            "q": "How do I connect an external program to Flux?",
+            "a": "Settings → API, where you generate the workspace key. It is sent as the header `Authorization: Bearer <key>` and is valid only for this workspace: the key itself says which one, so whoever integrates does not have to state it anywhere else and cannot hit the wrong workspace by mistake. The same page shows this business's identifier, which is what integration addresses are built from.\nThere is one key per workspace and you see it once, when it is created: it cannot be read back. If you lose it you create another, and the old one stops working at that same moment — so the integration has to be updated at the same moment. 'Revoke' switches it off immediately without creating a new one. Flux does not record when a key was last used: to see whether an integration is working, look at the Assistant's contribution."
+          },
+          "t02": {
+            "q": "What can an API key do?",
+            "a": "Write, not read. The routes available are all POST and cover contacts, leads, companies, notes, orders, activities (including activities on a contact, a lead, a company or a deal), custom fields, moving a lead to another stage, closing a person's deals, opting a contact point out, and GDPR erasure. Nearly all of them also have a 'bulk' version for sending several records at once.\n⚠️ There is no read route at all: from outside you cannot read back a list of contacts or orders, so reconciling weeks later against what the CRM actually holds is not possible and has to be done from the screens. A key is the equivalent of a user who can write records, not an administrator: it changes no settings. Calls are counted against the workspace's plan, and past the limit the answer is 429."
+          },
+          "t03": {
+            "q": "What does a request with several records answer?",
+            "a": "Always 200, even when some records were rejected. The body holds a summary — total, created, updated, skipped, errors and duration — and a list with one entry per record sent: its position, its outcome, the id it was given, or the field-by-field reasons it was rejected. A bad row does not fail the whole request, so an integrator should not be waiting for an error status: the answer is in the body."
+          },
+          "t04": {
+            "q": "How do I repeat a call without duplicating data?",
+            "a": "By sending the `Idempotency-Key` header with a value of your own, different for every request. It matters because an answer that never arrives — a timeout, a dropped connection — leaves the caller not knowing whether the work was done, and sending it all again duplicates whatever Flux cannot recognise: contacts and leads are matched on email alone, which is optional, and activities are matched on nothing.\nWith the key, the first request imports and every identical repeat gets the same answer back, with the same ids, having written nothing, marked `Idempotent-Replay: true`. The same key with a different body is refused with 422, one still in flight with 409, and keys are forgotten after thirty days. With no header nothing changes from how it was. It is accepted by the contacts, leads, companies, notes, orders and activities routes, both single and bulk; it is not accepted yet by the lead stage change, custom fields, closing deals, opt-out and erasure."
+          },
+          "t05": {
+            "q": "What does the 'Assistant's contribution' page show?",
+            "a": "What came into the CRM from integrations, in the current month: how many records were written, in how many requests, when the last one arrived, and a table by kind — contacts, companies, leads, notes, activities, orders, custom fields, closed deals, withdrawn consents, erasures. It sits under Analysis, not inside Reports, because whoever connects an integration needs to be able to check it whether or not they bought the reporting module.\nThree warnings. It counts only writes that arrived through the API routes: what the team does inside Flux does not go through them and does not appear, so this is not a comparison between people and the assistant. One request can write many rows — a five-hundred-contact import is one request and five hundred rows — which is why the two columns are separate. And a key identifies the workspace, not who is using it: with two integrations connected the figures are their sum. Erasures are counted without saying who they were about, so as to leave no trail back to someone who asked to disappear."
           }
         }
       },
@@ -6327,7 +6415,7 @@
         "topics": {
           "t01": {
             "q": "Which events generate a notification?",
-            "a": "When a task assigned to you is about to fall due or is overdue, when one of your deals is closed as won, when a lead is assigned to you, when a campaign you started goes out. On tickets: when an SLA promise has used up half its time and then 80%, so you can still do something about it, and on breach — which also alerts the people in the group named in the policy, each of them only once. Automations can add more."
+            "a": "When a task assigned to you is about to fall due or is overdue, when one of your deals is closed as won, when a lead is assigned to you, when a campaign you started goes out, when a contract you own reaches its notice period, and when somebody replies to a sequence. On quotes: an approval request and the outcome that follows it. On tickets: when an SLA promise has used up half its time and then 80%, so you can still do something about it, and on breach — which also alerts the people in the group named in the policy, each of them only once. On top of that, chat messages, direct messages and mentions in notes. Automations can add more."
           },
           "t02": {
             "q": "Can I receive notifications even when Flux is closed?",
@@ -6339,7 +6427,7 @@
           },
           "t04": {
             "q": "I get too many notifications. Can I choose which ones?",
-            "a": "Yes, in Settings → Notifications there is a switch for each type of event. By default only the four things that need a person right away are on: a lead assigned to you, one of your tasks falling due, a ticket close to its SLA and a ticket that has breached it. Everything else — chat messages, mentions in notes, quotes, won deals — is off until you turn it on. There is also a main switch that pauses them all without losing your individual choices. The bell inside Flux keeps showing everything regardless."
+            "a": "Yes, in Settings → Notifications there is a switch for each type of event. Six are on by default, the ones that usually need someone straight away: a lead assigned to you, one of your tasks falling due, a ticket close to its SLA, a ticket that has breached it, a contract you own reaching its notice period, and a reply to a sequence. Everything else — chat and direct messages, mentions in notes, quote approvals and outcomes, won deals — is off until you turn it on.\nThere is also a main switch that pauses them all without losing your individual choices. Only the choices you actually make are stored, so a type of alert added later arrives at whatever it is meant to be by default instead of being silently off. The bell inside Flux keeps showing everything regardless."
           },
           "t05": {
             "q": "I said no to the browser and now it does not ask any more.",
@@ -6348,6 +6436,29 @@
           "t06": {
             "q": "How do I mark notifications as read?",
             "a": "Click the bell icon → the panel with recent notifications opens. Click a notification to go to the corresponding page (the notification is marked as read). Or use 'Mark all as read' to clear them all in one go."
+          }
+        }
+      },
+      "mobileApp": {
+        "title": "The app on your phone",
+        "subtitle": "Installing and using Flux on mobile",
+        "description": "Flux can be added to the home screen and opens full screen, with its own icon and no browser bar. Below a certain width the interface changes shape, not just size.",
+        "topics": {
+          "t01": {
+            "q": "How do I install Flux on my phone?",
+            "a": "Open Flux in the phone's browser and add it to the home screen. On Android and Chrome-based browsers the 'Install' prompt appears, and Flux itself offers it once: dismiss it and it does not come back, but the option stays in the browser menu. On iPhone and iPad there is no button: use Share → 'Add to Home Screen'. Once installed, Flux opens on the dashboard full screen, and holding the icon gives you shortcuts to Pipeline, Tickets and New order."
+          },
+          "t02": {
+            "q": "What changes when using Flux on a phone?",
+            "a": "A bar appears at the bottom with five destinations, chosen from the ones you have access to, while the full menu stays in the button at the top left — the same side its panel comes out of. Long lists (contacts, companies, leads, orders, quotes, tickets) become cards instead of tables: a nine-column table does not become usable by scrolling sideways. Dialogs open full screen, so the keyboard does not end up on top of them. On a computer everything is as it was: these are two layouts of the same screen, not two products."
+          },
+          "t03": {
+            "q": "Does Flux work without a connection?",
+            "a": "No, and that is on purpose. Every page and every figure comes over the network: with no connection you get a screen that says so, instead of the browser's error page. Nothing you see is kept on the phone, because a saved copy does not know which workspace it came from or what role you had when you opened it, and a pipeline from twenty minutes ago is worse than no pipeline — nothing on the screen would say it was old, and somebody would quote from it to a customer. When a new version is released Flux tells you and reloads only when you press, so it does not update while you are writing a quote."
+          },
+          "t04": {
+            "q": "Do push notifications work on a phone?",
+            "a": "Yes, but on iPhone and iPad only if you have added Flux to the home screen: Apple does not deliver them to a Safari tab, and until you install the app the button to turn them on stays disabled with an explanation. On Android and on a computer nothing needs installing. Permission is given once per browser and per device, so a phone and a laptop are turned on separately; it is done in Settings → Notifications, where you also choose which kinds of alert reach you and see the list of registered devices."
           }
         }
       },

@@ -5808,12 +5808,31 @@
             "a": "La barra laterale raggruppa tutto in sette sezioni: Lavoro (dashboard, calendario, task, chat), Clienti (contatti, aziende, lead), Vendite (pipeline con obiettivi, funnel, win/loss, previsioni e report, poi preventivi, ordini, prodotti e finance), Assistenza (panoramica, ticket, SLA, macro), Marketing e automazioni, Analisi, e Amministrazione (utenti, ruoli, impostazioni). Alcune voci compaiono solo se il piano include il modulo corrispondente. Su telefono la barra lascia il posto a una barra di schede in basso con le sezioni più usate."
           },
           "t05": {
-            "q": "Posso installare Flux sul telefono?",
-            "a": "Sì. Aprendo Flux dal browser del telefono puoi aggiungerlo alla schermata iniziale: da lì si apre a schermo intero, con la sua icona e senza la barra del browser. Su Android il browser propone da solo 'Installa'; su iPhone si usa Condividi → Aggiungi a Home. Senza rete compare una schermata che lo dice, invece di una pagina di errore del browser."
-          },
-          "t06": {
             "q": "Posso personalizzare la vista?",
             "a": "Sì. Dall'header in alto a destra puoi cambiare il tema (chiaro/scuro), la lingua (italiano/inglese) e la valuta di visualizzazione. Puoi anche modificare il layout della sidebar e abilitare la navbar fissa tramite i controlli di layout."
+          }
+        }
+      },
+      "quickAccess": {
+        "title": "Ricerca e accesso rapido",
+        "subtitle": "Ctrl+K, creazione rapida, recenti",
+        "description": "Un solo campo per raggiungere qualunque record senza sapere in che elenco sta, un menu per crearne uno nuovo da dove sei, e l'elenco di quelli che hai aperto da poco.",
+        "topics": {
+          "t01": {
+            "q": "Come trovo velocemente un record?",
+            "a": "Con Ctrl+K (⌘K su Mac), da qualunque schermata; funziona anche Ctrl+J, e nell'intestazione c'è il pulsante 'Cerca' per chi preferisce il mouse. Scrivi almeno due lettere e i risultati arrivano mentre scrivi: frecce su e giù per muoverti, Invio per aprire, Esc per chiudere. Le schede in cima al riquadro restringono la ricerca a un gruppo — clienti, vendite, documenti, assistenza, lavoro, marketing — e compaiono solo se hai accesso a più di un gruppo. Oltre ai record la ricerca riconosce anche i comandi: scrivendo 'nuovo contatto' apri direttamente la creazione."
+          },
+          "t02": {
+            "q": "Che cosa trova la ricerca?",
+            "a": "Lead, contatti e aziende (nome, email, telefono, partita IVA), trattative, prodotti e listini, preventivi, ordini, contratti, fatture e note di credito (numero del documento e nome del cliente), ticket, task, appuntamenti, campagne, sequenze, modelli email e i documenti allegati, cercati per nome del file. Un telefono si trova scrivendone almeno quattro cifre. Di ogni tipo mostra al massimo cinque risultati, e cerca per pezzo di testo contenuto: un nome scritto con un errore di battitura non viene trovato.\nVedi solo quello che puoi già vedere: i tipi esclusi dal tuo ruolo o dal piano del workspace non compaiono affatto. Prodotti e modelli non hanno una scheda propria, quindi il risultato apre il loro elenco già filtrato; un documento apre il record a cui è allegato; una nota di credito apre la fattura."
+          },
+          "t03": {
+            "q": "Come creo qualcosa senza cercare la pagina giusta?",
+            "a": "Con 'Creazione rapida', il pulsante in cima alla barra laterale: elenca tutto ciò che puoi creare — lead, contatto, azienda, trattativa, prodotto, listino, preventivo, ordine, contratto, fattura, ticket, task, appuntamento, campagna, sequenza — e apre direttamente il modulo di creazione sulla schermata giusta. L'elenco è filtrato sui tuoi permessi e sul piano, quindi contiene solo cose che puoi davvero creare; se non ce n'è nessuna, il menu lo dice invece di restare vuoto. Le stesse voci compaiono nel riquadro di ricerca quando lo apri senza scrivere niente."
+          },
+          "t04": {
+            "q": "A che cosa serve l'elenco dei recenti?",
+            "a": "A tornare su quello che stavi guardando. L'icona con la freccia circolare nell'intestazione apre l'elenco dei record aperti di recente, divisi per tipo, con quanto tempo fa; gli stessi compaiono a sinistra nel riquadro di ricerca quando non hai ancora scritto niente. Si riempie da solo quando apri la scheda di un record o un risultato di ricerca, il più recente sta in cima e riaprire qualcosa lo rimette in testa invece di duplicarlo; tiene fino a dieci voci per tipo e ottanta in tutto, e il pannello ne mostra dodici.\nÈ salvato nel browser di questo dispositivo e per questo workspace: non ti segue dal computer al telefono, sparisce se svuoti i dati del sito ed è condiviso con chiunque usi lo stesso profilo del browser. 'Svuota' lo azzera, e sulle schede di un gruppo azzera solo quello. Sotto una certa larghezza il pulsante non compare: sul telefono resta la ricerca."
           }
         }
       },
@@ -5989,58 +6008,30 @@
         "description": "Il modulo Preventivi gestisce l'intero processo di offerta commerciale: dalla redazione interna con workflow di approvazione, all'invio via email al cliente con link di visualizzazione, fino all'accettazione o al declino.",
         "topics": {
           "t01": {
-            "q": "Come gestisco contratti ricorrenti e rinnovi?",
-            "a": "In Vendite → Contratti registri gli accordi ricorrenti: azienda, importo per mese, trimestre, semestre o anno, data di inizio, fine del periodo, giorni di preavviso e, se previsto, il rinnovo automatico con la sua durata. Lo stato non si imposta a mano ma è calcolato dalle date: 'In vigore', 'Da decidere', 'Scaduto', 'Non ancora iniziato'. A mano si scelgono solo 'Bozza' e 'Disdetto'. Un contratto diventa 'Da decidere' un mese prima della data limite del preavviso (la fine del periodo meno i giorni di preavviso), così resta il tempo per rinnovare o disdire; quel giorno il titolare riceve una notifica, anche push, una sola volta per periodo. Un contratto a rinnovo automatico non scade mai: la sua scadenza avanza di un periodo alla volta e l'avviso si ripete prima di ogni rinnovo. In cima alla pagina e sul cruscotto trovi il ricavo ricorrente mensile, calcolato solo sui contratti in vigore oggi. Un contratto firmato che parte il mese prossimo, o uno scaduto, non ci entrano. Per un cliente che disdice, imposta 'Disdetto' invece di eliminare: resta nello storico."
-          },
-          "t02": {
-            "q": "Come emetto una fattura elettronica?",
-            "a": "Prima completa Impostazioni → Fatturazione elettronica (denominazione, partita IVA, regime fiscale, sede) e i dati fiscali del cliente sulla sua scheda: partita IVA o codice fiscale, e codice destinatario o PEC. Poi apri Vendite → Fatture → 'Nuova fattura': in una sola pagina scegli il cliente, eventualmente un ordine da cui copiare righe e sconto, e compili righe, pagamento e scadenza (dalla pagina di un ordine, il pulsante 'Fattura' apre la stessa pagina già compilata); sulle righe con IVA 0% scegli la Natura, obbligatoria. Un riquadro elenca cosa manca prima di poter emettere. 'Emetti' assegna il numero progressivo dell'anno e del sezionale, la data di oggi e congela i dati di emittente, cliente e righe: una fattura emessa non si modifica né si elimina, si corregge con una nota di credito. Una bozza non ha numero, quindi eliminarla non lascia buchi nella numerazione."
-          },
-          "t03": {
-            "q": "Dove trovo il file XML della fattura?",
-            "a": "Sulla fattura emessa, con il pulsante 'XML FatturaPA'. Il file è in formato FatturaPA FPR12 (schema 1.2.3, specifiche 1.4), con il nome previsto da SDI, e viene costruito dai dati congelati al momento dell'emissione: scaricandolo tra un anno ottieni lo stesso file, anche se nel frattempo sono cambiati i dati dell'azienda o del tuo profilo. Ogni tracciato generato è verificato contro lo schema ufficiale dell'Agenzia delle Entrate. L'invio automatico allo SDI non è ancora attivo: per ora il file va trasmesso con il canale che già usi."
-          },
-          "t04": {
-            "q": "Come mando la fattura al cliente, e dove resta archiviata?",
-            "a": "Sulla fattura emessa trovi 'PDF di cortesia', 'XML FatturaPA' e 'Invia al cliente'. Il PDF è una copia leggibile costruita dagli stessi dati dell'XML, con a piè di pagina la dicitura che è priva di valore fiscale: la fattura vera è il file XML trasmesso tramite SDI, e il cliente la ritrova nella sua area riservata dell'Agenzia delle Entrate. 'Invia al cliente' manda il PDF in allegato dall'indirizzo configurato in Impostazioni → Email, proponendo l'email principale dell'azienda; sulla fattura resta scritto quando e a chi è stata inviata. Subito dopo l'emissione XML e PDF vengono salvati nell'archivio documenti, con un'impronta che permette di accorgersi se un file viene alterato: in quel caso non viene servito, e il documento è ricostruito dai dati congelati. Se l'archiviazione non è riuscita, la fattura lo dice e il pulsante 'Archivia ora' la ripete; succede comunque da sola al primo download. Attenzione: l'archivio di Flux non sostituisce la conservazione sostitutiva a norma, che resta a carico del servizio di conservazione che usi."
-          },
-          "t05": {
-            "q": "In che lingua e in che valuta ricevono i documenti i miei clienti?",
-            "a": "Nella lingua indicata sulla scheda dell'azienda, in 'Lingua dei documenti' (scheda Fatturazione): italiano o inglese. Se la lasci su 'Automatica', è italiano per un indirizzo in Italia o senza paese e inglese per gli altri. La lingua vale per il PDF e la stampa del preventivo, la pagina che il cliente apre dal link, l'email con cui lo invii e la copia di cortesia della fattura, qualunque sia la lingua in cui usi Flux: un preventivo per un cliente tedesco esce in inglese anche se il tuo gestionale è in italiano. Gli importi sono sempre nella valuta del documento, scelta quando crei preventivo, ordine o contratto, e non vengono mai convertiti: il selettore di valuta nell'intestazione cambia solo i totali generali della dashboard. Il nome in testa al preventivo è la denominazione in Impostazioni → Fatturazione elettronica, oppure il nome del workspace se non l'hai ancora compilata."
-          },
-          "t06": {
-            "q": "Come correggo o annullo una fattura emessa?",
-            "a": "Con una nota di credito: una fattura emessa non si modifica né si elimina. Sulla fattura premi 'Nota di credito' e scegli 'Storno totale', che copia tutte le righe e si emette così com'è, oppure 'Storno parziale', che parte dalle stesse righe da ridurre o togliere. Nasce una bozza di tipo TD04 collegata alla fattura, con lo stesso sezionale, quindi la numerazione prosegue; la cambi nella bozza se usi un sezionale dedicato alle note di credito. All'emissione l'importo viene scalato dal residuo della fattura, e non si può stornare più di quanto fatturato: se due note vengono emesse insieme, la seconda viene rifiutata senza consumare numeri. Sulla fattura un riquadro mostra fatturato, stornato e residuo, e nell'elenco compare 'Stornata' o 'Stornata in parte'. La nota di credito non riaddebita mai l'imposta di bollo: la riga di rivalsa restituirebbe i 2 € al cliente, mentre il bollo già versato non viene rimborsato. Il bollo sulla nota stessa si decide come per le fatture, dalle Nature IVA delle sue righe."
-          },
-          "t07": {
-            "q": "Come viene calcolata l'imposta di bollo?",
-            "a": "Automaticamente, dalla Natura IVA di ogni riga. Il bollo di € 2,00 è dovuto quando le righe senza IVA che lo richiedono superano insieme € 77,47: conta la loro somma, non il totale della fattura, dopo lo sconto sul documento. Sono esenti le esportazioni (N3.1), le cessioni intracomunitarie (N3.2), le cessioni verso San Marino (N3.3) e le operazioni assimilate alle esportazioni (N3.4). Attenzione: le operazioni con dichiarazione d'intento (N3.5) non sono esenti, anche se non imponibili come le esportazioni. Il regime del margine (N5) non paga bollo perché l'IVA è compresa nel prezzo. La bozza mostra se il bollo è dovuto e perché. Puoi forzarlo o toglierlo per i casi particolari, per esempio un'esenzione soggettiva del cliente, ma solo scrivendo il motivo, che resta sulla fattura. In Impostazioni → Fatturazione elettronica scegli se addebitarlo al cliente: in quel caso la fattura riceve una riga 'Imposta di bollo assolta in modo virtuale' di € 2,00 esclusa IVA (N1), che non conta per la soglia. Nella pagina Fatture un riepilogo stima il bollo di ogni trimestre, con codice tributo F24 (2521–2524) e scadenza, applicando i rinvii sotto € 5.000; l'importo da versare resta quello che l'Agenzia delle Entrate pubblica nell'area riservata."
-          },
-          "t08": {
             "q": "Come creo un nuovo preventivo?",
             "a": "Vai su Preventivi → 'Nuovo Preventivo'. Seleziona l'azienda, il contatto di riferimento e la deal collegata. Aggiungi le righe di prodotto/servizio dal catalogo (o inserendo dati liberi), imposta eventuali sconti, l'IVA e la data di scadenza. Il sistema calcola automaticamente subtotale, sconti, IVA e totale finale."
           },
-          "t09": {
+          "t02": {
             "q": "Cos'è il workflow di approvazione?",
             "a": "È un passaggio facoltativo, non un blocco. Da una bozza puoi cliccare 'Richiedi Approvazione' e il preventivo passa in 'In approvazione': lo vede chi ha il ruolo di amministratore o proprietario del workspace, che può approvarlo o rifiutarlo con una nota. Una volta approvato compare il pulsante di invio. Chi ha il permesso di scrivere preventivi può però inviare direttamente dalla bozza senza passare di qui: l'approvazione serve a chi vuole una revisione interna, non impedisce l'invio a chi non la usa."
           },
-          "t10": {
+          "t03": {
             "q": "Come invio il preventivo al cliente?",
             "a": "Il pulsante di invio compare su una bozza e su un preventivo approvato. Il sistema prepara un'email con un link univoco al preventivo: il cliente lo apre senza fare login e vede il documento formattato. Oggetto e testo sono modificabili prima di partire, e niente parte finché non lo mandi tu."
           },
-          "t11": {
+          "t04": {
             "q": "Come vede il preventivo il cliente?",
             "a": "Il cliente riceve un'email con un link personalizzato. Cliccandolo, accede a una pagina pubblica con tutti i dettagli del preventivo: voci, prezzi, sconti, totali e note. Dalla stessa pagina può accettare o rifiutare il preventivo (con la possibilità di lasciare un motivo in caso di rifiuto)."
           },
-          "t12": {
+          "t05": {
             "q": "Come so se il cliente ha aperto il preventivo?",
             "a": "Non appena il cliente apre il link, lo stato del preventivo cambia automaticamente da 'Inviato' a 'Visualizzato' e viene registrato l'orario esatto di apertura. Vedrai questa informazione nella timeline del preventivo e nel dettaglio."
           },
-          "t13": {
+          "t06": {
             "q": "Come sollecito un preventivo senza risposta?",
             "a": "Sul dettaglio del preventivo compare da solo un riquadro quando c'è motivo di sollecitare, e dice quale: mai aperto, aperto ma senza risposta, in scadenza, oppure già scaduto. Sono quattro situazioni diverse e propongono quattro messaggi diversi — a chi non ha aperto si chiede se la mail è arrivata, non una decisione. Il riquadro non compare su un preventivo già accettato o rifiutato, né su uno spedito ieri. Il testo è una bozza: modificala come vuoi, e parte solo quando premi tu."
           },
-          "t14": {
+          "t07": {
             "q": "Posso esportare il preventivo in PDF?",
             "a": "Sì. Dal dettaglio del preventivo trovi il pulsante 'Esporta PDF' per scaricare il documento formattato, pronto per l'invio tramite altri canali o per l'archiviazione."
           }
@@ -6066,6 +6057,80 @@
           "t04": {
             "q": "Dove registro pagamenti e consegna?",
             "a": "Nel dettaglio dell'ordine trovi il riquadro dei pagamenti: i versamenti sono elencati uno per uno con data e importo, non sommati in un unico numero, così si vede un acconto seguito da un saldo. Accanto puoi registrare la data di consegna effettiva."
+          }
+        }
+      },
+      "invoicing": {
+        "title": "Fatturazione elettronica",
+        "subtitle": "Fatture, note di credito e bollo",
+        "description": "Il modulo Fatture emette fatture elettroniche italiane in formato FatturaPA: numerazione per sezionale e anno, imposta di bollo calcolata dalle Nature IVA delle righe, note di credito e archivio dell'XML e del PDF di cortesia. Flux produce il file; la trasmissione allo SDI resta al canale che già usi.",
+        "topics": {
+          "t01": {
+            "q": "Che cosa devo compilare prima di emettere la prima fattura?",
+            "a": "Da te: Impostazioni → Fatturazione elettronica, dove servono denominazione, partita IVA, regime fiscale (RF01 ordinario, RF19 forfettario, e gli altri previsti dal tracciato) e la sede — via, CAP, città, provincia, paese. I dati REA sono facoltativi, ma o li metti tutti o nessuno: ufficio, numero e stato di liquidazione insieme, perché SDI rifiuta mezzo blocco. IBAN, banca, email e telefono compaiono sulla fattura se li compili. In cima alla pagina un riquadro dice se il profilo è pronto e che cosa manca o è scritto male.\nDal lato del cliente, nella scheda Fatturazione dell'azienda: partita IVA o codice fiscale, l'indirizzo completo e un recapito elettronico — codice destinatario SDI oppure PEC. Senza questi la fattura si può scrivere ma non emettere, e la bozza lo dice."
+          },
+          "t02": {
+            "q": "Come emetto una fattura elettronica?",
+            "a": "Vendite → Fatture → 'Nuova fattura': in una sola pagina scegli il cliente, eventualmente un ordine da cui copiare righe e sconto, e compili righe, pagamento e scadenza. Dalla pagina di un ordine, il pulsante 'Fattura' apre la stessa schermata già compilata. Sulle righe con IVA 0% la Natura è obbligatoria, e su quelle con IVA non va messa: sono i due errori che SDI scarta. Un riquadro elenca cosa manca prima di poter emettere.\n'Emetti' assegna il numero, mette la data di oggi e congela i dati di emittente, cliente e righe. Da lì in poi la fattura non si modifica né si elimina: si corregge con una nota di credito. Una bozza invece non ha numero, quindi eliminarla non lascia buchi nella numerazione."
+          },
+          "t03": {
+            "q": "Come funzionano la numerazione e i sezionali?",
+            "a": "Il numero non si scrive a mano: viene assegnato al momento dell'emissione, dal contatore del sezionale e dell'anno della fattura. Il sezionale è un codice breve di lettere e cifre che scegli sulla bozza; lasciandolo vuoto usi la numerazione principale e il numero si legge '12', altrimenti '12/B'. Ogni sezionale ha il suo contatore e riparte da 1 a ogni anno nuovo.\nIl numero viene preso nella stessa operazione che emette la fattura, quindi due persone che premono 'Emetti' insieme non ottengono lo stesso numero e un tentativo fallito non ne consuma nessuno: la numerazione resta senza buchi, come la legge richiede. Un numero non viene mai riusato e una fattura emessa non si rinumera."
+          },
+          "t04": {
+            "q": "Flux manda la fattura allo SDI?",
+            "a": "No, non ancora, ed è la cosa più importante da sapere prima di iniziare. Flux costruisce il file XML, lo valida e lo conserva; la trasmissione al Sistema di Interscambio e la ricezione delle ricevute — consegna, scarto, mancata consegna, esito — non sono state realizzate, perché il canale con cui trasmettere non è ancora stato scelto. In pratica: scarichi l'XML da Flux e lo trasmetti con l'intermediario o il portale che usi già, e lì segui gli esiti. Di conseguenza 'Emessa' in Flux vuol dire che il documento è stato numerato e congelato, non che è stato consegnato al cliente."
+          },
+          "t05": {
+            "q": "Dove trovo il file XML della fattura?",
+            "a": "Sulla fattura emessa, con il pulsante 'XML FatturaPA'. Il file è in formato FatturaPA FPR12 (schema 1.2.3, specifiche 1.4), con il nome che SDI si aspetta, e viene costruito dai dati congelati al momento dell'emissione: scaricandolo tra un anno ottieni lo stesso file, anche se nel frattempo sono cambiati i dati della tua azienda o del cliente. Ogni tracciato generato è verificato contro lo schema ufficiale dell'Agenzia delle Entrate prima di uscire."
+          },
+          "t06": {
+            "q": "Come mando la fattura al cliente, e dove resta archiviata?",
+            "a": "Sulla fattura emessa trovi 'PDF di cortesia', 'XML FatturaPA' e 'Invia al cliente'. Il PDF è una copia leggibile costruita dagli stessi dati dell'XML, con a piè di pagina la dicitura che è priva di valore fiscale: la fattura vera è il file XML trasmesso tramite SDI, e il cliente la ritrova nella sua area riservata dell'Agenzia delle Entrate. 'Invia al cliente' manda il PDF in allegato dall'indirizzo configurato in Impostazioni → Email, proponendo l'email principale dell'azienda; sulla fattura resta scritto quando e a chi è stata inviata.\nSubito dopo l'emissione XML e PDF vengono salvati nell'archivio documenti, con un'impronta che permette di accorgersi se un file viene alterato: in quel caso non viene servito, e il documento è ricostruito dai dati congelati. Se l'archiviazione non è riuscita, la fattura lo dice e il pulsante 'Archivia ora' la ripete; succede comunque da sola al primo download. Attenzione: l'archivio di Flux non sostituisce la conservazione sostitutiva a norma, che resta a carico del servizio di conservazione che usi."
+          },
+          "t07": {
+            "q": "Come correggo o annullo una fattura emessa?",
+            "a": "Con una nota di credito: una fattura emessa non si modifica né si elimina. Sulla fattura premi 'Nota di credito' e scegli 'Storno totale', che copia tutte le righe e si emette così com'è, oppure 'Storno parziale', che parte dalle stesse righe da ridurre o togliere. Nasce una bozza di tipo TD04 collegata alla fattura, con lo stesso sezionale, quindi la numerazione prosegue; la cambi nella bozza se usi un sezionale dedicato alle note di credito.\nAll'emissione l'importo viene scalato dal residuo della fattura, e non si può stornare più di quanto fatturato: se due note vengono emesse insieme, la seconda viene rifiutata senza consumare numeri. Sulla fattura un riquadro mostra fatturato, stornato e residuo, e nell'elenco compare 'Stornata' o 'Stornata in parte'. La nota di credito non riaddebita mai l'imposta di bollo: la riga di rivalsa restituirebbe i 2 € al cliente, mentre il bollo già versato non viene rimborsato. Il bollo sulla nota stessa si decide come per le fatture, dalle Nature IVA delle sue righe."
+          },
+          "t08": {
+            "q": "Come viene calcolata l'imposta di bollo?",
+            "a": "Automaticamente, dalla Natura IVA di ogni riga. Il bollo di € 2,00 è dovuto quando le righe senza IVA che lo richiedono superano insieme € 77,47: conta la loro somma, non il totale della fattura, dopo lo sconto sul documento. Sono esenti le esportazioni (N3.1), le cessioni intracomunitarie (N3.2), le cessioni verso San Marino (N3.3) e le operazioni assimilate alle esportazioni (N3.4). Attenzione: le operazioni con dichiarazione d'intento (N3.5) non sono esenti, anche se non imponibili come le esportazioni. Il regime del margine (N5) non paga bollo perché l'IVA è compresa nel prezzo.\nLa bozza mostra se il bollo è dovuto e perché. Puoi forzarlo o toglierlo per i casi particolari, per esempio un'esenzione soggettiva del cliente, ma solo scrivendo il motivo, che resta sulla fattura. In Impostazioni → Fatturazione elettronica scegli se addebitarlo al cliente: in quel caso la fattura riceve una riga 'Imposta di bollo assolta in modo virtuale' di € 2,00 esclusa IVA (N1), che non conta per la soglia."
+          },
+          "t09": {
+            "q": "A che cosa serve il riepilogo trimestrale del bollo?",
+            "a": "A sapere quanto e quando versare. Nella pagina Fatture un riquadro stima il bollo di ogni trimestre dell'anno, contando le fatture emesse che lo portano, e per ciascuno indica il codice tributo F24 (2521, 2522, 2523, 2524) e la scadenza, applicando i rinvii previsti quando l'importo resta sotto i 5.000 €. È una stima fatta sui tuoi dati, non una comunicazione dell'Agenzia: l'importo da versare resta quello che l'Agenzia delle Entrate pubblica nell'area riservata, e Flux non predispone né invia l'F24."
+          },
+          "t10": {
+            "q": "In che lingua e in che valuta ricevono i documenti i miei clienti?",
+            "a": "Nella lingua indicata sulla scheda dell'azienda, in 'Lingua dei documenti' (scheda Fatturazione): italiano o inglese. Se la lasci su 'Automatica', è italiano per un indirizzo in Italia o senza paese e inglese per gli altri. La lingua vale per il PDF e la stampa del preventivo, la pagina che il cliente apre dal link, l'email con cui lo invii e la copia di cortesia della fattura, qualunque sia la lingua in cui usi Flux: un preventivo per un cliente tedesco esce in inglese anche se il tuo gestionale è in italiano. Una fattura congela la lingua all'emissione, quindi una copia ristampata l'anno prossimo non cambia lingua insieme alla scheda del cliente.\nGli importi sono sempre nella valuta del documento, scelta quando crei preventivo, ordine, contratto o fattura, e non vengono mai convertiti: il selettore di valuta nell'intestazione cambia solo i totali generali della dashboard. Il nome in testa ai documenti è la denominazione in Impostazioni → Fatturazione elettronica, oppure il nome del workspace se non l'hai ancora compilata."
+          }
+        }
+      },
+      "contracts": {
+        "title": "Contratti e rinnovi",
+        "subtitle": "Accordi ricorrenti e scadenze",
+        "description": "In Vendite → Contratti registri gli accordi che si ripetono: un importo per periodo, una durata, un preavviso. Flux calcola da solo a che punto è ogni contratto, avvisa il titolare prima che scada il termine per decidere, e somma quanto vale in un mese.",
+        "topics": {
+          "t01": {
+            "q": "Come registro un contratto ricorrente?",
+            "a": "Vendite → Contratti → 'Nuovo contratto'. Servono un titolo, l'azienda e, se vuoi, il contatto di riferimento e la trattativa da cui nasce; poi l'importo con la sua valuta e il periodo di fatturazione — mensile, trimestrale, semestrale o annuale — la data di inizio, la fine del periodo, i giorni di preavviso e, se previsto, il rinnovo automatico con la durata di ogni rinnovo. La fine del periodo può restare vuota: è un contratto senza scadenza. Il titolare è la persona che riceverà l'avviso del rinnovo, quindi vale la pena sceglierlo davvero invece di lasciare chi ha creato il record."
+          },
+          "t02": {
+            "q": "Che cosa significano gli stati di un contratto?",
+            "a": "Quasi tutti sono calcolati dalle date, non scelti: 'Non ancora iniziato' prima della data di inizio, 'In vigore' mentre corre, 'Da decidere' quando si avvicina il termine per rinnovare o disdire, 'Scaduto' quando il periodo è finito. Un contratto senza data di fine resta 'In vigore'. A mano si impostano solo le due cose che dipendono da una persona: 'Bozza', finché l'accordo non è chiuso, e 'Disdetto'.\nÈ così di proposito: uno stato salvato sarebbe sbagliato dalla prima mattina in cui nessuno tocca il record, e un elenco di rinnovi costruito su quello si perderebbe proprio i contratti di cui non si sta occupando nessuno. Per un cliente che disdice usa 'Disdetto' invece di eliminare: il contratto resta nello storico."
+          },
+          "t03": {
+            "q": "Come funzionano il preavviso e il promemoria?",
+            "a": "Il termine per decidere è la fine del periodo meno i giorni di preavviso. Il contratto passa a 'Da decidere' un mese prima di quel termine, così resta il tempo per rinnovare o disdire, e in quel momento il titolare riceve una notifica nella campanella — e anche push, se ha le notifiche attive: 'Un contratto di cui sono titolare arriva al preavviso' è uno dei tipi accesi di default. L'avviso parte da un controllo che gira una volta al giorno, quindi arriva nel corso della giornata e non nell'istante esatto, e parte una volta sola per periodo anche se il contratto resta 'Da decidere' per settimane. Il prossimo periodo di un contratto che si rinnova avrà il suo avviso."
+          },
+          "t04": {
+            "q": "Come funziona il rinnovo automatico?",
+            "a": "Un contratto a rinnovo automatico non scade mai: quando il periodo finisce la scadenza avanza da sola della durata che hai indicato, e il preavviso si ripete prima di ogni rinnovo. È solo il calcolo delle date a muoversi: il rinnovo non emette una fattura, non crea un ordine e non cambia l'importo — quelli restano cose da fare. Se il cliente disdice, imposti 'Disdetto' e il contratto smette di rinnovarsi e di contare nel ricavo ricorrente."
+          },
+          "t05": {
+            "q": "Che cos'è il ricavo ricorrente mensile?",
+            "a": "Quanto valgono in un mese i contratti che stanno guadagnando oggi. L'importo di ciascuno viene riportato al mese — un annuale diviso dodici, un trimestrale diviso tre — e sommato. Entrano solo i contratti già iniziati e non ancora finiti, quindi né una bozza, né un contratto firmato che parte il mese prossimo, né uno scaduto o disdetto: contarli farebbe di una previsione un dato di fatto. Lo trovi in cima alla pagina Contratti e sul cruscotto, accanto al numero di contratti in attesa di una decisione. Contratti scritti in valute diverse danno cifre separate, una per valuta, mai una somma unica."
           }
         }
       },
@@ -6307,16 +6372,39 @@
             "a": "Impostazioni → Email. Scegli il provider: Resend (basta la tua API key) o SMTP (host, porta, credenziali e TLS). Poi imposta nome mittente e indirizzo da cui parte tutto: campagne, inviti, notifiche. ⚠️ Quell'indirizzo non serve solo a spedire: è anche quello a cui i clienti rispondono, e da cui il sistema riconosce che una mail in arrivo appartiene a questo workspace. Se resta vuoto, le email in entrata non diventano ticket."
           },
           "t03": {
-            "q": "Come collego un programma esterno a Flux?",
-            "a": "Impostazioni → Chiavi API, dove generi una chiave del workspace. Si passa come intestazione `Authorization: Bearer <chiave>` e vale solo per questo workspace: quale sia lo dice la chiave stessa, quindi chi integra non deve indicarlo da nessun'altra parte, e non può sbagliare workspace per errore. La chiave si vede una volta sola al momento della creazione: se la perdi ne generi un'altra e la vecchia smette di funzionare. Le rotte disponibili, con corpi e risposte, sono nella documentazione API del pannello di amministrazione."
-          },
-          "t04": {
             "q": "Non trovo più un ticket chiuso mesi fa.",
             "a": "L'elenco dei ticket è una coda di lavoro: mostra sempre tutto ciò che è ancora aperto, in lavorazione o in attesa, a qualunque data, e in più solo ciò che è stato risolto o chiuso negli ultimi 30 giorni. Quando qualcosa resta fuori, sopra le schede di stato compare una riga che dice quanti ticket sono nascosti e un link per vederli tutti. Niente viene cancellato."
           },
-          "t05": {
+          "t04": {
             "q": "Come gestisco le risposte rapide per i ticket?",
             "a": "Impostazioni → Macro. Crea nuove macro con titolo e testo pre-compilato. Le macro pubbliche sono visibili a tutto il team nel modulo ticket; quelle private sono visibili solo a te. Sono disponibili direttamente nella casella di risposta del ticket."
+          }
+        }
+      },
+      "integrations": {
+        "title": "Integrazioni e API",
+        "subtitle": "Chiave API e contributo dell'assistente",
+        "description": "Un sistema esterno — un sito, un gestionale, un assistente — scrive dentro Flux attraverso le rotte /api/crm/*, usando una chiave del workspace. In Analisi → Contributo dell'assistente vedi che cosa ha scritto.",
+        "topics": {
+          "t01": {
+            "q": "Come collego un programma esterno a Flux?",
+            "a": "Impostazioni → API, dove generi la chiave del workspace. Si passa come intestazione `Authorization: Bearer <chiave>` e vale solo per questo workspace: quale sia lo dice la chiave stessa, quindi chi integra non deve indicarlo altrove e non può sbagliare workspace per errore. Nella stessa pagina c'è l'identificativo di questa attività, che serve a comporre gli indirizzi dell'integrazione.\nC'è una chiave sola per workspace e la vedi una volta sola, al momento della creazione: non è rileggibile. Se la perdi ne crei un'altra, e la vecchia smette di funzionare nello stesso istante — quindi l'integrazione va aggiornata nello stesso momento. 'Revoca' la spegne subito senza crearne una nuova. Flux non registra quando una chiave è stata usata l'ultima volta: per capire se un'integrazione sta lavorando si guarda il Contributo dell'assistente."
+          },
+          "t02": {
+            "q": "Che cosa può fare una chiave API?",
+            "a": "Scrivere, non leggere. Le rotte disponibili sono tutte in POST e coprono contatti, lead, aziende, note, ordini, attività (anche collegate a un contatto, un lead, un'azienda o una trattativa), campi personalizzati, il cambio di fase di un lead, la chiusura delle trattative di una persona, l'opt-out da un recapito e la cancellazione GDPR. Quasi tutte hanno anche una versione 'bulk' per mandare più record in una volta.\n⚠️ Non esiste nessuna rotta di lettura: dall'esterno non si può rileggere un elenco di contatti o di ordini, quindi riconciliare a distanza di settimane quello che il CRM contiene davvero oggi non è possibile e va fatto dalle schermate. Una chiave equivale a un utente che può scrivere i record, non a un amministratore: non cambia impostazioni. Le chiamate sono contate sul piano del workspace, e oltre il limite la risposta è 429."
+          },
+          "t03": {
+            "q": "Che cosa risponde una richiesta con più record?",
+            "a": "Sempre 200, anche quando qualche record è stato rifiutato. Nel corpo trovi un riepilogo — totale, creati, aggiornati, saltati, errori e durata — e un elenco con una riga per ogni record mandato: la sua posizione, l'esito, l'id assegnato oppure i motivi, campo per campo, del rifiuto. Una riga sbagliata non fa fallire tutta la richiesta, quindi chi integra non deve aspettarsi un codice di errore: la risposta sta nel corpo."
+          },
+          "t04": {
+            "q": "Come ripeto una chiamata senza duplicare i dati?",
+            "a": "Mandando l'intestazione `Idempotency-Key` con un valore tuo, diverso per ogni richiesta. Serve perché una risposta che non arriva — un timeout, una connessione caduta — lascia chi chiama senza sapere se il lavoro è stato fatto, e rimandare tutto duplica quello che Flux non sa riconoscere: contatti e lead si riconoscono solo dall'email, che però è facoltativa, e le attività non si riconoscono da niente.\nCon la chiave, la prima richiesta importa e ogni ripetizione identica riceve la stessa risposta, con gli stessi id, senza scrivere niente, marcata `Idempotent-Replay: true`. La stessa chiave con un corpo diverso viene rifiutata con 422, una ancora in corso con 409, e le chiavi si dimenticano dopo trenta giorni. Senza intestazione non cambia nulla rispetto a prima. La accettano le rotte di contatti, lead, aziende, note, ordini e attività, sia singole sia bulk; non la accettano ancora il cambio di fase del lead, i campi personalizzati, la chiusura delle trattative, l'opt-out e la cancellazione."
+          },
+          "t05": {
+            "q": "Che cosa mostra la pagina 'Contributo dell'assistente'?",
+            "a": "Che cosa è entrato nel CRM dalle integrazioni, nel mese in corso: quanti record sono stati scritti, in quante richieste, quando è arrivata l'ultima, e una tabella per tipo — contatti, aziende, lead, note, attività, ordini, campi personalizzati, trattative chiuse, consensi revocati, cancellazioni. La trovi in Analisi, non dentro i Report, perché chi collega un'integrazione deve poterla controllare anche senza aver acquistato il modulo dei report.\nTre avvertenze. Conta solo le scritture arrivate dalle rotte API: quello che il team fa dentro Flux non passa di lì e non compare, quindi non è un confronto tra le persone e l'assistente. Una richiesta può scrivere molte righe — un'importazione da cinquecento contatti è una richiesta e cinquecento righe — ed è per questo che le due colonne sono separate. E una chiave identifica il workspace, non chi la usa: con due integrazioni collegate i numeri sono la loro somma. Le cancellazioni sono contate senza dire su chi, per non lasciare traccia di chi ha chiesto di sparire."
           }
         }
       },
@@ -6327,7 +6415,7 @@
         "topics": {
           "t01": {
             "q": "Quali eventi generano una notifica?",
-            "a": "Quando un task assegnato a te sta per scadere o è scaduto, quando una tua trattativa viene chiusa come vinta, quando ti viene assegnato un lead, quando parte una campagna che hai avviato. Sui ticket: quando una promessa SLA ha consumato metà del tempo e poi l'80%, così puoi ancora farci qualcosa, e alla violazione — che avvisa anche le persone del gruppo indicato nella politica, ciascuna una volta sola. Le automazioni possono aggiungerne altre."
+            "a": "Quando un task assegnato a te sta per scadere o è scaduto, quando una tua trattativa viene chiusa come vinta, quando ti viene assegnato un lead, quando parte una campagna che hai avviato, quando un contratto di cui sei titolare arriva al preavviso e quando qualcuno risponde a una sequenza. Sui preventivi: una richiesta di approvazione e l'esito che ne segue. Sui ticket: quando una promessa SLA ha consumato metà del tempo e poi l'80%, così puoi ancora farci qualcosa, e alla violazione — che avvisa anche le persone del gruppo indicato nella politica, ciascuna una volta sola. In più i messaggi in chat, i messaggi diretti e le menzioni nelle note. Le automazioni possono aggiungerne altre."
           },
           "t02": {
             "q": "Posso ricevere le notifiche anche con Flux chiuso?",
@@ -6339,7 +6427,7 @@
           },
           "t04": {
             "q": "Ricevo troppe notifiche. Posso scegliere quali?",
-            "a": "Sì, in Impostazioni → Notifiche c'è un interruttore per ogni tipo di evento. Di default arrivano solo le quattro cose che richiedono una persona subito: un lead assegnato a te, una tua attività in scadenza, un ticket vicino allo SLA e un ticket che lo ha superato. Tutto il resto — messaggi in chat, menzioni nelle note, preventivi, trattative vinte — è spento finché non lo accendi tu. C'è anche un interruttore generale che le sospende tutte senza perdere le singole scelte. La campanella dentro Flux continua a mostrare tutto in ogni caso."
+            "a": "Sì, in Impostazioni → Notifiche c'è un interruttore per ogni tipo di evento. Di default ne arrivano sei, quelle che di solito chiedono qualcuno subito: un lead assegnato a te, una tua attività in scadenza, un ticket vicino allo SLA, un ticket che lo ha superato, un contratto di cui sei titolare che arriva al preavviso e una risposta a una sequenza. Tutto il resto — messaggi in chat e diretti, menzioni nelle note, approvazioni ed esiti dei preventivi, trattative vinte — è spento finché non lo accendi tu.\nC'è anche un interruttore generale che le sospende tutte senza perdere le singole scelte. Vengono salvate solo le scelte che fai davvero, quindi un tipo di avviso aggiunto in futuro arriva com'è previsto di default invece di risultare spento senza che tu l'abbia deciso. La campanella dentro Flux continua a mostrare tutto in ogni caso."
           },
           "t05": {
             "q": "Ho detto di no al browser e ora non me lo chiede più.",
@@ -6348,6 +6436,29 @@
           "t06": {
             "q": "Come segno le notifiche come lette?",
             "a": "Clicca sull'icona campanella → si apre il pannello con le notifiche recenti. Clicca su una notifica per navigare alla pagina corrispondente (la notifica viene marcata come letta). Oppure usa 'Segna tutte come lette' per azzerarle tutte in un colpo."
+          }
+        }
+      },
+      "mobileApp": {
+        "title": "App sul telefono",
+        "subtitle": "Installazione e uso da mobile",
+        "description": "Flux si aggiunge alla schermata iniziale e si apre a schermo intero, con la sua icona e senza la barra del browser. Sotto una certa larghezza l'interfaccia cambia forma, non solo dimensione.",
+        "topics": {
+          "t01": {
+            "q": "Come installo Flux sul telefono?",
+            "a": "Apri Flux dal browser del telefono e aggiungilo alla schermata iniziale. Su Android e sui browser basati su Chrome compare la proposta 'Installa', e Flux stesso la offre una volta: se la chiudi non torna più, ma l'opzione resta nel menu del browser. Su iPhone e iPad non esiste un pulsante: si usa Condividi → 'Aggiungi a Home'. Una volta installato, Flux si apre sulla dashboard a schermo intero, e tenendo premuta l'icona trovi le scorciatoie per Pipeline, Ticket e Nuovo ordine."
+          },
+          "t02": {
+            "q": "Che cosa cambia usando Flux dal telefono?",
+            "a": "In basso compare una barra con cinque destinazioni, scelte tra quelle a cui hai accesso, mentre il menu completo resta nel pulsante in alto a sinistra — lo stesso lato da cui esce il pannello. Gli elenchi lunghi (contatti, aziende, lead, ordini, preventivi, ticket) diventano schede invece di tabelle: una tabella da nove colonne non si usa scorrendo di lato. Le finestre di dialogo si aprono a schermo intero, così la tastiera non ci finisce sopra. Dal computer torna tutto com'è: sono due disposizioni della stessa schermata, non due prodotti."
+          },
+          "t03": {
+            "q": "Flux funziona senza rete?",
+            "a": "No, e la scelta è voluta. Ogni pagina e ogni dato passano dalla rete: senza connessione compare una schermata che lo dice, invece dell'errore del browser. Nulla di quello che vedi viene tenuto sul telefono, perché una copia salvata non sa da quale workspace veniva né che ruolo avevi quando l'hai aperta, e una pipeline di venti minuti fa è peggio di nessuna pipeline — sullo schermo niente direbbe che è vecchia, e qualcuno la userebbe per parlare con un cliente. Quando esce una versione nuova Flux te lo dice e ricarica solo quando premi tu, così non si aggiorna mentre stai scrivendo un preventivo."
+          },
+          "t04": {
+            "q": "Le notifiche push funzionano sul telefono?",
+            "a": "Sì, ma su iPhone e iPad solo se hai aggiunto Flux alla schermata iniziale: Apple non le recapita a una scheda di Safari, e finché non installi l'app il pulsante per attivarle resta spento con la spiegazione. Su Android e su computer non serve installare nulla. Il permesso si dà una volta per browser e per dispositivo, quindi telefono e computer vanno attivati separatamente; si fa in Impostazioni → Notifiche, dove scegli anche quali tipi di avviso ti raggiungono e vedi l'elenco dei dispositivi registrati."
           }
         }
       },
