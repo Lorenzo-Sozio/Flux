@@ -143,6 +143,23 @@
   // sveglio ventiquattro ore su ventiquattro e ha esaurito il piano gratuito in
   // sedici giorni, senza un solo utente collegato: da lì in poi ogni pagina
   // risponde 402 e sembra un guasto dell'applicazione.
+  // ⚠️⚠️ **Come il Worker raggiunge Postgres.** Un Worker non apre una connessione TLS
+  // verso il proxy pubblico di Railway: provata sul runtime vero, la connessione in
+  // chiaro riesce e quella cifrata muore con «Connection terminated unexpectedly».
+  // Hyperdrive sta in mezzo — tiene lui le connessioni e termina il TLS — e verifica
+  // il certificato autofirmato di Railway contro la CA caricata sull'account
+  // (`wrangler cert upload`), cioè `sslmode=verify-ca`. La cache delle query è
+  // disattivata di proposito: un CRM che mostra righe vecchie di un minuto senza
+  // dirlo è peggio di un CRM lento.
+  //
+  // ⚠️ Una configurazione per database, e i binding sono statici: un nuovo workspace
+  // richiede `wrangler hyperdrive create` e un deploy. È il costo di questa scelta,
+  // scritto qui perché nessuno lo scopra il giorno del primo cliente.
+  "hyperdrive": [
+    { "binding": "HYPERDRIVE_PLATFORM", "id": "3f97155992724eb5967c8e9d3acdda1a" },
+    { "binding": "HYPERDRIVE_FLUX_DEMO", "id": "d34f1735315a41d59650ab42002d6f18" }
+  ],
+
   "triggers": {
     "crons": ["*/10 * * * *", "0 6 * * *", "0 3 * * *"]
   },

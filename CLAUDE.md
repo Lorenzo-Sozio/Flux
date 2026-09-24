@@ -497,6 +497,42 @@ the runtime has not been exercised. A deployment on Workers pointed at plain Pos
 has to be tried before it is trusted (`npm run cf:preview`), and Hyperdrive is the
 documented route if it does not.
 
+### On Workers the database is reached through Hyperdrive
+
+⚠️⚠️ **A Worker cannot open a TLS connection to a Postgres like Railway's.** Tried on
+the real runtime, twice: plaintext connects, TLS dies with "Connection terminated
+unexpectedly". So on Workers every connection goes through a **Hyperdrive** binding,
+which holds the pool and terminates the TLS itself, verifying Railway's self-signed
+certificate against a CA uploaded to the account (`wrangler cert upload`,
+`sslmode=verify-ca`). Query caching is off: a CRM that serves rows a minute old
+without saying so is worse than a slow one.
+
+One binding per database. The registry's is named `HYPERDRIVE_PLATFORM`; a workspace's
+is named after its database (`flux_demo` → `HYPERDRIVE_FLUX_DEMO`). Adding a workspace
+therefore needs `wrangler hyperdrive create` **and a deploy** — bindings are static.
+That is the cost of this arrangement, and the reason it is a stop on the way rather
+than a destination: an app beside its database (Railway, Vercel, a container) needs
+none of it.
+
+Three ways this failed silently, all of them fixed in [src/db/index.ts](src/db/index.ts):
+
+- **The binding name did not match.** The lookup derived `HYPERDRIVE_RAILWAY` from the
+  database name while the binding was `HYPERDRIVE_PLATFORM`, found nothing, and fell
+  back to the direct connection — which a Worker cannot make. A name is passed in now,
+  and the derived one is only a fallback.
+- **`require` inside the Worker.** The context was loaded with `require(...)` in a
+  function; the bundle is ESM, the call threw on every request, and the surrounding
+  `catch` turned that into "no Hyperdrive here". It is a static import.
+- **A pool reused between requests.** The socket closes with the invocation, so the
+  next request got a dead one: "Connection terminated unexpectedly" again, while a
+  hand-written `Client` in the same Worker worked. The instance is keyed to the request
+  (a `WeakMap` on the execution context) on Workers, and to the connection string
+  everywhere else.
+
+⚠️ `npm run cf:preview` and `cf:deploy` need `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_<BINDING>`
+set, or wrangler refuses to start: it wants a local database to emulate each binding.
+They are in `.dev.vars`, which is not committed.
+
 ### Tenant migrations are embedded, not read from disk
 
 ⚠️ Drizzle's migrator reads `meta/_journal.json` and the `.sql` files **at the moment it
